@@ -3,9 +3,10 @@
 Two groups live here.
 
 The **infrastructure** dependencies (`get_db`, `get_email_provider`,
-`get_rate_limiter`) exist to be overridden in tests: a session already inside
-a rolled-back transaction, a mail provider that records instead of sending, a
-limiter that counts nothing.
+`get_rate_limiter`, `get_storage_provider`, `get_job_queue`) exist to be
+overridden in tests: a session already inside a rolled-back transaction, a
+mail provider that records instead of sending, a limiter that counts nothing,
+an object store held in memory, a queue that records instead of enqueueing.
 
 The **authentication** chain is the one every protected endpoint from
 TASK-009 onward is built on, and it is deliberately a chain rather than one
@@ -39,7 +40,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated
@@ -51,6 +52,7 @@ from sqlalchemy.orm import Session
 from app.api.errors import ApiError
 from app.core.config import Settings, get_settings
 from app.core.db import get_session_factory
+from app.core.queue import JobQueue, create_job_queue
 from app.core.rate_limit import RateLimiter, RedisRateLimiter
 from app.core.redis import get_redis_client
 from app.core.tokens import (
@@ -62,6 +64,8 @@ from app.core.tokens import (
 from app.models.user import User
 from app.providers.email.base import EmailConfigurationError, EmailProvider
 from app.providers.email.factory import build_email_provider
+from app.providers.storage.base import StorageProvider
+from app.providers.storage.s3_provider import S3StorageProvider
 from app.repositories.tenant import (
     OPERATOR_ROLE,
     OWNER_ROLE,
@@ -128,6 +132,32 @@ def get_email_provider() -> EmailProvider | None:
     except EmailConfigurationError as exc:
         logger.warning("email provider unavailable: %s", exc)
         return None
+
+
+def get_storage_provider() -> StorageProvider:
+    """The configured object store, for PDF uploads."""
+    settings = get_settings()
+    return S3StorageProvider(
+        bucket=settings.s3_bucket,
+        endpoint_url=settings.s3_endpoint_url,
+        access_key=settings.s3_access_key,
+        secret_key=settings.s3_secret_key,
+        region=settings.s3_region,
+    )
+
+
+async def get_job_queue() -> AsyncIterator[JobQueue]:
+    """A Redis pool for the duration of one request.
+
+    Opened per request rather than shared, so a broken connection cannot
+    outlive the request that found it. Enqueueing happens once per upload, so
+    the extra handshake is not on any hot path.
+    """
+    queue = await create_job_queue()
+    try:
+        yield queue
+    finally:
+        await queue.close()
 
 
 # --------------------------------------------------------------- rate limit
