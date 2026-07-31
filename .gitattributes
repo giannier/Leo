@@ -1,0 +1,22 @@
+# Normalize every text file to LF, both in the repository and in the working
+# tree. This project builds and runs on Linux (Docker containers, GitHub
+# Actions runners); CRLF line endings break shell scripts, the Makefile and
+# Dockerfile RUN steps once they cross into a Linux environment. Contributors
+# on Windows keep LF locally — modern editors handle it transparently.
+* text=auto eol=lf
+
+# Files that must never be line-ending converted.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
+
+# Lockfiles are generated; collapse them in diffs and reviews.
+uv.lock            linguist-generated=true
+frontend/package-lock.json linguist-generated=true

@@ -1,0 +1,11 @@
+# Keep the Docker build context (and the image's `COPY . .` layer) free of
+# host-specific artifacts. Without this, a local `node_modules/` built for
+# Windows would overwrite the Linux-native `npm ci` install done in the image.
+node_modules
+.next
+out
+npm-debug.log*
+.git
+.env
+.env.*
+!.env.example

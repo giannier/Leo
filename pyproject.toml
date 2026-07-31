@@ -1,0 +1,23 @@
+[tool.uv.workspace]
+members = ["backend"]
+
+# mypy only searches the *current working directory* for config (it does not
+# walk up from the target path like ruff does). Verification is run as
+# `uv run mypy backend/app` from the repo root, so this mirror of
+# `backend/pyproject.toml`'s `[tool.mypy]` table is what actually applies —
+# keep both in sync.
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+no_implicit_optional = true
+strict_equality = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

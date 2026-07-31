@@ -1,0 +1,52 @@
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Node / Next.js ---------------------------------------------------------
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Env / secrets ---------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Build / editor artifacts ----------------------------------------------
+dist/
+build/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Alembic -----------------------------------------------------------
+# Migration scripts ARE tracked; only local sqlite fallback DBs are ignored.
+*.sqlite3
+
+# --- Agent tooling ----------------------------------------------------------
+# Generated skill registry and its cache; regenerated on demand, not source.
+.atl/
+
+# --- Redundant archives -----------------------------------------------------
+# Duplicates the tracked contents of leo-sdd/; would go stale immediately.
+leo-sdd-completo.zip
