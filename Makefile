@@ -1,6 +1,11 @@
-.PHONY: up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
+.PHONY: hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
 
 COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
+
+hooks: ## Install the git hooks that gate pushes to main.
+	git config core.hooksPath deploy/git-hooks
+	chmod +x deploy/git-hooks/* 2>/dev/null || true
+	@echo "core.hooksPath -> deploy/git-hooks"
 
 up: ## Start the local dev stack (Postgres, Redis, MinIO, backend, frontend).
 	$(COMPOSE) up -d --build
