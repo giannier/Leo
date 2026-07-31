@@ -77,6 +77,50 @@ jobs:
         # Includes tests/isolation/; that suite becomes a dedicated gate in TASK-004.
         run: make test
 
+  isolation:
+    name: Multi-tenant isolation
+    # A dedicated gate, not just a subset of `make test`. The Constitution
+    # requires this suite to be visible on its own so that disabling it is an
+    # obvious red status check rather than a quietly shrinking test count.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: leo
+          POSTGRES_PASSWORD: leo
+          POSTGRES_DB: leo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leo -d leo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://leo:leo@localhost:5432/leo
+      LEO_REQUIRE_DB: "1"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Apply migrations
+        run: make migrate
+
+      - name: Isolation suite
+        run: make isolation
+
   frontend:
     name: Frontend (eslint + build)
     runs-on: ubuntu-latest
@@ -112,7 +156,7 @@ jobs:
     name: CI
     # Single aggregate status check to require in branch protection, so adding a
     # job above never silently leaves a gap in the merge gate.
-    needs: [backend, frontend]
+    needs: [backend, isolation, frontend]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
