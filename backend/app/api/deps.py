@@ -64,6 +64,8 @@ from app.core.tokens import (
 from app.models.user import User
 from app.providers.email.base import EmailConfigurationError, EmailProvider
 from app.providers.email.factory import build_email_provider
+from app.providers.otp.base import OtpSender
+from app.providers.otp.console import ConsoleOtpSender
 from app.providers.storage.base import StorageProvider
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.repositories.tenant import (
@@ -178,6 +180,41 @@ def _auth_rate_limiter() -> RedisRateLimiter:
 def get_rate_limiter() -> RateLimiter:
     """The limiter guarding `/auth/*`. Overridden in tests."""
     return _auth_rate_limiter()
+
+
+@lru_cache
+def _otp_request_rate_limiter() -> RedisRateLimiter:
+    """The 3-per-hour cap on asking for a new OTP (contracts/api.md).
+
+    A second limiter rather than a tighter setting on the first, because the
+    two answer different questions. The router's 5/min is per IP and stops
+    bursts; this one is per *user* and stops a slow drip that would otherwise
+    let someone request codes all day - each one retiring the last and
+    resetting the attempt budget.
+    """
+    settings = get_settings()
+    return RedisRateLimiter(
+        get_redis_client(),
+        limit=settings.otp_request_limit,
+        window_seconds=settings.otp_request_window_seconds,
+        namespace="ratelimit:otp-request",
+    )
+
+
+def get_otp_request_limiter() -> RateLimiter:
+    """The per-user OTP request limiter. Overridden in tests."""
+    return _otp_request_rate_limiter()
+
+
+def get_otp_sender() -> OtpSender:
+    """How a one-time code reaches the customer.
+
+    Only a development sender exists: WhatsApp Business is not connected until
+    Feature 002 and no SMS provider has been approved. `ConsoleOtpSender`
+    refuses to construct outside development, so a deployment that forgets to
+    configure a real channel fails loudly instead of logging live codes.
+    """
+    return ConsoleOtpSender(environment=get_settings().environment)
 
 
 def client_identifier(request: Request, settings: Settings) -> str:
