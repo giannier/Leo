@@ -129,6 +129,10 @@ class Settings(BaseSettings):
     s3_bucket: str = "leo-storage"
     s3_region: str = "us-east-1"
 
+    # Phone OTP (contracts/api.md: 3 requests per hour)
+    otp_request_limit: int = 3
+    otp_request_window_seconds: int = 3600
+
     # Transactional email (Resend)
     resend_api_key: str | None = None
     email_from: str = "Leo <onboarding@example.com>"
