@@ -107,6 +107,27 @@ class Settings(BaseSettings):
     # Lifetime of an email verification link (data-model.md: 24h).
     email_verification_token_ttl_hours: int = 24
 
+    # --- Knowledge ingestion / RAG (TASK-012) -----------------------------
+    # Per-file upload ceiling. Clarification 011 fixes it at 10 MB; it is not
+    # a `plans` column because the clarification states it as one rule for
+    # every plan. The *aggregate* budgets (`max_rag_chars`,
+    # `max_knowledge_files`) do vary per plan and are read from that table -
+    # never from here.
+    knowledge_max_pdf_bytes: int = 10 * 1024 * 1024
+
+    # Chunking. See `app/services/chunking.py` for why these are characters
+    # and why these values stay inside the embedding model's token window.
+    knowledge_chunk_chars: int = 1000
+    knowledge_chunk_overlap_chars: int = 150
+
+    # Chunks per embedding request. Bounds the payload and the blast radius
+    # of a provider timeout; a 400-page manual would otherwise go up in one
+    # request that either succeeds entirely or has to be redone entirely.
+    knowledge_embed_batch_size: int = 32
+
+    # Default `k` for `search_knowledge`.
+    knowledge_search_default_k: int = 5
+
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 

@@ -34,6 +34,23 @@ class TenantRepository:
     def get(self, tenant_id: uuid.UUID) -> Tenant | None:
         return self._session.get(Tenant, tenant_id)
 
+    def lock(self, tenant_id: uuid.UUID) -> Tenant | None:
+        """Take a row lock on the tenant for the rest of the transaction.
+
+        The mutex for anything that has to read a per-tenant total, decide
+        against a plan limit and then write - the RAG character budget being
+        the first case. Two uploads landing together would otherwise both
+        read the same "used" figure, both find room, and both commit, putting
+        the tenant over their plan.
+
+        `SELECT ... FOR UPDATE` on the tenant row serialises them: the second
+        transaction blocks until the first commits, then reads a total that
+        already includes it. Contention is per tenant, so no two customers
+        ever wait on each other, and the lock is released by the commit that
+        makes the reservation visible - there is no window in between.
+        """
+        return self._session.get(Tenant, tenant_id, with_for_update=True)
+
     def create_trial(self, *, name: str, plan_id: str, trial_ends_at: datetime) -> Tenant:
         """Open a tenant on a trial plan.
 

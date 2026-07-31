@@ -8,13 +8,17 @@ that records what was sent.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_session_factory
+from app.core.queue import JobQueue, create_job_queue
 from app.providers.email.base import EmailConfigurationError, EmailProvider
 from app.providers.email.factory import build_email_provider
+from app.providers.storage.base import StorageProvider
+from app.providers.storage.s3_provider import S3StorageProvider
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +54,34 @@ def get_email_provider() -> EmailProvider | None:
     except EmailConfigurationError as exc:
         logger.warning("email provider unavailable: %s", exc)
         return None
+
+
+# --------------------------------------------------------------- TASK-012
+# Appended for knowledge ingestion. Both exist to be overridden in tests, the
+# same way `get_db` and `get_email_provider` above are.
+
+
+def get_storage_provider() -> StorageProvider:
+    """The configured object store, for PDF uploads."""
+    settings = get_settings()
+    return S3StorageProvider(
+        bucket=settings.s3_bucket,
+        endpoint_url=settings.s3_endpoint_url,
+        access_key=settings.s3_access_key,
+        secret_key=settings.s3_secret_key,
+        region=settings.s3_region,
+    )
+
+
+async def get_job_queue() -> AsyncIterator[JobQueue]:
+    """A Redis pool for the duration of one request.
+
+    Opened per request rather than shared, so a broken connection cannot
+    outlive the request that found it. Enqueueing happens once per upload, so
+    the extra handshake is not on any hot path.
+    """
+    queue = await create_job_queue()
+    try:
+        yield queue
+    finally:
+        await queue.close()
