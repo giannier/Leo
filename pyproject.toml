@@ -22,10 +22,10 @@ plugins = ["pydantic.mypy"]
 module = "tests.*"
 disallow_untyped_defs = false
 [[tool.mypy.overrides]]
-# boto3 and botocore ship no type information. Ignoring their imports is
+# boto3, botocore and openpyxl ship no type information. Ignoring their imports is
 # narrower than loosening strictness globally; app code that uses them is
 # still fully checked.
-module = ["boto3.*", "botocore.*"]
+module = ["boto3.*", "botocore.*", "openpyxl.*"]
 ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # passlib 1.7 predates PEP 561 and ships no `py.typed`. Confined to
