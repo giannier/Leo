@@ -18,13 +18,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from arq import cron
+
 from app.core.config import get_settings
 from app.core.db import get_session_factory
 from app.core.queue import redis_settings
+from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.workers.knowledge_indexer import index_knowledge_source
+from app.workers.trial_lifecycle import (
+    tenant_archiver,
+    trial_enforcer,
+    trial_notifier,
+    wizard_reminder,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +60,40 @@ async def startup(ctx: dict[str, Any]) -> None:
     # Embeddings are always platform-funded, never the tenant's own key -
     # see `app/models/llm_settings.py` for why that is not configurable.
     ctx["llm"] = platform_provider(settings)
-    logger.info("knowledge worker ready")
+    # The lifecycle jobs write to customers. `None` when no provider is
+    # configured, which the jobs treat as "do the state change, skip the
+    # email" rather than as a reason to fail.
+    ctx["email"] = build_email_provider(settings)
+    logger.info("worker ready")
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("llm", None)
     ctx.pop("storage", None)
     ctx.pop("pdf_extractor", None)
+    ctx.pop("email", None)
 
 
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
     functions = [index_knowledge_source]
+
+    # Times are UTC and deliberately off the hour: everything on a VPS
+    # that fires at :00 competes with everything else that fires at :00.
+    #
+    # 11:00 UTC is 06:00 in Lima - the notices land before the business
+    # day rather than in the middle of the night, which is when a customer
+    # can actually act on "your trial ends tomorrow".
+    cron_jobs = [
+        cron(trial_notifier, hour=11, minute=5),
+        # Hourly: the quota can run out at any moment, and a tenant that
+        # spent its last message at 09:05 should not keep answering free
+        # until midnight.
+        cron(trial_enforcer, minute=20),
+        cron(tenant_archiver, hour=11, minute=35),
+        cron(wizard_reminder, hour=14, minute=50),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = redis_settings()

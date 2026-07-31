@@ -27,6 +27,21 @@ TENANT_ROLES = ("owner", "tenant_admin", "operator")
 MEMBERSHIP_STATUSES = ("active", "disabled")
 INVITABLE_ROLES = ("tenant_admin", "operator")
 
+# One-shot notices, each sent at most once per tenant. The trial ones are the
+# day -3 / -1 / 0 warnings of Clarification 004; `wizard_reminder` is the
+# single nudge for an abandoned checklist.
+TRIAL_ENDING_SOON = "trial_ending_3d"
+TRIAL_ENDING_TOMORROW = "trial_ending_1d"
+TRIAL_ENDED = "trial_ended"
+WIZARD_REMINDER = "wizard_reminder"
+
+NOTIFICATION_KINDS = (
+    TRIAL_ENDING_SOON,
+    TRIAL_ENDING_TOMORROW,
+    TRIAL_ENDED,
+    WIZARD_REMINDER,
+)
+
 
 class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """A customer business account.
@@ -72,6 +87,32 @@ class TrialPhoneLock(Base, CreatedAtMixin):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
     )
+
+
+class TenantNotification(Base, CreatedAtMixin):
+    """A one-shot notice that has already been sent (TASK-019).
+
+    The trial notifier runs daily and the wizard reminder sends "un email
+    unico" (Clarification 004, contracts §jobs). Both need to know what has
+    already gone out, and a job that re-reads a date and re-decides would mail
+    the customer again on every run, after every worker restart, and twice if
+    two workers pick up the same tick.
+
+    The composite primary key *is* the guarantee. An `INSERT` either succeeds
+    or violates the key, and that violation is the answer to "was this already
+    sent?" - the same reasoning as `trial_phone_locks` and the connection
+    request indexes: let the database decide, never a check in front of it.
+    """
+
+    __tablename__ = "tenant_notifications"
+    __table_args__ = (enum_check("kind", NOTIFICATION_KINDS, "tenant_notifications_kind"),)
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
 class TenantUser(Base, UUIDPrimaryKeyMixin, TimestampMixin):

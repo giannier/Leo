@@ -140,7 +140,7 @@
   - **Depends on:** TASK-017
   - **Verification:** integration test del flujo requested→in_progress→connected/rejected; audit log presente
 
-- [ ] **TASK-019: Lifecycle del trial (jobs) + activación del agente**
+- [x] **TASK-019: Lifecycle del trial (jobs) + activación del agente**
   - **Input:** RF-004/005/006, Clarification 001/004, `contracts/api.md` (§jobs)
   - **Output:** contador `ai_messages_used` (solo canal whatsapp — hook en agent-core listo para Feature 002); jobs `trial_notifier`, `trial_enforcer` (con cierre con gracia), `tenant_archiver`, `wizard_reminder`; endpoints activate/deactivate con guards
   - **Depends on:** TASK-014, TASK-018
