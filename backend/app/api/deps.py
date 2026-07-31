@@ -47,6 +47,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
@@ -134,6 +135,16 @@ def get_email_provider() -> EmailProvider | None:
     except EmailConfigurationError as exc:
         logger.warning("email provider unavailable: %s", exc)
         return None
+
+
+def get_redis() -> Redis:
+    """The shared Redis client, for callers that keep short-lived state.
+
+    Returned rather than opened per request: `from_url` builds a connection
+    pool, so this hands out the pool and the command borrows a connection.
+    Overridden in tests with a fake.
+    """
+    return get_redis_client()
 
 
 def get_storage_provider() -> StorageProvider:
@@ -282,6 +293,7 @@ SessionDep = Annotated[Session, Depends(get_db)]
 # Optional: a deployment with no mail credential still serves requests, and
 # the endpoint reports that the message did not go out rather than failing.
 EmailProviderDep = Annotated[EmailProvider | None, Depends(get_email_provider)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 
 
