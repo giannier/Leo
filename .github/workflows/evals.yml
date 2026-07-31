@@ -1,0 +1,94 @@
+name: Evals
+
+# Its own workflow, not a job in `ci.yml`, because it is the only check that
+# costs money and can fail for a reason nobody in this repository caused - a
+# vendor changing a model. Keeping it separate means a slow or throttled
+# provider never blocks an unrelated pull request.
+#
+# The Constitution: "No cambiar prompts del agente en producción sin correr
+# los evals." So this runs whenever anything the agent's behaviour depends on
+# changes, and only then.
+on:
+  pull_request:
+    paths:
+      - "backend/app/agent/**"
+      - "backend/evals/**"
+      - "backend/app/providers/llm/**"
+      - ".github/workflows/evals.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/agent/**"
+      - "backend/evals/**"
+      - "backend/app/providers/llm/**"
+  # Runnable by hand, for checking whether a vendor changed a model under us
+  # without any of our own code moving.
+  workflow_dispatch:
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  golden-conversations:
+    name: Golden conversations
+    runs-on: ubuntu-latest
+    # Generous: five conversations against a free-tier provider, each with up
+    # to three model round trips, plus retries for a blip.
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: leo
+          POSTGRES_PASSWORD: leo
+          POSTGRES_DB: leo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leo -d leo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://leo:leo@localhost:5432/leo
+      LEO_REQUIRE_DB: "1"
+      # Turns "no credential" into a failure rather than a skipped suite. An
+      # eval run that silently skips is worse than none: it still shows green,
+      # and the whole point is to block a prompt change that regressed.
+      LEO_REQUIRE_LLM: "1"
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fail early if the credential is missing
+        # Checked before spending three minutes on setup, and with the fix
+        # named rather than left as a stack trace to interpret.
+        run: |
+          if [ -z "${NVIDIA_API_KEY}" ]; then
+            echo "::error::NVIDIA_API_KEY is not set."
+            echo "The evals run the real model - a mocked eval asserts nothing."
+            echo "Add it at Settings > Secrets and variables > Actions > New repository secret."
+            exit 1
+          fi
+          echo "credential present (${#NVIDIA_API_KEY} characters)"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Apply migrations
+        run: make migrate
+
+      - name: Golden conversations
+        run: make evals
