@@ -14,8 +14,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_email_provider
+from app.api.deps import get_db, get_email_provider, get_rate_limiter
 from app.core.config import get_settings
+from app.core.rate_limit import NullRateLimiter, RateLimiter
 from app.providers.email.base import EmailProvider
 from app.providers.email.mock import MockEmailProvider
 
@@ -76,10 +77,19 @@ async def api(app: FastAPI, db: Session, mail: MockEmailProvider) -> AsyncIterat
     makes this work: a service that commits releases a savepoint, and one
     that rolls back returns to it, both without touching the outer
     transaction the fixture owns.
+
+    Rate limiting is switched off here. Every test shares one client address,
+    and the `/auth/*` allowance is five requests per minute per address, so
+    the real limiter would start refusing requests partway through the suite
+    for reasons that have nothing to do with what is being tested - and which
+    test failed would depend on execution order. The limiter has its own
+    tests, which install it explicitly: `test_auth_rate_limit.py`.
     """
     provider: EmailProvider = mail
+    limiter: RateLimiter = NullRateLimiter()
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_email_provider] = lambda: provider
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
