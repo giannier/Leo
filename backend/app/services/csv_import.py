@@ -1,4 +1,4 @@
-"""Parse a product catalogue out of a spreadsheet export.
+"""Parse a product catalogue out of a spreadsheet export (CSV or XLSX).
 
 This code reads files a stranger uploaded, so most of it is about the ways a
 real one is wrong rather than the happy path.
@@ -28,8 +28,11 @@ from __future__ import annotations
 import csv
 import io
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+
+import openpyxl
 
 # Bounds an upload before any of it is parsed. Generous for a real catalogue,
 # small enough that a hostile file cannot exhaust memory.
@@ -175,20 +178,80 @@ def _normalise_header(cell: str) -> str:
     return _HEADER_ALIASES.get(cell.strip().lower().lstrip("﻿"), "")
 
 
+def _is_xlsx(raw: bytes) -> bool:
+    """XLSX is a zip archive; CSV never starts with the local-file signature."""
+    return raw[:4] == b"PK\x03\x04"
+
+
+def _read_xlsx(raw: bytes) -> list[list[str]]:
+    """Rows from the first worksheet, as strings.
+
+    `read_only=True` streams the sheet instead of building the whole object
+    graph, which is what keeps a wide workbook from becoming a memory problem
+    - an XLSX is a zip, so five compressed megabytes can be far more once
+    expanded, and the byte ceiling alone does not bound that.
+
+    `data_only=True` returns the values Excel last calculated rather than
+    formula text. That is what the customer sees on screen, and it means a
+    `=A1*2` cell arrives as a number instead of as a string this parser would
+    have to treat as hostile. A cell that is *literally* text beginning with
+    `=` still reaches `neutralise_formula` like any other.
+    """
+    try:
+        workbook = openpyxl.load_workbook(
+            io.BytesIO(raw), read_only=True, data_only=True, keep_links=False
+        )
+    except Exception as exc:  # openpyxl raises a wide variety on a bad file
+        raise ImportError_("invalid_xlsx") from exc
+
+    try:
+        sheet = workbook.worksheets[0]
+    except IndexError as exc:
+        raise ImportError_("empty_file") from exc
+
+    rows: list[list[str]] = []
+    try:
+        for index, row in enumerate(sheet.iter_rows(values_only=True)):
+            # +1 for the header. Bounded here as well as in the row loop
+            # below, because iteration itself is what a decompression bomb
+            # makes expensive.
+            if index > MAX_ROWS:
+                break
+            rows.append(
+                ["" if cell is None else str(cell) for cell in row[: len(CANONICAL_COLUMNS) + 5]]
+            )
+    finally:
+        workbook.close()
+
+    if not rows:
+        raise ImportError_("empty_file")
+    return rows
+
+
 def parse_catalogue(raw: bytes) -> ParsedCatalogue:
     """Turn an uploaded file into rows to create and rows to report.
+
+    Accepts CSV and XLSX, detected by content rather than by the filename the
+    browser supplied - a customer who renames `catalogo.xlsx` to `.csv` should
+    still get their products, and an attacker's extension proves nothing.
 
     Partial success by design (plan.md): a customer with 500 products and
     three bad prices gets 497 imported and a list of three, not a rejection.
     """
     if len(raw) > MAX_BYTES:
         raise ImportError_("file_too_large")
-
-    text = decode(raw)
-    if not text.strip():
+    if not raw.strip():
         raise ImportError_("empty_file")
 
-    reader = csv.reader(io.StringIO(text), delimiter=sniff_delimiter(text))
+    if _is_xlsx(raw):
+        rows = iter(_read_xlsx(raw))
+    else:
+        text = decode(raw)
+        if not text.strip():
+            raise ImportError_("empty_file")
+        rows = iter(csv.reader(io.StringIO(text), delimiter=sniff_delimiter(text)))
+
+    reader: Iterator[list[str]] = rows
     try:
         header = next(reader)
     except StopIteration as exc:

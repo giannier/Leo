@@ -203,3 +203,108 @@ class TestResourceLimits:
     def test_an_enormous_field_is_rejected_not_truncated(self) -> None:
         parsed = parse_catalogue(_csv(f"{'x' * 5000},,10.00,,"))
         assert parsed.invalid[0].reason == "nombre_demasiado_largo"
+
+
+def _xlsx(rows: list[list[object]]) -> bytes:
+    """Build a real workbook in memory, so the test exercises openpyxl."""
+    import io
+
+    import openpyxl
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    for row in rows:
+        sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+class TestXlsx:
+    """The contract says CSV/XLSX; plan.md said CSV. Giannier settled it in
+    favour of the contract, so openpyxl is now an approved dependency."""
+
+    def test_a_workbook_is_parsed(self) -> None:
+        raw = _xlsx(
+            [
+                ["nombre", "descripcion", "precio", "stock", "categoria"],
+                ["Lomo saltado", "rico", 32.0, 4, "Platos"],
+            ]
+        )
+        parsed = parse_catalogue(raw)
+        assert parsed.valid_rows == 1
+        assert parsed.valid[0]["name"] == "Lomo saltado"
+        assert parsed.valid[0]["price"] == "32.00"
+
+    def test_the_format_is_detected_by_content_not_filename(self) -> None:
+        """A customer who renames catalogo.xlsx to .csv still gets their
+        products, and an attacker's extension proves nothing."""
+        raw = _xlsx([["nombre", "precio"], ["Lomo", 32.0]])
+        assert raw[:4] == b"PK\x03\x04"
+        assert parse_catalogue(raw).valid_rows == 1
+
+    def test_numeric_cells_keep_their_value(self) -> None:
+        """Excel stores 32.5 as a float; it must not arrive as '32.5000001'."""
+        raw = _xlsx([["nombre", "precio"], ["X", 32.5]])
+        assert parse_catalogue(raw).valid[0]["price"] == "32.50"
+
+    def test_empty_cells_become_empty_strings(self) -> None:
+        raw = _xlsx([["nombre", "precio", "categoria"], ["X", 10.0, None]])
+        assert parse_catalogue(raw).valid[0]["category"] is None
+
+    def test_a_literal_text_cell_that_looks_like_a_formula_is_neutralised(self) -> None:
+        """The genuinely hostile shape, and it has to be built deliberately.
+
+        Assigning `"=..."` through openpyxl makes a *formula* cell, not a text
+        one. An attacker writes the cell with its type forced to string, so it
+        survives as literal text and is re-interpreted as a formula by
+        whoever opens the export later.
+        """
+        import io
+
+        import openpyxl
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(["nombre", "precio"])
+        sheet.append(["placeholder", 10.0])
+        cell = sheet.cell(row=2, column=1)
+        cell.value = "=cmd|'/c calc'!A1"
+        cell.data_type = "s"  # literal string, not a formula
+        buffer = io.BytesIO()
+        workbook.save(buffer)
+
+        parsed = parse_catalogue(buffer.getvalue())
+        assert str(parsed.valid[0]["name"]).startswith("'")
+
+    def test_an_uncalculated_formula_reads_as_empty(self) -> None:
+        """Documented behaviour, not an accident.
+
+        `data_only=True` returns the value Excel last calculated. A workbook
+        built by a script and never opened in Excel has no cached values, so
+        every formula cell arrives as None and its row fails validation.
+
+        That is the safe direction - no formula text ever reaches the database
+        - but it means such a file imports as "nombre_vacio" on every row,
+        which is confusing without this note. Worth surfacing better if a real
+        customer ever hits it.
+        """
+        raw = _xlsx([["nombre", "precio"], ["=1+1", 10.0]])
+        parsed = parse_catalogue(raw)
+        assert parsed.valid_rows == 0
+        assert parsed.invalid[0].reason == "nombre_vacio"
+
+    def test_a_corrupt_workbook_is_reported_not_crashed(self) -> None:
+        raw = b"PK\x03\x04" + b"garbage that is not a zip directory"
+        with pytest.raises(ImportError_, match="invalid_xlsx"):
+            parse_catalogue(raw)
+
+    def test_spanish_headers_work_in_xlsx_too(self) -> None:
+        raw = _xlsx([["producto", "precio", "cantidad"], ["Lomo", 32.0, 4]])
+        assert parse_catalogue(raw).valid_rows == 1
+
+    def test_row_numbers_still_match_the_customers_editor(self) -> None:
+        raw = _xlsx([["nombre", "precio"], ["Bueno", 10.0], ["Malo", "gratis"]])
+        parsed = parse_catalogue(raw)
+        assert parsed.valid_rows == 1
+        assert parsed.invalid[0].row == 3

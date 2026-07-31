@@ -37,6 +37,11 @@ dependencies = [
   # Starlette cannot parse the upload the contract requires without it. Pure
   # Python, no dependencies; the parser FastAPI itself documents for `UploadFile`.
   "python-multipart>=0.0.9",
+  # XLSX import. Not in plan.md - which says "Import CSV" where
+  # contracts/api.md says "CSV/XLSX" - approved by Giannier on 2026-07-31 to
+  # settle that in favour of the contract. Pure Python, reads the sheet in
+  # read-only streaming mode so a large workbook is not held in memory.
+  "openpyxl>=3.1",
 ]
 
 [dependency-groups]
@@ -88,10 +93,10 @@ plugins = ["pydantic.mypy"]
 module = "tests.*"
 disallow_untyped_defs = false
 [[tool.mypy.overrides]]
-# boto3 and botocore ship no type information. Ignoring their imports is
+# boto3, botocore and openpyxl ship no type information. Ignoring their imports is
 # narrower than loosening strictness globally; app code that uses them is
 # still fully checked.
-module = ["boto3.*", "botocore.*"]
+module = ["boto3.*", "botocore.*", "openpyxl.*"]
 ignore_missing_imports = true
 [[tool.mypy.overrides]]
 # passlib 1.7 predates PEP 561 and ships no `py.typed`. Confined to
