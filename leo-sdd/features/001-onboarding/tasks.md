@@ -106,7 +106,7 @@
 
 ## Phase 3: Agent-core v0 + Sandbox
 
-- [ ] **TASK-014: Agent-core v0 — motor y registro de tools**
+- [x] **TASK-014: Agent-core v0 — motor y registro de tools**
   - **Input:** `constitution.md` (principios del agente), Clarification 010, TASK-005/012
   - **Output:** builder de system prompt desde config del tenant (identidad, tono, restricciones, reglas de escalamiento, horarios); loop LLM+tools con registro de tools; tools `consultar_catalogo` y `consultar_conocimiento`; guardrail "no inventar" (instrucción + fallback a escalamiento); persistencia de `agent_traces`
   - **Depends on:** TASK-012, TASK-013
