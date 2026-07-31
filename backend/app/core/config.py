@@ -5,12 +5,13 @@ only. Production values must be supplied via the real environment (or a
 non-committed `.env`), never hardcoded.
 """
 
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production", "test"]
 
@@ -189,7 +190,36 @@ class Settings(BaseSettings):
     knowledge_search_default_k: int = 5
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # `NoDecode` turns off pydantic-settings' JSON decoding for this field.
+    # Without it the environment source parses the value before any
+    # validator runs, so the one below never sees the raw string.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, value: object) -> object:
+        """Accept a comma-separated list, not only JSON.
+
+        pydantic-settings parses a `list[str]` from the environment as JSON,
+        so `CORS_ORIGINS=http://localhost:3000` raises at startup and
+        `CORS_ORIGINS=["http://localhost:3000"]` is required instead. Nobody
+        writes the second form by hand, `deploy/env.reference` documented the
+        first, and the failure is a `SettingsError` during import - which
+        looks like a broken build rather than a typo in a config file.
+
+        JSON still works, so an existing deployment written that way keeps
+        working.
+        """
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            # Still accept the JSON form, so a deployment already written
+            # that way keeps working.
+            return json.loads(text)
+        return [origin.strip() for origin in text.split(",") if origin.strip()]
 
     @property
     def is_deployed(self) -> bool:
