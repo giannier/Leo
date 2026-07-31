@@ -30,6 +30,10 @@ _password_context = CryptContext(schemes=["argon2"], deprecated="auto")
 # make guessing pointless while still fitting in a query string.
 TOKEN_ENTROPY_BYTES = 32
 
+# Six digits is what a customer can be read over the phone and retype. It is
+# deliberately weak entropy, contained by the attempt cap and the expiry.
+OTP_DIGITS = 6
+
 
 def hash_password(password: str) -> str:
     """Derive the storable Argon2id hash of a plaintext password."""
@@ -57,6 +61,20 @@ def generate_token() -> str:
 def hash_token(token: str) -> str:
     """Digest a token for storage and for lookup."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_otp_code(digits: int = OTP_DIGITS) -> str:
+    """Return a numeric one-time code, zero-padded to `digits`.
+
+    Six digits is only ~20 bits, so unlike the tokens above this one *is*
+    guessable - which is why the attempt cap and the ten-minute expiry in
+    `OtpService` are load-bearing rather than merely tidy. `secrets` is still
+    used over `random` so the sequence cannot be predicted from earlier codes.
+
+    Zero-padding matters: dropping a leading zero would silently produce a
+    five-digit code that no longer matches what the customer was told.
+    """
+    return f"{secrets.randbelow(10**digits):0{digits}d}"
 
 
 def tokens_match(token: str, token_hash: str) -> bool:
