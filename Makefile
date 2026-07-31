@@ -1,4 +1,4 @@
-.PHONY: up down test isolation evals lint format migrate front-install front-lint front-build front-dev
+.PHONY: up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
 
 COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
 
@@ -28,6 +28,9 @@ format: ## Auto-fix lint issues and reformat.
 
 migrate: ## Apply all pending Alembic migrations.
 	uv run --directory backend alembic upgrade head
+
+worker: ## Run the ARQ worker (knowledge indexing). Needs Redis.
+	uv run --directory backend arq app.workers.settings.WorkerSettings
 
 front-install: ## Install frontend dependencies.
 	cd frontend && npm install
