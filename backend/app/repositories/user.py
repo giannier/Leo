@@ -15,13 +15,14 @@ reach a tenant-scoped table, it belongs in a `BaseRepository` instead.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, select, update
 from sqlalchemy.orm import Session
 
-from app.models.user import EmailToken, User
+from app.models.user import EmailToken, RefreshToken, User
 
 VERIFY_EMAIL = "verify_email"
 
@@ -145,3 +146,75 @@ class EmailTokenRepository:
         result = cast("CursorResult[Any]", self._session.execute(statement))
         self._session.flush()
         return result.rowcount
+
+
+class RefreshTokenRepository:
+    """Rotating session tokens. Only digests are ever stored or compared."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def issue(
+        self,
+        *,
+        user_id: uuid.UUID,
+        family_id: uuid.UUID,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> RefreshToken:
+        token = RefreshToken(
+            user_id=user_id,
+            family_id=family_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self._session.add(token)
+        self._session.flush()
+        return token
+
+    def find_by_hash(self, token_hash: str) -> RefreshToken | None:
+        """The row with this digest, *whatever its state*.
+
+        Deliberately does not filter out revoked or expired rows, unlike
+        `EmailTokenRepository.find_usable`. Reuse detection is the whole point
+        of rotation, and a query that hid revoked rows would report a replayed
+        token as merely unknown - which is exactly the case that has to be
+        treated as a theft.
+        """
+        statement = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def revoke(self, token: RefreshToken, *, at: datetime) -> None:
+        """Retire one link. Idempotent: an earlier revocation is kept."""
+        if token.revoked_at is None:
+            token.revoked_at = at
+        self._session.flush()
+
+    def revoke_family(self, family_id: uuid.UUID, *, at: datetime) -> int:
+        """Retire every live link of one session chain. Returns how many.
+
+        A bulk `UPDATE`, not a loop over ORM objects: this runs while
+        answering a request that has already been identified as a probable
+        token theft, and the number of rows is unbounded (one per rotation
+        the chain has been through).
+        """
+        statement = (
+            update(RefreshToken)
+            .where(
+                RefreshToken.family_id == family_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=at)
+        )
+        result = cast("CursorResult[Any]", self._session.execute(statement))
+        self._session.flush()
+        return result.rowcount
+
+    def live_tokens_for(self, user_id: uuid.UUID, *, now: datetime) -> Sequence[RefreshToken]:
+        """Every still-usable token of one user. Used by tests and TASK-009."""
+        statement = select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+        return self._session.execute(statement).scalars().all()

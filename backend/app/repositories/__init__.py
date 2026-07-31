@@ -13,11 +13,17 @@ from app.repositories.knowledge import (
 from app.repositories.plan import PlanRepository
 from app.repositories.product import ProductRepository
 from app.repositories.tenant import (
+    TenantMembership,
     TenantRepository,
     TenantUserRepository,
     TrialPhoneLockRepository,
+    UserMembershipRepository,
 )
-from app.repositories.user import EmailTokenRepository, UserRepository
+from app.repositories.user import (
+    EmailTokenRepository,
+    RefreshTokenRepository,
+    UserRepository,
+)
 
 __all__ = [
     "AgentTraceRepository",
@@ -29,9 +35,12 @@ __all__ = [
     "MessageRepository",
     "PlanRepository",
     "ProductRepository",
+    "RefreshTokenRepository",
+    "TenantMembership",
     "TenantRepository",
     "TenantScopeError",
     "TenantUserRepository",
     "TrialPhoneLockRepository",
+    "UserMembershipRepository",
     "UserRepository",
 ]

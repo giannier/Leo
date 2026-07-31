@@ -124,13 +124,28 @@ CREATE TABLE email_tokens (
 CREATE TABLE refresh_tokens (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id),
+  family_id   UUID NOT NULL,                        -- cadena de rotación (migración 0004)
   token_hash  TEXT NOT NULL UNIQUE,
   expires_at  TIMESTAMPTZ NOT NULL,                 -- 30 días, rotativo
   revoked_at  TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX ix_refresh_tokens_family_id ON refresh_tokens(family_id);
 ```
+
+**`family_id` (añadido en TASK-007, migración 0004).** Cada uso del refresh token
+lo revoca y emite un sucesor, así que un inicio de sesión deja una cadena de filas:
+una viva y el resto revocadas. `family_id` se acuña en el login y se copia a cada
+sucesor, de modo que la cadena es identificable.
+
+Existe para hacer **detectable el robo**. Un token robado es indistinguible del
+original; la señal no es el token sino el *uso duplicado*: quien rote en segundo
+lugar presenta una fila ya revocada. En ese punto no hay forma de distinguir a la
+víctima del ladrón, así que se revoca la familia completa y ambos vuelven a pasar
+por la contraseña. Sin `family_id` la alternativa sería no revocar nada (el robo
+pasa inadvertido) o revocar todas las sesiones del usuario, incluidas las de
+dispositivos que nunca estuvieron involucrados.
 
 ### business_profiles
 ```sql
