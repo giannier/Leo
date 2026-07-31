@@ -35,14 +35,22 @@ class BaseRepository[ModelT: Base]:
 
     model: ClassVar[type[Any]]
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
+    def __init_subclass__(cls, *, abstract: bool = False, **kwargs: Any) -> None:
         """Reject repositories whose model is not tenant-scoped.
 
         Catching this at class-definition time means a mistake surfaces the
         first time the module is imported - including in CI - rather than as
         a silent full-table read in production.
+
+        `abstract=True` exempts an intermediate base that exists only to share
+        behaviour between real repositories and binds no model of its own. It
+        must be stated explicitly: silently skipping any subclass without a
+        `model` would turn a forgotten attribute - the exact mistake this
+        guard exists to catch - into a pass.
         """
         super().__init_subclass__(**kwargs)
+        if abstract:
+            return
         model = getattr(cls, "model", None)
         if model is None:
             raise TypeError(f"{cls.__name__} must define a `model` attribute")

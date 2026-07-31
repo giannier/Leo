@@ -68,7 +68,9 @@ class BusinessProfile(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        # See TimestampMixin: `now()` is transaction-scoped and would stamp
+        # two writes in one transaction identically.
+        onupdate=func.clock_timestamp(),
     )
 
 
@@ -106,7 +108,9 @@ class AgentConfig(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        # See TimestampMixin: `now()` is transaction-scoped and would stamp
+        # two writes in one transaction identically.
+        onupdate=func.clock_timestamp(),
     )
 
 
