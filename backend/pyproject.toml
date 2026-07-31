@@ -110,9 +110,10 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
-addopts = "-ra -m 'not slow'"
+addopts = "-ra -m 'not slow and not evals'"
 markers = [
   "slow: hits a real third-party provider over the network; excluded by default",
+  "evals: golden agent conversations against a real model; run with `make evals`",
 ]
 
 [tool.coverage.run]
