@@ -135,6 +135,10 @@ class SandboxService:
 
         # `tenants.ai_messages_used` is deliberately untouched: the sandbox is
         # free and unmetered, during the trial and after (Clarification 002).
+        # The real channel meters through `app.services.trial.record_ai_message`
+        # and gates on `agent_may_reply`; Feature 002 calls both from the
+        # webhook. Neither belongs here, and neither belongs inside `AgentCore`
+        # either - putting them there would meter the sandbox by accident.
         self._session.commit()
 
         return SandboxTurn(

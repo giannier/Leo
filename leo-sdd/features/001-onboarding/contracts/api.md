@@ -59,7 +59,10 @@ Roles: owner, tenant_admin. Cálculo en tiempo real (Clarification 009).
   "sandbox_ready": false, "activation_ready": false }
 ```
 
-### POST /tenant/agent/activate  → `204` | `409 checklist_incomplete` | `409 number_not_connected`
+### POST /tenant/agent/activate  → `204` | `409 checklist_incomplete` | `409 number_not_connected` | `409 tenant_not_active`
+`tenant_not_active` se agrego en TASK-019: un tenant `paused` o `archived` no puede activar.
+Aceptarlo dejaria el panel mostrando un agente activo que no responde a nadie, porque es la
+pausa la que lo detiene.
 ### POST /tenant/agent/deactivate → `204`
 Roles: owner, tenant_admin.
 
