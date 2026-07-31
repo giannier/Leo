@@ -83,7 +83,7 @@
   - **Parallel:** Sí (con TASK-011/012)
   - **Verification:** unit tests de validación; test de last-write-wins con aviso
 
-- [ ] **TASK-011: Catálogo — CRUD + importación CSV/XLSX con preview**
+- [x] **TASK-011: Catálogo — CRUD + importación CSV/XLSX con preview**
   - **Input:** `contracts/api.md` (§productos)
   - **Output:** CRUD soft-delete; parser de import con preview en Redis (expira 1h), confirmación, reporte de filas inválidas; plantilla CSV descargable
   - **Depends on:** TASK-007
