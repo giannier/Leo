@@ -76,7 +76,7 @@
 
 ## Phase 2: Wizard, Catálogo y Conocimiento
 
-- [ ] **TASK-010: Perfil de negocio + configuración del agente (API)**
+- [x] **TASK-010: Perfil de negocio + configuración del agente (API)**
   - **Input:** `contracts/api.md`, `data-model.md`
   - **Output:** GET/PUT de business-profile y agent-config con validaciones y `updated_at` para concurrencia
   - **Depends on:** TASK-007
