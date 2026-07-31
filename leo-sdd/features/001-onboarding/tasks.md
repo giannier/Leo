@@ -96,7 +96,7 @@
   - **Depends on:** TASK-004, TASK-005
   - **Verification:** integration test de ingesta e indexación; PDF sin texto → `failed` con mensaje; límite excedido → 413 con uso
 
-- [ ] **TASK-013: Métodos de pago del negocio + checklist de activación**
+- [x] **TASK-013: Métodos de pago del negocio + checklist de activación**
   - **Input:** `contracts/api.md`, Clarification 009
   - **Output:** CRUD de payment-methods; `ActivationChecklistService` puro con los 6 ítems y flags `sandbox_ready`/`activation_ready`; endpoint del checklist
   - **Depends on:** TASK-010, TASK-011
