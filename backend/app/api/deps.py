@@ -279,6 +279,9 @@ class Principal:
 
 
 SessionDep = Annotated[Session, Depends(get_db)]
+# Optional: a deployment with no mail credential still serves requests, and
+# the endpoint reports that the message did not go out rather than failing.
+EmailProviderDep = Annotated[EmailProvider | None, Depends(get_email_provider)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 
 
