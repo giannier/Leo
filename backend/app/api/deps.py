@@ -71,6 +71,8 @@ from app.providers.otp.base import OtpSender
 from app.providers.otp.console import ConsoleOtpSender
 from app.providers.storage.base import StorageProvider
 from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.whatsapp.base import WhatsAppProvider
+from app.providers.whatsapp.manual_ycloud import ManualYCloudProvider
 from app.repositories.tenant import (
     OPERATOR_ROLE,
     OWNER_ROLE,
@@ -254,6 +256,17 @@ def get_platform_llm() -> LLMProvider:
     return platform_provider()
 
 
+def get_whatsapp_provider() -> WhatsAppProvider:
+    """The adapter that validates a number's credentials.
+
+    v1 has exactly one, and it connects nothing: a person does the provider
+    work by hand (Clarification 007). The dependency exists so Feature 002 can
+    swap in the real YCloud client without the admin router noticing, and so a
+    test can substitute a provider that rejects.
+    """
+    return ManualYCloudProvider()
+
+
 def get_otp_sender() -> OtpSender:
     """How a one-time code reaches the customer.
 
@@ -336,6 +349,7 @@ SandboxLimiterDep = Annotated[RateLimiter, Depends(get_sandbox_limiter)]
 # invisible to `dependency_overrides`, so tests would silently reach the
 # real provider - which is exactly what happened before this was a Depends.
 PlatformLLMDep = Annotated[LLMProvider, Depends(get_platform_llm)]
+WhatsAppProviderDep = Annotated[WhatsAppProvider, Depends(get_whatsapp_provider)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 
 
@@ -470,6 +484,38 @@ def require_roles(*roles: str) -> Callable[[Principal], Principal]:
 # `MemberDep` is `CurrentPrincipalDep` rather than `require_roles(*ANY_MEMBER)`
 # because resolving an active membership *is* the check at that level - a
 # second pass over a set containing every role would only be ceremony.
+async def get_platform_admin(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """A platform operator, acting across every tenant.
+
+    The deliberate exception to tenant scoping, and the only one. Everything
+    else in this application is confined to one business by construction;
+    this is the seam where Giannier connects numbers and extends trials, and
+    it necessarily sees all of them.
+
+    Because of that it is built on `get_current_user` rather than on
+    `get_current_principal`: a platform admin has no active tenant and does
+    not need a membership. Requiring one would either fail for a legitimate
+    operator or, worse, invite somebody to give the admin account memberships
+    everywhere - which is the same authority with none of the auditing.
+
+    `is_platform_admin` is read from the database on every request, never from
+    the token, exactly as roles are: revoking it must take effect now, not
+    within the access token's fifteen minutes.
+    """
+    if not user.is_platform_admin:
+        # 404-shaped rather than 403: the existence of the admin surface is
+        # not something an ordinary account should be able to confirm.
+        raise ApiError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            error="not_found",
+            message="Not found.",
+        )
+    return user
+
+
 MemberDep = CurrentPrincipalDep
 ConfigurationManagerDep = Annotated[Principal, Depends(require_roles(*MANAGES_CONFIGURATION))]
 AccountOwnerDep = Annotated[Principal, Depends(require_roles(*OWNS_THE_ACCOUNT))]
+PlatformAdminDep = Annotated[User, Depends(get_platform_admin)]
