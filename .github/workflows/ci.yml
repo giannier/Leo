@@ -18,6 +18,31 @@ jobs:
     name: Backend (ruff + mypy + pytest)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    services:
+      postgres:
+        # pgvector image, not plain postgres: migration 0001 creates the
+        # `vector` extension and the suite round-trips a real embedding.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: leo
+          POSTGRES_PASSWORD: leo
+          POSTGRES_DB: leo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leo -d leo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # No .env file exists in CI, so this is set explicitly rather than
+      # relying on the defaults baked into Settings.
+      DATABASE_URL: postgresql+psycopg://leo:leo@localhost:5432/leo
+      # Turn "database unreachable" into a failure instead of a skipped suite.
+      LEO_REQUIRE_DB: "1"
+
     steps:
       - uses: actions/checkout@v7
 
@@ -41,6 +66,12 @@ jobs:
         # `make lint` = ruff check + ruff format --check + mypy (strict).
         # Runs from the repo root so mypy picks up the root [tool.mypy] table.
         run: make lint
+
+      - name: Apply migrations
+        # The schema under test is the one the migration produces, never
+        # metadata.create_all() - that would let the models and the migration
+        # drift apart while the suite stayed green.
+        run: make migrate
 
       - name: Tests
         # Includes tests/isolation/; that suite becomes a dedicated gate in TASK-004.
