@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from app.core.config import Settings, get_settings
 from app.providers.email.base import EmailConfigurationError, EmailProvider
+from app.providers.email.console import ConsoleEmailProvider
 from app.providers.email.resend_provider import ResendEmailProvider
 
 
@@ -21,10 +22,17 @@ def build_email_provider(settings: Settings | None = None) -> EmailProvider:
     client, which is not the same as swallowing it here.
     """
     settings = settings or get_settings()
-    if not settings.resend_api_key:
-        raise EmailConfigurationError(
-            "RESEND_API_KEY is not set, so no transactional email can be sent. "
-            "Set it in .env (or the deployment environment) to enable email "
-            "verification."
-        )
-    return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
+    if settings.resend_api_key:
+        return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
+
+    # No credential. In development that is the normal case - the console
+    # provider logs the verification link so the flow stays walkable with no
+    # external service. Anywhere else it is a misconfiguration, and
+    # `ConsoleEmailProvider` refuses to construct, so this still raises.
+    if not settings.is_deployed:
+        return ConsoleEmailProvider(environment=settings.environment)
+
+    raise EmailConfigurationError(
+        "RESEND_API_KEY is not set, so no transactional email can be sent. "
+        "Set it in the deployment environment to enable email verification."
+    )
