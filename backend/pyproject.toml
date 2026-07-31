@@ -80,6 +80,12 @@ disallow_untyped_defs = false
 # still fully checked.
 module = ["boto3.*", "botocore.*"]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+# passlib 1.7 predates PEP 561 and ships no `py.typed`. Confined to
+# `app/core/security.py`, which annotates every value it gets back so the
+# `Any` does not escape into the rest of the codebase.
+module = ["passlib.*"]
+ignore_missing_imports = true
 
 
 [tool.pytest.ini_options]
