@@ -1,4 +1,4 @@
-.PHONY: env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
+.PHONY: simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
 
 COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
 
@@ -33,6 +33,9 @@ lint: ## Ruff (check + format) + mypy, matching CI.
 format: ## Auto-fix lint issues and reformat.
 	uv run ruff check backend --fix
 	uv run ruff format backend
+
+simulate-trial: ## Walk a tenant through a whole 14-day trial in seconds.
+	uv run --directory backend python -m scripts.simulate_trial
 
 migrate: ## Apply all pending Alembic migrations.
 	uv run --directory backend alembic upgrade head
