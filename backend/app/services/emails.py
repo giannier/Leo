@@ -91,3 +91,63 @@ El equipo de Leo
         html=html_body,
         text=text_body,
     )
+
+
+INVITATION_SUBJECT = "Te invitaron a un equipo en Leo"
+
+
+def build_invitation_email(
+    *,
+    to: str,
+    tenant_name: str,
+    inviter_name: str,
+    accept_url: str,
+    expires_in_days: int,
+) -> EmailMessage:
+    """The "join this team" message sent by `POST /tenant/team/invitations`.
+
+    `tenant_name` and `inviter_name` are customer-supplied and `accept_url`
+    carries a token, so all three are escaped before reaching the HTML body.
+    The plain-text alternative needs no escaping, and exists so the link stays
+    usable in clients that block HTML.
+
+    The business and the person are both named on purpose: an invitation that
+    says only "you have been invited" is indistinguishable from phishing, and
+    the recipient has no way to decide whether to trust it.
+    """
+    safe_tenant = escape(tenant_name)
+    safe_inviter = escape(inviter_name)
+    safe_url = escape(accept_url, quote=True)
+    validity = f"{expires_in_days} dias" if expires_in_days != 1 else "1 dia"
+
+    html_body = f"""\
+<p>Hola,</p>
+<p><strong>{safe_inviter}</strong> te invito a unirte al equipo de
+<strong>{safe_tenant}</strong> en Leo.</p>
+<p><a href="{safe_url}">Aceptar la invitacion</a></p>
+<p>El enlace vence en {validity} y solo se puede usar una vez.</p>
+<p>Si no esperabas esta invitacion, puedes ignorar este mensaje.</p>
+<p>El equipo de Leo</p>
+"""
+
+    text_body = f"""\
+Hola,
+
+{inviter_name} te invito a unirte al equipo de {tenant_name} en Leo.
+
+Acepta la invitacion aqui:
+{accept_url}
+
+El enlace vence en {validity} y solo se puede usar una vez.
+
+Si no esperabas esta invitacion, puedes ignorar este mensaje.
+
+El equipo de Leo
+"""
+
+    return EmailMessage(
+        to=(to,),
+        subject=INVITATION_SUBJECT,
+        html=html_body,
+        text=text_body,
+    )

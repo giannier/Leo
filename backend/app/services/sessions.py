@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.core.security import generate_token, hash_password, hash_token, verify_password
 from app.core.tokens import issue_access_token
+from app.models.user import User
 from app.repositories.tenant import (
     TenantMembership,
     UserMembershipRepository,
@@ -251,6 +252,29 @@ class SessionService:
         return True
 
     # ------------------------------------------------------------ internals
+
+    def open_for_user(
+        self, user: User, *, tenant_id: uuid.UUID | None = None
+    ) -> AuthenticatedSession:
+        """Sign in a user the caller has already authenticated another way.
+
+        Used by invitation acceptance, where the token in the email is the
+        credential and there is no password to check - a brand-new invitee may
+        have set one only moments earlier, and sending them to a login form
+        after they clicked "accept" is a step with no security value.
+
+        Deliberately does not check `email_verified_at`: acceptance verifies
+        the address as a side effect, and re-checking here would reject the
+        very account it just created.
+        """
+        return self._open_session(
+            user_id=user.id,
+            full_name=user.full_name,
+            email=user.email,
+            family_id=uuid.uuid4(),
+            requested_tenant_id=tenant_id,
+            now=datetime.now(UTC),
+        )
 
     def _open_session(
         self,
