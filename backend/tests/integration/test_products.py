@@ -1,0 +1,260 @@
+"""Product catalogue CRUD and the two-step import (TASK-011)."""
+
+from __future__ import annotations
+
+import re
+import uuid
+from typing import Any
+from urllib.parse import parse_qs, urlparse
+
+import pytest
+from httpx import AsyncClient
+
+from app.api.deps import get_redis
+
+AUTH = "/api/v1/auth"
+PRODUCTS = "/api/v1/tenant/products"
+PASSWORD = "una-clave-suficientemente-larga"
+_HREF = re.compile(r'href="([^"]+)"')
+
+
+class FakeRedis:
+    """Enough Redis for the preview: set, get, delete, and a TTL we record.
+
+    A real client would need a running server for a test whose subject is the
+    import, not the cache. The TTL is captured so the one-hour expiry the
+    contract specifies is still asserted.
+    """
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.ttls: dict[str, int | None] = {}
+
+    async def set(self, key: str, value: str, *, ex: int | None = None) -> None:
+        self.store[key] = value
+        self.ttls[key] = ex
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def delete(self, key: str) -> int:
+        return 1 if self.store.pop(key, None) is not None else 0
+
+
+@pytest.fixture
+def redis(app: Any) -> FakeRedis:
+    fake = FakeRedis()
+    app.dependency_overrides[get_redis] = lambda: fake
+    return fake
+
+
+def _link_token(message: Any) -> str:
+    for href in _HREF.findall(message.html):
+        query = parse_qs(urlparse(href).query)
+        if "token" in query:
+            return str(query["token"][0])
+    raise AssertionError("no tokenised link in the email body")
+
+
+async def _owner(api: AsyncClient, mail: Any) -> dict[str, str]:
+    body = {
+        "full_name": "Ana Quispe",
+        "email": f"ana-{uuid.uuid4().hex[:12]}@example.com",
+        "password": PASSWORD,
+        "business_name": "Panaderia Quispe",
+    }
+    assert (await api.post(f"{AUTH}/register", json=body)).status_code == 201
+    await api.post(f"{AUTH}/verify-email", json={"token": _link_token(mail.last)})
+    session = await api.post(f"{AUTH}/login", json={"email": body["email"], "password": PASSWORD})
+    return {"Authorization": f"Bearer {session.json()['access_token']}"}
+
+
+class TestCrud:
+    async def test_create_and_read_back(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={"name": "Lomo saltado", "price": "32.00", "category": "Platos"},
+        )
+        assert created.status_code == 201
+        product_id = created.json()["id"]
+
+        fetched = await api.get(f"{PRODUCTS}/{product_id}", headers=headers)
+        assert fetched.status_code == 200
+        assert fetched.json()["price"] == "32.00"
+
+    async def test_price_keeps_its_decimals(self, api: AsyncClient, mail: Any) -> None:
+        """Money is Decimal end to end. A float would return 19.989999999999998."""
+        headers = await _owner(api, mail)
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "X", "price": "19.99"})
+        assert created.json()["price"] == "19.99"
+
+    async def test_a_negative_price_is_rejected(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        response = await api.post(PRODUCTS, headers=headers, json={"name": "X", "price": "-1.00"})
+        assert response.status_code == 400
+
+    async def test_a_partial_update_keeps_other_fields(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS, headers=headers, json={"name": "Lomo", "price": "32.00", "stock": 5}
+        )
+        product_id = created.json()["id"]
+
+        updated = await api.put(f"{PRODUCTS}/{product_id}", headers=headers, json={"stock": 3})
+        assert updated.json()["name"] == "Lomo"
+        assert updated.json()["price"] == "32.00"
+        assert updated.json()["stock"] == 3
+
+    async def test_delete_is_soft_and_hides_the_product(self, api: AsyncClient, mail: Any) -> None:
+        """Past conversations reference products by id; a hard delete would
+        rewrite what the agent said last week."""
+        headers = await _owner(api, mail)
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "X", "price": "1.00"})
+        product_id = created.json()["id"]
+
+        assert (await api.delete(f"{PRODUCTS}/{product_id}", headers=headers)).status_code == 204
+        assert (await api.get(f"{PRODUCTS}/{product_id}", headers=headers)).status_code == 404
+        assert (await api.get(PRODUCTS, headers=headers)).json()["total"] == 0
+
+    async def test_an_unknown_id_is_404(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        assert (await api.get(f"{PRODUCTS}/{uuid.uuid4()}", headers=headers)).status_code == 404
+
+    async def test_anonymous_callers_are_refused(self, api: AsyncClient) -> None:
+        assert (await api.get(PRODUCTS)).status_code == 401
+
+
+class TestListing:
+    async def test_search_and_filters(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        for name, category in [("Lomo saltado", "Platos"), ("Inca Kola", "Bebidas")]:
+            await api.post(
+                PRODUCTS,
+                headers=headers,
+                json={"name": name, "price": "5.00", "category": category},
+            )
+
+        by_search = await api.get(PRODUCTS, headers=headers, params={"search": "lomo"})
+        assert by_search.json()["total"] == 1
+
+        by_category = await api.get(PRODUCTS, headers=headers, params={"category": "Bebidas"})
+        assert by_category.json()["total"] == 1
+
+    async def test_the_total_is_the_full_match_not_the_page(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        """What lets a client know another page exists."""
+        headers = await _owner(api, mail)
+        for index in range(3):
+            await api.post(PRODUCTS, headers=headers, json={"name": f"P{index}", "price": "1.00"})
+
+        page = await api.get(PRODUCTS, headers=headers, params={"limit": 2})
+        assert len(page.json()["items"]) == 2
+        assert page.json()["total"] == 3
+
+
+class TestTemplate:
+    async def test_the_template_downloads_as_a_file(self, api: AsyncClient, mail: Any) -> None:
+        """The literal path must win over `/{product_id}`, or this 422s."""
+        headers = await _owner(api, mail)
+        response = await api.get(f"{PRODUCTS}/template.csv", headers=headers)
+        assert response.status_code == 200
+        assert "attachment" in response.headers["content-disposition"]
+        assert "nombre" in response.text
+
+
+class TestImport:
+    async def test_preview_reports_without_creating(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        csv = b"nombre,precio\nLomo,32.00\nMalo,gratis\n"
+        preview = await api.post(
+            f"{PRODUCTS}/import", headers=headers, files={"file": ("catalogo.csv", csv, "text/csv")}
+        )
+        assert preview.status_code == 200
+        assert preview.json()["valid_rows"] == 1
+        assert preview.json()["invalid_rows"] == [{"row": 3, "reason": "precio_invalido"}]
+
+        # Nothing written yet.
+        assert (await api.get(PRODUCTS, headers=headers)).json()["total"] == 0
+
+    async def test_confirm_creates_the_valid_rows(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        csv = b"nombre,precio,categoria\nLomo,32.00,Platos\nInca Kola,5.50,Bebidas\n"
+        preview = await api.post(
+            f"{PRODUCTS}/import", headers=headers, files={"file": ("c.csv", csv, "text/csv")}
+        )
+        preview_id = preview.json()["preview_id"]
+
+        confirmed = await api.post(f"{PRODUCTS}/import/{preview_id}/confirm", headers=headers)
+        assert confirmed.status_code == 201
+        assert confirmed.json()["created"] == 2
+        assert (await api.get(PRODUCTS, headers=headers)).json()["total"] == 2
+
+    async def test_the_preview_expires_in_an_hour(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        await api.post(
+            f"{PRODUCTS}/import",
+            headers=headers,
+            files={"file": ("c.csv", b"nombre,precio\nX,1.00\n", "text/csv")},
+        )
+        assert set(redis.ttls.values()) == {3600}
+
+    async def test_confirming_twice_creates_once(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        """The preview is consumed, so a double click cannot import twice."""
+        headers = await _owner(api, mail)
+        preview = await api.post(
+            f"{PRODUCTS}/import",
+            headers=headers,
+            files={"file": ("c.csv", b"nombre,precio\nX,1.00\n", "text/csv")},
+        )
+        preview_id = preview.json()["preview_id"]
+
+        assert (
+            await api.post(f"{PRODUCTS}/import/{preview_id}/confirm", headers=headers)
+        ).status_code == 201
+        second = await api.post(f"{PRODUCTS}/import/{preview_id}/confirm", headers=headers)
+        assert second.status_code == 404
+        assert (await api.get(PRODUCTS, headers=headers)).json()["total"] == 1
+
+    async def test_an_unknown_preview_is_404(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        response = await api.post(f"{PRODUCTS}/import/{uuid.uuid4()}/confirm", headers=headers)
+        assert response.status_code == 404
+
+    async def test_a_file_without_required_columns_is_rejected(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        response = await api.post(
+            f"{PRODUCTS}/import",
+            headers=headers,
+            files={"file": ("c.csv", b"nombre,categoria\nX,Y\n", "text/csv")},
+        )
+        assert response.status_code == 400
+        assert response.json()["error"] == "missing_columns"
+
+    async def test_an_imported_formula_is_stored_as_text(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        """End to end: the payload must not survive to the database intact."""
+        headers = await _owner(api, mail)
+        csv = b"nombre,precio\n=cmd|'/c calc'!A1,10.00\n"
+        preview = await api.post(
+            f"{PRODUCTS}/import", headers=headers, files={"file": ("c.csv", csv, "text/csv")}
+        )
+        await api.post(f"{PRODUCTS}/import/{preview.json()['preview_id']}/confirm", headers=headers)
+
+        stored = (await api.get(PRODUCTS, headers=headers)).json()["items"][0]["name"]
+        assert stored.startswith("'")
