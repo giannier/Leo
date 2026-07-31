@@ -15,6 +15,7 @@ from app.models.business import (
 )
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
+from app.models.llm_settings import TenantLLMSettings
 from app.models.plan import Plan
 from app.models.tenant import Invitation, Tenant, TenantUser, TrialPhoneLock
 from app.models.user import EmailToken, OtpCode, RefreshToken, User
@@ -39,6 +40,7 @@ __all__ = [
     "Product",
     "RefreshToken",
     "Tenant",
+    "TenantLLMSettings",
     "TenantUser",
     "TrialPhoneLock",
     "User",

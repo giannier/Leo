@@ -21,9 +21,21 @@ from app.models.base import (
 KNOWLEDGE_TYPES = ("faq", "policy", "pdf", "text")
 KNOWLEDGE_STATUSES = ("pending", "indexing", "indexed", "failed")
 
-# Matches the embedding width of the configured LLMProvider. Changing this
-# requires re-embedding every chunk, so it is a migration, not a setting.
-EMBEDDING_DIMENSIONS = 1536
+# Width of the configured embedding model. The single source of truth: the
+# migration and the tests both read it from here.
+#
+# 1024 is what `nvidia/nv-embedqa-e5-v5` returns. The data model specified
+# 1536, an OpenAI width that no NVIDIA embedding model produces - their
+# catalogue offers 1024 and 2048, verified against the live API.
+#
+# 2048 is not an option even though those models are newer: pgvector refuses
+# to build an HNSW index above 2000 dimensions ("column cannot have more than
+# 2000 dimensions for hnsw index"), and RAG without a vector index degrades to
+# a sequential scan over every chunk in the table.
+#
+# Changing this is a migration plus a full re-embedding of every chunk, never
+# a configuration tweak: existing vectors would silently stop being comparable.
+EMBEDDING_DIMENSIONS = 1024
 
 
 class KnowledgeSource(Base, UUIDPrimaryKeyMixin, TimestampMixin):
