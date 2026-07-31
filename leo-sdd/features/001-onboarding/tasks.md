@@ -112,7 +112,7 @@
   - **Depends on:** TASK-012, TASK-013
   - **Verification:** unit tests del builder; tests del loop con LLM mock; traza completa por respuesta
 
-- [ ] **TASK-015: Sandbox — endpoints de conversación**
+- [x] **TASK-015: Sandbox — endpoints de conversación**
   - **Input:** `contracts/api.md` (§sandbox), TASK-014
   - **Output:** crear conversación sandbox (guard `sandbox_ready`), enviar mensaje → respuesta del agente + traza; historial; rate limit 30/min/tenant; sin consumo de cuota (Clarification 002)
   - **Depends on:** TASK-014
