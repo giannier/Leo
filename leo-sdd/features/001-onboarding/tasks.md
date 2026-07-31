@@ -48,7 +48,7 @@
 
 ## Phase 1: Identidad, Tenants y Equipo
 
-- [ ] **TASK-006: Registro + verificación de email**
+- [x] **TASK-006: Registro + verificación de email**
   - **Input:** `contracts/api.md` (§auth), TASK-003/004/005
   - **Output:** `POST /auth/register` (transacción user+tenant trial+trial_ends_at), `verify-email`, `resend-verification`, emails transaccionales, validación `phone_in_active_trial` con `trial_phone_locks`
   - **Depends on:** TASK-003, TASK-005
