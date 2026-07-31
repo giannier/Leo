@@ -19,7 +19,7 @@
   - **Verification:** `docker compose up` levanta todo; healthcheck OK; `pytest` y `ruff` corren en verde
   - **Parallel:** No (es la primera)
 
-- [ ] **TASK-002: CI en GitHub Actions**
+- [x] **TASK-002: CI en GitHub Actions**
   - **Input:** TASK-001
   - **Output:** workflow con lint (Ruff), mypy, pytest (backend), build de frontend; bloqueo de merge si falla
   - **Depends on:** TASK-001
