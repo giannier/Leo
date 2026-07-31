@@ -17,6 +17,13 @@ dependencies = [
   "passlib[argon2]>=1.7",
   "boto3>=1.35",
   "arq>=0.26",
+  # Fernet, for encrypting per-tenant provider credentials at rest.
+  # Pre-approved in plan.md's Decisiones Tecnicas table.
+  "cryptography>=43.0",
+  # Runtime HTTP client for the provider adapters. Previously a dev-only
+  # dependency (test client); promoted here because app code now depends on
+  # it. No new package enters the lockfile.
+  "httpx>=0.27",
 ]
 
 [dependency-groups]
@@ -25,7 +32,6 @@ dev = [
   "mypy>=1.13",
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
-  "httpx>=0.27",
   "coverage>=7.6",
 ]
 
@@ -68,12 +74,22 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+[[tool.mypy.overrides]]
+# boto3 and botocore ship no type information. Ignoring their imports is
+# narrower than loosening strictness globally; app code that uses them is
+# still fully checked.
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
-addopts = "-ra"
+addopts = "-ra -m 'not slow'"
+markers = [
+  "slow: hits a real third-party provider over the network; excluded by default",
+]
 
 [tool.coverage.run]
 source = ["app"]
