@@ -129,6 +129,10 @@ class Settings(BaseSettings):
     s3_bucket: str = "leo-storage"
     s3_region: str = "us-east-1"
 
+    # Sandbox (contracts/api.md: 30 messages per minute, per tenant)
+    sandbox_rate_limit_requests: int = 30
+    sandbox_rate_limit_window_seconds: int = 60
+
     # Phone OTP (contracts/api.md: 3 requests per hour)
     otp_request_limit: int = 3
     otp_request_window_seconds: int = 3600
