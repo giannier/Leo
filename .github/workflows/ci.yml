@@ -22,7 +22,11 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9
+        # Pinned to an exact tag on purpose. Unlike actions/*, this repository
+        # stopped publishing moving major aliases after v7: `@v8` and `@v9` do
+        # not exist and resolve to a "Set up job" failure before any step runs.
+        # Bump this to another exact tag; do not "simplify" it to `@v9`.
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           # Python version is pinned by `.python-version`; uv reads it.
