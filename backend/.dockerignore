@@ -1,0 +1,35 @@
+# Build context for the backend image (`deploy/docker-compose.dev.yml` builds
+# with context `../backend`).
+#
+# Without this the whole directory is sent to the daemon - 114 MB, most of it
+# a virtualenv that the image rebuilds from `uv.lock` anyway. On Windows it
+# does not merely waste time: `.venv/lib64` is a symlink the daemon cannot
+# read, and the build fails outright with "file cannot be accessed by the
+# system".
+#
+# Shipping a host virtualenv would also be wrong even where it works - Windows
+# wheels inside a Linux image, and native extensions built for the wrong
+# platform silently shadowing the correct ones.
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+.git/
+.gitignore
+
+# Secrets never belong in a build context: anything copied in is readable in
+# the image's layers even if a later step deletes it.
+.env
+.env.*
+
+*.log
+*.sqlite3
