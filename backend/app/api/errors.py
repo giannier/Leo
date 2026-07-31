@@ -45,6 +45,10 @@ class ApiError(Exception):
     Carries the whole envelope, so the endpoint that raises it decides the
     status code and the stable code together and there is no mapping table
     to drift out of sync.
+
+    `headers` is for the few failures where the status code alone is not the
+    whole answer: `Retry-After` on a 429, `WWW-Authenticate` on a 401. Both
+    are part of the HTTP semantics of those codes, not decoration.
     """
 
     def __init__(
@@ -54,12 +58,14 @@ class ApiError(Exception):
         error: str,
         message: str,
         fields: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error = error
         self.message = message
         self.fields = fields
+        self.headers = headers
 
 
 def error_body(*, error: str, message: str, fields: dict[str, str] | None = None) -> dict[str, Any]:
@@ -97,6 +103,7 @@ async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content=error_body(error=exc.error, message=exc.message, fields=exc.fields),
+        headers=exc.headers,
     )
 
 
