@@ -128,7 +128,7 @@
 
 ## Phase 4: Conexión de número, Lifecycle del trial y Admin
 
-- [ ] **TASK-017: Solicitudes de conexión (tenant) + cifrado de credenciales**
+- [x] **TASK-017: Solicitudes de conexión (tenant) + cifrado de credenciales**
   - **Input:** `contracts/api.md` (§conexión), `data-model.md`, RF-008/009
   - **Output:** endpoints de connection-requests con validaciones (OTP requerido, unicidad E.164, solicitud abierta única); `whatsapp_numbers` con credenciales Fernet; interfaz `WhatsAppProvider` con implementación `ManualYCloudProvider` (v1: solo almacena/valida credenciales que carga el admin)
   - **Depends on:** TASK-008
