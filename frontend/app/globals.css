@@ -1,1 +1,107 @@
 @import "tailwindcss";
+
+/* Design tokens for the Leo panel.
+ *
+ * Semantic names, never raw hex in components: a component that says
+ * `bg-surface` keeps working when the palette moves, and one that says
+ * `bg-[#ffffff]` has to be found and edited.
+ *
+ * The palette is a professional navy with a blue call to action. The people
+ * using this are shop owners checking their agent between customers, often on
+ * a mid-range Android in a lit room - so contrast is generous everywhere and
+ * nothing important is carried by colour alone.
+ */
+
+@theme {
+  /* Brand ------------------------------------------------------------- */
+  --color-ink: #020617;
+  --color-ink-soft: #334155;
+  --color-ink-faint: #64748b;
+
+  --color-brand: #0f172a;
+  --color-brand-fg: #ffffff;
+
+  /* The one colour that means "press this". Used for primary actions only,
+   * so that when it appears the eye knows what it is for. */
+  --color-accent: #0369a1;
+  --color-accent-hover: #075985;
+  --color-accent-fg: #ffffff;
+
+  /* Surfaces ---------------------------------------------------------- */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+
+  /* Status. Each one is always paired with an icon or a word in the UI -
+   * roughly one man in twelve cannot tell the red from the green. */
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-warning: #b45309;
+  --color-warning-soft: #fffbeb;
+  --color-success: #15803d;
+  --color-success-soft: #f0fdf4;
+  --color-info: #0369a1;
+  --color-info-soft: #f0f9ff;
+
+  /* Type -------------------------------------------------------------- */
+  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-open-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* Layering. Written down so a new overlay does not become z-9999. */
+  --z-sticky: 20;
+  --z-drawer: 40;
+  --z-overlay: 50;
+  --z-toast: 60;
+}
+
+@layer base {
+  html {
+    /* 16px base. Anything smaller makes iOS Safari zoom on focus, which
+     * throws the user out of the form they were filling. */
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+  }
+
+  /* A visible focus ring on everything reachable by keyboard. Removing this
+   * is the single most common accessibility mistake in a panel like this. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Counters and prices use tabular figures, so a number going from 9 to 10
+   * does not shift the row it sits in. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

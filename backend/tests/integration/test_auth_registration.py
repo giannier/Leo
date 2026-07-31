@@ -228,10 +228,16 @@ class TestDuplicates:
         self, api: AsyncClient, db: Session
     ) -> None:
         """Clarification 005: one live trial per contact phone."""
-        first = _payload()
+        # A name unique to this run. The assertion below counts tenants by
+        # business name, and two real bakeries may well share one - so with a
+        # fixed name the test fails for anyone whose development database
+        # happens to hold a "Panaderia Quispe" from a manual experiment,
+        # which says nothing about the code.
+        business = f"Panaderia {uuid.uuid4().hex[:10]}"
+        first = _payload(business_name=business)
         assert (await api.post(f"{AUTH}/register", json=first)).status_code == 201
 
-        second = _payload(phone_e164=first["phone_e164"])
+        second = _payload(phone_e164=first["phone_e164"], business_name=business)
         response = await api.post(f"{AUTH}/register", json=second)
 
         assert response.status_code == 409

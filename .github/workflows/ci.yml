@@ -168,11 +168,144 @@ jobs:
         # `next build` type-checks and lints as part of the build.
         run: npm run build
 
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: leo
+          POSTGRES_PASSWORD: leo
+          POSTGRES_DB: leo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leo -d leo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://leo:leo@localhost:5432/leo
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-000000
+      FRONTEND_BASE_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000
+      # No real email in CI. The console provider writes the verification link
+      # to this file, which is the only place the token's plaintext ever
+      # exists - it is stored hashed, so the database cannot give it back.
+      EMAIL_PROVIDER: console
+      EMAIL_OUTBOX_PATH: ${{ github.workspace }}/backend/.tmp/outbox.jsonl
+      # Raised for the browser suite only. The real limit is five per minute
+      # per IP, and one browser walking register -> verify -> login spends
+      # that in a single test - every test after the first would then fail on
+      # a 429 that proves nothing. The limit is not left untested: it has its
+      # own suite in `test_auth_rate_limit.py`, which installs the limiter
+      # explicitly at the documented value and asserts the sixth request is
+      # refused.
+      AUTH_RATE_LIMIT_REQUESTS: "500"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: uv sync --locked
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Apply migrations
+        run: make migrate
+
+      - name: Start the API
+        run: |
+          mkdir -p backend/.tmp
+          uv run --directory backend uvicorn app.main:app --host 127.0.0.1 --port 8000             > "${{ github.workspace }}/api.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/api/v1/health > /dev/null; then
+              echo "API up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::The API never became healthy."
+          cat "${{ github.workspace }}/api.log"
+          exit 1
+
+      - name: Build and start the panel
+        working-directory: frontend
+        env:
+          # Inlined at build time by Next.js, so it has to be set here rather
+          # than when the server starts.
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+        run: |
+          npm run build
+          npm run start -- --port 3000 > "${{ github.workspace }}/web.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/login > /dev/null; then
+              echo "Panel up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::The panel never became reachable."
+          cat "${{ github.workspace }}/web.log"
+          exit 1
+
+      - name: Run the end-to-end suite
+        working-directory: frontend
+        env:
+          E2E_OUTBOX: ${{ github.workspace }}/backend/.tmp/outbox.jsonl
+        # Chromium only. The mobile project runs the same specs against a
+        # phone viewport and is worth the minute locally, but doubling CI time
+        # to re-check layout on every push is not.
+        run: npx playwright test --project=chromium
+
+      - name: Collect the report when something failed
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+            api.log
+            web.log
+          retention-days: 7
+
   ci:
     name: CI
     # Single aggregate status check to require in branch protection, so adding a
     # job above never silently leaves a gap in the merge gate.
-    needs: [backend, isolation, frontend]
+    needs: [backend, isolation, frontend, e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

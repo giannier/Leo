@@ -150,7 +150,7 @@
 
 ## Phase 5: Frontend (Next.js)
 
-- [ ] **TASK-020: Base del frontend — auth, layout y guardas**
+- [x] **TASK-020: Base del frontend — auth, layout y guardas**
   - **Input:** `contracts/api.md`, TASK-007; leer skill `frontend-design` si disponible
   - **Output:** páginas registro/login/verificación (email y OTP), cliente API tipado (OpenAPI), layout del panel con estado del trial visible, guardas por rol, manejo de sesión/refresh
   - **Depends on:** TASK-007 (API estable)

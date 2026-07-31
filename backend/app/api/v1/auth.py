@@ -65,14 +65,28 @@ from app.services.team import (
     accept_invitation,
 )
 
-# The rate limit guards the whole router, not just `login`: an attacker
-# blocked at the login endpoint would otherwise simply move to
-# `resend-verification`, or to the OTP endpoints TASK-008 adds here.
-router = APIRouter(
-    prefix="/auth",
-    tags=["auth"],
-    dependencies=[Depends(enforce_auth_rate_limit)],
-)
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Applied per endpoint rather than to the whole router.
+#
+# It used to guard everything under `/auth`, on the reasoning that an attacker
+# blocked at `login` would simply move to `resend-verification`. That reasoning
+# still holds for the endpoints that take a *guessable* secret, and they all
+# carry the dependency below.
+#
+# It does not hold for `refresh` and `logout`, and applying it there locked out
+# real customers. The budget is five requests per minute **per IP address**, and
+# a shop is one IP: the owner and two assistants signing in at opening time, each
+# with a couple of tabs whose access tokens expire together fifteen minutes
+# later, exhaust it between them - and the failure looks like "the panel logged
+# me out again", from a control meant to stop credential stuffing by strangers.
+#
+# Neither endpoint needs it. `refresh` authenticates a 256-bit opaque token that
+# is rotated on every use, with family-wide revocation the moment one is
+# replayed, so guessing is not the threat and a hit is already fatal to the
+# session. `logout` must work on the first press, always: a stop button that
+# answers 429 is worse than no stop button.
+RATE_LIMITED = [Depends(enforce_auth_rate_limit)]
 
 REFRESH_COOKIE_NAME = "refresh_token"
 
@@ -343,6 +357,7 @@ def _invalid_refresh() -> ApiError:
 
 @router.post(
     "/register",
+    dependencies=RATE_LIMITED,
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register an owner and open their trial tenant",
@@ -399,6 +414,7 @@ async def register(
 
 @router.post(
     "/verify-email",
+    dependencies=RATE_LIMITED,
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Consume an email verification token",
     responses=error_responses(
@@ -420,6 +436,7 @@ async def verify_email(payload: VerifyEmailRequest, session: SessionDep) -> None
 
 @router.post(
     "/invitations/accept",
+    dependencies=RATE_LIMITED,
     summary="Join a team with an invitation token",
     responses=error_responses(
         (400, "`validation_error` or `password_required`"),
@@ -477,6 +494,7 @@ async def accept_invitation_endpoint(
 
 @router.post(
     "/phone/request-otp",
+    dependencies=RATE_LIMITED,
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Send a one-time code to the caller's contact phone",
     responses=error_responses(
@@ -527,6 +545,7 @@ async def request_otp(
 
 @router.post(
     "/phone/verify-otp",
+    dependencies=RATE_LIMITED,
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Verify the contact phone with a one-time code",
     responses=error_responses(
@@ -568,6 +587,7 @@ async def verify_otp(
 
 @router.post(
     "/resend-verification",
+    dependencies=RATE_LIMITED,
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Send a fresh verification link",
     responses=error_responses((400, "`validation_error`")),
@@ -589,6 +609,7 @@ async def resend_verification(
 
 @router.post(
     "/login",
+    dependencies=RATE_LIMITED,
     response_model=SessionResponse,
     status_code=status.HTTP_200_OK,
     summary="Sign in and open a session",

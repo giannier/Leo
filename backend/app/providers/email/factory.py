@@ -22,6 +22,17 @@ def build_email_provider(settings: Settings | None = None) -> EmailProvider:
     client, which is not the same as swallowing it here.
     """
     settings = settings or get_settings()
+
+    # An explicit choice always wins over inference.
+    if settings.email_provider == "console":
+        return ConsoleEmailProvider(
+            environment=settings.environment, outbox_path=settings.email_outbox_path
+        )
+    if settings.email_provider == "resend":
+        if not settings.resend_api_key:
+            raise EmailConfigurationError("EMAIL_PROVIDER=resend but RESEND_API_KEY is not set.")
+        return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
+
     if settings.resend_api_key:
         return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
 
@@ -30,7 +41,9 @@ def build_email_provider(settings: Settings | None = None) -> EmailProvider:
     # external service. Anywhere else it is a misconfiguration, and
     # `ConsoleEmailProvider` refuses to construct, so this still raises.
     if not settings.is_deployed:
-        return ConsoleEmailProvider(environment=settings.environment)
+        return ConsoleEmailProvider(
+            environment=settings.environment, outbox_path=settings.email_outbox_path
+        )
 
     raise EmailConfigurationError(
         "RESEND_API_KEY is not set, so no transactional email can be sent. "
