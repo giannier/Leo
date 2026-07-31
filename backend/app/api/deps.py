@@ -65,6 +65,8 @@ from app.core.tokens import (
 from app.models.user import User
 from app.providers.email.base import EmailConfigurationError, EmailProvider
 from app.providers.email.factory import build_email_provider
+from app.providers.llm.base import LLMProvider
+from app.providers.llm.factory import platform_provider
 from app.providers.otp.base import OtpSender
 from app.providers.otp.console import ConsoleOtpSender
 from app.providers.storage.base import StorageProvider
@@ -217,6 +219,41 @@ def get_otp_request_limiter() -> RateLimiter:
     return _otp_request_rate_limiter()
 
 
+@lru_cache
+def _sandbox_rate_limiter() -> RedisRateLimiter:
+    """30 messages a minute per tenant (contracts/api.md).
+
+    Per **tenant**, not per user: the cost being guarded is the LLM bill,
+    which the business incurs however many of its people are typing. A quota
+    was rejected deliberately - the sandbox is free and unmetered
+    (Clarification 002), and a limit throttles abuse without ever telling a
+    paying customer they have run out of the thing they are evaluating.
+    """
+    settings = get_settings()
+    return RedisRateLimiter(
+        get_redis_client(),
+        limit=settings.sandbox_rate_limit_requests,
+        window_seconds=settings.sandbox_rate_limit_window_seconds,
+        namespace="ratelimit:sandbox",
+    )
+
+
+def get_sandbox_limiter() -> RateLimiter:
+    """The sandbox limiter. Overridden in tests."""
+    return _sandbox_rate_limiter()
+
+
+def get_platform_llm() -> LLMProvider:
+    """The provider the platform itself pays for.
+
+    The sandbox always uses this one, never a tenant's own credential: a
+    customer evaluating the product should not be billed by their own vendor
+    for the evaluation, and a broken BYO key must not make the sandbox
+    unusable.
+    """
+    return platform_provider()
+
+
 def get_otp_sender() -> OtpSender:
     """How a one-time code reaches the customer.
 
@@ -294,6 +331,11 @@ SessionDep = Annotated[Session, Depends(get_db)]
 # the endpoint reports that the message did not go out rather than failing.
 EmailProviderDep = Annotated[EmailProvider | None, Depends(get_email_provider)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+SandboxLimiterDep = Annotated[RateLimiter, Depends(get_sandbox_limiter)]
+# Injected rather than called directly at the call site: a direct call is
+# invisible to `dependency_overrides`, so tests would silently reach the
+# real provider - which is exactly what happened before this was a Depends.
+PlatformLLMDep = Annotated[LLMProvider, Depends(get_platform_llm)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 
 
