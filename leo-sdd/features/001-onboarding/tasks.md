@@ -31,7 +31,7 @@
   - **Depends on:** TASK-001
   - **Verification:** `alembic upgrade head` y `downgrade -1` sin errores; tests de smoke de modelos
 
-- [ ] **TASK-004: Capa base de repositorios multi-tenant + suite de aislamiento**
+- [x] **TASK-004: Capa base de repositorios multi-tenant + suite de aislamiento**
   - **Input:** TASK-003, `constitution.md` (principio de aislamiento)
   - **Output:** `BaseRepository` que exige `tenant_id` en toda operación; repos de products/knowledge/conversations; **suite de tests de aislamiento** (2 tenants fixture, acceso cruzado debe fallar) integrada a CI
   - **Depends on:** TASK-003
