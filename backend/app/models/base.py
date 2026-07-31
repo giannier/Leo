@@ -78,9 +78,19 @@ class CreatedAtMixin:
 class TimestampMixin(CreatedAtMixin):
     """`created_at` + `updated_at`, refreshed on every UPDATE."""
 
+    # `clock_timestamp()`, not `now()`. In PostgreSQL `now()` is the
+    # *transaction* start time and is constant for the whole transaction, so
+    # two writes in one transaction would stamp an identical `updated_at`.
+    # That is wrong for a column whose job is to say when the row last
+    # changed, and it silently breaks the concurrency check in
+    # `WizardService`, which compares this value to decide whether a save
+    # landed on top of somebody else's.
+    #
+    # The INSERT default stays `now()`: at insert time there is exactly one
+    # write, and it is what the existing migration already emits.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=func.clock_timestamp(),
     )
