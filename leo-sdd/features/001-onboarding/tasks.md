@@ -37,7 +37,7 @@
   - **Depends on:** TASK-003
   - **Verification:** suite de aislamiento pasa y falla correctamente si se rompe el filtro (test del test)
 
-- [ ] **TASK-005: Adaptadores de proveedor (interfaces + implementaciones v1)**
+- [x] **TASK-005: Adaptadores de proveedor (interfaces + implementaciones v1)**
   - **Input:** `plan.md` (Ports & Adapters), aprobación de dependencias
   - **Output:** interfaces `LLMProvider` (chat con tools + embed), `EmailProvider`, `StorageProvider`; implementaciones: LLM real configurable por env, email (Resend/SMTP según aprobación), MinIO; mocks para tests; contract tests
   - **Depends on:** TASK-001
