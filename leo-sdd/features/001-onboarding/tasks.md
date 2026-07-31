@@ -60,7 +60,7 @@
   - **Depends on:** TASK-006
   - **Verification:** tests de rotación/revocación de refresh; acceso denegado sin email verificado
 
-- [ ] **TASK-008: OTP de teléfono**
+- [x] **TASK-008: OTP de teléfono**
   - **Input:** `contracts/api.md`, Clarification 005
   - **Output:** request-otp/verify-otp con hash, expiración 10min, máx 5 intentos, rate limit 3/h; envío vía canal decidido (documentar decisión en el PR)
   - **Depends on:** TASK-007
