@@ -66,3 +66,34 @@ Restricción de Constitution: este módulo requiere revisión humana en todo cam
 - [ ] Upgrade con prorrateo y downgrade con validación de exceso, correctos al centavo (tests de dinero con Decimal, jamás float).
 - [ ] Idempotencia de webhooks probada con replays.
 - [ ] Cobertura ≥80% (módulo crítico) y revisión humana línea por línea del servicio de cobros (milestone).
+
+---
+
+## Decisión registrada — Modelo "socio" por comisión (2026-07-31)
+
+**Propuesta de Giannier:** ofrecer dos formas de hacer negocio con el cliente:
+(a) **servicio directo** — el tenant contrata un plan, que es lo ya especificado
+arriba; y (b) **socio** — Leo cobra una comisión cuando el agente concreta una
+venta.
+
+**Decisión: (b) queda fuera del MVP.** Se retoma después de cerrar el MVP y con
+ratificación explícita.
+
+**Motivo técnico, no de preferencia.** Cobrar por venta concretada exige
+*atribución*: el sistema tiene que registrar que hubo una venta, por qué monto,
+y decidir si la causó el agente o el humano que retomó la conversación después.
+Nada de eso existe hoy — no hay tabla de pedidos ni de ventas en la Feature 001,
+y `016-pedidos-delivery` es post-MVP. Sin pedidos, el modelo socio no tiene
+sobre qué calcularse.
+
+**Qué haría falta antes de retomarlo:**
+- Pedidos con monto y estado (Feature 016).
+- Un evento de "venta concretada" enlazado a la conversación que la originó.
+- Una regla de atribución escrita: ventana temporal, y qué pasa cuando un
+  operador humano cierra una venta que el agente inició.
+- Liquidación y comprobante de comisión, con su propio audit log.
+
+**Nota de alcance:** esto no afecta a `payment_methods_business`. Esa tabla
+guarda cómo los clientes **del tenant** le pagan **al tenant** (Yape, Plin,
+transferencia) — instrucciones que el agente le dicta a un comprador. Es
+independiente de cómo el tenant le paga a Leo.
