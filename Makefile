@@ -1,4 +1,4 @@
-.PHONY: simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-dev
+.PHONY: simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
 
@@ -51,6 +51,9 @@ front-lint: ## Lint the frontend (ESLint).
 
 front-build: ## Type-check and production-build the frontend, matching CI.
 	cd frontend && npm run build
+
+front-e2e: ## Run the Playwright suite against the local stack (needs `make up`).
+	cd frontend && E2E_OUTBOX=../backend/.tmp/outbox.jsonl npx playwright test
 
 front-dev: ## Run the frontend dev server outside Docker.
 	cd frontend && npm run dev
