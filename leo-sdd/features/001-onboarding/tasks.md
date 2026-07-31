@@ -134,7 +134,7 @@
   - **Depends on:** TASK-008
   - **Verification:** tests de todas las validaciones; roundtrip de cifrado; contract test del provider
 
-- [ ] **TASK-018: Panel admin de plataforma (API) + audit log**
+- [x] **TASK-018: Panel admin de plataforma (API) + audit log**
   - **Input:** `contracts/api.md` (§platform-admin), Clarification 012
   - **Output:** cola de solicitudes, transición de estados con credenciales, notificación al tenant, listado/detalle de tenants, extend-trial; audit log en toda acción
   - **Depends on:** TASK-017

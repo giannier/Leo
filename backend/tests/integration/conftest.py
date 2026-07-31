@@ -5,6 +5,7 @@ suite can point at the ordinary development database without leaving rows
 behind and without tests seeing each other's writes.
 """
 
+import base64
 import os
 from collections.abc import AsyncIterator, Iterator
 
@@ -25,6 +26,26 @@ from app.providers.email.mock import MockEmailProvider
 # skip the entire suite and the pipeline would still pass. When this is set,
 # an unreachable database fails the run instead.
 REQUIRE_DB_ENV_VAR = "LEO_REQUIRE_DB"
+
+# A Fernet key the suite owns, so encryption tests do not depend on whatever
+# happens to be in a developer's `.env` - and so CI needs no secret to run
+# them. It says what it is when read out of a dump, which is the point: a
+# real key must never end up here, and a test must never accidentally
+# encrypt with a production one.
+TEST_ENCRYPTION_KEY = base64.urlsafe_b64encode(b"leo-test-key-not-for-real-use!!!").decode()
+
+
+@pytest.fixture(autouse=True)
+def encryption_key(monkeypatch: pytest.MonkeyPatch) -> str:
+    """Every integration test runs with the suite's own credential key.
+
+    Autouse rather than opt-in: `store_credentials` is reached indirectly from
+    several endpoints, and a test that forgot to ask for the key would fail
+    with `CREDENTIALS_ENCRYPTION_KEY is not set` far from its cause.
+    """
+    settings = get_settings()
+    monkeypatch.setattr(settings, "credentials_encryption_key", TEST_ENCRYPTION_KEY)
+    return TEST_ENCRYPTION_KEY
 
 
 @pytest.fixture(scope="session")
