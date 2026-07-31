@@ -118,7 +118,7 @@
   - **Depends on:** TASK-014
   - **Verification:** integration test de conversación completa con catálogo real del fixture
 
-- [ ] **TASK-016: Evals semilla en CI**
+- [x] **TASK-016: Evals semilla en CI**
   - **Input:** TASK-015, `constitution.md` (estándar de evals)
   - **Output:** dataset de 5 conversaciones doradas (tenant restaurante demo) + runner de evals (aserciones: precio correcto, no inventa productos, escala cuando debe) + job de CI marcado requerido para cambios en `agent/`
   - **Depends on:** TASK-015
