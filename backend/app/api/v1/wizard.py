@@ -1,0 +1,223 @@
+"""Business profile and agent configuration endpoints (TASK-010).
+
+The `/tenant/business-profile` and `/tenant/agent-config` pairs from
+`contracts/api.md`. Both are one row per tenant, created on first write.
+
+`is_active` is absent from the agent payload on purpose: the contract routes
+activation through `/agent/activate`, which has preconditions - the activation
+checklist - that a configuration form does not evaluate.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Annotated, Any, Literal
+
+from fastapi import APIRouter
+from pydantic import BaseModel, Field, StringConstraints
+
+from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
+from app.api.errors import error_responses
+from app.services.wizard import WizardService
+
+router = APIRouter(prefix="/tenant", tags=["wizard"])
+
+# Spelled out rather than derived from the tuples in `app.models.business`:
+# `Literal` needs its members at type-check time, and writing them here is what
+# lets mypy and the generated OpenAPI schema both see the allowed values.
+# `tests/unit/test_wizard_validation.py` asserts these stay in step with the
+# CHECK constraints, so a divergence fails the build rather than production.
+Industry = Literal["restaurante", "instituto", "retail", "servicios", "salud", "otros"]
+Tone = Literal["profesional", "cercano", "juvenil"]
+Objective = Literal["vender", "atender", "ambos"]
+
+ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
+# IANA zone name. Not validated against the database here: the list ships with
+# the OS and drifts, and a wrong-but-well-formed value fails visibly at the
+# first scheduled job rather than silently.
+TimezoneName = Annotated[str, StringConstraints(strip_whitespace=True, max_length=64)]
+CurrencyCode = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Z]{3}$")]
+
+
+class ConcurrencyAware(BaseModel):
+    """Mixin for the optional last-write-wins check."""
+
+    # The `updated_at` the client last saw. Optional: a client that does not
+    # send it simply is not warned. Sending it never blocks the write -
+    # Clarification 008 chose last-write-wins over pessimistic locking.
+    expected_updated_at: datetime | None = None
+
+
+class BusinessProfileRequest(ConcurrencyAware):
+    business_name: ShortText | None = None
+    industry: Industry | None = None
+    description: LongText | None = None
+    website: Annotated[str, StringConstraints(max_length=500)] | None = None
+    social_links: dict[str, str] | None = None
+    currency: CurrencyCode | None = None
+    timezone: TimezoneName | None = None
+    opening_hours: dict[str, list[list[str]]] | None = None
+
+
+class BusinessProfileResponse(BaseModel):
+    business_name: str | None
+    industry: str | None
+    description: str | None
+    website: str | None
+    social_links: dict[str, Any]
+    currency: str
+    timezone: str
+    opening_hours: dict[str, Any]
+    updated_at: datetime | None
+    # True when this save landed on top of a newer version. The panel shows
+    # "somebody else saved changes while you were editing"; the write still
+    # happened.
+    overwrote_newer: bool = False
+
+
+class AgentConfigRequest(ConcurrencyAware):
+    agent_name: ShortText | None = None
+    tone: Tone | None = None
+    objective: Objective | None = None
+    restrictions: LongText | None = None
+    escalation_rules: list[str] | None = Field(default=None, max_length=20)
+    farewell_on_pause: LongText | None = None
+
+
+class AgentConfigResponse(BaseModel):
+    agent_name: str
+    tone: str
+    objective: str
+    restrictions: str | None
+    escalation_rules: list[str]
+    farewell_on_pause: str | None
+    is_active: bool
+    updated_at: datetime | None
+    overwrote_newer: bool = False
+
+
+PROFILE_DEFAULTS = BusinessProfileResponse(
+    business_name=None,
+    industry=None,
+    description=None,
+    website=None,
+    social_links={},
+    currency="PEN",
+    timezone="America/Lima",
+    opening_hours={},
+    updated_at=None,
+)
+
+AGENT_DEFAULTS = AgentConfigResponse(
+    agent_name="Leo",
+    tone="cercano",
+    objective="ambos",
+    restrictions=None,
+    escalation_rules=["cliente_molesto", "pide_humano", "fuera_de_catalogo"],
+    farewell_on_pause=None,
+    is_active=False,
+    updated_at=None,
+)
+
+AUTH_RESPONSES = (
+    (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
+    (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
+)
+
+
+def _profile_response(record: Any, *, overwrote_newer: bool = False) -> BusinessProfileResponse:
+    if record is None:
+        return PROFILE_DEFAULTS
+    return BusinessProfileResponse(
+        business_name=record.business_name,
+        industry=record.industry,
+        description=record.description,
+        website=record.website,
+        social_links=record.social_links,
+        currency=record.currency,
+        timezone=record.timezone,
+        opening_hours=record.opening_hours,
+        updated_at=record.updated_at,
+        overwrote_newer=overwrote_newer,
+    )
+
+
+def _agent_response(record: Any, *, overwrote_newer: bool = False) -> AgentConfigResponse:
+    if record is None:
+        return AGENT_DEFAULTS
+    return AgentConfigResponse(
+        agent_name=record.agent_name,
+        tone=record.tone,
+        objective=record.objective,
+        restrictions=record.restrictions,
+        escalation_rules=record.escalation_rules,
+        farewell_on_pause=record.farewell_on_pause,
+        is_active=record.is_active,
+        updated_at=record.updated_at,
+        overwrote_newer=overwrote_newer,
+    )
+
+
+@router.get(
+    "/business-profile",
+    summary="Read the business identity",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+async def get_business_profile(
+    principal: MemberDep, session: SessionDep
+) -> BusinessProfileResponse:
+    """Returns the column defaults when the wizard has not written a row yet.
+
+    The alternative - 404 until first save - would make every client handle a
+    state that carries no information the defaults do not already give.
+    """
+    return _profile_response(WizardService(session, principal.tenant_id).business_profile())
+
+
+@router.put(
+    "/business-profile",
+    summary="Save the business identity",
+    responses=error_responses((400, "`validation_error`"), *AUTH_RESPONSES),
+)
+async def put_business_profile(
+    payload: BusinessProfileRequest,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+) -> BusinessProfileResponse:
+    """Partial save: fields not sent are left alone.
+
+    The wizard writes step by step, so a PUT carrying only the current step
+    must not null out what an earlier one collected.
+    """
+    values = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
+    outcome = WizardService(session, principal.tenant_id).save_business_profile(
+        expected_updated_at=payload.expected_updated_at, **values
+    )
+    return _profile_response(outcome.record, overwrote_newer=outcome.overwrote_newer)
+
+
+@router.get(
+    "/agent-config",
+    summary="Read the agent's personality and guardrails",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+async def get_agent_config(principal: MemberDep, session: SessionDep) -> AgentConfigResponse:
+    return _agent_response(WizardService(session, principal.tenant_id).agent_config())
+
+
+@router.put(
+    "/agent-config",
+    summary="Save the agent's personality and guardrails",
+    responses=error_responses((400, "`validation_error`"), *AUTH_RESPONSES),
+)
+async def put_agent_config(
+    payload: AgentConfigRequest,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+) -> AgentConfigResponse:
+    values = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
+    outcome = WizardService(session, principal.tenant_id).save_agent_config(
+        expected_updated_at=payload.expected_updated_at, **values
+    )
+    return _agent_response(outcome.record, overwrote_newer=outcome.overwrote_newer)
