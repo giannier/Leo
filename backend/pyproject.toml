@@ -26,14 +26,16 @@ dependencies = [
   "httpx>=0.27",
   # PDF text extraction for the RAG ingestion worker (TASK-012).
   # PENDING GIANNIER'S EXPLICIT APPROVAL - the Constitution requires it for
-  # every new dependency. Proposed in plan.md's "Dependencias Nuevas" table.
+  # every new dependency. Named in plan.md's "Dependencias Nuevas" table and
+  # approved by Giannier on 2026-07-31.
   # Pure Python, zero runtime dependencies, MIT/BSD. Confined to
   # `app/providers/pdf/` behind the `PdfTextExtractor` port.
   "pypdf>=5.1",
   # Required by Starlette/FastAPI to parse `multipart/form-data`, which the
   # API contract mandates for the PDF upload (and TASK-011's CSV import).
-  # PENDING GIANNIER'S EXPLICIT APPROVAL. Pure Python, no dependencies; it is
-  # the parser FastAPI itself documents for `UploadFile`.
+  # Not in plan.md; approved by Giannier on 2026-07-31 as non-optional -
+  # Starlette cannot parse the upload the contract requires without it. Pure
+  # Python, no dependencies; the parser FastAPI itself documents for `UploadFile`.
   "python-multipart>=0.0.9",
 ]
 
