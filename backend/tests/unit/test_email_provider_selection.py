@@ -14,6 +14,7 @@ import pytest
 from app.api.deps import get_email_provider
 from app.core.config import Settings
 from app.providers.email.base import EmailConfigurationError, EmailProvider
+from app.providers.email.console import ConsoleEmailProvider
 from app.providers.email.factory import build_email_provider
 from app.providers.email.resend_provider import ResendEmailProvider
 
@@ -26,9 +27,32 @@ class TestFactory:
         assert isinstance(provider, ResendEmailProvider)
         assert isinstance(provider, EmailProvider)
 
-    def test_raises_a_named_error_when_no_key_is_configured(self) -> None:
+    def test_development_falls_back_to_the_console_provider(self) -> None:
+        """Email verification gates the panel, so a developer with no Resend
+        key would otherwise be unable to get past registration - the token
+        exists only inside the message."""
+        provider = build_email_provider(Settings(resend_api_key=None, environment="development"))
+        assert isinstance(provider, ConsoleEmailProvider)
+        assert isinstance(provider, EmailProvider)
+
+    @pytest.mark.parametrize("environment", ["staging", "production"])
+    def test_a_deployment_without_a_key_still_raises(self, environment: str) -> None:
+        """The console provider logs verification links. A deployment that
+        reached one would be writing customer credentials into its log
+        aggregator, so the fallback must never apply there."""
         with pytest.raises(EmailConfigurationError, match="RESEND_API_KEY"):
-            build_email_provider(Settings(resend_api_key=None))
+            build_email_provider(
+                Settings(
+                    resend_api_key=None,
+                    environment=environment,  # type: ignore[arg-type]
+                    secret_key="a-real-secret-key-of-sufficient-length",
+                )
+            )
+
+    def test_the_console_provider_refuses_to_construct_when_deployed(self) -> None:
+        """Belt and braces: even constructed directly, it will not run."""
+        with pytest.raises(EmailConfigurationError, match="never run"):
+            ConsoleEmailProvider(environment="production")
 
 
 class TestDependency:
