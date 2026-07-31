@@ -21,7 +21,7 @@ from datetime import datetime
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from app.models.tenant import Tenant, TenantUser, TrialPhoneLock
+from app.models.tenant import Invitation, Tenant, TenantUser, TrialPhoneLock
 from app.repositories.base import BaseRepository
 
 OWNER_ROLE = "owner"
@@ -174,6 +174,95 @@ class UserMembershipRepository:
             )
             for membership, tenant in rows
         ]
+
+
+class InvitationRepository(BaseRepository[Invitation]):
+    """Pending invitations for one tenant. Only digests are stored."""
+
+    model = Invitation
+
+    def issue(
+        self,
+        *,
+        email: str,
+        role: str,
+        token_hash: str,
+        expires_at: datetime,
+        invited_by: uuid.UUID,
+    ) -> Invitation:
+        return self.add(
+            email=email,
+            role=role,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            invited_by=invited_by,
+        )
+
+    def list_pending(self, *, now: datetime) -> Sequence[Invitation]:
+        """Invitations still worth showing: neither accepted, revoked nor expired."""
+        return self.list(
+            Invitation.accepted_at.is_(None),
+            Invitation.revoked_at.is_(None),
+            Invitation.expires_at > now,
+        )
+
+    def pending_count(self, *, now: datetime) -> int:
+        """Live invitations, which count against the seat limit.
+
+        An invitation that has been sent but not yet accepted is a seat
+        already promised. Counting only accepted members would let an owner
+        invite ten people into a two-seat plan and discover the problem only
+        when the third one clicked.
+        """
+        return self.count(
+            Invitation.accepted_at.is_(None),
+            Invitation.revoked_at.is_(None),
+            Invitation.expires_at > now,
+        )
+
+    def find_pending_for_email(self, *, email: str, now: datetime) -> Invitation | None:
+        statement = (
+            self._scoped()
+            .where(
+                Invitation.email == email,
+                Invitation.accepted_at.is_(None),
+                Invitation.revoked_at.is_(None),
+                Invitation.expires_at > now,
+            )
+            .limit(1)
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def revoke(self, invitation: Invitation, *, at: datetime) -> None:
+        invitation.revoked_at = at
+        self._session.flush()
+
+    def accept(self, invitation: Invitation, *, at: datetime) -> None:
+        invitation.accepted_at = at
+        self._session.flush()
+
+
+class InvitationLookup:
+    """Finds an invitation by its token digest, across every tenant.
+
+    The one read of `invitations` that cannot be tenant-scoped: acceptance is
+    a public endpoint, so at that moment there is no authenticated caller and
+    therefore no tenant to scope by - working out which tenant the token
+    belongs to is the whole question.
+
+    Same shape as `UserMembershipRepository`: the filter is not weakened, it
+    is *changed*. A 256-bit digest is the mandatory predicate, and it is
+    unique, so this can return at most one row and an attacker cannot enumerate
+    with it. Everything the caller then does goes through the tenant-scoped
+    repositories above.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def by_token_hash(self, token_hash: str) -> Invitation | None:
+        statement = select(Invitation).where(Invitation.token_hash == token_hash)
+        return self._session.execute(statement).scalar_one_or_none()
 
 
 class TrialPhoneLockRepository(BaseRepository[TrialPhoneLock]):
