@@ -46,6 +46,8 @@ Thumbs.db
 # --- Agent tooling ----------------------------------------------------------
 # Generated skill registry and its cache; regenerated on demand, not source.
 .atl/
+# Scratch git worktrees used to run agents in parallel. Transient by design.
+.claude/
 
 # --- Redundant archives -----------------------------------------------------
 # Duplicates the tracked contents of leo-sdd/; would go stale immediately.
