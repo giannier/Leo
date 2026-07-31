@@ -36,12 +36,28 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        # The `/auth/*` rate limit is Redis-backed, because the counter has to
+        # be shared between worker processes. Without this service the
+        # rate-limit tests would skip and CI would go green on an untested
+        # brute-force defence.
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       # No .env file exists in CI, so this is set explicitly rather than
       # relying on the defaults baked into Settings.
       DATABASE_URL: postgresql+psycopg://leo:leo@localhost:5432/leo
-      # Turn "database unreachable" into a failure instead of a skipped suite.
+      REDIS_URL: redis://localhost:6379/0
+      # Turn "unreachable" into a failure instead of a skipped suite.
       LEO_REQUIRE_DB: "1"
+      LEO_REQUIRE_REDIS: "1"
 
     steps:
       - uses: actions/checkout@v7

@@ -9,15 +9,19 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from decimal import Decimal
 
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_db, get_email_provider, get_rate_limiter
 from app.core.config import get_settings
+from app.core.rate_limit import NullRateLimiter, RateLimiter
 from app.models import (
     Conversation,
     KnowledgeChunk,
@@ -27,6 +31,8 @@ from app.models import (
     Tenant,
 )
 from app.models.knowledge import EMBEDDING_DIMENSIONS
+from app.providers.email.base import EmailProvider
+from app.providers.email.mock import MockEmailProvider
 
 REQUIRE_DB_ENV_VAR = "LEO_REQUIRE_DB"
 
@@ -80,6 +86,35 @@ def db(engine: Engine) -> Iterator[Session]:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def mail() -> MockEmailProvider:
+    """Email provider that records instead of sending."""
+    return MockEmailProvider()
+
+
+@pytest.fixture
+async def api(app: FastAPI, db: Session, mail: MockEmailProvider) -> AsyncIterator[AsyncClient]:
+    """HTTP client sharing this test's transaction.
+
+    Mirrors the integration suite's fixture. It is here because the tenant
+    boundary is not only a repository property: the authentication
+    dependencies are what decide which tenant a request may act in, and a
+    hole there is a cross-tenant leak whatever the repositories do. Proving
+    that end to end needs real requests.
+    """
+    provider: EmailProvider = mail
+    limiter: RateLimiter = NullRateLimiter()
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_email_provider] = lambda: provider
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            yield client
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _populate(db: Session, label: str) -> TenantFixture:
