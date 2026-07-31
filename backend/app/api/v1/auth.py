@@ -23,16 +23,32 @@ from fastapi import APIRouter, Cookie, Depends, Response, status
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy.orm import Session
 
-from app.api.deps import enforce_auth_rate_limit, get_db, get_email_provider
+from app.api.deps import (
+    MemberDep,
+    enforce_auth_rate_limit,
+    get_db,
+    get_email_provider,
+    get_otp_request_limiter,
+    get_otp_sender,
+)
 from app.api.errors import ApiError, error_responses
 from app.core.config import Settings, get_settings
+from app.core.rate_limit import RateLimiter
 from app.providers.email.base import EmailProvider
+from app.providers.otp.base import OtpSender
 from app.services.auth import (
     AuthService,
     EmailAlreadyRegisteredError,
     InvalidEmailTokenError,
     PhoneInActiveTrialError,
     TrialPlanUnavailableError,
+)
+from app.services.otp import (
+    InvalidOrExpiredOtp,
+    NoPhoneOnRecord,
+    OtpDeliveryFailed,
+    OtpService,
+    PhoneAlreadyInActiveTrial,
 )
 from app.services.sessions import (
     AuthenticatedSession,
@@ -105,6 +121,13 @@ class RegisterResponse(BaseModel):
     user_id: uuid.UUID
     tenant_id: uuid.UUID
     verification_email_sent: bool
+
+
+class VerifyOtpRequest(BaseModel):
+    # Exactly six digits. Anything else cannot be a code this service issued,
+    # so it is a validation error rather than a wasted verification attempt -
+    # otherwise malformed input would burn the caller's five real tries.
+    code: Annotated[str, StringConstraints(pattern=r"^\d{6}$")]
 
 
 class VerifyEmailRequest(BaseModel):
@@ -180,6 +203,8 @@ class SessionResponse(BaseModel):
 
 SessionDep = Annotated[Session, Depends(get_db)]
 EmailProviderDep = Annotated[EmailProvider | None, Depends(get_email_provider)]
+OtpSenderDep = Annotated[OtpSender, Depends(get_otp_sender)]
+OtpRequestLimiterDep = Annotated[RateLimiter, Depends(get_otp_request_limiter)]
 RefreshCookieDep = Annotated[str | None, Cookie(alias=REFRESH_COOKIE_NAME)]
 
 
@@ -368,6 +393,97 @@ async def verify_email(payload: VerifyEmailRequest, session: SessionDep) -> None
             status_code=status.HTTP_400_BAD_REQUEST,
             error="invalid_or_expired_token",
             message="This verification link is invalid, expired or already used.",
+        ) from exc
+
+
+@router.post(
+    "/phone/request-otp",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Send a one-time code to the caller's contact phone",
+    responses=error_responses(
+        (400, "`no_phone_on_record`"),
+        (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
+        (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
+        (429, "`rate_limited` - 5/min per IP, and 3/hour per user"),
+        (503, "`otp_delivery_unavailable`"),
+    ),
+)
+async def request_otp(
+    principal: MemberDep,
+    session: SessionDep,
+    sender: OtpSenderDep,
+    limiter: OtpRequestLimiterDep,
+) -> None:
+    """Issue a fresh code, retiring any still-live one for this user.
+
+    Throttled per user on top of the router's per-IP limit. The per-IP limit
+    alone would not stop one account draining an SMS budget from a changing
+    address, and each new code resets the attempt budget on the last.
+    """
+    decision = await limiter.hit(f"user:{principal.user_id}")
+    if not decision.allowed:
+        raise ApiError(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            error="rate_limited",
+            message="Too many code requests. Please wait before asking for another.",
+            headers={"Retry-After": str(decision.retry_after_seconds)},
+        )
+
+    service = OtpService(session, sender=sender)
+    try:
+        await service.request(principal.user)
+    except NoPhoneOnRecord as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="no_phone_on_record",
+            message="This account has no contact phone to verify.",
+        ) from exc
+    except OtpDeliveryFailed as exc:
+        raise ApiError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            error="otp_delivery_unavailable",
+            message="Could not send the code right now. Please try again shortly.",
+        ) from exc
+
+
+@router.post(
+    "/phone/verify-otp",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Verify the contact phone with a one-time code",
+    responses=error_responses(
+        (400, "`validation_error` or `invalid_or_expired_otp` (max 5 attempts)"),
+        (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
+        (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
+        (409, "`phone_in_active_trial`"),
+        (429, "`rate_limited`"),
+    ),
+)
+async def verify_otp(
+    payload: VerifyOtpRequest,
+    principal: MemberDep,
+    session: SessionDep,
+    sender: OtpSenderDep,
+) -> None:
+    """Consume the code and mark the phone verified.
+
+    Wrong code, expired code, no code at all and the attempt cap being reached
+    all answer identically. Distinguishing them tells an attacker whether they
+    were close enough to be counted, and whether the account exists at all.
+    """
+    service = OtpService(session, sender=sender)
+    try:
+        service.verify(principal.user, payload.code)
+    except InvalidOrExpiredOtp as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="invalid_or_expired_otp",
+            message="That code is invalid or has expired.",
+        ) from exc
+    except PhoneAlreadyInActiveTrial as exc:
+        raise ApiError(
+            status_code=status.HTTP_409_CONFLICT,
+            error="phone_in_active_trial",
+            message="This phone number is already verified on another trial account.",
         ) from exc
 
 
