@@ -64,5 +64,6 @@ class TenantLLMSettings(Base):
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        # See TimestampMixin: `now()` is transaction-scoped.
+        onupdate=func.clock_timestamp(),
     )
