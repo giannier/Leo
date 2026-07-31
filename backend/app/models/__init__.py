@@ -17,7 +17,13 @@ from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
 from app.models.plan import Plan
-from app.models.tenant import Invitation, Tenant, TenantUser, TrialPhoneLock
+from app.models.tenant import (
+    Invitation,
+    Tenant,
+    TenantNotification,
+    TenantUser,
+    TrialPhoneLock,
+)
 from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
@@ -41,6 +47,7 @@ __all__ = [
     "RefreshToken",
     "Tenant",
     "TenantLLMSettings",
+    "TenantNotification",
     "TenantUser",
     "TrialPhoneLock",
     "User",

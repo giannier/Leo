@@ -13,6 +13,7 @@ whose autoescaping you have to go and check.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from html import escape
 
 from app.providers.email.base import EmailMessage
@@ -264,6 +265,151 @@ El equipo de Leo
     return EmailMessage(
         to=(to,),
         subject=NUMBER_REJECTED_SUBJECT,
+        html=html_body,
+        text=text_body,
+    )
+
+
+TRIAL_NOTICE_SUBJECTS = {
+    "trial_ending_3d": "A tu prueba de Leo le quedan 3 dias",
+    "trial_ending_1d": "Manana termina tu prueba de Leo",
+    "trial_ended": "Tu prueba de Leo termino",
+}
+
+
+def build_trial_notice_email(
+    *,
+    kind: str,
+    to: str,
+    tenant_name: str,
+    panel_url: str,
+) -> EmailMessage:
+    """The day -3 / -1 / 0 warnings of Clarification 004.
+
+    Three separate messages rather than one with a countdown in it. What the
+    customer has to do differs at each point: at -3 there is still time to
+    finish evaluating, at -1 the decision is now, and at 0 the agent has
+    already stopped and the message has to say so plainly instead of implying
+    there is time left.
+    """
+    safe_tenant = escape(tenant_name)
+    safe_url = escape(panel_url, quote=True)
+
+    if kind == "trial_ending_3d":
+        lead_html = (
+            f"A la prueba gratuita de <strong>{safe_tenant}</strong> le quedan "
+            "<strong>3 dias</strong>. Si tu agente ya esta respondiendo como "
+            "esperas, este es un buen momento para elegir un plan y no cortar "
+            "la atencion."
+        )
+        lead_text = (
+            f"A la prueba gratuita de {tenant_name} le quedan 3 dias. Si tu agente "
+            "ya esta respondiendo como esperas, este es un buen momento para "
+            "elegir un plan y no cortar la atencion."
+        )
+        cta = "Ver planes"
+    elif kind == "trial_ending_1d":
+        lead_html = (
+            f"<strong>Manana</strong> termina la prueba gratuita de "
+            f"<strong>{safe_tenant}</strong>. Cuando termine, tu agente deja de "
+            "responder automaticamente, pero no pierdes nada: tus datos, tu "
+            "catalogo y tus conversaciones se quedan donde estan."
+        )
+        lead_text = (
+            f"Manana termina la prueba gratuita de {tenant_name}. Cuando termine, "
+            "tu agente deja de responder automaticamente, pero no pierdes nada: "
+            "tus datos, tu catalogo y tus conversaciones se quedan donde estan."
+        )
+        cta = "Elegir un plan"
+    else:
+        lead_html = (
+            f"La prueba gratuita de <strong>{safe_tenant}</strong> termino, asi que "
+            "tu agente dejo de responder automaticamente. Los mensajes que te "
+            "escriban siguen llegando a tu bandeja y puedes contestarlos a mano "
+            "cuando quieras."
+        )
+        lead_text = (
+            f"La prueba gratuita de {tenant_name} termino, asi que tu agente dejo "
+            "de responder automaticamente. Los mensajes que te escriban siguen "
+            "llegando a tu bandeja y puedes contestarlos a mano cuando quieras."
+        )
+        cta = "Reactivar mi agente"
+
+    html_body = f"""\
+<p>Hola,</p>
+<p>{lead_html}</p>
+<p><a href="{safe_url}">{cta}</a></p>
+<p>El equipo de Leo</p>
+"""
+
+    text_body = f"""\
+Hola,
+
+{lead_text}
+
+{cta}:
+{panel_url}
+
+El equipo de Leo
+"""
+
+    return EmailMessage(
+        to=(to,),
+        subject=TRIAL_NOTICE_SUBJECTS[kind],
+        html=html_body,
+        text=text_body,
+    )
+
+
+WIZARD_REMINDER_SUBJECT = "Te falta poco para dejar listo tu agente en Leo"
+
+
+def build_wizard_reminder_email(
+    *,
+    to: str,
+    tenant_name: str,
+    pending: Sequence[str],
+    panel_url: str,
+) -> EmailMessage:
+    """The single nudge for an abandoned checklist (§jobs).
+
+    It names what is actually missing. "Completa tu configuracion" tells
+    somebody who already thought they were finished nothing at all, and the
+    reason a checklist stalls is usually one item the customer did not realise
+    was still open.
+    """
+    safe_tenant = escape(tenant_name)
+    safe_url = escape(panel_url, quote=True)
+    items_html = "".join(f"<li>{escape(item)}</li>" for item in pending)
+    items_text = "\n".join(f"- {item}" for item in pending)
+
+    html_body = f"""\
+<p>Hola,</p>
+<p>
+  Dejaste la configuracion de <strong>{safe_tenant}</strong> a medio camino.
+  Te falta esto:
+</p>
+<ul>{items_html}</ul>
+<p><a href="{safe_url}">Continuar donde lo dejaste</a></p>
+<p>El equipo de Leo</p>
+"""
+
+    text_body = f"""\
+Hola,
+
+Dejaste la configuracion de {tenant_name} a medio camino. Te falta esto:
+
+{items_text}
+
+Continuar donde lo dejaste:
+{panel_url}
+
+El equipo de Leo
+"""
+
+    return EmailMessage(
+        to=(to,),
+        subject=WIZARD_REMINDER_SUBJECT,
         html=html_body,
         text=text_body,
     )
