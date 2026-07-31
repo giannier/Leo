@@ -25,7 +25,7 @@
   - **Depends on:** TASK-001
   - **Verification:** pipeline verde en un PR de prueba
 
-- [ ] **TASK-003: Migración 0001 — esquema completo + seed de planes**
+- [x] **TASK-003: Migración 0001 — esquema completo + seed de planes**
   - **Input:** `data-model.md`
   - **Output:** migraciones Alembic de todas las tablas, extensiones (vector, citext), seed de `plans` (trial/emprende/crece/pro con límites de clarifications), modelos SQLAlchemy tipados
   - **Depends on:** TASK-001
