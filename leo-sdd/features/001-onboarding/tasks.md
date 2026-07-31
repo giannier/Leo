@@ -90,7 +90,7 @@
   - **Parallel:** Sí
   - **Verification:** tests con CSV válido, parcialmente inválido y malicioso (fórmulas, encoding)
 
-- [ ] **TASK-012: Ingesta de conocimiento + RAG (worker)**
+- [x] **TASK-012: Ingesta de conocimiento + RAG (worker)**
   - **Input:** `contracts/api.md` (§conocimiento), Clarification 011
   - **Output:** endpoints de knowledge; worker `knowledge_indexer` (extracción PDF, chunking, `LLMProvider.embed`, estados pending→indexed/failed); límites por plan; búsqueda vectorial `search_knowledge(tenant_id, query, k)`
   - **Depends on:** TASK-004, TASK-005
