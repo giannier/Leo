@@ -6,12 +6,22 @@ non-committed `.env`), never hardcoded.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production", "test"]
+
+# backend/app/core/config.py -> backend/app/core -> backend/app -> backend -> repo root
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+# Absolute, so the same `.env` is found no matter the working directory.
+# A relative "env_file" resolves against the CWD, which silently returns the
+# hardcoded defaults when Alembic runs from `backend/` instead of the repo
+# root - producing a confusing authentication failure rather than an error.
+ENV_FILE = _REPO_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -23,7 +33,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
