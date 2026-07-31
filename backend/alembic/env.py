@@ -5,6 +5,11 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 
+# Importing the package registers every model on `Base.metadata`. Without
+# this import autogenerate would see an empty schema and propose dropping
+# every table.
+from app.models import Base
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -19,11 +24,7 @@ if config.config_file_name is not None:
 # app and its migrations.
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
-# TASK-003 introduces the SQLAlchemy models and their shared declarative
-# `Base`. Once that lands, import it here and set:
-#   target_metadata = Base.metadata
-# so `alembic revision --autogenerate` can diff against it.
-target_metadata = None
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -69,7 +70,14 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            # Detect column type changes, not just added and dropped columns.
+            # Without this a widened NUMERIC or a changed timezone flag would
+            # drift silently between the models and the database.
+            compare_type=True,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

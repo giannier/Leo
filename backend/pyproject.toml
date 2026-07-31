@@ -44,6 +44,12 @@ ignore = []
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
+[tool.ruff.lint.per-file-ignores]
+# Alembic autogenerates one long line per column. Re-wrapping generated DDL by
+# hand on every migration invites transcription errors in exactly the place you
+# least want them, so line length is not enforced there. Every other rule is.
+"alembic/versions/*.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
 
