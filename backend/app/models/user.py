@@ -97,13 +97,32 @@ class EmailToken(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
 
 
 class RefreshToken(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
-    """Rotating refresh token backing a signed-in session."""
+    """One link in a rotating session chain.
+
+    Every use of a refresh token revokes it and issues a replacement, so a
+    single sign-in leaves behind a chain of rows: one live, the rest revoked.
+    `family_id` is what ties that chain together - it is minted at login and
+    copied to every successor.
+
+    The chain exists to make theft detectable. A stolen token is
+    indistinguishable from the real one, so the give-away is not the token
+    itself but the *duplicate use*: whichever party rotates second presents a
+    row that is already revoked. There is no way to tell victim from thief at
+    that point, so the whole family is revoked and both are forced back
+    through the password. Without `family_id` the choice would be between
+    revoking nothing (theft goes unnoticed indefinitely) and revoking every
+    session the user has anywhere, including the ones on devices that were
+    never involved.
+    """
 
     __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
+    # Indexed because revoking a family is a write over every row that shares
+    # this value, on the hot path of a suspected token theft.
+    family_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
