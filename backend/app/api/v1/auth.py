@@ -58,6 +58,12 @@ from app.services.sessions import (
     SessionService,
     TenantNotAccessibleError,
 )
+from app.services.team import (
+    InvitationExpired,
+    PasswordRequired,
+    SeatLimitReached,
+    accept_invitation,
+)
 
 # The rate limit guards the whole router, not just `login`: an attacker
 # blocked at the login endpoint would otherwise simply move to
@@ -121,6 +127,22 @@ class RegisterResponse(BaseModel):
     user_id: uuid.UUID
     tenant_id: uuid.UUID
     verification_email_sent: bool
+
+
+class AcceptInvitationRequest(BaseModel):
+    """Payload of `POST /auth/invitations/accept`.
+
+    `full_name` and `password` are only needed by somebody who does not have
+    an account yet. An existing user accepting an invitation sends the token
+    alone - asking for their password again would add friction without adding
+    proof, since the token in their inbox is the credential.
+    """
+
+    token: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
+    full_name: ShortText | None = None
+    password: str | None = Field(
+        default=None, min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH
+    )
 
 
 class VerifyOtpRequest(BaseModel):
@@ -394,6 +416,63 @@ async def verify_email(payload: VerifyEmailRequest, session: SessionDep) -> None
             error="invalid_or_expired_token",
             message="This verification link is invalid, expired or already used.",
         ) from exc
+
+
+@router.post(
+    "/invitations/accept",
+    summary="Join a team with an invitation token",
+    responses=error_responses(
+        (400, "`validation_error` or `password_required`"),
+        (409, "`seat_limit_reached`"),
+        (410, "`invitation_expired`"),
+        (429, "`rate_limited`"),
+    ),
+)
+async def accept_invitation_endpoint(
+    payload: AcceptInvitationRequest,
+    session: SessionDep,
+    response: Response,
+) -> SessionResponse:
+    """Public: the person accepting has no session, and may have no account.
+
+    Returns a signed-in session rather than a bare 204, so the invitee lands
+    in the panel from the email instead of being sent to a login form they
+    may not yet have a password for.
+
+    A brand-new account is created already verified: receiving the invitation
+    at that address is the proof, and a second confirmation email would lock
+    them out of the team they were just invited to until they found it.
+    """
+    try:
+        accepted = accept_invitation(
+            session,
+            token=payload.token,
+            full_name=payload.full_name,
+            password=payload.password,
+        )
+    except PasswordRequired as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="password_required",
+            message=str(exc),
+        ) from exc
+    except SeatLimitReached as exc:
+        raise ApiError(
+            status_code=status.HTTP_409_CONFLICT,
+            error="seat_limit_reached",
+            message=str(exc),
+        ) from exc
+    except InvitationExpired as exc:
+        raise ApiError(
+            status_code=status.HTTP_410_GONE,
+            error="invitation_expired",
+            message=str(exc),
+        ) from exc
+
+    service = SessionService(session)
+    authenticated = service.open_for_user(accepted.user, tenant_id=accepted.tenant_id)
+    _set_refresh_cookie(response, authenticated)
+    return _as_response(authenticated)
 
 
 @router.post(
