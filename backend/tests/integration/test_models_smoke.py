@@ -25,6 +25,7 @@ from app.models import (
     TrialPhoneLock,
     User,
 )
+from app.models.knowledge import EMBEDDING_DIMENSIONS
 
 
 def _make_user(db: Session, email: str) -> User:
@@ -167,14 +168,14 @@ class TestVectorColumn:
             tenant_id=tenant.id,
             source_id=source.id,
             content="We open at 9am.",
-            embedding=[0.1] * 1536,
+            embedding=[0.1] * EMBEDDING_DIMENSIONS,
         )
         db.add(chunk)
         db.flush()
         db.refresh(chunk)
 
         assert chunk.embedding is not None
-        assert len(chunk.embedding) == 1536
+        assert len(chunk.embedding) == EMBEDDING_DIMENSIONS
 
     def test_wrong_embedding_dimension_is_rejected(self, db: Session) -> None:
         tenant = _make_tenant(db)
@@ -206,7 +207,7 @@ class TestCascades:
                 tenant_id=tenant.id,
                 source_id=source.id,
                 content="chunk",
-                embedding=[0.0] * 1536,
+                embedding=[0.0] * EMBEDDING_DIMENSIONS,
             )
         )
         db.flush()

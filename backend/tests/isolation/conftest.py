@@ -26,9 +26,13 @@ from app.models import (
     Product,
     Tenant,
 )
+from app.models.knowledge import EMBEDDING_DIMENSIONS
 
 REQUIRE_DB_ENV_VAR = "LEO_REQUIRE_DB"
-EMBEDDING_DIM = 1536
+
+# Re-exported from the model rather than repeated, so a dimension change is a
+# one-line edit instead of a hunt through the test suite.
+EMBEDDING_DIM = EMBEDDING_DIMENSIONS
 
 
 @dataclass(frozen=True)
