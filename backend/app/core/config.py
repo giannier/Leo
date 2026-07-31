@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     resend_api_key: str | None = None
     email_from: str = "Leo <onboarding@example.com>"
 
+    # Public base URL of the tenant panel. Verification links in transactional
+    # email are built from this, so in production it must be the real HTTPS
+    # origin - a wrong value produces links that silently go nowhere.
+    frontend_base_url: str = "http://localhost:3000"
+
+    # Lifetime of an email verification link (data-model.md: 24h).
+    email_verification_token_ttl_hours: int = 24
+
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 
