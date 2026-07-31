@@ -7,12 +7,34 @@ non-committed `.env`), never hardcoded.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production", "test"]
+
+# Environments where a real deployment is reachable by real users, so a
+# placeholder secret or a plaintext cookie is a live vulnerability rather
+# than a local convenience.
+DEPLOYED_ENVIRONMENTS: frozenset[str] = frozenset({"staging", "production"})
+
+# The committed placeholder. Signing tokens with a value everyone can read in
+# the repository means anyone can mint an access token for any account.
+#
+# Long enough to clear the 32-byte floor below: HS256 keys shorter than the
+# hash they feed weaken the MAC, and PyJWT warns about it on every call.
+INSECURE_SECRET_KEY = "dev-secret-key-change-me-in-production"
+
+# Any of these means "nobody has set a real key yet", whichever placeholder a
+# given `.env` happens to be carrying. Historic values stay listed: an old
+# `.env` promoted to production must still be refused.
+PLACEHOLDER_SECRET_KEYS: frozenset[str] = frozenset(
+    {"dev-secret-key-change-me", INSECURE_SECRET_KEY, "change-me", "secret"}
+)
+
+# RFC 7518 §3.2: an HMAC key should be at least as long as the hash output.
+MIN_SECRET_KEY_LENGTH = 32
 
 # Which upstream the platform's own LLM calls go to. Both are hosted APIs
 # speaking the same protocol; neither runs a model on our infrastructure.
@@ -83,10 +105,22 @@ class Settings(BaseSettings):
     credentials_encryption_key: str | None = None
 
     # Auth (JWT access + refresh)
-    secret_key: str = "dev-secret-key-change-me"
+    secret_key: str = INSECURE_SECRET_KEY
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
+
+    # Rate limit applied to every `/auth/*` endpoint, per client IP
+    # (contracts/api.md: 5/min/IP on login).
+    auth_rate_limit_requests: int = 5
+    auth_rate_limit_window_seconds: int = 60
+
+    # Whether `X-Forwarded-For` may be believed when identifying the client.
+    # False by default because a client can send that header itself: trusting
+    # it without a reverse proxy in front turns every per-IP limit into a
+    # per-header-value limit, which an attacker simply varies. Set it to true
+    # only where a proxy we control (Caddy, in `deploy/`) rewrites the header.
+    trust_proxy_headers: bool = False
 
     # Object storage (S3-compatible / MinIO in dev)
     s3_endpoint_url: str | None = "http://localhost:9000"
@@ -109,6 +143,43 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @property
+    def is_deployed(self) -> bool:
+        """Whether this process serves real users over the public internet.
+
+        Drives the `Secure` flag on the refresh cookie: forcing it on in
+        development would make the cookie unusable over plain-HTTP localhost,
+        and leaving it off in production would put the refresh token on the
+        wire in the clear.
+        """
+        return self.environment in DEPLOYED_ENVIRONMENTS
+
+    @model_validator(mode="after")
+    def _reject_weak_secret_when_deployed(self) -> Self:
+        """Refuse to start a deployed process with a guessable signing key.
+
+        Failing at startup is the only safe answer: the alternative is a
+        deployment that looks perfectly healthy while every access token it
+        issues can be forged by anyone who has read the repository.
+
+        Only enforced where it matters. Development and the test suite keep
+        the placeholder, because a local stack that demands a generated
+        secret before it will boot is a local stack nobody runs.
+        """
+        if not self.is_deployed:
+            return self
+        hint = 'Generate one with `python -c "import secrets; print(secrets.token_urlsafe(48))"`.'
+        if self.secret_key in PLACEHOLDER_SECRET_KEYS:
+            raise ValueError(
+                f"SECRET_KEY is still a placeholder in environment={self.environment!r}. {hint}"
+            )
+        if len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_LENGTH} characters in "
+                f"environment={self.environment!r}. {hint}"
+            )
+        return self
 
 
 @lru_cache
