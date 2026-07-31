@@ -31,7 +31,12 @@ from app.providers.llm.base import (
     ToolSpec,
 )
 
-DEFAULT_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+# 30 seconds, not 60. This bounds how long a WhatsApp customer stares at a
+# typing indicator, and nobody waits a minute for a chat reply - by then the
+# canned fallback is a better answer than a late correct one. Measured
+# baseline against NVIDIA: ~2s without tools, ~8s with them, so 30s is a wide
+# margin for a slow day rather than a tight budget.
+DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 
 class OpenAICompatibleProvider:
