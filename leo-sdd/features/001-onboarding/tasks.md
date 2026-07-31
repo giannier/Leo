@@ -54,7 +54,7 @@
   - **Depends on:** TASK-003, TASK-005
   - **Verification:** integration tests del flujo completo, incl. duplicados de email/teléfono
 
-- [ ] **TASK-007: Login, JWT + refresh rotativo, logout**
+- [x] **TASK-007: Login, JWT + refresh rotativo, logout**
   - **Input:** `contracts/api.md`, TASK-006
   - **Output:** login con memberships, access 15min, refresh httpOnly rotativo revocable, middleware de auth + resolución de tenant + roles, rate limit 5/min/IP en auth
   - **Depends on:** TASK-006
