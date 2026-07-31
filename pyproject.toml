@@ -21,3 +21,10 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+[[tool.mypy.overrides]]
+# boto3 and botocore ship no type information. Ignoring their imports is
+# narrower than loosening strictness globally; app code that uses them is
+# still fully checked.
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
