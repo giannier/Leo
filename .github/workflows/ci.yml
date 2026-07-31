@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Supersede in-flight runs for the same branch/PR; always let main finish.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (ruff + mypy + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          # Python version is pinned by `.python-version`; uv reads it.
+          # Do not duplicate it here — one source of truth.
+
+      - name: Install dependencies
+        # `--locked` fails the build if uv.lock is stale rather than silently
+        # resolving something different from what was committed.
+        run: uv sync --locked
+
+      - name: Lint and type-check
+        # `make lint` = ruff check + ruff format --check + mypy (strict).
+        # Runs from the repo root so mypy picks up the root [tool.mypy] table.
+        run: make lint
+
+      - name: Tests
+        # Includes tests/isolation/; that suite becomes a dedicated gate in TASK-004.
+        run: make test
+
+  frontend:
+    name: Frontend (eslint + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          # Matches frontend/Dockerfile (node:24-slim).
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        # `npm ci`, not `npm install`: it honours package-lock.json exactly and
+        # fails on drift. `make front-install` stays on `npm install` because
+        # local development does need to add and resolve new dependencies.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # `next build` type-checks and lints as part of the build.
+        run: npm run build
+
+  ci:
+    name: CI
+    # Single aggregate status check to require in branch protection, so adding a
+    # job above never silently leaves a gap in the merge gate.
+    needs: [backend, frontend]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify every required job succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "One or more required jobs did not succeed."
+          exit 1
