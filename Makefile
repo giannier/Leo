@@ -22,8 +22,8 @@ test: ## Run the full backend test suite.
 isolation: ## Run only the multi-tenant isolation suite.
 	uv run pytest backend/tests/isolation -v
 
-evals: ## Run the agent evals dataset (dataset ships in TASK-016).
-	uv run pytest backend/evals -v
+evals: ## Run the golden agent conversations against the configured model.
+	uv run pytest backend/evals -v -m evals
 
 lint: ## Ruff (check + format) + mypy, matching CI.
 	uv run ruff check backend
