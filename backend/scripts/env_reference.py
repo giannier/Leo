@@ -61,7 +61,13 @@ GROUPS: list[tuple[str, list[str]]] = [
     ),
     (
         "Transactional email",
-        ["resend_api_key", "email_from", "email_verification_token_ttl_hours"],
+        [
+            "email_provider",
+            "resend_api_key",
+            "email_from",
+            "email_outbox_path",
+            "email_verification_token_ttl_hours",
+        ],
     ),
     ("Phone OTP", ["otp_request_limit", "otp_request_window_seconds"]),
     (

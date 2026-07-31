@@ -112,10 +112,12 @@ class TestTheAuthLimit:
 
         assert set(response.json()) == {"error", "message"}
 
-    async def test_the_limit_covers_the_whole_auth_router(self, throttled: AsyncClient) -> None:
+    async def test_every_endpoint_taking_a_guessable_secret_shares_the_budget(
+        self, throttled: AsyncClient
+    ) -> None:
         """Guessing throttled at `login` and free at `resend-verification`
-        would not be throttled at all - and TASK-008 mounts the OTP endpoints
-        on this same router."""
+        would not be throttled at all. One shared window, so moving between
+        endpoints buys an attacker nothing."""
         for _ in range(5):
             await throttled.post(f"{AUTH}/login", json=CREDENTIALS)
 
@@ -231,3 +233,50 @@ class TestClientIdentification:
     def test_the_default_is_not_to_trust_the_header(self) -> None:
         """Safe by default: a deployment opts in once a proxy is in front."""
         assert Settings(environment="test").trust_proxy_headers is False
+
+
+class TestWhatTheLimitDeliberatelyDoesNotCover:
+    """`refresh` and `logout` are exempt, and that is a decision, not an
+    oversight.
+
+    The budget is five requests per minute **per IP address**, and a shop is
+    one IP. The owner and two assistants signing in at opening time, each with
+    a couple of tabs whose access tokens expire together fifteen minutes
+    later, exhaust it between them - and the failure reads as "the panel keeps
+    logging me out", produced by a control meant to stop strangers guessing
+    passwords.
+    """
+
+    async def test_refresh_is_not_throttled(self, throttled: AsyncClient) -> None:
+        """It authenticates a 256-bit opaque token that rotates on every use,
+        with family-wide revocation the moment one is replayed. Guessing is
+        not the threat, and a single replay is already fatal to the session."""
+        for _ in range(5):
+            await throttled.post(f"{AUTH}/login", json=CREDENTIALS)
+
+        response = await throttled.post(f"{AUTH}/refresh", json={})
+
+        # 401 because there is no cookie here - the point is that it is not
+        # 429. A signed-in customer must never be locked out of their own
+        # session by somebody else on the same wifi.
+        assert response.status_code == 401, response.text
+
+    async def test_logout_is_not_throttled(self, throttled: AsyncClient) -> None:
+        """A stop button that answers 429 is worse than no stop button."""
+        for _ in range(5):
+            await throttled.post(f"{AUTH}/login", json=CREDENTIALS)
+
+        response = await throttled.post(f"{AUTH}/logout")
+
+        assert response.status_code != 429, response.text
+
+    async def test_refresh_does_not_spend_the_budget_either(self, throttled: AsyncClient) -> None:
+        """Exempt from the limit means exempt from the counter. If refreshes
+        still incremented it, several tabs waking up together would use up a
+        real login attempt each."""
+        for _ in range(5):
+            await throttled.post(f"{AUTH}/refresh", json={})
+
+        response = await throttled.post(f"{AUTH}/login", json=CREDENTIALS)
+
+        assert response.status_code == 401, response.text

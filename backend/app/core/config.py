@@ -141,6 +141,24 @@ class Settings(BaseSettings):
     resend_api_key: str | None = None
     email_from: str = "Leo <onboarding@example.com>"
 
+    # Which provider to build. `auto` picks Resend when a key is present and
+    # falls back to the console in development.
+    #
+    # `console` is an explicit override, and it exists because "has a key"
+    # turned out to be the wrong question. A developer with a Resend key on a
+    # sandbox account cannot send to anyone but themselves and cannot send
+    # *from* an unverified domain - so registration fails at the one step that
+    # gates entry to the panel, and `auto` never falls back because the key is
+    # right there. Forcing `console` walks the whole flow offline.
+    email_provider: Literal["auto", "console", "resend"] = "auto"
+
+    # Where the console provider records what it "sent", as JSONL. Only read
+    # in development - `ConsoleEmailProvider` refuses to construct anywhere
+    # else. The end-to-end suite reads the verification link from here,
+    # because the token is stored hashed and the message is the only place
+    # its plaintext ever exists.
+    email_outbox_path: str | None = None
+
     # Public base URL of the tenant panel. Verification links in transactional
     # email are built from this, so in production it must be the real HTTPS
     # origin - a wrong value produces links that silently go nowhere.
