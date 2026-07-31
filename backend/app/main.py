@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.errors import install_error_contract
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -25,6 +26,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Before the routers, so every failure - including the ones FastAPI
+    # raises itself - comes back in the envelope the API contract documents.
+    install_error_contract(app)
 
     app.include_router(v1_router, prefix=settings.api_v1_prefix)
 

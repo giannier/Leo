@@ -14,6 +14,10 @@ class EmailAuthError(EmailError):
     """The provider rejected the credential. Retrying will not help."""
 
 
+class EmailConfigurationError(EmailError):
+    """No provider can be built: the deployment has no credential set."""
+
+
 @dataclass(frozen=True)
 class EmailMessage:
     to: tuple[str, ...]
