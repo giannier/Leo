@@ -66,7 +66,7 @@
   - **Depends on:** TASK-007
   - **Verification:** tests de expiración, reintentos y consumo único
 
-- [ ] **TASK-009: Equipo — invitaciones, roles y membresías**
+- [x] **TASK-009: Equipo — invitaciones, roles y membresías**
   - **Input:** `contracts/api.md` (§team), Clarifications 003/008
   - **Output:** endpoints de team completos; límite de asientos desde `plans`; expiración 7 días; revocación de sesiones al desactivar miembro; autorización por rol en dependencias FastAPI reutilizables
   - **Depends on:** TASK-007
