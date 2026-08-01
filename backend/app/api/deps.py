@@ -302,7 +302,10 @@ def get_otp_sender() -> OtpSender:
     refuses to construct outside development, so a deployment that forgets to
     configure a real channel fails loudly instead of logging live codes.
     """
-    return ConsoleOtpSender(environment=get_settings().environment)
+    settings = get_settings()
+    return ConsoleOtpSender(
+        environment=settings.environment, outbox_path=settings.email_outbox_path
+    )
 
 
 def client_identifier(request: Request, settings: Settings) -> str:

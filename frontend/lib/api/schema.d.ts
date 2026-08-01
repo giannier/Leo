@@ -1092,6 +1092,8 @@ export interface components {
             phone_e164: string;
             /** Display Name */
             display_name: string;
+            /** Business Description */
+            business_description: string | null;
             /** Status */
             status: string;
             /** Rejection Reason */
