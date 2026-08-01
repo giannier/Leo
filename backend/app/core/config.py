@@ -34,6 +34,14 @@ PLACEHOLDER_SECRET_KEYS: frozenset[str] = frozenset(
     {"dev-secret-key-change-me", INSECURE_SECRET_KEY, "change-me", "secret"}
 )
 
+# The credential key the development compose file hands out, so a fresh
+# clone can connect a number without generating anything. It is refused in a
+# deployed environment: the whole value of encrypting credentials at rest is
+# that the key is not in the repository, and a default that silently survived
+# into production would hand every stored WhatsApp token to anyone who has
+# read this file.
+DEV_CREDENTIALS_KEY = "bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE="
+
 # RFC 7518 §3.2: an HMAC key should be at least as long as the hash output.
 MIN_SECRET_KEY_LENGTH = 32
 
@@ -311,6 +319,14 @@ class Settings(BaseSettings):
         if self.secret_key in PLACEHOLDER_SECRET_KEYS:
             raise ValueError(
                 f"SECRET_KEY is still a placeholder in environment={self.environment!r}. {hint}"
+            )
+        if self.credentials_encryption_key == DEV_CREDENTIALS_KEY:
+            raise ValueError(
+                "CREDENTIALS_ENCRYPTION_KEY is still the development default in "
+                f"environment={self.environment!r}. Generate one with "
+                '`python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"`. Encrypting credentials with a '
+                "key that is committed to the repository protects nothing."
             )
         if len(self.secret_key) < MIN_SECRET_KEY_LENGTH:
             raise ValueError(

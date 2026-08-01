@@ -1,4 +1,4 @@
-.PHONY: reindex simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: admin reindex simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -40,6 +40,9 @@ lint: ## Ruff (check + format) + mypy, matching CI.
 format: ## Auto-fix lint issues and reformat.
 	uv run python -m ruff check backend --fix
 	uv run python -m ruff format backend
+
+admin: ## Grant platform-admin rights. EMAIL=tu@correo.com [ARGS=--revoke]
+	uv run --directory backend python -m scripts.grant_platform_admin $(EMAIL) $(ARGS)
 
 reindex: ## Re-embed knowledge whose vectors came from another model. ARGS=--dry-run to preview.
 	uv run --directory backend python -m scripts.reindex_knowledge $(ARGS)

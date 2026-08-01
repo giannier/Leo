@@ -231,6 +231,21 @@ export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
 export type KnowledgeSource = KnowledgeList["sources"][number];
 export type KnowledgeUsage = KnowledgeList["usage"];
 
+export type ConnectionRequest = Ok<
+  Ops["/api/v1/tenant/connection-requests"]["get"]
+>[number];
+export type ConnectionRequestBody = JsonBody<
+  Ops["/api/v1/tenant/connection-requests"]["post"]["requestBody"]
+>;
+export type WhatsAppNumber = Ok<Ops["/api/v1/tenant/whatsapp-number"]["get"]>;
+
+export type Team = Ok<Ops["/api/v1/tenant/team"]["get"]>;
+export type TeamMember = Team["members"][number];
+export type TeamInvitation = Team["invitations"][number];
+export type InviteBody = JsonBody<
+  Ops["/api/v1/tenant/team/invitations"]["post"]["requestBody"]
+>;
+
 export type SandboxTurn = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["post"]
 >;
@@ -329,6 +344,34 @@ export const api = {
       });
     },
     remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+  },
+
+  connection: {
+    list: () => request<ConnectionRequest[]>("/tenant/connection-requests"),
+    create: (body: ConnectionRequestBody) =>
+      request<ConnectionRequest>("/tenant/connection-requests", { method: "POST", body }),
+    /** The live number, or `null`. A 404 here means "none yet", which is a
+     * state and not an error - so it is translated rather than thrown. */
+    number: async () => {
+      try {
+        return await request<WhatsAppNumber>("/tenant/whatsapp-number");
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 404) return null;
+        throw caught;
+      }
+    },
+  },
+
+  team: {
+    get: () => request<Team>("/tenant/team"),
+    invite: (body: InviteBody) =>
+      request<TeamInvitation>("/tenant/team/invitations", { method: "POST", body }),
+    resendInvitation: (id: string) =>
+      request<void>(`/tenant/team/invitations/${id}/resend`, { method: "POST" }),
+    revokeInvitation: (id: string) =>
+      request<void>(`/tenant/team/invitations/${id}`, { method: "DELETE" }),
+    updateMember: (membershipId: string, body: { role?: string; status?: string }) =>
+      request<TeamMember>(`/tenant/team/members/${membershipId}`, { method: "PATCH", body }),
   },
 
   sandbox: {

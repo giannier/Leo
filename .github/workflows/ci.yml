@@ -225,6 +225,11 @@ jobs:
       # is what the golden-conversation evals are for, and they run against a
       # real model in their own workflow.
       LLM_PROFILE: offline
+      # Connecting a number encrypts its provider credentials at rest, so the
+      # end-to-end run needs a key or the admin step answers 500. The same
+      # obviously-fake one the development compose file uses; `Settings`
+      # refuses it in staging and production.
+      CREDENTIALS_ENCRYPTION_KEY: bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE=
 
     steps:
       - uses: actions/checkout@v7
