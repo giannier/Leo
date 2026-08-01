@@ -56,7 +56,7 @@
 
 - [x] **TASK-007: Login, JWT + refresh rotativo, logout**
   - **Input:** `contracts/api.md`, TASK-006
-  - **Output:** login con memberships, access 15min, refresh httpOnly rotativo revocable, middleware de auth + resolución de tenant + roles, rate limit 5/min/IP en auth
+  - **Output:** login con memberships, access 15min, refresh httpOnly rotativo revocable, middleware de auth + resolución de tenant + roles, rate limit en auth (revisado en TASK-020: guarda por IP + contador por cuenta; ver contracts/api.md)
   - **Depends on:** TASK-006
   - **Verification:** tests de rotación/revocación de refresh; acceso denegado sin email verificado
 

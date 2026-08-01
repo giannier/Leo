@@ -223,6 +223,16 @@ export interface paths {
          *
          *     The response lists every business the caller belongs to, so the panel can
          *     offer a choice; the access token is scoped to whichever one is active.
+         *
+         *     Guarded per **account** as well as per IP. The per-account counter is what
+         *     actually stops somebody guessing a password: it does not care which
+         *     connection the attempt arrives on, so a shop whose whole staff shares one
+         *     router is not treated as a single attacker.
+         *
+         *     The counter is spent before the password is checked, not after. Verifying
+         *     an Argon2 hash is deliberately expensive, and doing it for a caller who is
+         *     already over their limit hands an attacker a way to burn the server's CPU
+         *     for free.
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -2053,7 +2063,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `rate_limited` - 5/min per IP, and 3/hour per user */
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes, or more than the hourly cap for this user */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -2220,7 +2230,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `rate_limited` - more than 5 requests per minute from this IP */
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -2282,7 +2292,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `rate_limited` - more than 5 requests per minute from this IP */
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -2311,7 +2321,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description `rate_limited` - more than 5 requests per minute from this IP */
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
             429: {
                 headers: {
                     [name: string]: unknown;

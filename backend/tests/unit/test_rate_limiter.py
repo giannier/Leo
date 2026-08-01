@@ -1,4 +1,4 @@
-"""Tests for the throttle behind the 5/min/IP rule on `/auth/*`.
+"""Tests for the throttle behind the rate limits on `/auth/*`.
 
 `RedisRateLimiter` is exercised against a real Redis, not a fake. The whole
 reason it is not an in-process dictionary is that the counter has to be
@@ -222,11 +222,44 @@ class TestConfiguration:
                 window_seconds=window,
             )
 
-    def test_the_configured_default_is_the_contracted_five_per_minute(self) -> None:
-        """contracts/api.md: rate limit 5/min/IP on login."""
+    def test_the_configuration_matches_the_published_contract(self) -> None:
+        """Reads the numbers out of `contracts/api.md` rather than repeating them.
+
+        This test used to assert `== 5`, and when the limit was raised it
+        failed for the wrong reason: it was pinning a literal, not checking
+        that the code and the document agreed. Parsing the contract means the
+        two can only ever drift apart deliberately - change one without the
+        other and this goes red.
+        """
+        import re
+        from pathlib import Path
+
+        contract = (
+            Path(__file__).resolve().parents[3]
+            / "leo-sdd"
+            / "features"
+            / "001-onboarding"
+            / "contracts"
+            / "api.md"
+        ).read_text(encoding="utf-8")
+
+        documented = {
+            name: int(value)
+            for name, value in re.findall(
+                r"`(AUTH_RATE_LIMIT_REQUESTS|AUTH_RATE_LIMIT_WINDOW_SECONDS|"
+                r"LOGIN_ATTEMPT_LIMIT|LOGIN_ATTEMPT_WINDOW_SECONDS)=(\d+)`",
+                contract,
+            )
+        }
+        assert len(documented) == 4, f"contract does not name all four limits: {documented}"
+
         settings = get_settings()
-        assert settings.auth_rate_limit_requests == 5
-        assert settings.auth_rate_limit_window_seconds == 60
+        assert settings.auth_rate_limit_requests == documented["AUTH_RATE_LIMIT_REQUESTS"]
+        assert (
+            settings.auth_rate_limit_window_seconds == documented["AUTH_RATE_LIMIT_WINDOW_SECONDS"]
+        )
+        assert settings.login_attempt_limit == documented["LOGIN_ATTEMPT_LIMIT"]
+        assert settings.login_attempt_window_seconds == documented["LOGIN_ATTEMPT_WINDOW_SECONDS"]
 
 
 class TestNullRateLimiter:

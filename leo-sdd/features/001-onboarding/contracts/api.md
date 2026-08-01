@@ -29,7 +29,25 @@ Errores: `409 email_taken`, `409 phone_in_active_trial` (Clarification 005), `40
 { "access_token": "jwt", "user": { "id":"uuid","full_name":"...","email":"..." },
   "memberships": [ { "tenant_id":"uuid","tenant_name":"...","role":"owner" } ] }
 ```
-Errores: `401 invalid_credentials`, `403 email_not_verified`. Rate limit 5/min/IP.
+Errores: `401 invalid_credentials`, `403 email_not_verified`, `429 rate_limited`.
+
+**Rate limits (revisados en TASK-020).** Dos capas, porque una sola no cubre el caso real:
+
+- `AUTH_RATE_LIMIT_REQUESTS=20` por `AUTH_RATE_LIMIT_WINDOW_SECONDS=60`, por direccion IP,
+  compartido por los endpoints de `/auth` que reciben un secreto adivinable. Guarda gruesa:
+  impide que un solo origen barra muchas cuentas.
+- `LOGIN_ATTEMPT_LIMIT=10` por `LOGIN_ATTEMPT_WINDOW_SECONDS=900`, **por cuenta**, contando
+  solo intentos fallidos y reiniciandose al primer ingreso correcto. Esta es la defensa real
+  contra adivinar una contrasena.
+
+El limite por IP era 5/min y suponia que una IP era una persona. Un negocio pequeno es un
+router: la duena y dos ayudantes entrando a las 8 de la manana son un solo cliente para ese
+contador, y una contrasena mal tipeada entre ellos bastaba para bloquear al resto. El contador
+por cuenta no depende de la conexion, asi que protege igual sin castigar a quien comparte wifi.
+
+`/auth/refresh` y `/auth/logout` quedan **fuera** de ambos limites: el primero presenta un token
+opaco de 256 bits que rota en cada uso y se revoca por familia ante un replay, y el segundo debe
+funcionar siempre al primer intento.
 ### POST /auth/refresh → rota refresh, devuelve nuevo access. `401 invalid_refresh`.
 ### POST /auth/logout → revoca refresh. `204`.
 ### POST /auth/phone/request-otp → envía OTP al `phone_e164` del usuario. `204`. Rate limit 3/h.

@@ -41,6 +41,8 @@ GROUPS: list[tuple[str, list[str]]] = [
             "refresh_token_expire_days",
             "auth_rate_limit_requests",
             "auth_rate_limit_window_seconds",
+            "login_attempt_limit",
+            "login_attempt_window_seconds",
             "trust_proxy_headers",
         ],
     ),

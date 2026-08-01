@@ -1,6 +1,6 @@
 """Per-caller request throttling.
 
-`contracts/api.md` puts a 5/min/IP limit on `/auth/*`. That number is not
+`contracts/api.md` puts a per-IP limit on `/auth/*`. That number is not
 about capacity - it is what makes online password guessing and account
 enumeration impractical, so the counter has to be shared by every worker
 process. An in-process dictionary would give each Gunicorn/Uvicorn worker its
@@ -53,6 +53,16 @@ class RateLimiter(Protocol):
         """Count one request against `key` and say whether it may proceed."""
         ...
 
+    async def reset(self, key: str) -> None:
+        """Forget everything counted against `key`.
+
+        Exists for counters that measure *failure*. A password limiter that
+        never resets punishes the person who mistyped twice and then got it
+        right: their two failures sit in the window for the next quarter of an
+        hour, and the next honest mistake locks them out.
+        """
+        ...
+
 
 class NullRateLimiter:
     """Allows everything.
@@ -64,6 +74,9 @@ class NullRateLimiter:
 
     async def hit(self, key: str) -> RateLimitDecision:
         return RateLimitDecision(allowed=True, retry_after_seconds=0)
+
+    async def reset(self, key: str) -> None:
+        return None
 
 
 class RedisRateLimiter:
@@ -121,3 +134,25 @@ class RedisRateLimiter:
         if int(count) > self._limit:
             return RateLimitDecision(allowed=False, retry_after_seconds=seconds_left)
         return RateLimitDecision(allowed=True, retry_after_seconds=0)
+
+    async def reset(self, key: str) -> None:
+        """Drop the counter for `key`, in this window and the one before it.
+
+        Both, because the window boundary is arbitrary: a failure at 09:14:58
+        and a success at 09:15:01 fall either side of it, and clearing only
+        the current window would leave that failure to be counted against the
+        next honest mistake.
+
+        A Redis outage is swallowed. Failing to clear a counter can at worst
+        delay somebody by one window; failing their *successful* login because
+        the bookkeeping did not work would be far worse.
+        """
+        now = int(time.time())
+        current = now // self._window
+        keys = [f"{self._namespace}:{key}:{index}" for index in (current, current - 1)]
+        try:
+            await self._client.delete(*keys)
+        except RedisError:
+            logger.warning(
+                "could not clear rate limit counter", exc_info=True, extra={"rate_limit_key": key}
+            )

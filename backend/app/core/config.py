@@ -112,9 +112,36 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
 
     # Rate limit applied to every `/auth/*` endpoint, per client IP
-    # (contracts/api.md: 5/min/IP on login).
-    auth_rate_limit_requests: int = 5
+    # (contracts/api.md documents both numbers).
+    # Coarse per-IP guard on the endpoints that take a guessable secret.
+    #
+    # It was 5/min, matching the original contract, and that number assumed
+    # one IP meant one person. The customers are small businesses, and a
+    # small business is one wifi router: the owner and two assistants opening
+    # the panel at eight in the morning are a single client to this counter,
+    # and a mistyped password between them was enough to lock the rest out.
+    #
+    # The precise work is now done by `login_attempt_*` below, which counts
+    # per account and does not care whose connection the attempt came from.
+    # What is left for this one is stopping a single source from hammering
+    # *many* accounts, and 20 a minute does that while leaving room for a
+    # shop full of people.
+    auth_rate_limit_requests: int = 20
     auth_rate_limit_window_seconds: int = 60
+
+    # Failed sign-ins per account. The actual defence against somebody
+    # guessing a password, and the reason the per-IP number above can be
+    # relaxed: this one is immune to shared connections, because it counts
+    # the account being attacked rather than the address attacking it.
+    #
+    # Ten in a quarter of an hour is far past normal - nobody mistypes their
+    # own password ten times in fifteen minutes - and far below useful for an
+    # attacker: 960 guesses a day against an Argon2 hash of a password that
+    # must be at least ten characters.
+    #
+    # A success clears the counter, so honest fumbling never accumulates.
+    login_attempt_limit: int = 10
+    login_attempt_window_seconds: int = 900
 
     # Whether `X-Forwarded-For` may be believed when identifying the client.
     # False by default because a client can send that header itself: trusting
@@ -231,6 +258,40 @@ class Settings(BaseSettings):
         wire in the clear.
         """
         return self.environment in DEPLOYED_ENVIRONMENTS
+
+    @model_validator(mode="after")
+    def _require_a_decision_about_proxy_headers(self) -> Self:
+        """A deployed process must say, out loud, whether it sits behind a proxy.
+
+        The default is `False`, and silently keeping it is the worst outcome
+        available. `deploy/` puts Caddy in front, so every request reaches the
+        application from Caddy's address: with the header untrusted, the
+        per-IP rate limiter sees one client, and the entire customer base -
+        every shop in the country - shares a single budget of
+        `auth_rate_limit_requests` per window. Nobody can sign in, and nothing
+        in the logs says why.
+
+        Setting it to `True` without a proxy is the mirror image: the header
+        is then attacker-supplied, so the limiter is keyed on a string the
+        attacker picks and stops limiting anything at all.
+
+        Both failures are silent, and they are opposites, so there is no
+        default that is safe in both cases. What this refuses is not a value -
+        it is the *absence of a choice*. Either answer boots; not answering
+        does not.
+        """
+        if not self.is_deployed:
+            return self
+        if "trust_proxy_headers" not in self.model_fields_set:
+            raise ValueError(
+                "TRUST_PROXY_HEADERS is not set, and in environment="
+                f"{self.environment!r} it must be stated explicitly. "
+                "Behind a reverse proxy (the `deploy/` stack uses Caddy) set it "
+                "to true; exposed directly, set it to false. Left unset, every "
+                "per-IP limit counts the whole platform as one client and locks "
+                "everybody out."
+            )
+        return self
 
     @model_validator(mode="after")
     def _reject_weak_secret_when_deployed(self) -> Self:

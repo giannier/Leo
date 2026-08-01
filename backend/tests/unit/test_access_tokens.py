@@ -211,12 +211,16 @@ class TestDeploymentSafety:
         """Signing with a key that is committed to a public repository means
         anyone can mint a token for any account. Fail at startup instead."""
         with pytest.raises(ValueError, match="SECRET_KEY"):
-            Settings(environment="production", secret_key=placeholder)
+            Settings(environment="production", secret_key=placeholder, trust_proxy_headers=False)
 
     def test_a_deployed_environment_refuses_a_short_secret(self) -> None:
         """RFC 7518: an HS256 key below 32 bytes weakens the MAC."""
         with pytest.raises(ValueError, match="at least 32"):
-            Settings(environment="staging", secret_key="s3cr3t-but-far-too-short")
+            Settings(
+                environment="staging",
+                secret_key="s3cr3t-but-far-too-short",
+                trust_proxy_headers=False,
+            )
 
     @pytest.mark.parametrize("environment", ["development", "test"])
     def test_a_local_environment_keeps_working_with_a_placeholder(self, environment: str) -> None:
@@ -239,7 +243,9 @@ class TestDeploymentSafety:
 
     def test_a_deployed_environment_accepts_a_real_secret(self) -> None:
         settings = Settings(
-            environment="production", secret_key="a-real-generated-secret-of-ample-length"
+            environment="production",
+            secret_key="a-real-generated-secret-of-ample-length",
+            trust_proxy_headers=False,
         )
         assert settings.is_deployed is True
 
@@ -258,5 +264,8 @@ class TestDeploymentSafety:
         settings = Settings(
             environment=environment,  # type: ignore[arg-type]
             secret_key="a-real-generated-secret-of-ample-length",
+            # Stated because a deployed Settings refuses to build without it.
+            # This case is about the cookie flag, not about proxies.
+            trust_proxy_headers=False,
         )
         assert settings.is_deployed is deployed
