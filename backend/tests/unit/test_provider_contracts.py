@@ -30,7 +30,9 @@ from app.providers.llm import (
     OpenAICompatibleProvider,
     ToolSpec,
 )
-from app.providers.llm.factory import LLMConfigurationError, platform_profile
+from app.providers.llm.base import LLMConfigurationError
+from app.providers.llm.factory import platform_profile
+from app.providers.llm.offline import OfflineLLMProvider
 from app.providers.storage import MockStorageProvider, ObjectNotFoundError, StorageProvider
 
 
@@ -297,3 +299,93 @@ class TestTheCredentialIsCheckedForPlausibility:
     def test_the_nvidia_profile_is_held_to_the_same_bar(self) -> None:
         with pytest.raises(LLMConfigurationError, match="NVIDIA_API_KEY"):
             platform_profile(Settings(llm_profile="nvidia", nvidia_api_key="nv-x"))
+
+
+class TestTheOfflineProvider:
+    """`LLM_PROFILE=offline`: deterministic, credential-free, and honest.
+
+    It exists so the product can be walked end to end with no key and no
+    network. The risk it carries is somebody mistaking it for the real agent,
+    so most of what is asserted here is about it refusing to look like one.
+    """
+
+    def test_it_refuses_to_run_outside_development(self) -> None:
+        """The whole safety argument rests on this. A deployment answering
+        customers from a hash would be worse than one that is down."""
+        for environment in ("staging", "production"):
+            with pytest.raises(LLMConfigurationError, match="never run in"):
+                OfflineLLMProvider(environment=environment)
+
+    async def test_every_reply_says_it_is_not_the_agent(self) -> None:
+        provider = OfflineLLMProvider(environment="test")
+
+        result = await provider.chat([ChatMessage("user", "¿hacen delivery?")])
+
+        assert result.content.startswith("[MODO SIN CONEXION")
+        # And it quotes the question, so a person testing the UI can see their
+        # message made the whole round trip.
+        assert "¿hacen delivery?" in result.content
+
+    async def test_it_never_invents_a_tool_call(self) -> None:
+        """Choosing a tool is a judgement about meaning and a hash cannot make
+        one. A plausible-looking call would put fiction in the trace panel,
+        which is the one place that has to be trustworthy."""
+        provider = OfflineLLMProvider(environment="test")
+
+        result = await provider.chat(
+            [ChatMessage("user", "quiero comprar dos panes")],
+            tools=[ToolSpec(name="consultar_catalogo", description="busca productos")],
+        )
+
+        assert result.tool_calls == ()
+
+    async def test_the_same_text_always_embeds_to_the_same_vector(self) -> None:
+        provider = OfflineLLMProvider(environment="test")
+
+        first, second = await provider.embed(["pan artesanal", "pan artesanal"])
+
+        assert first == second
+
+    async def test_shared_words_score_closer_than_unrelated_text(self) -> None:
+        """Not semantic - it cannot be, offline - but not random either.
+
+        Random vectors would let somebody conclude retrieval is broken, or
+        that it works, on no evidence at all.
+        """
+        provider = OfflineLLMProvider(environment="test")
+
+        same, similar, unrelated = await provider.embed(
+            [
+                "hacemos delivery en miraflores",
+                "delivery en miraflores por ocho soles",
+                "reparacion de motores diesel industriales",
+            ]
+        )
+        cosine = lambda a, b: sum(x * y for x, y in zip(a, b, strict=True))  # noqa: E731
+
+        assert cosine(same, similar) > cosine(same, unrelated)
+
+    async def test_the_vectors_are_the_configured_width(self) -> None:
+        """A different width would be rejected by pgvector at insert time,
+        long after the cause."""
+        provider = OfflineLLMProvider(environment="test")
+
+        [vector] = await provider.embed(["cualquier cosa"])
+
+        assert len(vector) == EMBEDDING_DIMENSIONS
+
+    async def test_an_empty_chunk_still_produces_a_usable_vector(self) -> None:
+        """A zero vector is undefined under cosine distance. Punctuation-only
+        chunks do occur in real PDFs."""
+        provider = OfflineLLMProvider(environment="test")
+
+        [vector] = await provider.embed(["...  ---  "])
+
+        assert any(value != 0.0 for value in vector)
+
+    async def test_the_vectors_are_normalised(self) -> None:
+        provider = OfflineLLMProvider(environment="test")
+
+        [vector] = await provider.embed(["pan ciabatta recién horneado"])
+
+        assert abs(sum(value * value for value in vector) - 1.0) < 1e-9

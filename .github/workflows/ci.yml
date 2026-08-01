@@ -217,6 +217,14 @@ jobs:
       # explicitly at the documented value and asserts the sixth request is
       # refused.
       AUTH_RATE_LIMIT_REQUESTS: "500"
+      # A deterministic provider that talks to nobody. Every path through the
+      # sandbox ends at a completion or an embedding call, so without this the
+      # screen could not be exercised here at all - and CI has no credential.
+      # It answers from a hash and says so in its first line, so what this
+      # proves is the plumbing, never the quality of an answer. Answer quality
+      # is what the golden-conversation evals are for, and they run against a
+      # real model in their own workflow.
+      LLM_PROFILE: offline
 
     steps:
       - uses: actions/checkout@v7

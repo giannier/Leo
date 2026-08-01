@@ -19,7 +19,8 @@ from app.core.config import Settings, get_settings
 from app.core.crypto import decrypt_secret
 from app.models.knowledge import EMBEDDING_DIMENSIONS
 from app.models.llm_settings import TenantLLMSettings
-from app.providers.llm.base import LLMProvider
+from app.providers.llm.base import LLMConfigurationError, LLMProvider
+from app.providers.llm.offline import OfflineLLMProvider
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
 # Shortest thing that could plausibly be a key. Real ones are far longer -
@@ -32,10 +33,6 @@ from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 # call, where the symptom is a knowledge source stuck at `failed` with a
 # provider error - a long way from the line in `.env` that caused it.
 MIN_PLAUSIBLE_KEY_LENGTH = 20
-
-
-class LLMConfigurationError(RuntimeError):
-    """The requested profile is selected but not usable."""
 
 
 def _require_key(value: str | None, *, variable: str, hint: str) -> str:
@@ -110,6 +107,17 @@ def platform_profile(settings: Settings | None = None) -> ProviderProfile:
     return _nvidia_profile(settings)
 
 
+def _offline_provider(settings: Settings) -> LLMProvider:
+    """The provider for `LLM_PROFILE=offline`.
+
+    It has no profile: there is no base URL, no key and no model to describe,
+    so it is built directly rather than squeezed into `ProviderProfile`.
+    `OfflineLLMProvider` refuses to construct outside development, so this
+    cannot become a deployment that answers customers from a hash.
+    """
+    return OfflineLLMProvider(environment=settings.environment)
+
+
 def build_provider(profile: ProviderProfile) -> LLMProvider:
     return OpenAICompatibleProvider(
         api_key=profile.api_key,
@@ -123,6 +131,9 @@ def build_provider(profile: ProviderProfile) -> LLMProvider:
 
 def platform_provider(settings: Settings | None = None) -> LLMProvider:
     """Provider for platform-funded work: embeddings, and default chat."""
+    settings = settings or get_settings()
+    if settings.llm_profile == "offline":
+        return _offline_provider(settings)
     return build_provider(platform_profile(settings))
 
 

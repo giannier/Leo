@@ -9,6 +9,7 @@ from app.providers.llm.base import (
     ChatMessage,
     ChatResult,
     LLMAuthError,
+    LLMConfigurationError,
     LLMError,
     LLMProvider,
     LLMRateLimitError,
@@ -16,7 +17,6 @@ from app.providers.llm.base import (
     ToolSpec,
 )
 from app.providers.llm.factory import (
-    LLMConfigurationError,
     ProviderProfile,
     build_provider,
     platform_profile,
@@ -24,6 +24,7 @@ from app.providers.llm.factory import (
     provider_for_tenant,
 )
 from app.providers.llm.mock import MockLLMProvider
+from app.providers.llm.offline import OfflineLLMProvider
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "ChatResult",
     "LLMAuthError",
     "LLMConfigurationError",
+    "OfflineLLMProvider",
     "LLMError",
     "LLMProvider",
     "LLMRateLimitError",

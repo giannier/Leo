@@ -1,5 +1,12 @@
 .PHONY: simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
+# `--env-file .env` is load-bearing, not decoration: it makes the repo's
+# own .env the source for variable interpolation. Compose otherwise
+# interpolates from the shell alone, so a `${LLM_PROFILE:-offline}`
+# default in the compose file silently wins over the value in .env -
+# `environment:` beats `env_file:`, and the file you edited loses to a
+# default you never saw. Always drive the stack through `make`, or pass
+# the flag by hand.
 COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
 
 env-reference: ## Regenerate deploy/env.reference from Settings.

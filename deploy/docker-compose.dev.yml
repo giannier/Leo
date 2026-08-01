@@ -86,6 +86,12 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       # Inside the bind mount, so the host (and Playwright) can read it.
       EMAIL_OUTBOX_PATH: /app/.tmp/outbox.jsonl
+      # No credential, no network, no cost. The whole product is walkable
+      # offline; every reply says so in its first line. Point LLM_PROFILE at a
+      # real provider in `.env` to see real answers. `OfflineLLMProvider`
+      # refuses to construct outside development, so this cannot reach a
+      # deployment.
+      LLM_PROFILE: ${LLM_PROFILE:-offline}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -132,6 +138,7 @@ services:
       S3_ENDPOINT_URL: http://minio:9000
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_OUTBOX_PATH: /app/.tmp/outbox.jsonl
+      LLM_PROFILE: ${LLM_PROFILE:-offline}
     volumes:
       - ../backend:/app
     depends_on:

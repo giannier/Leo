@@ -162,7 +162,7 @@
   - **Depends on:** TASK-013, TASK-020
   - **Verification:** E2E: completar wizard hasta `sandbox_ready`
 
-- [ ] **TASK-022: Sandbox (UI)**
+- [x] **TASK-022: Sandbox (UI)**
   - **Input:** spec HU-03, TASK-015
   - **Output:** chat de simulación con etiqueta MODO PRUEBA, reinicio de conversación, panel expandible de trazas (tools y fuentes), estados de carga
   - **Depends on:** TASK-015, TASK-021
