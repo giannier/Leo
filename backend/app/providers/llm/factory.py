@@ -63,6 +63,9 @@ class ProviderProfile:
     embedding_dimensions: int | None
     # NVIDIA requires `input_type` on embeddings; OpenAI rejects it.
     send_embedding_input_type: bool
+    # OpenAI's newer models reject `max_tokens` and require
+    # `max_completion_tokens`. NVIDIA still takes the old name.
+    max_tokens_field: str = "max_tokens"
 
 
 def _nvidia_profile(settings: Settings) -> ProviderProfile:
@@ -96,6 +99,7 @@ def _openai_profile(settings: Settings) -> ProviderProfile:
         embedding_model=settings.openai_embedding_model,
         embedding_dimensions=EMBEDDING_DIMENSIONS,
         send_embedding_input_type=False,
+        max_tokens_field="max_completion_tokens",
     )
 
 
@@ -126,6 +130,7 @@ def build_provider(profile: ProviderProfile) -> LLMProvider:
         embedding_model=profile.embedding_model,
         embedding_dimensions=profile.embedding_dimensions,
         send_embedding_input_type=profile.send_embedding_input_type,
+        max_tokens_field=profile.max_tokens_field,
     )
 
 

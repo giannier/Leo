@@ -46,6 +46,13 @@ class ChatMessage:
     # Set on `tool` messages to link a result back to its call.
     tool_call_id: str | None = None
     name: str | None = None
+    # Set on the `assistant` turn that *requested* tools, and it has to be:
+    # the OpenAI API rejects a `tool` message whose preceding assistant turn
+    # does not carry the matching `tool_calls`. NVIDIA's endpoint tolerated
+    # the omission, so the agent loop replayed only the assistant's text and
+    # worked - right up until the profile was switched to OpenAI, where every
+    # tool-using turn then failed and fell back.
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 @dataclass(frozen=True)
