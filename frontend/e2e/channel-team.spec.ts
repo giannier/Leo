@@ -99,28 +99,28 @@ async function readOtp(
 /**
  * Promotes a user to platform admin.
  *
- * Through the database, because there is deliberately no API that grants it -
- * an endpoint that can make somebody a platform admin is an endpoint that can
- * be used to make somebody a platform admin. Same shape as the rate-limiter
- * fixture reaching for `redis-cli`: a development-only escape hatch that the
- * product itself does not offer.
+ * Through the same script an operator uses, rather than `docker exec psql`:
+ * in CI the database is a service container with a different name, and the
+ * container form failed there while passing locally. Going through the script
+ * also means the test exercises the path a person actually takes.
+ *
+ * There is deliberately no API for this. An endpoint that can make somebody a
+ * platform admin is an endpoint that can be used to make somebody a platform
+ * admin, and that role reads every business on the platform.
  */
 async function makePlatformAdmin(email: string): Promise<void> {
   const { execFile } = await import("node:child_process");
   const { promisify } = await import("node:util");
   const run = promisify(execFile);
-  const container = process.env.E2E_POSTGRES_CONTAINER ?? "leo-dev-postgres-1";
-  await run("docker", [
-    "exec",
-    container,
-    "psql",
-    "-U",
-    "leo",
-    "-d",
-    "leo",
-    "-c",
-    `UPDATE users SET is_platform_admin = true WHERE email = '${email}'`,
-  ]);
+  // No `shell: true`. Node warns that arguments are concatenated rather than
+  // escaped under a shell, and an email interpolated into a command line is
+  // exactly the shape that goes wrong. `uv` is resolved from PATH directly.
+  const uv = process.platform === "win32" ? "uv.exe" : "uv";
+  await run(
+    uv,
+    ["run", "--directory", "backend", "python", "-m", "scripts.grant_platform_admin", email],
+    { cwd: ".." },
+  );
 }
 
 test.describe("Conexión del número", () => {
