@@ -92,6 +92,11 @@ services:
       # refuses to construct outside development, so this cannot reach a
       # deployment.
       LLM_PROFILE: ${LLM_PROFILE:-offline}
+      # Fernet key for credentials at rest. A default so a fresh clone can
+      # connect a number without generating one; obviously fake, and
+      # `Settings` refuses it outright in staging or production - a key
+      # committed to the repository protects nothing.
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:-bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE=}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -139,6 +144,7 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_OUTBOX_PATH: /app/.tmp/outbox.jsonl
       LLM_PROFILE: ${LLM_PROFILE:-offline}
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:-bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE=}
     volumes:
       - ../backend:/app
     depends_on:

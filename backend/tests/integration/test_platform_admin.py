@@ -111,8 +111,23 @@ async def _file_request(api: AsyncClient, headers: dict[str, str]) -> tuple[uuid
     return uuid.UUID(created.json()["id"]), phone
 
 
-def _audit(db: Session, action: str) -> list[AuditLog]:
-    return list(db.execute(select(AuditLog).where(AuditLog.action == action)).scalars().all())
+def _audit(db: Session, action: str, tenant_id: uuid.UUID) -> list[AuditLog]:
+    """Audit entries for one action, against one tenant.
+
+    Scoped, and it has to be. Counting the whole table asserted "this is the
+    only such action anywhere in the database", which is true only of a
+    database nobody has touched - the end-to-end suite connects real numbers
+    and writes real audit rows, and these tests then failed for a reason that
+    had nothing to do with auditing. Third time this shape of bug has
+    appeared, after products and knowledge sources.
+    """
+    return list(
+        db.execute(
+            select(AuditLog).where(AuditLog.action == action, AuditLog.tenant_id == tenant_id)
+        )
+        .scalars()
+        .all()
+    )
 
 
 class TestTheGate:
@@ -430,7 +445,7 @@ class TestTheAuditTrail:
             json={"status": "connected", "credentials": GOOD_CREDENTIALS},
         )
 
-        entries = _audit(db, "connection_request.connected")
+        entries = _audit(db, "connection_request.connected", tenant_id)
         assert len(entries) == 1
         entry = entries[0]
         assert entry.actor_id == admin_id
@@ -447,6 +462,7 @@ class TestTheAuditTrail:
         self, api: AsyncClient, mail: Any, db: Session
     ) -> None:
         tenant_headers, _ = await _register(api, mail, db)
+        tenant_id = uuid.UUID((await api.get(TENANT, headers=tenant_headers)).json()["id"])
         request_id, _ = await _file_request(api, tenant_headers)
         admin_headers, _ = await _admin(api, mail, db)
 
@@ -456,7 +472,7 @@ class TestTheAuditTrail:
             json={"status": "rejected", "rejection_reason": "WABA ya activa en otra cuenta"},
         )
 
-        entries = _audit(db, "connection_request.rejected")
+        entries = _audit(db, "connection_request.rejected", tenant_id)
         assert len(entries) == 1
         assert entries[0].detail["rejection_reason"] == "WABA ya activa en otra cuenta"
 
@@ -466,6 +482,7 @@ class TestTheAuditTrail:
         """An audit log that records attempts as if they were actions is worse
         than none: it makes a rejected connection look like a connected one."""
         tenant_headers, _ = await _register(api, mail, db)
+        tenant_id = uuid.UUID((await api.get(TENANT, headers=tenant_headers)).json()["id"])
         request_id, _ = await _file_request(api, tenant_headers)
         admin_headers, _ = await _admin(api, mail, db)
 
@@ -475,7 +492,7 @@ class TestTheAuditTrail:
             json={"status": "connected"},
         )
         assert refused.status_code == 400
-        assert _audit(db, "connection_request.connected") == []
+        assert _audit(db, "connection_request.connected", tenant_id) == []
 
 
 class TestTheTenantIsTold:
@@ -545,6 +562,7 @@ class TestTheTenantIsTold:
         retrying - hits `illegal_transition` and looks like a second bug.
         """
         tenant_headers, _ = await _register(api, mail, db)
+        tenant_id = uuid.UUID((await api.get(TENANT, headers=tenant_headers)).json()["id"])
         request_id, phone = await _file_request(api, tenant_headers)
         admin_headers, _ = await _admin(api, mail, db)
 
@@ -565,7 +583,7 @@ class TestTheTenantIsTold:
             select(WhatsAppNumber).where(WhatsAppNumber.phone_e164 == phone)
         ).scalar_one()
         assert number.status == "connected"
-        assert len(_audit(db, "connection_request.connected")) == 1
+        assert len(_audit(db, "connection_request.connected", tenant_id)) == 1
 
 
 class TestTenants:
@@ -623,7 +641,7 @@ class TestExtendTrial:
             days=7
         )
 
-        entries = _audit(db, "trial.extended")
+        entries = _audit(db, "trial.extended", tenant_id)
         assert len(entries) == 1
         assert entries[0].actor_id == admin_id
         assert entries[0].tenant_id == tenant_id

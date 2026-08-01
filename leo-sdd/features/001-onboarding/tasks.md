@@ -168,7 +168,7 @@
   - **Depends on:** TASK-015, TASK-021
   - **Verification:** E2E: conversación con respuesta del agente y traza visible
 
-- [ ] **TASK-023: Conexión de número + equipo + activación (UI)**
+- [x] **TASK-023: Conexión de número + equipo + activación (UI)**
   - **Input:** HU-04/05/06, TASK-017/019, TASK-009
   - **Output:** formulario y seguimiento de solicitud de conexión (estados), gestión de equipo (invitar/roles/desactivar), switch del agente con guía de primer test real
   - **Depends on:** TASK-019, TASK-021

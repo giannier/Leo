@@ -60,6 +60,10 @@ class ConnectionRequestResponse(BaseModel):
     id: uuid.UUID
     phone_e164: str
     display_name: str
+    # Returned so a rejected request can be corrected without retyping it.
+    # Clarification 012 makes re-filing the expected path, and a retry form
+    # that arrives empty is one the customer abandons.
+    business_description: str | None
     status: str
     rejection_reason: str | None
     created_at: datetime
