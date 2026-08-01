@@ -16,6 +16,7 @@ import json
 import httpx
 import pytest
 
+from app.core.config import Settings
 from app.models.knowledge import EMBEDDING_DIMENSIONS
 from app.providers.email import EmailMessage, MockEmailProvider
 from app.providers.llm import (
@@ -29,6 +30,7 @@ from app.providers.llm import (
     OpenAICompatibleProvider,
     ToolSpec,
 )
+from app.providers.llm.factory import LLMConfigurationError, platform_profile
 from app.providers.storage import MockStorageProvider, ObjectNotFoundError, StorageProvider
 
 
@@ -250,3 +252,48 @@ class TestEmbeddingOrdering:
         ordered = sorted(payload["data"], key=lambda item: item["index"])
         assert [item["embedding"] for item in ordered] == [[1.0], [2.0]]
         assert json.dumps(payload)  # payload stays serialisable
+
+
+class TestTheCredentialIsCheckedForPlausibility:
+    """A key that is obviously not a key must be refused where it is read.
+
+    "Set" turned out to be the wrong question. A ten-character value passed
+    every guard and failed at the embedding call, and the symptom there is a
+    knowledge source stuck at `failed` with a provider error - a long way from
+    the line in `.env` that caused it. Real keys are long: an OpenAI project
+    key is around 160 characters, an NVIDIA one about 70.
+    """
+
+    @staticmethod
+    def _settings(**overrides: object) -> Settings:
+        base: dict[str, object] = {"llm_profile": "openai", "openai_api_key": None}
+        base.update(overrides)
+        return Settings(**base)  # type: ignore[arg-type]
+
+    def test_a_missing_key_names_the_variable_and_where_to_get_one(self) -> None:
+        with pytest.raises(LLMConfigurationError) as caught:
+            platform_profile(self._settings())
+
+        message = str(caught.value)
+        assert "OPENAI_API_KEY" in message
+        # An error that only says "not set" sends somebody hunting.
+        assert "platform.openai.com" in message
+
+    @pytest.mark.parametrize("value", ["x", "sk-short", "changeme", "   sk-abc   "])
+    def test_something_far_too_short_is_refused(self, value: str) -> None:
+        with pytest.raises(LLMConfigurationError, match="too short"):
+            platform_profile(self._settings(openai_api_key=value))
+
+    def test_a_plausible_key_is_accepted(self) -> None:
+        profile = platform_profile(self._settings(openai_api_key="sk-proj-" + "a" * 40))
+        assert profile.name == "openai"
+
+    def test_surrounding_whitespace_is_not_counted_as_length(self) -> None:
+        """A pasted key often carries a trailing newline; padding must not be
+        what makes an eight-character placeholder look long enough."""
+        with pytest.raises(LLMConfigurationError, match="too short"):
+            platform_profile(self._settings(openai_api_key="  sk-abc  " + " " * 30))
+
+    def test_the_nvidia_profile_is_held_to_the_same_bar(self) -> None:
+        with pytest.raises(LLMConfigurationError, match="NVIDIA_API_KEY"):
+            platform_profile(Settings(llm_profile="nvidia", nvidia_api_key="nv-x"))

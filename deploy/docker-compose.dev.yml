@@ -110,6 +110,38 @@ services:
       retries: 10
       start_period: 15s
 
+  worker:
+    # The ARQ worker. Same image as the API, different command.
+    #
+    # It was missing, and its absence is silent in the worst way: uploading a
+    # PDF answers 202 and the source sits at `pending` for ever, which reads
+    # as a broken product rather than as a component nobody started. The trial
+    # crons - notifier, enforcer, archiver, wizard reminder - live here too,
+    # so without it a trial never ends.
+    build:
+      context: ../backend
+      dockerfile: ../deploy/Dockerfile
+      target: dev
+    restart: unless-stopped
+    command: ["uv", "run", "arq", "app.workers.settings.WorkerSettings"]
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-leo}:${POSTGRES_PASSWORD:-leo}@postgres:5432/${POSTGRES_DB:-leo}
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      EMAIL_OUTBOX_PATH: /app/.tmp/outbox.jsonl
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
   frontend:
     build:
       context: ../frontend

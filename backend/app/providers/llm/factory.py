@@ -22,9 +22,33 @@ from app.models.llm_settings import TenantLLMSettings
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
+# Shortest thing that could plausibly be a key. Real ones are far longer -
+# an OpenAI project key is around 160 characters, an NVIDIA one about 70 - so
+# this rejects only the things that are obviously not keys: a placeholder
+# somebody tabbed past, a truncated paste, the word "changeme".
+#
+# The check exists because "set" turned out to be the wrong question. A
+# ten-character value passed every guard here and failed at the embedding
+# call, where the symptom is a knowledge source stuck at `failed` with a
+# provider error - a long way from the line in `.env` that caused it.
+MIN_PLAUSIBLE_KEY_LENGTH = 20
+
 
 class LLMConfigurationError(RuntimeError):
     """The requested profile is selected but not usable."""
+
+
+def _require_key(value: str | None, *, variable: str, hint: str) -> str:
+    """The configured credential, or a refusal that names the fix."""
+    key = (value or "").strip()
+    if not key:
+        raise LLMConfigurationError(f"{variable} is not set. {hint}")
+    if len(key) < MIN_PLAUSIBLE_KEY_LENGTH:
+        raise LLMConfigurationError(
+            f"{variable} is only {len(key)} characters, which is too short to be a real "
+            f"key - it looks like a placeholder or a truncated paste. {hint}"
+        )
+    return key
 
 
 @dataclass(frozen=True)
@@ -45,14 +69,14 @@ class ProviderProfile:
 
 
 def _nvidia_profile(settings: Settings) -> ProviderProfile:
-    if not settings.nvidia_api_key:
-        raise LLMConfigurationError(
-            "LLM_PROFILE=nvidia but NVIDIA_API_KEY is not set. Get a free key "
-            "at https://build.nvidia.com and put it in .env."
-        )
+    key = _require_key(
+        settings.nvidia_api_key,
+        variable="NVIDIA_API_KEY",
+        hint="Get a free key at https://build.nvidia.com and put it in .env.",
+    )
     return ProviderProfile(
         name="nvidia",
-        api_key=settings.nvidia_api_key,
+        api_key=key,
         base_url=settings.nvidia_base_url,
         chat_model=settings.nvidia_chat_model,
         embedding_model=settings.nvidia_embedding_model,
@@ -62,11 +86,14 @@ def _nvidia_profile(settings: Settings) -> ProviderProfile:
 
 
 def _openai_profile(settings: Settings) -> ProviderProfile:
-    if not settings.openai_api_key:
-        raise LLMConfigurationError("LLM_PROFILE=openai but OPENAI_API_KEY is not set.")
+    key = _require_key(
+        settings.openai_api_key,
+        variable="OPENAI_API_KEY",
+        hint="Create one at https://platform.openai.com/api-keys and put it in .env.",
+    )
     return ProviderProfile(
         name="openai",
-        api_key=settings.openai_api_key,
+        api_key=key,
         base_url=settings.openai_base_url,
         chat_model=settings.openai_chat_model,
         embedding_model=settings.openai_embedding_model,
