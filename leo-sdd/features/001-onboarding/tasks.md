@@ -156,7 +156,7 @@
   - **Depends on:** TASK-007 (API estable)
   - **Verification:** E2E Playwright: registro→verificación→login
 
-- [ ] **TASK-021: Wizard de onboarding (UI)**
+- [x] **TASK-021: Wizard de onboarding (UI)**
   - **Input:** spec HU-02, TASK-010/011/012/013
   - **Output:** wizard de 6 pasos con autosave, re-entrante, import CSV con preview, subida de PDFs con estados de indexación, checklist visual con deep-links a lo pendiente
   - **Depends on:** TASK-013, TASK-020
