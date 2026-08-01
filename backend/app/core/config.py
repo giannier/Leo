@@ -39,7 +39,7 @@ MIN_SECRET_KEY_LENGTH = 32
 
 # Which upstream the platform's own LLM calls go to. Both are hosted APIs
 # speaking the same protocol; neither runs a model on our infrastructure.
-LLMProfile = Literal["nvidia", "openai"]
+LLMProfile = Literal["nvidia", "openai", "offline"]
 
 # backend/app/core/config.py -> backend/app/core -> backend/app -> backend -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[3]
