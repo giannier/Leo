@@ -194,6 +194,8 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
         self,
         source_id: uuid.UUID,
         chunks: Sequence[tuple[str, Sequence[float]]],
+        *,
+        embedding_model: str | None = None,
     ) -> int:
         """Swap a source's chunks for a freshly embedded set.
 
@@ -211,5 +213,10 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
 
         self.delete_for_source(source_id)
         for content, embedding in chunks:
-            self.add(source_id=source_id, content=content, embedding=list(embedding))
+            self.add(
+                source_id=source_id,
+                content=content,
+                embedding=list(embedding),
+                embedding_model=embedding_model,
+            )
         return len(chunks)
