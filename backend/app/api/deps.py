@@ -202,8 +202,8 @@ def _otp_request_rate_limiter() -> RedisRateLimiter:
     """The 3-per-hour cap on asking for a new OTP (contracts/api.md).
 
     A second limiter rather than a tighter setting on the first, because the
-    two answer different questions. The router's 5/min is per IP and stops
-    bursts; this one is per *user* and stops a slow drip that would otherwise
+    two answer different questions. `enforce_auth_rate_limit` is per IP and
+    stops bursts; this one is per *user* and stops a slow drip that would otherwise
     let someone request codes all day - each one retiring the last and
     resetting the attempt budget.
     """
@@ -219,6 +219,33 @@ def _otp_request_rate_limiter() -> RedisRateLimiter:
 def get_otp_request_limiter() -> RateLimiter:
     """The per-user OTP request limiter. Overridden in tests."""
     return _otp_request_rate_limiter()
+
+
+@lru_cache
+def _login_attempt_rate_limiter() -> RedisRateLimiter:
+    """Failed sign-ins per account.
+
+    Keyed on the email address, never on the caller's IP, and that is the
+    whole point. A small business is one wifi router, so a per-IP password
+    limit counts the owner and her assistants as one attacker and locks them
+    out of their own panel over somebody else's typo.
+
+    Counting the account under attack instead is both kinder and stricter: a
+    shop full of people signing in is untouched, while an attacker gets the
+    same ten guesses whether they come from one address or a thousand.
+    """
+    settings = get_settings()
+    return RedisRateLimiter(
+        get_redis_client(),
+        limit=settings.login_attempt_limit,
+        window_seconds=settings.login_attempt_window_seconds,
+        namespace="ratelimit:login-attempt",
+    )
+
+
+def get_login_limiter() -> RateLimiter:
+    """The per-account failed-login limiter. Overridden in tests."""
+    return _login_attempt_rate_limiter()
 
 
 @lru_cache
@@ -306,7 +333,13 @@ async def enforce_auth_rate_limit(
     request: Request,
     limiter: Annotated[RateLimiter, Depends(get_rate_limiter)],
 ) -> None:
-    """Throttle `/auth/*` per client IP (contracts/api.md: 5/min/IP).
+    """Throttle the guessable-secret endpoints per client address.
+
+    A coarse guard, and deliberately no longer the primary one. The budget
+    is `auth_rate_limit_requests` per `auth_rate_limit_window_seconds`; the
+    number that actually stops somebody guessing a password is the
+    per-account counter in `_login_attempt_rate_limiter`, which is immune
+    to a whole shop sharing one address.
 
     Applied to the whole router rather than to `login` alone, so password
     guessing cannot simply move to `resend-verification` or, from TASK-008,

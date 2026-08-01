@@ -28,6 +28,7 @@ from app.api.deps import (
     enforce_auth_rate_limit,
     get_db,
     get_email_provider,
+    get_login_limiter,
     get_otp_request_limiter,
     get_otp_sender,
 )
@@ -87,6 +88,27 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # session. `logout` must work on the first press, always: a stop button that
 # answers 429 is worse than no stop button.
 RATE_LIMITED = [Depends(enforce_auth_rate_limit)]
+
+
+def _throttle_doc() -> str:
+    """The 429 description, written from the live configuration.
+
+    Not a literal. Every one of these strings used to spell out "5 requests
+    per minute", and every one of them was wrong the moment the number moved -
+    including the copies baked into the generated frontend types, which is how
+    a stale comment becomes a stale API contract.
+    """
+    settings = get_settings()
+    per_ip = settings.auth_rate_limit_requests
+    window = settings.auth_rate_limit_window_seconds
+    per_account = settings.login_attempt_limit
+    account_window = settings.login_attempt_window_seconds // 60
+    return (
+        f"`rate_limited` - more than {per_ip} requests in {window}s from this "
+        f"address, or more than {per_account} failed sign-ins for one account "
+        f"in {account_window} minutes"
+    )
+
 
 REFRESH_COOKIE_NAME = "refresh_token"
 
@@ -241,6 +263,7 @@ SessionDep = Annotated[Session, Depends(get_db)]
 EmailProviderDep = Annotated[EmailProvider | None, Depends(get_email_provider)]
 OtpSenderDep = Annotated[OtpSender, Depends(get_otp_sender)]
 OtpRequestLimiterDep = Annotated[RateLimiter, Depends(get_otp_request_limiter)]
+LoginLimiterDep = Annotated[RateLimiter, Depends(get_login_limiter)]
 RefreshCookieDep = Annotated[str | None, Cookie(alias=REFRESH_COOKIE_NAME)]
 
 
@@ -501,7 +524,7 @@ async def accept_invitation_endpoint(
         (400, "`no_phone_on_record`"),
         (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
         (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
-        (429, "`rate_limited` - 5/min per IP, and 3/hour per user"),
+        (429, _throttle_doc() + ", or more than the hourly cap for this user"),
         (503, "`otp_delivery_unavailable`"),
     ),
 )
@@ -617,19 +640,42 @@ async def resend_verification(
         (400, "`validation_error`"),
         (401, "`invalid_credentials`"),
         (403, "`email_not_verified` or `tenant_access_denied`"),
-        (429, "`rate_limited` - more than 5 requests per minute from this IP"),
+        (429, _throttle_doc()),
     ),
 )
 async def login(
     payload: LoginRequest,
     session: SessionDep,
     response: Response,
+    login_limiter: LoginLimiterDep,
 ) -> SessionResponse:
     """Exchange a password for an access token and a refresh cookie.
 
     The response lists every business the caller belongs to, so the panel can
     offer a choice; the access token is scoped to whichever one is active.
+
+    Guarded per **account** as well as per IP. The per-account counter is what
+    actually stops somebody guessing a password: it does not care which
+    connection the attempt arrives on, so a shop whose whole staff shares one
+    router is not treated as a single attacker.
+
+    The counter is spent before the password is checked, not after. Verifying
+    an Argon2 hash is deliberately expensive, and doing it for a caller who is
+    already over their limit hands an attacker a way to burn the server's CPU
+    for free.
     """
+    # Lower-cased so `Ana@` and `ana@` share one counter, matching the CITEXT
+    # column - otherwise changing the capitalisation resets the budget.
+    attempt_key = payload.email.strip().lower()
+    decision = await login_limiter.hit(attempt_key)
+    if not decision.allowed:
+        raise ApiError(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            error="rate_limited",
+            message="Too many failed sign-in attempts for this account. Try again shortly.",
+            headers={"retry-after": str(decision.retry_after_seconds)},
+        )
+
     service = SessionService(session)
     try:
         result = service.login(
@@ -658,6 +704,11 @@ async def login(
             message="You are not an active member of this tenant.",
         ) from exc
 
+    # Cleared only now, when the password is known to be right. Somebody who
+    # mistypes twice and then gets it in should not carry those two failures
+    # for the next quarter of an hour.
+    await login_limiter.reset(attempt_key)
+
     _set_refresh_cookie(response, result)
     return _as_response(result)
 
@@ -671,7 +722,7 @@ async def login(
         (400, "`validation_error`"),
         (401, "`invalid_refresh` - unknown, expired, revoked or replayed"),
         (403, "`email_not_verified` or `tenant_access_denied`"),
-        (429, "`rate_limited` - more than 5 requests per minute from this IP"),
+        (429, _throttle_doc()),
     ),
 )
 async def refresh(
@@ -720,7 +771,7 @@ async def refresh(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="End the current session",
     responses=error_responses(
-        (429, "`rate_limited` - more than 5 requests per minute from this IP"),
+        (429, _throttle_doc()),
     ),
 )
 async def logout(
