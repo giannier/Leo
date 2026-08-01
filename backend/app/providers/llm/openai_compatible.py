@@ -51,6 +51,7 @@ class OpenAICompatibleProvider:
         embedding_model: str,
         embedding_dimensions: int | None = None,
         send_embedding_input_type: bool = True,
+        max_tokens_field: str = "max_tokens",
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
     ) -> None:
         self._api_key = api_key
@@ -65,6 +66,12 @@ class OpenAICompatibleProvider:
         self._embedding_dimensions = embedding_dimensions
         # NVIDIA requires `input_type`; OpenAI rejects the unknown field.
         self._send_embedding_input_type = send_embedding_input_type
+        # What this vendor calls the output cap. OpenAI's newer models
+        # reject `max_tokens` outright and demand
+        # `max_completion_tokens`; NVIDIA still takes `max_tokens`. Same
+        # kind of vendor difference as `send_embedding_input_type`, so it
+        # is carried the same way rather than branched on a provider name.
+        self._max_tokens_field = max_tokens_field
         self._timeout = timeout
 
     @property
@@ -134,6 +141,22 @@ class OpenAICompatibleProvider:
                 item["tool_call_id"] = message.tool_call_id
             if message.name is not None:
                 item["name"] = message.name
+            if message.tool_calls:
+                item["tool_calls"] = [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.name,
+                            "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                        },
+                    }
+                    for call in message.tool_calls
+                ]
+                # An assistant turn that only asked for tools has no prose.
+                # OpenAI accepts null there but not the empty string.
+                if not message.content:
+                    item["content"] = None
             encoded.append(item)
         return encoded
 
@@ -187,7 +210,7 @@ class OpenAICompatibleProvider:
             "model": self._chat_model,
             "messages": self._encode_messages(messages),
             "temperature": temperature,
-            "max_tokens": max_tokens,
+            self._max_tokens_field: max_tokens,
             "stream": False,
         }
         if tools:

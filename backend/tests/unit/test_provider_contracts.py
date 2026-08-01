@@ -28,6 +28,7 @@ from app.providers.llm import (
     LLMRateLimitError,
     MockLLMProvider,
     OpenAICompatibleProvider,
+    ToolCall,
     ToolSpec,
 )
 from app.providers.llm.base import LLMConfigurationError
@@ -389,3 +390,80 @@ class TestTheOfflineProvider:
         [vector] = await provider.embed(["pan ciabatta recién horneado"])
 
         assert abs(sum(value * value for value in vector) - 1.0) < 1e-9
+
+
+class TestVendorDifferencesOnTheWire:
+    """Two things OpenAI rejects and NVIDIA tolerated.
+
+    Both were invisible until a real OpenAI key was configured, and both made
+    the agent fall back on every tool-using turn. The evals run against
+    NVIDIA, so they could not have caught either.
+    """
+
+    @staticmethod
+    def _encode(messages: list[ChatMessage]) -> list[dict[str, object]]:
+        return OpenAICompatibleProvider._encode_messages(messages)
+
+    def test_the_openai_profile_asks_for_max_completion_tokens(self) -> None:
+        """`max_tokens` is refused outright by OpenAI's newer models."""
+        profile = platform_profile(
+            Settings(llm_profile="openai", openai_api_key="sk-proj-" + "a" * 40)
+        )
+        assert profile.max_tokens_field == "max_completion_tokens"
+
+    def test_the_nvidia_profile_keeps_the_old_name(self) -> None:
+        """NVIDIA has not moved, so neither do we for that profile."""
+        profile = platform_profile(
+            Settings(llm_profile="nvidia", nvidia_api_key="nvapi-" + "a" * 40)
+        )
+        assert profile.max_tokens_field == "max_tokens"
+
+    def test_an_assistant_turn_carries_the_calls_it_made(self) -> None:
+        """The bug: only the assistant's *text* was replayed, so the `tool`
+        results that followed answered nothing, and OpenAI refused the whole
+        request with "messages with role 'tool' must be a response to a
+        preceeding message with 'tool_calls'"."""
+        call = ToolCall(id="call_1", name="consultar_catalogo", arguments={"q": "pan"})
+
+        [encoded] = self._encode([ChatMessage("assistant", "", tool_calls=(call,))])
+
+        assert encoded["tool_calls"] == [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "consultar_catalogo", "arguments": '{"q": "pan"}'},
+            }
+        ]
+
+    def test_a_calls_only_turn_sends_null_content_not_an_empty_string(self) -> None:
+        """OpenAI accepts `null` there and rejects `""`."""
+        call = ToolCall(id="c", name="t", arguments={})
+
+        [encoded] = self._encode([ChatMessage("assistant", "", tool_calls=(call,))])
+
+        assert encoded["content"] is None
+
+    def test_prose_alongside_a_call_is_preserved(self) -> None:
+        """Some models emit a sentence *and* a call; dropping the sentence
+        would lose part of the turn."""
+        call = ToolCall(id="c", name="t", arguments={})
+
+        [encoded] = self._encode([ChatMessage("assistant", "Déjame revisar", tool_calls=(call,))])
+
+        assert encoded["content"] == "Déjame revisar"
+
+    def test_an_ordinary_message_gains_no_tool_calls_key(self) -> None:
+        """Sending an empty `tool_calls` on a plain turn is not the same as
+        omitting it."""
+        [encoded] = self._encode([ChatMessage("user", "hola")])
+
+        assert "tool_calls" not in encoded
+
+    def test_arguments_keep_their_accents(self) -> None:
+        """`ensure_ascii` would turn "camión" into escapes in the payload the
+        model reads back."""
+        call = ToolCall(id="c", name="t", arguments={"q": "camión"})
+
+        [encoded] = self._encode([ChatMessage("assistant", "", tool_calls=(call,))])
+
+        assert "camión" in str(encoded["tool_calls"])
