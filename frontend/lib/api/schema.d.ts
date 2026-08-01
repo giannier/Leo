@@ -1723,6 +1723,11 @@ export interface components {
             full_name: string;
             /** Email */
             email: string;
+            /**
+             * Is Platform Admin
+             * @default false
+             */
+            is_platform_admin: boolean;
         };
         /** ValidationError */
         ValidationError: {

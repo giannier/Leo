@@ -174,7 +174,7 @@
   - **Depends on:** TASK-019, TASK-021
   - **Verification:** E2E con solicitud simulada llevada a `connected` vía API admin
 
-- [ ] **TASK-024: Panel admin de plataforma (UI)**
+- [x] **TASK-024: Panel admin de plataforma (UI)**
   - **Input:** TASK-018
   - **Output:** vista de cola de solicitudes con acciones y captura de credenciales, listado de tenants con uso, acción extender trial
   - **Depends on:** TASK-018, TASK-020

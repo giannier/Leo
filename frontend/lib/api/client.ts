@@ -246,6 +246,17 @@ export type InviteBody = JsonBody<
   Ops["/api/v1/tenant/team/invitations"]["post"]["requestBody"]
 >;
 
+export type AdminRequest = Ok<
+  Ops["/api/v1/platform-admin/connection-requests"]["get"]
+>[number];
+export type AdminTenant = Ok<Ops["/api/v1/platform-admin/tenants"]["get"]>[number];
+export type AdminTenantDetail = Ok<
+  Ops["/api/v1/platform-admin/tenants/{tenant_id}"]["get"]
+>;
+export type TransitionBody = JsonBody<
+  Ops["/api/v1/platform-admin/connection-requests/{request_id}"]["put"]["requestBody"]
+>;
+
 export type SandboxTurn = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["post"]
 >;
@@ -344,6 +355,26 @@ export const api = {
       });
     },
     remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+  },
+
+  admin: {
+    queue: (status?: string) =>
+      request<AdminRequest[]>("/platform-admin/connection-requests", {
+        query: status ? { status } : undefined,
+      }),
+    transition: (id: string, body: TransitionBody) =>
+      request<AdminRequest>(`/platform-admin/connection-requests/${id}`, {
+        method: "PUT",
+        body,
+      }),
+    tenants: (query?: { search?: string; status?: string }) =>
+      request<AdminTenant[]>("/platform-admin/tenants", { query }),
+    tenant: (id: string) => request<AdminTenantDetail>(`/platform-admin/tenants/${id}`),
+    extendTrial: (id: string, days: number, reason: string) =>
+      request<AdminTenantDetail>(`/platform-admin/tenants/${id}/extend-trial`, {
+        method: "POST",
+        body: { days, reason },
+      }),
   },
 
   connection: {

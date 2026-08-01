@@ -189,12 +189,31 @@ class TestTheQueue:
         second, _ = await _file_request(api, tenant_headers)
         admin_headers, _ = await _admin(api, mail, db)
 
+        # Stamped explicitly, because the fixture runs the whole test inside
+        # one transaction and `created_at` defaults to `now()` - which in
+        # PostgreSQL is the *transaction* start time, identical for both rows.
+        # The ordering is then a tie and the queue may return either first,
+        # which made this case flaky rather than wrong. Production is
+        # unaffected: every request is its own transaction.
+        base = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
+        db.get(ConnectionRequest, first).created_at = base  # type: ignore[union-attr]
+        db.get(ConnectionRequest, second).created_at = base + timedelta(minutes=5)  # type: ignore[union-attr]
+        db.commit()
+
         body = (
-            await api.get(f"{ADMIN}/connection-requests?status=requested", headers=admin_headers)
+            await api.get(
+                f"{ADMIN}/connection-requests?status=requested&limit=200",
+                headers=admin_headers,
+            )
         ).json()
-        ids = [row["id"] for row in body]
-        assert str(first) in ids
-        assert ids.index(str(first)) < ids.index(str(second))
+
+        # The queue is platform-wide and paged, so it holds whatever else the
+        # database contains. What this case is about is the *ordering*, so it
+        # is asserted among this test's own two rows - a raw `.index()` into
+        # the full list breaks the moment anything else is queued, which the
+        # end-to-end suite guarantees.
+        mine = [row["id"] for row in body if row["id"] in {str(first), str(second)}]
+        assert mine == [str(first), str(second)], "oldest first"
 
     async def test_the_queue_crosses_tenants(
         self, api: AsyncClient, mail: Any, db: Session

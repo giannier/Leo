@@ -65,7 +65,7 @@ function isCurrent(pathname: string, href: string): boolean {
 export default function PanelLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { status, user, role, isPlatformAdmin, signOut } = useSession();
+  const { status, user, role, isPlatformAdmin, onlyPlatformAdmin, signOut } = useSession();
 
   const [tenant, setTenant] = useState<TenantSummary | null>(null);
   const [tenantError, setTenantError] = useState<string | null>(null);
@@ -76,12 +76,15 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
     }
   }, [status, router]);
 
-  // A platform admin has no tenant, so none of this shell applies to them.
+  // Only when they have no business of their own - this shell would have
+  // nothing to render. An operator who also runs a business keeps their
+  // panel and reaches the queue through the link below; forcing the redirect
+  // would take their own account away from them.
   useEffect(() => {
-    if (status === "authenticated" && isPlatformAdmin) {
+    if (status === "authenticated" && onlyPlatformAdmin) {
       router.replace("/admin");
     }
-  }, [status, isPlatformAdmin, router]);
+  }, [status, onlyPlatformAdmin, router]);
 
   const loadTenant = useCallback(async () => {
     setTenantError(null);
@@ -100,7 +103,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
 
   // `loading` is not `anonymous`. Rendering the login redirect here would
   // bounce every returning user out for a frame before the refresh lands.
-  if (status !== "authenticated" || isPlatformAdmin) {
+  if (status !== "authenticated" || onlyPlatformAdmin) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-canvas p-6">
         <div className="w-full max-w-sm space-y-3">
@@ -165,6 +168,15 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           </nav>
 
           <div className="border-t border-line p-3">
+            {isPlatformAdmin ? (
+              <Link
+                href="/admin"
+                className="mb-2 flex min-h-11 items-center gap-3 rounded-lg bg-brand px-3 text-sm font-semibold text-brand-fg hover:opacity-90"
+              >
+                <SparkIcon className="size-5 shrink-0" />
+                Panel de operación
+              </Link>
+            ) : null}
             <p className="truncate px-3 pb-2 text-xs text-ink-faint" title={user?.email}>
               {user?.full_name}
             </p>

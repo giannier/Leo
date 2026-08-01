@@ -45,6 +45,9 @@ interface SessionState {
   /** The caller's role in the active tenant. Null for a platform admin. */
   role: Role | null;
   isPlatformAdmin: boolean;
+  /** A platform admin with no business of their own: the panel has
+   * nothing to render for them, so they are sent to `/admin`. */
+  onlyPlatformAdmin: boolean;
   signIn: (credentials: LoginBody) => Promise<void>;
   signOut: () => Promise<void>;
   /** Re-read the session, e.g. after accepting an invitation. */
@@ -127,9 +130,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       memberships,
       activeTenantId,
       role: (active?.role as Role | undefined) ?? null,
-      // A platform admin belongs to no tenant, which is exactly how the
-      // backend reports them: authenticated, with no active tenant.
-      isPlatformAdmin: status === "authenticated" && activeTenantId === null,
+      // Read from the session, never inferred. "No active tenant" was the
+      // first guess and it was wrong: the operator who registers like any
+      // customer and is then promoted has both a tenant and the flag, so the
+      // guess sent them to their own panel and left `/admin` unreachable.
+      isPlatformAdmin: user?.is_platform_admin ?? false,
+      // True only when there is nothing else to show them.
+      onlyPlatformAdmin: (user?.is_platform_admin ?? false) && activeTenantId === null,
       signIn,
       signOut,
       reload,

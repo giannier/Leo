@@ -114,6 +114,14 @@ class AuthenticatedSession:
     user_id: uuid.UUID
     full_name: str
     email: str
+    # Carried so the panel knows which shell to render.
+    #
+    # It cannot be inferred from the memberships: a platform admin who also
+    # runs a business - which is the ordinary case, since the first operator
+    # registers like any customer and is then promoted - has both an active
+    # tenant and the flag. Guessing "no tenant means operator" sent them to
+    # their own panel and left `/admin` unreachable.
+    is_platform_admin: bool
 
     memberships: tuple[TenantMembership, ...]
     active_tenant_id: uuid.UUID | None
@@ -154,6 +162,7 @@ class SessionService:
             user_id=user.id,
             full_name=user.full_name,
             email=user.email,
+            is_platform_admin=user.is_platform_admin,
             family_id=uuid.uuid4(),
             requested_tenant_id=tenant_id,
             now=now,
@@ -202,6 +211,7 @@ class SessionService:
             user_id=user.id,
             full_name=user.full_name,
             email=user.email,
+            is_platform_admin=user.is_platform_admin,
             family_id=record.family_id,
             requested_tenant_id=tenant_id,
             now=now,
@@ -271,6 +281,7 @@ class SessionService:
             user_id=user.id,
             full_name=user.full_name,
             email=user.email,
+            is_platform_admin=user.is_platform_admin,
             family_id=uuid.uuid4(),
             requested_tenant_id=tenant_id,
             now=datetime.now(UTC),
@@ -285,6 +296,7 @@ class SessionService:
         family_id: uuid.UUID,
         requested_tenant_id: uuid.UUID | None,
         now: datetime,
+        is_platform_admin: bool = False,
     ) -> AuthenticatedSession:
         """Mint both credentials, persist the refresh link, commit."""
         memberships = tuple(UserMembershipRepository(self._session, user_id).active_memberships())
@@ -315,6 +327,7 @@ class SessionService:
             user_id=user_id,
             full_name=full_name,
             email=email,
+            is_platform_admin=is_platform_admin,
             memberships=memberships,
             active_tenant_id=active_tenant_id,
         )
