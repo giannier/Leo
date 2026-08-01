@@ -17,31 +17,31 @@ down: ## Stop the local dev stack.
 	$(COMPOSE) down
 
 test: ## Run the full backend test suite.
-	uv run pytest backend/tests -v
+	uv run python -m pytest backend/tests -v
 
 isolation: ## Run only the multi-tenant isolation suite.
-	uv run pytest backend/tests/isolation -v
+	uv run python -m pytest backend/tests/isolation -v
 
 evals: ## Run the golden agent conversations against the configured model.
-	uv run pytest backend/evals -v -m evals
+	uv run python -m pytest backend/evals -v -m evals
 
 lint: ## Ruff (check + format) + mypy, matching CI.
-	uv run ruff check backend
-	uv run ruff format --check backend
-	uv run mypy backend/app
+	uv run python -m ruff check backend
+	uv run python -m ruff format --check backend
+	uv run python -m mypy backend/app
 
 format: ## Auto-fix lint issues and reformat.
-	uv run ruff check backend --fix
-	uv run ruff format backend
+	uv run python -m ruff check backend --fix
+	uv run python -m ruff format backend
 
 simulate-trial: ## Walk a tenant through a whole 14-day trial in seconds.
 	uv run --directory backend python -m scripts.simulate_trial
 
 migrate: ## Apply all pending Alembic migrations.
-	uv run --directory backend alembic upgrade head
+	uv run --directory backend python -m alembic upgrade head
 
 worker: ## Run the ARQ worker (knowledge indexing). Needs Redis.
-	uv run --directory backend arq app.workers.settings.WorkerSettings
+	uv run --directory backend python -m arq app.workers.settings.WorkerSettings
 
 front-install: ## Install frontend dependencies.
 	cd frontend && npm install
