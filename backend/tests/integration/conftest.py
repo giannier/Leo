@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_email_provider, get_rate_limiter
+from app.api.deps import get_db, get_email_provider, get_login_limiter, get_rate_limiter
 from app.core.config import get_settings
 from app.core.rate_limit import NullRateLimiter, RateLimiter
 from app.providers.email.base import EmailProvider
@@ -111,6 +111,11 @@ async def api(app: FastAPI, db: Session, mail: MockEmailProvider) -> AsyncIterat
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_email_provider] = lambda: provider
     app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    # The per-account login limiter too. It counts *failed* sign-ins, and
+    # several suites deliberately get the password wrong; left real, those
+    # failures would accumulate in Redis across runs and start refusing
+    # logins in tests that have nothing to do with throttling.
+    app.dependency_overrides[get_login_limiter] = lambda: limiter
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(transport=transport, base_url="http://test") as client:

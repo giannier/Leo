@@ -72,3 +72,64 @@ class TestCorsOrigins:
 
         monkeypatch.setenv("CORS_ORIGINS", documented)
         assert Settings().cors_origins == ["http://localhost:3000"]
+
+
+class TestProxyHeadersMustBeDecided:
+    """A deployed process has to state whether it sits behind a proxy.
+
+    There is no safe default. `deploy/` puts Caddy in front, so with the
+    header untrusted every request arrives from Caddy's address and the per-IP
+    limiter counts the entire customer base as one client - the whole platform
+    sharing a single window, with nothing in the logs to say why nobody can
+    sign in.
+
+    Trusting it *without* a proxy is the exact mirror: the header becomes
+    attacker-supplied, so the limiter is keyed on a string the attacker picks
+    and stops limiting anything.
+
+    Both failures are silent and they are opposites, so what the validator
+    refuses is not a value - it is the absence of a choice.
+    """
+
+    @staticmethod
+    def _deployed(monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("SECRET_KEY", "x" * 64)
+
+    def test_it_refuses_to_start_when_nobody_decided(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._deployed(monkeypatch)
+        monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+
+        with pytest.raises(ValueError, match="TRUST_PROXY_HEADERS"):
+            Settings()
+
+    def test_the_message_names_both_options(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An error that only says "this is required" sends somebody to the
+        source to work out which value they want."""
+        self._deployed(monkeypatch)
+        monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+
+        with pytest.raises(ValueError) as caught:
+            Settings()
+
+        message = str(caught.value)
+        assert "proxy" in message
+        assert "true" in message
+        assert "false" in message
+
+    @pytest.mark.parametrize(("raw", "expected"), [("true", True), ("false", False)])
+    def test_either_answer_boots(
+        self, monkeypatch: pytest.MonkeyPatch, raw: str, expected: bool
+    ) -> None:
+        self._deployed(monkeypatch)
+        monkeypatch.setenv("TRUST_PROXY_HEADERS", raw)
+
+        assert Settings().trust_proxy_headers is expected
+
+    def test_development_is_left_alone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A local stack that will not boot until you have opinions about
+        reverse proxies is a local stack nobody runs."""
+        monkeypatch.setenv("ENVIRONMENT", "development")
+        monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+
+        assert Settings().trust_proxy_headers is False

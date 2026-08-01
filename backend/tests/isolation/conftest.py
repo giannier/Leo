@@ -19,7 +19,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_email_provider, get_rate_limiter
+from app.api.deps import get_db, get_email_provider, get_login_limiter, get_rate_limiter
 from app.core.config import get_settings
 from app.core.rate_limit import NullRateLimiter, RateLimiter
 from app.models import (
@@ -109,6 +109,10 @@ async def api(app: FastAPI, db: Session, mail: MockEmailProvider) -> AsyncIterat
     app.dependency_overrides[get_db] = lambda: db
     app.dependency_overrides[get_email_provider] = lambda: provider
     app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    # And the per-account login limiter. Both are Redis-backed and cached
+    # per process, so a real one would carry a connection bound to a dead
+    # event loop into the next test.
+    app.dependency_overrides[get_login_limiter] = lambda: limiter
     transport = ASGITransport(app=app)
     try:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
