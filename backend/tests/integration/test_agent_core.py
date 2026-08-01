@@ -14,7 +14,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from app.agent.core import FALLBACK_REPLY, AgentCore
+from app.agent.core import FALLBACK_REPLY, AgentCore, _usable_answer
 from app.agent.tools.registry import ToolRegistry
 from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.conversation import Conversation, Message
@@ -374,3 +374,94 @@ class TestTrace:
             conversation_id=conversation.id, customer_message="hola"
         )
         assert len(str(reply.tools_called[0]["args_resumen"])) <= 120
+
+
+class TestToolSyntaxNeverReachesTheCustomer:
+    """A model sometimes writes a tool call as prose instead of emitting it.
+
+    It happens in the final round, where no tools are offered in order to
+    force an answer: a model that still wants one has nowhere to put the call,
+    so it writes it out. Caught in CI against NVIDIA, on the angry-customer
+    case of all things - somebody writing a complaint received:
+
+        <function=consultar_conocimiento>
+        <parameter=consulta>reclamo queja</parameter>
+        </function>
+
+    which is worse than silence. It looks broken *and* it ignores them.
+    """
+
+    def test_the_leak_that_actually_happened(self) -> None:
+        raw = (
+            "<function=consultar_conocimiento>\n"
+            "<parameter=consulta>\nreclamo queja\n</parameter>\n"
+            "</function>\n</tool_call>"
+        )
+
+        content, unusable = _usable_answer(raw)
+
+        assert unusable is True
+        assert content == FALLBACK_REPLY
+        assert "<function" not in content
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "<tool_call>{}</tool_call>",
+            "<|python_tag|>",
+            "<parameter=x>y</parameter>",
+            "",
+            "   \n  ",
+        ],
+    )
+    def test_anything_without_a_real_answer_falls_back(self, raw: str) -> None:
+        content, unusable = _usable_answer(raw)
+
+        assert unusable is True
+        assert content == FALLBACK_REPLY
+
+    def test_a_real_answer_is_left_exactly_as_written(self) -> None:
+        """The guard must not touch the ordinary case. Rewriting a good reply
+        would be a far more common failure than the one being prevented."""
+        raw = "Lo siento mucho. Te derivo con una persona ahora mismo."
+
+        content, unusable = _usable_answer(raw)
+
+        assert content == raw
+        assert unusable is False
+
+    def test_prose_survives_alongside_stray_markup(self) -> None:
+        """Some models emit a sentence *and* a call. Dropping the sentence
+        would throw away the part the customer needed."""
+        raw = '<tool_call>{"a":1}</tool_call> El pan ciabatta cuesta S/ 8.50 en total.'
+
+        content, unusable = _usable_answer(raw)
+
+        assert unusable is False
+        assert "tool_call" not in content
+        assert "S/ 8.50" in content
+
+    def test_a_less_than_sign_in_ordinary_prose_is_not_stripped(self) -> None:
+        """The guard keys on tool-call *names*, not on angle brackets. A reply
+        that happens to contain one is not a leak."""
+        raw = "Te toma menos de <5 minutos preparar el pedido, avisame."
+
+        content, unusable = _usable_answer(raw)
+
+        assert content == raw
+        assert unusable is False
+
+    async def test_the_reply_is_marked_degraded_so_the_trace_says_so(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """`degraded` is what tells the tenant it was the model that failed
+        and not their configuration - the sandbox panel says so in words."""
+        leak = "<function=consultar_catalogo>\n<parameter=q>pan</parameter>\n</function>"
+        llm = MockLLMProvider(responses=[ChatResult(content=leak, model="test")])
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="hola"
+        )
+
+        assert reply.degraded is True
+        assert reply.content == FALLBACK_REPLY
