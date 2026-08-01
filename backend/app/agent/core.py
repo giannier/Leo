@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -59,6 +60,55 @@ FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
     "¿Podrías intentarlo de nuevo en unos segundos?"
 )
+
+
+# Tool-call syntax that a model sometimes writes as *prose* instead of
+# emitting through the structured channel.
+#
+# It happens in the final round, where no tools are offered in order to force
+# an answer: a model that still wants to call one has nowhere to put the call,
+# so it writes it out. Nemotron produces `<function=name><parameter=x>`,
+# others `<tool_call>` or `<|python_tag|>`.
+#
+# Left alone this reaches the customer verbatim. A person writing an angry
+# complaint received:
+#
+#     <function=consultar_conocimiento>
+#     <parameter=consulta>reclamo queja</parameter>
+#     </function>
+#
+# which is worse than saying nothing: it looks broken *and* it ignores them.
+_TOOL_BLOCK = re.compile(
+    r"<\s*(?:function|tool_call|tool_response)\b.*?"
+    r"(?:</\s*(?:function|tool_call|tool_response)\s*>|$)"
+    r"|<\s*/?\s*(?:function|parameter|tool_call|tool_response)\b[^>]*>"
+    r"|<\|[^|]{1,40}\|>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Below this, whatever survived the strip is a fragment rather than a reply.
+_MIN_ANSWER_CHARS = 12
+
+
+def _usable_answer(raw: str) -> tuple[str, bool]:
+    """The reply to show, and whether the model failed to produce one.
+
+    Any leftover tool-call markup is removed rather than shown. If that
+    leaves nothing substantive the answer is treated as absent - the customer
+    gets the fallback, and the trace records `degraded` so the tenant can see
+    it was the model that failed and not their configuration.
+    """
+    text = raw.strip()
+    if not text:
+        return FALLBACK_REPLY, True
+
+    cleaned = _TOOL_BLOCK.sub(" ", text)
+    cleaned = " ".join(cleaned.split()).strip()
+
+    if len(cleaned) < _MIN_ANSWER_CHARS:
+        return FALLBACK_REPLY, True
+    # Prose survived alongside the markup: keep the prose.
+    return cleaned if cleaned != text else text, False
 
 
 @dataclass
@@ -163,11 +213,10 @@ class AgentCore:
                 rag_sources.extend(sources)
                 messages.append(ChatMessage("tool", output, tool_call_id=call.id, name=call.name))
 
-        content = (result.content if result else "").strip()
-        if not content:
-            # A model that answers nothing is worse than one that says it
-            # cannot help: the customer sees an empty bubble and no next step.
-            content = FALLBACK_REPLY
+        # A model that answers nothing, or answers with tool-call syntax, is
+        # worse than one that says it cannot help: the customer sees an empty
+        # bubble or a pile of angle brackets, and no next step either way.
+        content, unusable = _usable_answer(result.content if result else "")
 
         return AgentReply(
             content=content,
@@ -177,7 +226,7 @@ class AgentCore:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             latency_ms=int((time.perf_counter() - started) * 1000),
-            degraded=result is None,
+            degraded=result is None or unusable,
         )
 
     async def _run_tool(
