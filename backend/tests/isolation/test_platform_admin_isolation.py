@@ -162,8 +162,18 @@ class TestAdminActionsDoNotSpill:
         assert after_b["trial_ends_at"] == before_b["trial_ends_at"]
 
         # And the audit entry names exactly one tenant - the one acted on.
+        # Restricted to the two under test: every trial ever extended writes
+        # this action, so reading them all asserts something about the whole
+        # database rather than about this case.
         entries = list(
-            db.execute(select(AuditLog).where(AuditLog.action == "trial.extended")).scalars().all()
+            db.execute(
+                select(AuditLog).where(
+                    AuditLog.action == "trial.extended",
+                    AuditLog.tenant_id.in_([tenant_a, tenant_b]),
+                )
+            )
+            .scalars()
+            .all()
         )
         assert [entry.tenant_id for entry in entries] == [tenant_a]
 

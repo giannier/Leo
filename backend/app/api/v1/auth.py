@@ -228,6 +228,10 @@ class UserSummary(BaseModel):
     id: uuid.UUID
     full_name: str
     email: str
+    # Which shell the panel should render. Not a secret - the person already
+    # knows - and not inferable from the memberships, because an operator who
+    # also runs a business has both.
+    is_platform_admin: bool = False
 
 
 class MembershipSummary(BaseModel):
@@ -345,6 +349,7 @@ def _as_response(session: AuthenticatedSession) -> SessionResponse:
             id=session.user_id,
             full_name=session.full_name,
             email=session.email,
+            is_platform_admin=session.is_platform_admin,
         ),
         memberships=[
             MembershipSummary(
