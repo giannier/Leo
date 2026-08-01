@@ -59,6 +59,12 @@ async function signIn(page: import("@playwright/test").Page, account: Account) {
   await page.getByLabel("Correo electrónico").fill(account.email);
   await page.getByLabel("Contraseña", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Entrar" }).click();
+
+  // Wait for the session to actually exist before returning. Clicking and
+  // moving on raced: locally the login won, in CI it did not, and the next
+  // `goto` landed on a page that bounced straight back to /login. The
+  // failure then pointed at whatever that page was supposed to show.
+  await expect(page).toHaveURL("/", { timeout: 20_000 });
 }
 
 /** See `channel-team.spec.ts`: a script, never an endpoint. */
@@ -129,7 +135,6 @@ test.describe("El panel de operación", () => {
   test("un cliente común no llega, y no se le dice que existe", async ({ request, page }) => {
     const account = await signUp(request, page);
     await signIn(page, account);
-    await expect(page).toHaveURL("/", { timeout: 15_000 });
 
     await page.goto("/admin");
 
@@ -150,7 +155,6 @@ test.describe("El panel de operación", () => {
     // first one registers like any customer and is then promoted. They keep
     // their own panel and cross over through a link, rather than being
     // redirected away from an account that is theirs.
-    await expect(page).toHaveURL("/", { timeout: 15_000 });
     await page.getByRole("link", { name: "Panel de operación" }).click();
 
     await expect(page).toHaveURL(/\/admin/, { timeout: 15_000 });
@@ -191,7 +195,6 @@ test.describe("El panel de operación", () => {
     const operator = await signUp(request, page);
     await promote(operator.email);
     await signIn(page, operator);
-    await expect(page).toHaveURL("/", { timeout: 15_000 });
     await page.goto("/admin");
 
     const card = page.locator("section").filter({ hasText: number });
@@ -227,7 +230,6 @@ test.describe("El panel de operación", () => {
     const operator = await signUp(request, page);
     await promote(operator.email);
     await signIn(page, operator);
-    await expect(page).toHaveURL("/", { timeout: 15_000 });
     await page.goto("/admin");
 
     await page.getByRole("link", { name: "Negocios" }).click();
