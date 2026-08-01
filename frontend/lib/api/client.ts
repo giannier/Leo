@@ -85,7 +85,11 @@ async function readError(response: Response): Promise<ApiError> {
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) {
+  // `FormData` is sent as-is. Setting Content-Type by hand would omit the
+  // multipart boundary the browser generates, and the server would reject
+  // every upload with a parse error that says nothing about the cause.
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) {
     headers["Content-Type"] = "application/json";
   }
   if (accessToken) {
@@ -96,7 +100,12 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
     return await fetch(buildUrl(path, options.query), {
       method: options.method ?? "GET",
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body:
+        options.body === undefined
+          ? undefined
+          : isForm
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
       // The refresh cookie rides on this. Without it the browser withholds
       // the cookie on a cross-origin request and every refresh 401s.
       credentials: "include",
@@ -204,6 +213,28 @@ export type RegisterBody = JsonBody<Ops["/api/v1/auth/register"]["post"]["reques
 export type SessionPayload = Session;
 export type TenantSummary = Ok<Ops["/api/v1/tenant"]["get"]>;
 export type Checklist = Ok<Ops["/api/v1/tenant/activation-checklist"]["get"]>;
+export type ChecklistItem = Checklist["items"][number];
+
+export type BusinessProfile = Ok<Ops["/api/v1/tenant/business-profile"]["get"]>;
+export type BusinessProfilePatch = JsonBody<
+  Ops["/api/v1/tenant/business-profile"]["put"]["requestBody"]
+>;
+export type AgentConfig = Ok<Ops["/api/v1/tenant/agent-config"]["get"]>;
+export type AgentConfigPatch = JsonBody<Ops["/api/v1/tenant/agent-config"]["put"]["requestBody"]>;
+
+export type ProductPage = Ok<Ops["/api/v1/tenant/products"]["get"]>;
+export type Product = ProductPage["items"][number];
+export type ProductBody = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
+export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
+
+export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
+export type KnowledgeSource = KnowledgeList["sources"][number];
+export type KnowledgeUsage = KnowledgeList["usage"];
+
+export type PaymentMethod = Ok<Ops["/api/v1/tenant/payment-methods"]["get"]>[number];
+export type PaymentMethodBody = JsonBody<
+  Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
+>;
 
 export const api = {
   auth: {
@@ -242,5 +273,61 @@ export const api = {
   agent: {
     activate: () => request<void>("/tenant/agent/activate", { method: "POST" }),
     deactivate: () => request<void>("/tenant/agent/deactivate", { method: "POST" }),
+  },
+
+  profile: {
+    get: () => request<BusinessProfile>("/tenant/business-profile"),
+    save: (body: BusinessProfilePatch) =>
+      request<BusinessProfile>("/tenant/business-profile", { method: "PUT", body }),
+  },
+
+  agentConfig: {
+    get: () => request<AgentConfig>("/tenant/agent-config"),
+    save: (body: AgentConfigPatch) =>
+      request<AgentConfig>("/tenant/agent-config", { method: "PUT", body }),
+  },
+
+  products: {
+    list: (query?: { limit?: number; offset?: number; search?: string }) =>
+      request<ProductPage>("/tenant/products", { query }),
+    create: (body: ProductBody) =>
+      request<Product>("/tenant/products", { method: "POST", body }),
+    remove: (id: string) => request<void>(`/tenant/products/${id}`, { method: "DELETE" }),
+
+    /** Upload a CSV or XLSX and get back what *would* be created. */
+    preview: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<ImportPreview>("/tenant/products/import", { method: "POST", body: form });
+    },
+    confirmImport: (previewId: string) =>
+      request<{ created: number }>(`/tenant/products/import/${previewId}/confirm`, {
+        method: "POST",
+      }),
+  },
+
+  knowledge: {
+    list: () => request<KnowledgeList>("/tenant/knowledge"),
+    addText: (body: { type: "faq" | "policy" | "text"; title: string; content: string }) =>
+      request<{ id: string; status: string }>("/tenant/knowledge", { method: "POST", body }),
+    addFile: (file: File, title: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("title", title);
+      return request<{ id: string; status: string }>("/tenant/knowledge", {
+        method: "POST",
+        body: form,
+      });
+    },
+    remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+  },
+
+  payments: {
+    list: () => request<PaymentMethod[]>("/tenant/payment-methods"),
+    create: (body: PaymentMethodBody) =>
+      request<PaymentMethod>("/tenant/payment-methods", { method: "POST", body }),
+    update: (id: string, body: Partial<PaymentMethodBody>) =>
+      request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PATCH", body }),
+    remove: (id: string) => request<void>(`/tenant/payment-methods/${id}`, { method: "DELETE" }),
   },
 };

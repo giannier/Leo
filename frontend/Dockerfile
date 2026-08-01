@@ -27,4 +27,11 @@ EXPOSE 3000
 # `-H 0.0.0.0` binds inside the container so the mapped port is reachable
 # from the host; the internal port stays fixed at 3000 (host-facing port is
 # configurable via FRONTEND_PORT in docker-compose.dev.yml).
-CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]
+# `dev:docker`, not `dev`: it runs webpack instead of Turbopack. Turbopack is
+# the faster of the two and is what `npm run dev` uses on the host, but it
+# ignores WATCHPACK_POLLING - and a bind mount from a Windows or macOS host
+# never delivers inotify events, so inside a container it simply never notices
+# an edit. The symptom is the worst kind: the file has changed, the container
+# can read the change, and the page keeps serving the old version until
+# somebody restarts it.
+CMD ["npm", "run", "dev:docker", "--", "-H", "0.0.0.0", "-p", "3000"]
