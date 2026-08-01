@@ -1,4 +1,4 @@
-.PHONY: simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: reindex simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -40,6 +40,9 @@ lint: ## Ruff (check + format) + mypy, matching CI.
 format: ## Auto-fix lint issues and reformat.
 	uv run python -m ruff check backend --fix
 	uv run python -m ruff format backend
+
+reindex: ## Re-embed knowledge whose vectors came from another model. ARGS=--dry-run to preview.
+	uv run --directory backend python -m scripts.reindex_knowledge $(ARGS)
 
 simulate-trial: ## Walk a tenant through a whole 14-day trial in seconds.
 	uv run --directory backend python -m scripts.simulate_trial

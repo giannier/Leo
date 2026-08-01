@@ -209,7 +209,12 @@ async def _index_extracted_text(
         return IndexingOutcome(source_id, OUTCOME_DELETED)
 
     KnowledgeChunkRepository(session, tenant_id).replace_for_source(
-        source_id, list(zip(chunks, embeddings, strict=True))
+        source_id,
+        list(zip(chunks, embeddings, strict=True)),
+        # Stamped so a later profile change can find these rows again. Read
+        # from the provider that just embedded them, never from settings: the
+        # two can disagree, and the vector is what has to be described.
+        embedding_model=llm.embedding_model,
     )
     sources.mark_indexed(source_id)
     session.commit()

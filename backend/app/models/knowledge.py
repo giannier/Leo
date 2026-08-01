@@ -99,3 +99,15 @@ class KnowledgeChunk(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(EMBEDDING_DIMENSIONS), nullable=True
     )
+    # Which model produced `embedding`.
+    #
+    # Vectors from two different models are not comparable, even at the same
+    # width - and nothing about a mixed table looks wrong. Search keeps
+    # returning results; they are simply the wrong passages, and retrieval
+    # degrades silently while the agent starts answering from nothing.
+    #
+    # Recording the model is what makes that detectable at all: it is how
+    # `scripts/reindex_knowledge.py` knows which rows a profile change
+    # invalidated. Nullable because rows written before this column existed
+    # cannot say, and "unknown" has to count as stale.
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
