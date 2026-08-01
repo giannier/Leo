@@ -231,6 +231,15 @@ export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
 export type KnowledgeSource = KnowledgeList["sources"][number];
 export type KnowledgeUsage = KnowledgeList["usage"];
 
+export type SandboxTurn = Ok<
+  Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["post"]
+>;
+export type SandboxTrace = SandboxTurn["trace"];
+export type SandboxHistory = Ok<
+  Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["get"]
+>;
+export type SandboxMessage = SandboxHistory["items"][number];
+
 export type PaymentMethod = Ok<Ops["/api/v1/tenant/payment-methods"]["get"]>[number];
 export type PaymentMethodBody = JsonBody<
   Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
@@ -320,6 +329,18 @@ export const api = {
       });
     },
     remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+  },
+
+  sandbox: {
+    start: () =>
+      request<{ conversation_id: string }>("/tenant/sandbox/conversations", { method: "POST" }),
+    send: (conversationId: string, content: string) =>
+      request<SandboxTurn>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
+        method: "POST",
+        body: { content },
+      }),
+    history: (conversationId: string) =>
+      request<SandboxHistory>(`/tenant/sandbox/conversations/${conversationId}/messages`),
   },
 
   payments: {

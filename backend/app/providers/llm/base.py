@@ -15,6 +15,14 @@ Role = Literal["system", "user", "assistant", "tool"]
 InputType = Literal["query", "passage"]
 
 
+class LLMConfigurationError(RuntimeError):
+    """The selected profile is not usable: no credential, or an implausible one.
+
+    Lives here rather than in `factory` so a provider can raise it without
+    importing the factory that builds providers.
+    """
+
+
 class LLMError(RuntimeError):
     """Any failure reaching or parsing a provider response."""
 
