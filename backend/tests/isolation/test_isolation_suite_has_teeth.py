@@ -81,9 +81,23 @@ class TestTheSuiteDetectsUnfilteredReads:
         self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
     ) -> None:
         # `count()` builds its own statement rather than reusing `_scoped()`,
-        # so it needs its own proof that the filter is really there.
+        # so it needs its own proof that the filter is really there. This one
+        # is safe as an absolute number: it is scoped, so nothing another
+        # tenant does can move it.
         assert ProductRepository(db, tenant_a.tenant_id).count() == 1
-        assert len(_UnscopedProductRepository(db, tenant_a.tenant_id).list()) == 2
+
+        # The unscoped one is asserted as a *property*, not as a count. It
+        # used to say `== 2`, meaning "the two fixture products and nothing
+        # else in the entire database" - which held only while the database
+        # contained nothing else, and broke the moment anybody ran the
+        # end-to-end suite or clicked around the panel by hand. The property
+        # that actually matters is that the missing filter lets tenant B's row
+        # through, and that is true whatever else is stored.
+        unscoped = {
+            product.id for product in _UnscopedProductRepository(db, tenant_a.tenant_id).list()
+        }
+        assert tenant_a.product_id in unscoped
+        assert tenant_b.product_id in unscoped, "sabotage no longer leaks; the meta-test is stale"
 
 
 class TestTheSuiteDetectsUnfilteredWrites:

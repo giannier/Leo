@@ -335,8 +335,21 @@ def _chunk_count(db: Session, source_id: uuid.UUID) -> int:
     return int(db.execute(statement).scalar_one())
 
 
-def _source_count(db: Session) -> int:
-    return int(db.execute(select(func.count()).select_from(KnowledgeSource)).scalar_one())
+def _source_count(db: Session, tenant_id: uuid.UUID) -> int:
+    """Sources belonging to one tenant.
+
+    Scoped on purpose. Counting the whole table asserted "nothing anywhere in
+    the database", which is only true of a database nobody has touched - it
+    broke as soon as the end-to-end suite, or a person clicking around the
+    panel, left a row behind. The property under test is that the *rejected
+    upload* created nothing, and that is about this tenant.
+    """
+    statement = (
+        select(func.count())
+        .select_from(KnowledgeSource)
+        .where(KnowledgeSource.tenant_id == tenant_id)
+    )
+    return int(db.execute(statement).scalar_one())
 
 
 # --------------------------------------------------------------------- tests
@@ -495,7 +508,7 @@ class TestPdfIngestion:
         assert response.json()["error"] == "invalid_pdf"
 
     async def test_a_pdf_over_the_size_ceiling_is_refused(
-        self, knowledge: AsyncClient, db: Session
+        self, knowledge: AsyncClient, db: Session, account: Account
     ) -> None:
         """Clarification 011 caps a single PDF at 10 MB."""
         limit = get_settings().knowledge_max_pdf_bytes
@@ -505,7 +518,7 @@ class TestPdfIngestion:
 
         assert response.status_code == 413
         assert response.json()["error"] == "pdf_too_large"
-        assert _source_count(db) == 0
+        assert _source_count(db, account.tenant_id) == 0
 
 
 class TestAScannedPdfFails:
@@ -633,14 +646,14 @@ class TestPlanLimits:
         }
 
     async def test_nothing_is_written_when_the_budget_refuses(
-        self, knowledge: AsyncClient, db: Session, plan: Plan
+        self, knowledge: AsyncClient, db: Session, plan: Plan, account: Account
     ) -> None:
         plan.max_rag_chars = 50
         db.flush()
 
         await _post_text(knowledge, content="x" * 200)
 
-        assert _source_count(db) == 0
+        assert _source_count(db, account.tenant_id) == 0
 
     async def test_the_file_count_budget_is_enforced(
         self, knowledge: AsyncClient, db: Session, plan: Plan

@@ -274,3 +274,158 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 export { cx };
+
+/* --------------------------------------------------------------- Textarea */
+
+interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  hint?: string;
+  error?: string;
+}
+
+export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
+  { label, hint, error, id, className, required, ...rest },
+  ref,
+) {
+  const generated = useId();
+  const fieldId = id ?? generated;
+  const hintId = `${fieldId}-hint`;
+  const errorId = `${fieldId}-error`;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline gap-1">
+        <label htmlFor={fieldId} className="text-sm font-medium text-ink">
+          {label}
+        </label>
+        {required ? (
+          <span className="text-danger" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </div>
+
+      <textarea
+        ref={ref}
+        id={fieldId}
+        required={required}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={cx(hint && hintId, error && errorId) || undefined}
+        className={cx(
+          "min-h-24 w-full rounded-lg border bg-surface px-3 py-2 text-base text-ink",
+          "placeholder:text-ink-faint transition-colors duration-150",
+          error ? "border-danger" : "border-line-strong hover:border-ink-faint",
+          className,
+        )}
+        {...rest}
+      />
+
+      {hint && !error ? (
+        <p id={hintId} className="text-xs text-ink-faint">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={errorId} role="alert" className="flex items-start gap-1.5 text-xs text-danger">
+          <AlertIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+});
+
+/* ----------------------------------------------------------------- Select */
+
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label: string;
+  hint?: string;
+  error?: string;
+  options: readonly { value: string; label: string }[];
+}
+
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  { label, hint, error, options, id, className, required, ...rest },
+  ref,
+) {
+  const generated = useId();
+  const fieldId = id ?? generated;
+  const hintId = `${fieldId}-hint`;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline gap-1">
+        <label htmlFor={fieldId} className="text-sm font-medium text-ink">
+          {label}
+        </label>
+        {required ? (
+          <span className="text-danger" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </div>
+
+      {/* A native select, deliberately. Android and iOS render it as their own
+       * wheel, which is faster to use one-handed than any listbox we would
+       * build, and it works with the keyboard for free. */}
+      <select
+        ref={ref}
+        id={fieldId}
+        required={required}
+        aria-describedby={hint ? hintId : undefined}
+        aria-invalid={error ? true : undefined}
+        className={cx(
+          "min-h-11 w-full cursor-pointer rounded-lg border bg-surface px-3 text-base text-ink",
+          "transition-colors duration-150",
+          error ? "border-danger" : "border-line-strong hover:border-ink-faint",
+          className,
+        )}
+        {...rest}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      {hint && !error ? (
+        <p id={hintId} className="text-xs text-ink-faint">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="flex items-start gap-1.5 text-xs text-danger">
+          <AlertIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+});
+
+/* -------------------------------------------------------------- Checkbox */
+
+export function Checkbox({
+  label,
+  hint,
+  ...rest
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+  const id = useId();
+  return (
+    <div className="flex items-start gap-3">
+      <input
+        id={id}
+        type="checkbox"
+        // 20px box inside a 44px row: the label is part of the target, so the
+        // whole line is tappable without the checkbox itself being huge.
+        className="mt-0.5 size-5 shrink-0 cursor-pointer rounded border-line-strong accent-accent"
+        {...rest}
+      />
+      <label htmlFor={id} className="cursor-pointer text-sm text-ink">
+        {label}
+        {hint ? <span className="mt-0.5 block text-xs text-ink-faint">{hint}</span> : null}
+      </label>
+    </div>
+  );
+}
