@@ -1144,3 +1144,72 @@ class TestRolesFollowClarification008:
         body = (await knowledge.get(KNOWLEDGE)).json()
 
         assert [source["title"] for source in body["sources"]] == ["Politica de cambios"]
+
+
+class TestChunksRecordTheModelThatEmbeddedThem:
+    """`knowledge_chunks.embedding_model`, and why it is not optional.
+
+    Vectors from two different embedding models are not comparable, even at
+    the same width - and nothing about a mixed table looks wrong. Search keeps
+    returning results; they are simply the wrong passages, and retrieval
+    degrades in silence while the agent starts answering from nothing.
+
+    Recording the model is what makes that state detectable at all. Without
+    it, switching `LLM_PROFILE` corrupts every stored vector and there is no
+    way to find out which ones, so no way to repair them either.
+    """
+
+    async def test_every_chunk_names_its_model(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        queue: RecordingQueue,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        await _post_text(knowledge)
+        source_id = queue.last_source_id
+        await _run_worker(db, tenant, source_id, llm=llm, storage=storage)
+
+        chunks = (
+            db.execute(select(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id))
+            .scalars()
+            .all()
+        )
+        assert chunks
+        # Taken from the provider that did the work, not from settings: the
+        # two can disagree, and it is the vector that has to be described.
+        assert {chunk.embedding_model for chunk in chunks} == {llm.embedding_model}
+
+    async def test_reindexing_restamps_rather_than_leaving_the_old_name(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        queue: RecordingQueue,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        """The repair path. A source re-embedded under a new model must end up
+        described by the new one, or `scripts/reindex_knowledge.py` would keep
+        finding it stale and reindexing it for ever."""
+        await _post_text(knowledge)
+        source_id = queue.last_source_id
+        await _run_worker(db, tenant, source_id, llm=llm, storage=storage)
+
+        moved = MockLLMProvider(embedding_model="otro-modelo-de-embeddings")
+        # The source is `indexed`, and `claim_for_indexing` refuses that -
+        # which is exactly why the reindex script resets the status first.
+        source = _source(db, source_id)
+        source.status = "pending"
+        db.commit()
+        await _run_worker(db, tenant, source_id, llm=moved, storage=storage)
+
+        chunks = (
+            db.execute(select(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id))
+            .scalars()
+            .all()
+        )
+        assert chunks
+        assert {chunk.embedding_model for chunk in chunks} == {"otro-modelo-de-embeddings"}

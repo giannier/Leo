@@ -16,24 +16,48 @@ from evals.dataset import GOLDEN_CASES
 from evals.runner import llm_required, run_all, seed_demo_knowledge, seed_demo_tenant
 from sqlalchemy.orm import Session
 
-from app.providers.llm.factory import LLMConfigurationError, platform_provider
+from app.core.config import get_settings
+from app.providers.llm.factory import (
+    LLMConfigurationError,
+    build_provider,
+    platform_profile,
+)
 
 pytestmark = pytest.mark.evals
 
 
-@pytest.fixture
-def llm():  # type: ignore[no-untyped-def]
-    """The provider the platform actually uses.
+# Every profile the platform can be pointed at. Both are exercised, and that
+# is not thoroughness for its own sake: two bugs shipped because the evals
+# only ever ran against NVIDIA. OpenAI rejects `max_tokens` and refuses a
+# `tool` message whose preceding assistant turn omits its `tool_calls`;
+# NVIDIA accepts both. Every tool-using turn failed the day a real OpenAI key
+# was configured, and no test we had could have said so.
+#
+# `offline` is deliberately absent. It answers from a hash, so running golden
+# conversations against it would assert that a hash is not a good waiter.
+EVAL_PROFILES = ("nvidia", "openai")
+
+
+@pytest.fixture(params=EVAL_PROFILES, ids=EVAL_PROFILES)
+def llm(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
+    """One real provider per run of the suite.
 
     An eval against a mock asserts that the mock returns what it was told to,
-    which is worth nothing. The whole question is whether *this* model behaves.
+    which is worth nothing. The whole question is whether *this* model
+    behaves - and "this model" is now plural.
+
+    The profile is built explicitly rather than read from `LLM_PROFILE`: the
+    point is to cover both regardless of how the environment happens to be
+    configured.
     """
+    profile = request.param
+    settings = get_settings().model_copy(update={"llm_profile": profile})
     try:
-        return platform_provider()
+        return build_provider(platform_profile(settings))
     except LLMConfigurationError as exc:
         if llm_required():
-            pytest.fail(f"LEO_REQUIRE_LLM is set but no provider is configured: {exc}")
-        pytest.skip(str(exc))
+            pytest.fail(f"LEO_REQUIRE_LLM is set but the {profile!r} profile is not usable: {exc}")
+        pytest.skip(f"{profile}: {exc}")
 
 
 class TestGoldenConversations:
