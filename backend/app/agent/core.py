@@ -147,7 +147,10 @@ class AgentCore:
             if not result.wants_tool:
                 break
 
-            messages.append(ChatMessage("assistant", result.content))
+            # The full turn, tool calls included. Replaying only the text
+            # leaves the `tool` results below answering nothing, which OpenAI
+            # rejects outright.
+            messages.append(ChatMessage("assistant", result.content, tool_calls=result.tool_calls))
             for call in result.tool_calls:
                 output, sources = await self._run_tool(context, call)
                 tools_called.append(

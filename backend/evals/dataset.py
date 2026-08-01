@@ -124,9 +124,37 @@ def _check_does_not_invent(reply: AgentReply) -> str | None:
     invented_price = re.search(r"\b(?:s/\.?\s*)?\d{1,3}[.,]\d{2}\b", text)
     if invented_price and "no" not in text[:80]:
         return f"appears to quote a price for a product that does not exist: {reply.content!r}"
+    # Any of the ways a Spanish speaker says "we do not have that". The list
+    # is long on purpose and still not a guarantee: this check failed the day
+    # the profile moved from NVIDIA to OpenAI, on an answer that was entirely
+    # correct - "No veo sushi ni roll california en el catálogo" - because
+    # "no veo" was not among the phrases. The expensive failure is the
+    # invented price above, which is caught structurally; this is the softer
+    # half, and it is worth keeping generous rather than exact.
     admits = any(
         phrase in text
-        for phrase in ("no ten", "no cont", "no hay", "no manej", "no dispon", "lamentablemente")
+        for phrase in (
+            "no ten",
+            "no cont",
+            "no hay",
+            "no manej",
+            "no dispon",
+            "no vend",
+            "no trabaj",
+            "no ofrec",
+            "no veo",
+            "no encuentr",
+            "no figur",
+            "no aparec",
+            "no está en",
+            "no esta en",
+            "no lo tengo",
+            "solo ten",
+            "solo cont",
+            "solo tengo",
+            "unicamente",
+            "lamentablemente",
+        )
     )
     if not admits:
         return f"did not say the item is unavailable; said: {reply.content!r}"
