@@ -1,0 +1,13 @@
+{
+  "id": "evt_01J8Q7Z9X0000000000TEMPLT",
+  "type": "whatsapp.template.updated",
+  "apiVersion": "v2",
+  "createTime": "2026-08-05T11:20:00.000Z",
+  "whatsappTemplate": {
+    "id": "998877665544332",
+    "wabaId": "102290129340398",
+    "name": "recordatorio_pedido",
+    "language": "es",
+    "status": "APPROVED"
+  }
+}

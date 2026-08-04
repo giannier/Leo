@@ -26,6 +26,7 @@ SECRETS = frozenset(
         "openai_api_key",
         "credentials_encryption_key",
         "secret_key",
+        "ycloud_webhook_secret",
     }
 )
 
@@ -72,6 +73,15 @@ GROUPS: list[tuple[str, list[str]]] = [
         ],
     ),
     ("Phone OTP", ["otp_request_limit", "otp_request_window_seconds"]),
+    (
+        "WhatsApp channel",
+        [
+            "ycloud_webhook_secret",
+            "ycloud_base_url",
+            "channel_debounce_seconds",
+            "channel_send_max_attempts",
+        ],
+    ),
     (
         "Object storage",
         ["s3_endpoint_url", "s3_access_key", "s3_secret_key", "s3_bucket", "s3_region"],

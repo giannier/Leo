@@ -165,6 +165,30 @@ class Settings(BaseSettings):
     s3_bucket: str = "leo-storage"
     s3_region: str = "us-east-1"
 
+    # --- WhatsApp channel (Feature 002) -----------------------------------
+    # Shared secret YCloud signs its webhooks with. Account-level, not
+    # per-number: one endpoint receives every tenant's traffic.
+    #
+    # Without it the endpoint refuses everything, which is the correct
+    # failure. An unsigned webhook endpoint is a public write API to the
+    # inbox of every business on the platform.
+    ycloud_webhook_secret: str | None = None
+
+    # Base URL of YCloud's API. Overridable so a staging deployment can be
+    # pointed at a recorded mock without touching code.
+    ycloud_base_url: str = "https://api.ycloud.com/v2"
+
+    # How long messages from one customer are collected before the agent is
+    # asked to answer (RF-005). Somebody typing "hola" / "buenas" / "tienen
+    # pan?" in three bursts is asking one question, and three separate
+    # answers read like a broken robot and cost three model calls.
+    channel_debounce_seconds: int = 8
+
+    # Attempts to hand one reply to the provider before it is marked failed
+    # (HU-02). Only retryable failures count - a rejected credential is not
+    # retried at all.
+    channel_send_max_attempts: int = 3
+
     # Sandbox (contracts/api.md: 30 messages per minute, per tenant)
     sandbox_rate_limit_requests: int = 30
     sandbox_rate_limit_window_seconds: int = 60

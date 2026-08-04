@@ -1,0 +1,18 @@
+{
+  "id": "evt_01J8Q7Z9X000000000000VIDEO",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:39:44.108Z",
+  "whatsappInboundMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBRBM0M0RDVFNkY3ODkwMTIzNDU2NwA=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:39:43.000Z",
+    "type": "video",
+    "video": {
+      "id": "1642909876543210",
+      "mimeType": "video/mp4"
+    }
+  }
+}

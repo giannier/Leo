@@ -1,0 +1,16 @@
+{
+  "id": "evt_01J8Q7Z9X00000000000DELIV",
+  "type": "whatsapp.message.updated",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:32:14.001Z",
+  "whatsappMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgARGBI5QjZDN0Q4RTlGMEExQjJDM0QA",
+    "wabaId": "102290129340398",
+    "from": "+51912345678",
+    "to": "+51987654321",
+    "type": "text",
+    "status": "delivered",
+    "createTime": "2026-08-04T14:32:12.500Z",
+    "updateTime": "2026-08-04T14:32:13.900Z"
+  }
+}
