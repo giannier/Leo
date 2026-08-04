@@ -27,6 +27,7 @@ import re
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -53,10 +54,15 @@ logger = logging.getLogger(__name__)
 # policy - and bounds a loop that would otherwise bill per iteration.
 MAX_TOOL_ROUNDS = 2
 
-# Conversation turns replayed into the prompt. Enough to follow a thread
-# without letting a long chat crowd out the tool results, which are the part
-# that keeps the answer truthful.
-HISTORY_TURNS = 10
+# Conversation *messages* - not exchanges - replayed into the prompt. At ten
+# the agent lost track inside a single order: a customer who said "para recoger
+# en Bagua" was asked for a delivery address four turns later, because the
+# sentence had already fallen out of the window. Thirty covers the ordering
+# conversations this is actually used for, at roughly 1.8k tokens of history,
+# and still leaves the tool results room to be the part that decides the
+# answer. A rolling summary (TASK-304) is what removes the ceiling; this only
+# raises it.
+HISTORY_TURNS = 30
 
 FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
@@ -112,6 +118,51 @@ _TOOL_BLOCK = re.compile(
 # failure that did not happen is the worse error of the two.
 _MIN_ANSWER_CHARS = 12
 
+# WhatsApp's markup is not Markdown, and every model defaults to Markdown.
+# `**negrita**` arrives with the asterisks showing, which reads to a customer
+# as a bot that is broken. The prompt asks for the right syntax; this converts
+# it regardless, because formatting is exactly the instruction a model drifts
+# away from once the conversation gets long.
+#
+# `(?=\S)` and `(?<=\S)` keep the delimiters glued to real text, so arithmetic
+# like `2 ** 3` and a row of `***` separators are left alone.
+_MD_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", re.DOTALL)
+_MD_BOLD_UNDERSCORE = re.compile(r"__(?=\S)(.+?)(?<=\S)__", re.DOTALL)
+_MD_STRIKE = re.compile(r"~~(?=\S)(.+?)(?<=\S)~~", re.DOTALL)
+# Headings have no equivalent at all: the marker is dropped and the text kept.
+_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.MULTILINE)
+
+
+def whatsapp_text(text: str) -> str:
+    """Rewrite Markdown emphasis as the markup WhatsApp actually renders.
+
+    Single-underscore `_cursiva_` means the same thing in both, so it is left
+    untouched.
+    """
+    text = _MD_BOLD.sub(r"*\1*", text)
+    text = _MD_BOLD_UNDERSCORE.sub(r"*\1*", text)
+    text = _MD_STRIKE.sub(r"~\1~", text)
+    return _MD_HEADING.sub("", text)
+
+
+_RUN_OF_BLANKS = re.compile(r"[ \t]+")
+_TRAILING_BLANKS = re.compile(r"[ \t]+$", re.MULTILINE)
+_RUN_OF_NEWLINES = re.compile(r"\n{3,}")
+
+
+def _tidy(text: str) -> str:
+    """Normalise spacing without flattening the reply onto one line.
+
+    This used to be `" ".join(text.split())`, which also ate every newline -
+    so a price list the model had laid out one product per line arrived as a
+    single run-on sentence with dashes in it, which is precisely the shape
+    nobody can read on a phone. Runs of blanks collapse, blank-line runs cap
+    at one, and real line breaks survive.
+    """
+    text = _RUN_OF_BLANKS.sub(" ", text)
+    text = _TRAILING_BLANKS.sub("", text)
+    return _RUN_OF_NEWLINES.sub("\n\n", text).strip()
+
 
 def _usable_answer(raw: str) -> tuple[str, bool]:
     """The reply to show, and whether the model failed to produce one.
@@ -122,20 +173,21 @@ def _usable_answer(raw: str) -> tuple[str, bool]:
     their configuration - when nothing is left after the strip, or when the
     strip removed markup and left too little behind to be anything but a
     fragment of the call. A short answer that carried no markup is kept.
+
+    Whatever survives is rewritten into WhatsApp's markup on the way out.
     """
     text = raw.strip()
     if not text:
         return FALLBACK_REPLY, True
 
     stripped = _TOOL_BLOCK.sub(" ", text)
-    cleaned = " ".join(stripped.split()).strip()
+    cleaned = _tidy(stripped)
 
     if not cleaned:
         return FALLBACK_REPLY, True
     if stripped != text and len(cleaned) < _MIN_ANSWER_CHARS:
         return FALLBACK_REPLY, True
-    # Prose survived alongside the markup: keep the prose.
-    return cleaned if cleaned != text else text, False
+    return whatsapp_text(cleaned), False
 
 
 # One turn's tool results, keyed by tool name and arguments.
@@ -195,11 +247,16 @@ class AgentCore:
         self._max_rounds = max_tool_rounds
 
     def system_prompt(self) -> str:
-        """The instructions this tenant's agent runs under."""
+        """The instructions this tenant's agent runs under.
+
+        The clock is read here, at the edge, so the builder itself stays pure
+        and the evals can pin a date.
+        """
         return build_system_prompt(
             profile=BusinessProfileRepository(self._session, self._tenant_id).current(),
             config=AgentConfigRepository(self._session, self._tenant_id).current(),
             tool_names=self._registry.names(),
+            now=datetime.now(UTC),
         )
 
     async def respond(self, *, conversation_id: uuid.UUID, customer_message: str) -> AgentReply:
