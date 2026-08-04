@@ -387,6 +387,7 @@ SandboxLimiterDep = Annotated[RateLimiter, Depends(get_sandbox_limiter)]
 # real provider - which is exactly what happened before this was a Depends.
 PlatformLLMDep = Annotated[LLMProvider, Depends(get_platform_llm)]
 WhatsAppProviderDep = Annotated[WhatsAppProvider, Depends(get_whatsapp_provider)]
+JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 
 

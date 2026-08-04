@@ -11,22 +11,36 @@ from arq.worker import Worker
 
 from app.core.config import get_settings
 from app.services.knowledge import INDEX_JOB
+from app.workers.channel import PROCESS_EVENT_JOB
 from app.workers.settings import WorkerSettings
+
+# Every name any part of the API enqueues by. Adding a job means adding it
+# here, which is the point: the list is the contract between two processes
+# that never import each other.
+ENQUEUED_BY_THE_API = {INDEX_JOB, PROCESS_EVENT_JOB}
 
 
 def _registered_names() -> set[str]:
+    """Job names the worker answers to, excluding the ones it schedules itself.
+
+    ARQ registers cron jobs in the same table under a `cron:` prefix. Those
+    are triggered by the clock, not enqueued by anyone, so they are not part
+    of the contract between the two processes.
+    """
     settings = {
         key: value for key, value in vars(WorkerSettings).items() if not key.startswith("__")
     }
-    return set(Worker(**settings).functions)
+    return {name for name in Worker(**settings).functions if not name.startswith("cron:")}
 
 
-class TestTheIndexingJobIsReachable:
-    def test_the_name_the_api_enqueues_is_the_name_the_worker_registers(self) -> None:
-        assert INDEX_JOB in _registered_names()
+class TestEveryEnqueuedJobIsReachable:
+    def test_the_names_the_api_enqueues_are_the_names_the_worker_registers(self) -> None:
+        assert _registered_names() >= ENQUEUED_BY_THE_API
 
-    def test_the_worker_registers_the_indexer(self) -> None:
-        assert [f.__name__ for f in WorkerSettings.functions] == ["index_knowledge_source"]
+    def test_the_worker_registers_nothing_nobody_asks_for(self) -> None:
+        """A registered function nothing enqueues is either dead code or a
+        name that drifted, and both look identical from here."""
+        assert _registered_names() == ENQUEUED_BY_THE_API
 
 
 class TestWorkerConnection:

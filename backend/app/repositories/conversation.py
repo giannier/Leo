@@ -32,6 +32,25 @@ class ConversationRepository(BaseRepository[Conversation]):
             criteria.append(Conversation.channel == channel)
         return self.list(*criteria)
 
+    def open_for_contact(self, contact_id: uuid.UUID) -> Conversation | None:
+        """The live WhatsApp thread with one person, if there is one.
+
+        At most one is expected - a new thread is only opened after the old
+        one is closed - but the newest is taken rather than asserting on it,
+        because a race between two workers could briefly produce two and
+        answering in the older one is a worse outcome than the anomaly itself.
+        """
+        statement = (
+            self._scoped()
+            .where(
+                Conversation.contact_id == contact_id,
+                Conversation.channel == "whatsapp",
+                Conversation.status == "open",
+            )
+            .order_by(Conversation.created_at.desc())
+        )
+        return self._session.execute(statement).scalars().first()
+
 
 class MessageRepository(BaseRepository[Message]):
     """Messages for one tenant."""
