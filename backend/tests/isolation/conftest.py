@@ -11,6 +11,7 @@ import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -23,6 +24,7 @@ from app.api.deps import get_db, get_email_provider, get_login_limiter, get_rate
 from app.core.config import get_settings
 from app.core.rate_limit import NullRateLimiter, RateLimiter
 from app.models import (
+    Contact,
     Conversation,
     KnowledgeChunk,
     KnowledgeSource,
@@ -41,6 +43,13 @@ REQUIRE_DB_ENV_VAR = "LEO_REQUIRE_DB"
 EMBEDDING_DIM = EMBEDDING_DIMENSIONS
 
 
+# Deliberately the same for both tenants. One person can write to two
+# different businesses, and when they do, each business must see their own
+# contact and nothing of the other's - the row that most invites a leak,
+# because the natural key looks global and is not.
+SHARED_CUSTOMER_PHONE = "+51987654321"
+
+
 @dataclass(frozen=True)
 class TenantFixture:
     """One tenant plus one row of each kind that belongs to it."""
@@ -51,6 +60,7 @@ class TenantFixture:
     chunk_id: uuid.UUID
     conversation_id: uuid.UUID
     message_id: uuid.UUID
+    contact_id: uuid.UUID
 
 
 @pytest.fixture(scope="session")
@@ -132,7 +142,13 @@ def _populate(db: Session, label: str) -> TenantFixture:
         tenant_id=tenant.id, type="faq", title=f"FAQ {label}", status="indexed"
     )
     conversation = Conversation(tenant_id=tenant.id, channel="sandbox")
-    db.add_all([product, source, conversation])
+    contact = Contact(
+        tenant_id=tenant.id,
+        phone_e164=SHARED_CUSTOMER_PHONE,
+        profile_name=f"Customer of {label}",
+        last_inbound_at=datetime.now(UTC),
+    )
+    db.add_all([product, source, conversation, contact])
     db.flush()
 
     chunk = KnowledgeChunk(
@@ -160,6 +176,7 @@ def _populate(db: Session, label: str) -> TenantFixture:
         chunk_id=chunk.id,
         conversation_id=conversation.id,
         message_id=message.id,
+        contact_id=contact.id,
     )
 
 

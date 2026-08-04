@@ -28,6 +28,25 @@ CONVERSATION_STATUSES = ("open", "closed")
 MESSAGE_DIRECTIONS = ("inbound", "outbound")
 MESSAGE_AUTHORS = ("customer", "agent", "human_operator", "system")
 
+# What arrived, or what was sent. `unsupported` is the honest answer for a
+# type this version cannot read at all: the message is still stored and still
+# counts as an interaction, because discarding it would lose a customer's
+# words (Feature 002, C-001).
+MESSAGE_TYPES = (
+    "text",
+    "image",
+    "document",
+    "audio",
+    "sticker",
+    "location",
+    "contact",
+    "unsupported",
+)
+
+# Where an outbound message got to. Null for anything inbound - a message the
+# customer sent us has no delivery state of ours to report.
+DELIVERY_STATUSES = ("queued", "sent", "delivered", "read", "failed")
+
 
 class Conversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """A thread with one customer, on the sandbox or the real channel."""
@@ -44,9 +63,12 @@ class Conversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
     channel: Mapped[str] = mapped_column(Text, nullable=False)
-    # Deliberately not a foreign key yet: `contacts` arrives in Feature 007,
-    # and sandbox conversations have no contact at all.
-    contact_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
+    # A real foreign key since Feature 002, which is where `contacts` was
+    # born. Still nullable, and always will be: a sandbox conversation is the
+    # owner talking to their own agent, and there is no contact involved.
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("contacts.id"), nullable=True
+    )
     # The panel user who opened a sandbox conversation.
     started_by: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -61,6 +83,8 @@ class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     __table_args__ = (
         enum_check("direction", MESSAGE_DIRECTIONS, "messages_direction"),
         enum_check("author", MESSAGE_AUTHORS, "messages_author"),
+        enum_check("msg_type", MESSAGE_TYPES, "messages_msg_type"),
+        enum_check("delivery_status", DELIVERY_STATUSES, "messages_delivery_status"),
         # Transcripts are always read in chronological order for one thread.
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
     )
@@ -74,6 +98,17 @@ class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     direction: Mapped[str] = mapped_column(Text, nullable=False)
     author: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # --- the real channel (Feature 002) -----------------------------------
+    # The provider's own id, both ways. Globally unique, which is what makes
+    # a redelivered inbound message insert exactly once, and what lets a
+    # status webhook find the outbound message it refers to.
+    #
+    # Null for the sandbox: nothing was sent anywhere, so no provider ever
+    # named it.
+    provider_message_id: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
+    msg_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="text")
+    delivery_status: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
