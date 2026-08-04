@@ -13,6 +13,7 @@ tenant actually reads is the frontend's, keyed off the stable `error` code.
 
 from __future__ import annotations
 
+import logging
 from http import HTTPStatus
 from typing import Any
 
@@ -22,6 +23,8 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
 
 VALIDATION_ERROR = "validation_error"
 INTERNAL_ERROR = "internal_error"
@@ -139,6 +142,32 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     )
 
 
+async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Render anything unexpected as the documented envelope.
+
+    Without this, a bug that escapes an endpoint leaves Starlette's own
+    plain-text `Internal Server Error`: a body the generated client cannot
+    parse, in a shape no route documents, from a service whose contract says
+    every failure looks the same.
+
+    The exception text never reaches the caller. It routinely carries a SQL
+    statement, a file path, or a provider's raw response - and a 500 is by
+    definition the case nobody anticipated, so there is no reviewing it
+    beforehand. It goes to the log instead, with the route that produced it.
+    """
+    logger.exception(
+        "unhandled error",
+        extra={"method": request.method, "path": request.url.path},
+    )
+    return JSONResponse(
+        status_code=500,
+        content=error_body(
+            error=INTERNAL_ERROR,
+            message="The server could not complete the request.",
+        ),
+    )
+
+
 def error_responses(*documented: tuple[int, str]) -> dict[int | str, dict[str, Any]]:
     """Build a route's `responses=`, all sharing the envelope model.
 
@@ -183,4 +212,10 @@ def install_error_contract(app: FastAPI) -> None:
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    # Starlette routes this one through `ServerErrorMiddleware`, which sits
+    # outside every other middleware - so this response is the one place in
+    # the service that does not pass through `SecurityHeadersMiddleware`. It
+    # carries a fixed string and no tenant data, which is why that is
+    # acceptable here and nowhere else.
+    app.add_exception_handler(Exception, unhandled_error_handler)
     _use_documented_error_schema(app)

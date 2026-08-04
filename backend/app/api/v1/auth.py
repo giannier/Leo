@@ -392,6 +392,7 @@ def _invalid_refresh() -> ApiError:
     responses=error_responses(
         (400, "`validation_error`"),
         (409, "`email_taken` or `phone_in_active_trial`"),
+        (429, _throttle_doc()),
         (503, "`registration_unavailable` - the trial plan is misconfigured"),
     ),
 )
@@ -447,6 +448,7 @@ async def register(
     summary="Consume an email verification token",
     responses=error_responses(
         (400, "`validation_error` or `invalid_or_expired_token`"),
+        (429, _throttle_doc()),
     ),
 )
 async def verify_email(payload: VerifyEmailRequest, session: SessionDep) -> None:
@@ -618,7 +620,10 @@ async def verify_otp(
     dependencies=RATE_LIMITED,
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Send a fresh verification link",
-    responses=error_responses((400, "`validation_error`")),
+    responses=error_responses(
+        (400, "`validation_error`"),
+        (429, _throttle_doc()),
+    ),
 )
 async def resend_verification(
     payload: ResendVerificationRequest,
@@ -727,7 +732,9 @@ async def login(
         (400, "`validation_error`"),
         (401, "`invalid_refresh` - unknown, expired, revoked or replayed"),
         (403, "`email_not_verified` or `tenant_access_denied`"),
-        (429, _throttle_doc()),
+        # No 429. `contracts/api.md` puts refresh outside both limits, and it
+        # carries no rate-limit dependency - so advertising the status would
+        # put a branch in the generated client that can never be reached.
     ),
 )
 async def refresh(
@@ -775,9 +782,9 @@ async def refresh(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="End the current session",
-    responses=error_responses(
-        (429, _throttle_doc()),
-    ),
+    # No documented failure at all: signing out always answers 204, and the
+    # contract keeps logout outside the rate limits so that it works on the
+    # first attempt even for a caller who has exhausted every other budget.
 )
 async def logout(
     session: SessionDep,

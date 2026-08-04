@@ -30,10 +30,15 @@ class ResendEmailProvider:
         api_key: str,
         sender: str,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._api_key = api_key
         self._sender = sender
         self._timeout = timeout
+        # `None` is httpx's own default, so nothing changes in production.
+        # The suite passes a `MockTransport`, which is the only way to check
+        # the payload this builds without sending real mail to a real address.
+        self._transport = transport
 
     async def send(self, message: EmailMessage) -> str:
         payload: dict[str, Any] = {
@@ -48,7 +53,9 @@ class ResendEmailProvider:
             payload["reply_to"] = message.reply_to
 
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport
+            ) as client:
                 response = await client.post(
                     RESEND_URL,
                     headers={

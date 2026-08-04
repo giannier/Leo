@@ -185,11 +185,26 @@
 
 ## Phase 6: Quality Gates y Deploy
 
-- [ ] **TASK-025: Endurecimiento y cobertura**
+- [x] **TASK-025: Endurecimiento y cobertura**
   - **Input:** toda la implementación, `constitution.md` (estándares)
   - **Output:** cobertura ≥80% agent/channels, ≥70% resto; rate limiting revisado; headers de seguridad; revisión de logs (sin secretos ni datos personales); casos edge de clarifications cubiertos por tests
   - **Depends on:** TASK-016..024
   - **Verification:** reporte de cobertura en CI; checklist de seguridad del plan marcado
+  - **Resultado:** `make coverage` corre la suite y aplica el estándar por grupo de
+    módulos (`backend/scripts/coverage_gate.py`); CI lo ejecuta en el job backend.
+    Medición: agent-core y tools 94.7%, channels 100%, billing 91.9%, resto 94.3%.
+    `fail_under` pasó de 0 a 70. Headers de seguridad en `app/api/security_headers.py`
+    (nosniff, DENY, no-referrer, CSP, Permissions-Policy, CORP; HSTS solo desplegado)
+    y sobre 500 no controlado ahora se devuelve el sobre documentado en vez del texto
+    plano de Starlette. Auditoría de logs: el limitador registraba la clave, que en el
+    contador por cuenta **es el email del cliente** (Ley 29733); ahora registra un
+    digest. Rate limiting revisado contra el contrato: las cuatro capas coinciden y
+    el esquema OpenAPI anunciaba 429 donde no lo había y lo omitía donde sí.
+  - **Pendiente de decisión de Giannier (no implementado a propósito):** el lock de
+    `trial_phone_locks` (Clarification 005) se toma al registrarse y **nunca se
+    libera**. Un cliente cuyo trial venció no puede volver a registrarse con su mismo
+    teléfono. Liberar al `paused` habilitaría trials infinitos; liberar al `archived`
+    (30 días) parece lo correcto, pero la decisión es suya.
 
 - [ ] **TASK-026: Deploy a producción en Contabo**
   - **Input:** TASK-025, `deploy/`

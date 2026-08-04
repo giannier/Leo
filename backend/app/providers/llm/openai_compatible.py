@@ -53,6 +53,7 @@ class OpenAICompatibleProvider:
         send_embedding_input_type: bool = True,
         max_tokens_field: str = "max_tokens",
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -73,6 +74,14 @@ class OpenAICompatibleProvider:
         # is carried the same way rather than branched on a provider name.
         self._max_tokens_field = max_tokens_field
         self._timeout = timeout
+        # The seam that makes everything below testable without a network.
+        # `None` is httpx's own default, so production behaviour is untouched;
+        # the suite passes a `MockTransport` and gets to assert on the exact
+        # payload this adapter builds. Without it the only reachable parts of
+        # the class are the pure encoders, and the request assembly - which is
+        # where the vendor differences live - could only be checked by calling
+        # a paid API.
+        self._transport = transport
 
     @property
     def chat_model(self) -> str:
@@ -115,7 +124,9 @@ class OpenAICompatibleProvider:
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, transport=self._transport
+            ) as client:
                 response = await client.post(url, headers=self._headers(), json=payload)
         except httpx.TimeoutException as exc:
             raise LLMError(f"{self._base_url} timed out after {self._timeout.read}s") from exc

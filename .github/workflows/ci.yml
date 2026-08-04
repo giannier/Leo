@@ -89,9 +89,16 @@ jobs:
         # drift apart while the suite stayed green.
         run: make migrate
 
-      - name: Tests
-        # Includes tests/isolation/; that suite becomes a dedicated gate in TASK-004.
-        run: make test
+      - name: Tests and the coverage standard
+        # `make coverage` = the same suite under `coverage run`, then the
+        # report, then `scripts/coverage_gate.py`. The gate is per module
+        # group because the Constitution's standard is: 80% on agent-core,
+        # tools, channels and billing, 70% on the rest. A single global
+        # percentage would let the agent slide while a well-tested repository
+        # layer carried the average.
+        #
+        # Includes tests/isolation/, which also has its own dedicated job.
+        run: make coverage
 
   isolation:
     name: Multi-tenant isolation

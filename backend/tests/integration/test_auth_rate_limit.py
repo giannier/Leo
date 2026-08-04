@@ -19,17 +19,20 @@ from collections.abc import AsyncIterator
 
 import pytest
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
     client_identifier,
+    enforce_auth_rate_limit,
     get_db,
     get_email_provider,
     get_login_limiter,
     get_rate_limiter,
 )
+from app.api.v1.auth import router as auth_router
 from app.core.config import Settings, get_settings
 from app.core.rate_limit import NullRateLimiter, RateLimiter, RedisRateLimiter
 from app.providers.email.base import EmailProvider
@@ -357,13 +360,46 @@ class TestWhatTheLimitDeliberatelyDoesNotCover:
     """`refresh` and `logout` are exempt, and that is a decision, not an
     oversight.
 
-    The budget is five requests per minute **per IP address**, and a shop is
-    one IP. The owner and two assistants signing in at opening time, each with
-    a couple of tabs whose access tokens expire together fifteen minutes
-    later, exhaust it between them - and the failure reads as "the panel keeps
-    logging me out", produced by a control meant to stop strangers guessing
-    passwords.
+    The budget is a fixed number of requests per minute **per IP address**,
+    and a shop is one IP. The owner and two assistants signing in at opening
+    time, each with a couple of tabs whose access tokens expire together
+    fifteen minutes later, exhaust it between them - and the failure reads as
+    "the panel keeps logging me out", produced by a control meant to stop
+    strangers guessing passwords.
     """
+
+    def test_the_schema_advertises_429_on_exactly_the_throttled_routes(self, app: FastAPI) -> None:
+        """The generated client is built from this schema.
+
+        A 429 documented on a route that cannot answer one becomes a branch
+        in generated code that can never run - the same defect this service
+        already refuses to ship for the 422 FastAPI adds by itself. It is also
+        the way the exemption above would rot: somebody reads the schema,
+        believes `logout` is throttled, and writes a retry loop around a
+        status it will never see.
+        """
+        throttled = {
+            route.path
+            for route in auth_router.routes
+            if isinstance(route, APIRoute)
+            and any(
+                dependency.dependency is enforce_auth_rate_limit
+                for dependency in route.dependencies
+            )
+        }
+        # Read back out of the published document rather than off the route
+        # objects: this is the artefact `npm run api:types` consumes.
+        paths = app.openapi()["paths"]
+        documents_429 = {
+            path.removeprefix(SETTINGS.api_v1_prefix)
+            for path, operations in paths.items()
+            if "/auth/" in path
+            for operation in operations.values()
+            if "429" in operation["responses"]
+        }
+
+        assert throttled, "no auth route carries the limiter; the wiring is gone"
+        assert documents_429 == throttled
 
     async def test_refresh_is_not_throttled(self, throttled: AsyncClient) -> None:
         """It authenticates a 256-bit opaque token that rotates on every use,
