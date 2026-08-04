@@ -1,0 +1,20 @@
+{
+  "id": "evt_01J8Q7Z9X0000000000000TEXT",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:32:11.412Z",
+  "whatsappInboundMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBQzQTVGN0E5QjRDMkQ4RTFGMEE5QwA=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "customerProfile": {
+      "name": "Ana Quispe"
+    },
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:32:10.000Z",
+    "type": "text",
+    "text": {
+      "body": "Hola, tienen pan integral?"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "evt_01J8Q7Z9X00000000000FAILD",
+  "type": "whatsapp.message.updated",
+  "apiVersion": "v2",
+  "createTime": "2026-08-05T09:11:04.220Z",
+  "whatsappMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgARGBJBQzFEMkUzRjRBNUI2QzdEOEUA",
+    "wabaId": "102290129340398",
+    "from": "+51912345678",
+    "to": "+51987654321",
+    "type": "text",
+    "status": "failed",
+    "createTime": "2026-08-05T09:11:03.100Z",
+    "updateTime": "2026-08-05T09:11:03.980Z",
+    "error": {
+      "code": 131047,
+      "message": "Message failed to send because more than 24 hours have passed since the customer last replied to this number."
+    }
+  }
+}

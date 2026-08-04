@@ -1,0 +1,23 @@
+{
+  "id": "evt_01J8Q7Z9X000000000000IMAGE",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:35:02.900Z",
+  "whatsappInboundMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBQ5RjJEM0MxQTdCOEU0RDVGMEExQwA=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "customerProfile": {
+      "name": "Ana Quispe"
+    },
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:35:01.000Z",
+    "type": "image",
+    "image": {
+      "id": "1642901234567890",
+      "mimeType": "image/jpeg",
+      "sha256": "b1946ac92492d2347c6235b4d2611184",
+      "caption": "Este es el que quiero"
+    }
+  }
+}

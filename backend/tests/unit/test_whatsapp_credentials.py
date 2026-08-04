@@ -8,9 +8,9 @@ from cryptography.fernet import Fernet
 from app.core.crypto import CredentialDecryptionError, decrypt_secret, encrypt_secret, mask_secret
 from app.providers.whatsapp import (
     InvalidCredentials,
-    ManualYCloudProvider,
     NumberCredentials,
     WhatsAppProvider,
+    YCloudProvider,
 )
 
 
@@ -43,18 +43,18 @@ def _valid() -> NumberCredentials:
 
 
 class TestProviderContract:
-    def test_the_manual_adapter_satisfies_the_port(self) -> None:
-        assert isinstance(ManualYCloudProvider(), WhatsAppProvider)
+    def test_the_adapter_satisfies_the_port(self) -> None:
+        assert isinstance(YCloudProvider(), WhatsAppProvider)
 
     def test_valid_credentials_pass(self) -> None:
-        ManualYCloudProvider().validate(_valid())
+        YCloudProvider().validate(_valid())
 
     @pytest.mark.parametrize("missing", ["waba_id", "phone_number_id", "api_key"])
     def test_each_required_key_is_required(self, missing: str) -> None:
         credentials = _valid()
         del credentials.values[missing]
         with pytest.raises(InvalidCredentials, match=missing):
-            ManualYCloudProvider().validate(credentials)
+            YCloudProvider().validate(credentials)
 
     def test_a_placeholder_is_rejected(self) -> None:
         """The realistic failure is somebody tabbing through the form and
@@ -62,12 +62,12 @@ class TestProviderContract:
         credentials = _valid()
         credentials.values["api_key"] = "TODO"
         with pytest.raises(InvalidCredentials, match="implausibly short"):
-            ManualYCloudProvider().validate(credentials)
+            YCloudProvider().validate(credentials)
 
     def test_the_wrong_provider_is_rejected(self) -> None:
         credentials = NumberCredentials(provider="meta", values=_valid().values)
         with pytest.raises(InvalidCredentials, match="ycloud"):
-            ManualYCloudProvider().validate(credentials)
+            YCloudProvider().validate(credentials)
 
 
 class TestEncryptionAtRest:

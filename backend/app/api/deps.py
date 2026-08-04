@@ -72,7 +72,7 @@ from app.providers.otp.console import ConsoleOtpSender
 from app.providers.storage.base import StorageProvider
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.whatsapp.base import WhatsAppProvider
-from app.providers.whatsapp.manual_ycloud import ManualYCloudProvider
+from app.providers.whatsapp.ycloud import YCloudProvider
 from app.repositories.tenant import (
     OPERATOR_ROLE,
     OWNER_ROLE,
@@ -283,15 +283,16 @@ def get_platform_llm() -> LLMProvider:
     return platform_provider()
 
 
+@lru_cache
 def get_whatsapp_provider() -> WhatsAppProvider:
-    """The adapter that validates a number's credentials.
+    """The one way in or out of WhatsApp.
 
-    v1 has exactly one, and it connects nothing: a person does the provider
-    work by hand (Clarification 007). The dependency exists so Feature 002 can
-    swap in the real YCloud client without the admin router noticing, and so a
-    test can substitute a provider that rejects.
+    Connecting a number is still manual - a person does the console work by
+    hand (Clarification 007) - but since Feature 002 this adapter also sends
+    messages and reads webhooks. Cached because it holds no per-number state:
+    the credentials travel with each call, so one instance serves every tenant.
     """
-    return ManualYCloudProvider()
+    return YCloudProvider()
 
 
 def get_otp_sender() -> OtpSender:

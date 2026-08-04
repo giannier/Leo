@@ -1,0 +1,14 @@
+{
+  "id": "evt_01J8Q7Z9X0000000000QUALIT",
+  "type": "whatsapp.business_account.phone_number.quality.updated",
+  "apiVersion": "v2",
+  "createTime": "2026-08-05T03:00:00.000Z",
+  "whatsappPhoneNumber": {
+    "id": "112233445566778",
+    "wabaId": "102290129340398",
+    "phoneNumber": "+51912345678",
+    "verifiedName": "Panaderia Quispe",
+    "qualityRating": "RED",
+    "messagingLimit": "TIER_1K"
+  }
+}
