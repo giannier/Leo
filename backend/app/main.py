@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.errors import install_error_contract
 from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.v1 import router as v1_router
+from app.api.webhooks import router as webhooks_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -50,6 +51,10 @@ def create_app() -> FastAPI:
     install_error_contract(app)
 
     app.include_router(v1_router, prefix=settings.api_v1_prefix)
+    # Deliberately outside the versioned prefix: the URL lives in a provider's
+    # console, and a version bump that moved it would silently stop a
+    # customer's WhatsApp number from working until a human noticed.
+    app.include_router(webhooks_router)
 
     return app
 

@@ -27,6 +27,8 @@ from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.channel import process_webhook_event
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.trial_lifecycle import (
     tenant_archiver,
@@ -64,6 +66,9 @@ async def startup(ctx: dict[str, Any]) -> None:
     # configured, which the jobs treat as "do the state change, skip the
     # email" rather than as a reason to fail.
     ctx["email"] = build_email_provider(settings)
+    # The channel adapter. Stateless - credentials travel with each call - so
+    # one instance serves every tenant.
+    ctx["whatsapp"] = YCloudProvider(base_url=settings.ycloud_base_url)
     logger.info("worker ready")
 
 
@@ -72,12 +77,13 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("storage", None)
     ctx.pop("pdf_extractor", None)
     ctx.pop("email", None)
+    ctx.pop("whatsapp", None)
 
 
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
-    functions = [index_knowledge_source]
+    functions = [index_knowledge_source, process_webhook_event]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
     # that fires at :00 competes with everything else that fires at :00.

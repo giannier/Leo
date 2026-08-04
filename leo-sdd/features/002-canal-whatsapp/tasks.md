@@ -29,7 +29,24 @@
   - **Config nueva:** `YCLOUD_WEBHOOK_SECRET` (sin él el endpoint rechaza todo, que
     es la falla correcta), `YCLOUD_BASE_URL`, `CHANNEL_DEBOUNCE_SECONDS`,
     `CHANNEL_SEND_MAX_ATTEMPTS`. `deploy/env.reference` regenerado.
-- [ ] **TASK-203: Endpoint de webhook + idempotencia + encolado** — persistencia cruda, verificación de firma, 200 <2s, dead-letter tras 5 intentos. Depends: 202.
+- [x] **TASK-203: Endpoint de webhook + idempotencia + encolado** — persistencia cruda, verificación de firma, 200 <2s, dead-letter tras 5 intentos. Depends: 202.
+  - **Resultado:** `POST /webhooks/ycloud` (fuera de `/api/v1`, sin JWT, fuera del
+    esquema publicado). El endpoint hace tres cosas y nada más: verificar, guardar,
+    encolar. Guarda el evento crudo ANTES de entender nada, que es lo que hace
+    reprocesable un arreglo del parser. Commitea antes de encolar: si Redis está
+    caído devuelve 503, el evento ya está guardado y la redelivery lo vuelve a
+    encolar. Nunca 500 — la URL es pública.
+  - `app/workers/channel.py::process_event` aplica el evento contra la BD. Un evento
+    es una transacción. Nada escapa a ARQ: una excepción se traduce en `attempts+1`
+    y, al llegar a 5, `dead_letter` — que NO es descartar (el payload sigue ahí y se
+    puede reprocesar). Un mensaje a un número que nadie tiene va directo a
+    dead-letter: significa que alguien sigue escribiéndole a un número desconectado.
+  - **Regrupación respecto al plan:** el upsert de contacto, la resolución de
+    conversación (nueva tras 24h, C-002) y el guardado del mensaje entraron acá y no
+    en TASK-204. Un transporte que recibe el webhook y tira el mensaje no es
+    entregable, y HU-01 dice que un mensaje no se descarta nunca. TASK-204 queda con
+    debounce, lock por conversación y agrupación de ráfagas.
+  - 41 tests nuevos entre endpoint y worker.
 - [ ] **TASK-204: Pipeline inbound** — upsert de contacto, resolución de conversación (nueva tras 24h), debounce 8s en Redis, lock por conversación, fallback de tipos no soportados. Depends: 203. Verificación: test de ráfaga (5 msgs → 1 respuesta).
 - [ ] **TASK-205: Invocación del agente en canal real + envío + estados** — integración agent-core, registro sent/delivered/read/failed desde webhooks de estado, reintentos de envío con backoff. Depends: 204.
 - [ ] **TASK-206: Ventana 24h + opt-out + quality rating** — guard de sesión, detección de STOP/BAJA configurable, webhook/poll de quality con alertas. Depends: 204.
