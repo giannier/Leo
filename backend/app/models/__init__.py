@@ -13,6 +13,7 @@ from app.models.business import (
     PaymentMethodBusiness,
     Product,
 )
+from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
@@ -34,12 +35,14 @@ __all__ = [
     "Base",
     "BusinessProfile",
     "ConnectionRequest",
+    "Contact",
     "Conversation",
     "EmailToken",
     "Invitation",
     "KnowledgeChunk",
     "KnowledgeSource",
     "Message",
+    "MessageStatusEvent",
     "OtpCode",
     "PaymentMethodBusiness",
     "Plan",
@@ -51,5 +54,6 @@ __all__ = [
     "TenantUser",
     "TrialPhoneLock",
     "User",
+    "WebhookEvent",
     "WhatsAppNumber",
 ]

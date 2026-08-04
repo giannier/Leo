@@ -1,6 +1,12 @@
 """Data access layer. Every business query is scoped by `tenant_id` here."""
 
 from app.repositories.base import BaseRepository, TenantScopeError
+from app.repositories.channel import (
+    ContactRepository,
+    MessageStatusEventRepository,
+    WebhookEventRepository,
+    session_window_is_open,
+)
 from app.repositories.conversation import (
     AgentTraceRepository,
     ConversationRepository,
@@ -28,11 +34,13 @@ from app.repositories.user import (
 __all__ = [
     "AgentTraceRepository",
     "BaseRepository",
+    "ContactRepository",
     "ConversationRepository",
     "EmailTokenRepository",
     "KnowledgeChunkRepository",
     "KnowledgeSourceRepository",
     "MessageRepository",
+    "MessageStatusEventRepository",
     "PlanRepository",
     "ProductRepository",
     "RefreshTokenRepository",
@@ -43,4 +51,6 @@ __all__ = [
     "TrialPhoneLockRepository",
     "UserMembershipRepository",
     "UserRepository",
+    "WebhookEventRepository",
+    "session_window_is_open",
 ]

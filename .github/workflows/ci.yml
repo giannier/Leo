@@ -89,6 +89,13 @@ jobs:
         # drift apart while the suite stayed green.
         run: make migrate
 
+      - name: The models and the migrations still agree
+        # `alembic check` autogenerates against the live schema and fails if
+        # anything would be emitted. Adding a column to a model and forgetting
+        # the migration otherwise passes every test - SQLAlchemy simply never
+        # selects it - and fails in production on the first INSERT.
+        run: uv run --directory backend python -m alembic check
+
       - name: Tests and the coverage standard
         # `make coverage` = the same suite under `coverage run`, then the
         # report, then `scripts/coverage_gate.py`. The gate is per module
