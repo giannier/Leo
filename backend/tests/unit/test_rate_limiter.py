@@ -209,6 +209,81 @@ class TestDegradation:
             await limiter.hit("203.0.113.1")
 
 
+class TestTheDegradationLogNamesNobody:
+    """Ley 29733: an outage must not turn the log into a customer list.
+
+    These keys are not opaque. The per-account login limiter is keyed on the
+    email address on purpose - that is what makes it immune to a whole shop
+    sharing one connection - and the per-IP limiter is keyed on the address.
+    Both lines below fire exactly when Redis is down, which is to say in
+    bursts, into whatever aggregator production ships logs to.
+    """
+
+    @staticmethod
+    def _emitted(caplog: pytest.LogCaptureFixture) -> str:
+        """Everything the handler would render: message and structured extras."""
+        return " ".join(f"{record.getMessage()} {record.__dict__}" for record in caplog.records)
+
+    async def test_the_hit_path_does_not_log_the_email_it_is_keyed_on(
+        self, namespace: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        limiter = RedisRateLimiter(
+            cast("Redis", _FailingRedis(RedisConnectionError("connection refused"))),
+            limit=1,
+            window_seconds=60,
+            namespace=namespace,
+        )
+
+        with caplog.at_level("ERROR", logger="app.core.rate_limit"):
+            await limiter.hit("ana.quispe@panaderia.pe")
+
+        emitted = self._emitted(caplog)
+        assert "ana.quispe@panaderia.pe" not in emitted
+        # Still correlatable: an operator has to be able to tell one caller
+        # hammering the endpoint from a hundred different ones.
+        assert "caller_ref" in emitted
+        assert namespace in emitted
+
+    async def test_the_reset_path_does_not_either(
+        self, namespace: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        class _FailingDelete(_FailingRedis):
+            async def delete(self, *keys: str) -> int:
+                raise self._error
+
+        limiter = RedisRateLimiter(
+            cast("Redis", _FailingDelete(RedisConnectionError("connection refused"))),
+            limit=1,
+            window_seconds=60,
+            namespace=namespace,
+        )
+
+        with caplog.at_level("WARNING", logger="app.core.rate_limit"):
+            await limiter.reset("ana.quispe@panaderia.pe")
+
+        assert "ana.quispe@panaderia.pe" not in self._emitted(caplog)
+
+    async def test_the_same_caller_always_gets_the_same_reference(
+        self, namespace: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A reference that changed per call would be useless for correlation,
+        which is the only reason it is logged at all."""
+        limiter = RedisRateLimiter(
+            cast("Redis", _FailingRedis(RedisConnectionError("connection refused"))),
+            limit=1,
+            window_seconds=60,
+            namespace=namespace,
+        )
+
+        with caplog.at_level("ERROR", logger="app.core.rate_limit"):
+            await limiter.hit("ana.quispe@panaderia.pe")
+            await limiter.hit("ana.quispe@panaderia.pe")
+            await limiter.hit("otro@panaderia.pe")
+
+        references = [record.__dict__["caller_ref"] for record in caplog.records]
+        assert references[0] == references[1] != references[2]
+
+
 class TestConfiguration:
     @pytest.mark.parametrize(("limit", "window"), [(0, 60), (-1, 60), (5, 0), (5, -1)])
     def test_a_nonsensical_configuration_is_refused_at_construction(
@@ -260,6 +335,36 @@ class TestConfiguration:
         )
         assert settings.login_attempt_limit == documented["LOGIN_ATTEMPT_LIMIT"]
         assert settings.login_attempt_window_seconds == documented["LOGIN_ATTEMPT_WINDOW_SECONDS"]
+
+    def test_the_other_two_limits_match_the_contract_as_well(self) -> None:
+        """The sandbox and OTP budgets, which the contract states in prose.
+
+        They are named nowhere near the `/auth` block and were the two nobody
+        was checking, so a change to either could drift from the document
+        without a single test noticing.
+        """
+        import re
+        from pathlib import Path
+
+        contract = (
+            Path(__file__).resolve().parents[3]
+            / "leo-sdd"
+            / "features"
+            / "001-onboarding"
+            / "contracts"
+            / "api.md"
+        ).read_text(encoding="utf-8")
+
+        otp_per_hour = re.search(r"Rate limit (\d+)/h", contract)
+        sandbox_per_minute = re.search(r"`429 rate_limited` \((\d+)/min\)", contract)
+        assert otp_per_hour is not None, "the contract no longer states the OTP limit"
+        assert sandbox_per_minute is not None, "the contract no longer states the sandbox limit"
+
+        settings = get_settings()
+        assert settings.otp_request_limit == int(otp_per_hour.group(1))
+        assert settings.otp_request_window_seconds == 3600
+        assert settings.sandbox_rate_limit_requests == int(sandbox_per_minute.group(1))
+        assert settings.sandbox_rate_limit_window_seconds == 60
 
 
 class TestNullRateLimiter:

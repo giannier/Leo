@@ -23,6 +23,7 @@ graceful degradation with a visible alert, never a silent failure.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from dataclasses import dataclass
@@ -32,6 +33,24 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
+
+
+def _log_reference(key: str) -> str:
+    """A correlation handle for a limiter key that is not the key.
+
+    The keys are not opaque. The per-account login limiter is keyed on the
+    email address itself - deliberately, because that is what makes it immune
+    to a whole shop sharing one connection - so logging the key logs a
+    customer's email address, and the per-IP limiter logs their address.
+    Both are personal data under Ley 29733, and a log aggregator is exactly
+    the kind of place it must not accumulate.
+
+    What an operator actually needs from these lines is whether the failures
+    are all one caller or many, and a truncated digest answers that. Twelve
+    hex characters make a collision between two live keys unrealistic, and the
+    value cannot be turned back into the address it came from.
+    """
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass(frozen=True)
@@ -127,7 +146,7 @@ class RedisRateLimiter:
             logger.error(
                 "rate limiter unavailable, request allowed unthrottled",
                 exc_info=True,
-                extra={"rate_limit_key": key},
+                extra={"limiter": self._namespace, "caller_ref": _log_reference(key)},
             )
             return RateLimitDecision(allowed=True, retry_after_seconds=0)
 
@@ -154,5 +173,7 @@ class RedisRateLimiter:
             await self._client.delete(*keys)
         except RedisError:
             logger.warning(
-                "could not clear rate limit counter", exc_info=True, extra={"rate_limit_key": key}
+                "could not clear rate limit counter",
+                exc_info=True,
+                extra={"limiter": self._namespace, "caller_ref": _log_reference(key)},
             )

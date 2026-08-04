@@ -503,6 +503,12 @@ class TestTheWizardReminder:
     ) -> None:
         """Somebody who signed up an hour ago and is still filling the wizard
         does not need an email about it."""
-        await _tenant(api, mail, db)
-        outcome = await run_wizard_reminder(db, email_provider=mail, now=datetime.now(UTC))
-        assert outcome.acted == 0
+        _, tenant = await _tenant(api, mail, db)
+        # Scoped to this tenant, never to `outcome.acted`. That counter covers
+        # every tenant in the database, so on any long-lived database - the
+        # development one this suite shares with the manual demo - it reports
+        # the hundreds of idle sign-ups left behind by earlier runs and the
+        # assertion fails for a reason that has nothing to do with the rule
+        # under test. See the rule at the top of tests/conftest.py.
+        await run_wizard_reminder(db, email_provider=mail, now=datetime.now(UTC))
+        assert _notifications(db, tenant.id) == set()

@@ -1,4 +1,4 @@
-.PHONY: admin reindex simulate-trial env-reference hooks up down test isolation evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: admin reindex simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -28,6 +28,11 @@ test: ## Run the full backend test suite.
 
 isolation: ## Run only the multi-tenant isolation suite.
 	uv run python -m pytest backend/tests/isolation -v
+
+coverage: ## Run the suite under coverage and enforce the Constitution's standard.
+	uv run --directory backend python -m coverage run -m pytest -q
+	uv run --directory backend python -m coverage report
+	uv run --directory backend python -m scripts.coverage_gate
 
 evals: ## Run the golden agent conversations against the configured model.
 	uv run python -m pytest backend/evals -v -m evals

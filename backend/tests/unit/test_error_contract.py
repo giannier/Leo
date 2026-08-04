@@ -58,7 +58,7 @@ class TestPublishedSchema:
     def test_the_auth_endpoints_advertise_the_envelope(self, app: FastAPI) -> None:
         schema = app.openapi()
         register = schema["paths"]["/api/v1/auth/register"]["post"]["responses"]
-        assert set(register) == {"201", "400", "409", "503"}
+        assert set(register) == {"201", "400", "409", "429", "503"}
         assert (
             register["409"]["content"]["application/json"]["schema"]["$ref"]
             == "#/components/schemas/ErrorResponse"

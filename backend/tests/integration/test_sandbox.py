@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -258,6 +259,41 @@ class TestQuota:
         tenant_id = uuid.UUID((await api.get(TENANT, headers=headers)).json()["id"])
         tenant = db.get(Tenant, tenant_id)
         assert tenant is not None
+        db.refresh(tenant)
+        assert tenant.ai_messages_used == 0
+
+    async def test_a_paused_tenant_can_still_use_it(
+        self, api: AsyncClient, mail: Any, llm: MockLLMProvider, db: Session
+    ) -> None:
+        """Clarification 002 says the sandbox is free and unlimited "durante
+        el trial y despues", and Clarification 004 keeps the panel usable in
+        read-only-plus-configuration mode once the trial lapses.
+
+        So the gate is the activation checklist, never the tenant's status.
+        The way this rule dies is somebody adding a `require_active_tenant`
+        dependency to the whole tenant router: every paid feature would be
+        correctly closed, and the one screen that convinces a lapsed customer
+        to pay would close with it.
+        """
+        headers = await _ready_owner(api, mail)
+        tenant_id = uuid.UUID((await api.get(TENANT, headers=headers)).json()["id"])
+        tenant = db.get(Tenant, tenant_id)
+        assert tenant is not None
+        tenant.status = "paused"
+        tenant.paused_at = datetime.now(UTC)
+        db.commit()
+
+        opened = await api.post(f"{SANDBOX}/conversations", headers=headers)
+        assert opened.status_code == 201, opened.text
+
+        llm.queue(ChatResult(content="Seguimos aca."))
+        replied = await api.post(
+            f"{SANDBOX}/conversations/{opened.json()['conversation_id']}/messages",
+            headers=headers,
+            json={"content": "hola"},
+        )
+        assert replied.status_code == 200, replied.text
+
         db.refresh(tenant)
         assert tenant.ai_messages_used == 0
 

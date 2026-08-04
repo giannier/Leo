@@ -124,4 +124,12 @@ omit = ["app/main.py"]
 [tool.coverage.report]
 show_missing = true
 skip_empty = true
-fail_under = 0
+# The floor for the codebase as a whole. It is deliberately the *baseline*
+# number from `constitution.md`, not the critical one: a single global gate
+# cannot say "80% on agent-core, 70% on the rest", and set to 80 it would
+# either fail honest code or, set to 70, quietly permit an untested agent.
+#
+# `scripts/coverage_gate.py` is what enforces the standard per module group,
+# and `make coverage` runs both. This value only guarantees that a collapse
+# in overall coverage cannot pass unnoticed.
+fail_under = 70
