@@ -20,6 +20,7 @@ from app.agent.core import (
     FALLBACK_REPLY,
     AgentCore,
     _usable_answer,
+    whatsapp_text,
 )
 from app.agent.tools.registry import ToolRegistry
 from app.models.business import AgentConfig, BusinessProfile, Product
@@ -1020,3 +1021,64 @@ class TestTheCatalogueGuard:
 
 def _guard_names(db: Session, tenant_id: uuid.UUID) -> list[str]:
     return ProductRepository(db, tenant_id).active_names(limit=100)
+
+
+class TestWhatsAppMarkup:
+    """WhatsApp is not Markdown. `**negrita**` arrives with the asterisks
+    showing, which a customer reads as a broken bot - and the model defaults to
+    Markdown no matter what the prompt asks for.
+    """
+
+    def test_double_asterisks_become_the_single_pair_whatsapp_renders(self) -> None:
+        assert whatsapp_text("Total: **S/ 9.00**") == "Total: *S/ 9.00*"
+
+    def test_underscore_bold_becomes_asterisks(self) -> None:
+        assert whatsapp_text("Total: __S/ 9.00__") == "Total: *S/ 9.00*"
+
+    def test_double_tildes_become_one(self) -> None:
+        assert whatsapp_text("~~agotado~~") == "~agotado~"
+
+    def test_headings_lose_the_marker_and_keep_the_text(self) -> None:
+        """WhatsApp has no headings at all, so the hashes are noise."""
+        assert whatsapp_text("### Pedido\nLeche") == "Pedido\nLeche"
+
+    def test_single_underscore_italics_are_left_alone(self) -> None:
+        """It means the same thing in both, so touching it would be a
+        regression rather than a fix."""
+        assert whatsapp_text("_importante_") == "_importante_"
+
+    def test_ordinary_prose_is_untouched(self) -> None:
+        raw = "Son 3 litros de leche a S/ 3.00 c/u, en total S/ 9.00."
+        assert whatsapp_text(raw) == raw
+
+    def test_arithmetic_is_not_mistaken_for_emphasis(self) -> None:
+        r"""`(?=\S)` is what keeps the delimiters glued to real text."""
+        assert whatsapp_text("2 ** 3 son 8") == "2 ** 3 son 8"
+
+    def test_a_reply_is_converted_on_the_way_out(self) -> None:
+        content, unusable = _usable_answer("Te separo **3 litros** de leche.")
+
+        assert unusable is False
+        assert content == "Te separo *3 litros* de leche."
+
+
+class TestReplyLayout:
+    def test_a_price_list_keeps_one_product_per_line(self) -> None:
+        """This arrived as a single run-on sentence with dashes in it, because
+        the cleanup collapsed every newline. On a phone it is unreadable."""
+        raw = "Tenemos:\n- Leche: S/ 3.00\n- Queso: S/ 16.00"
+
+        content, unusable = _usable_answer(raw)
+
+        assert unusable is False
+        assert content == raw
+
+    def test_runs_of_blank_lines_are_capped(self) -> None:
+        content, _ = _usable_answer("Hola, buenas tardes.\n\n\n\nTe ayudo con eso.")
+
+        assert content == "Hola, buenas tardes.\n\nTe ayudo con eso."
+
+    def test_trailing_spaces_are_dropped(self) -> None:
+        content, _ = _usable_answer("Leche: S/ 3.00   \nQueso: S/ 16.00")
+
+        assert content == "Leche: S/ 3.00\nQueso: S/ 16.00"

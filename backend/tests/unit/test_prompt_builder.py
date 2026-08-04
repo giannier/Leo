@@ -8,6 +8,8 @@ must survive every combination of settings.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from app.agent.prompts.builder import (
@@ -215,3 +217,85 @@ class TestTheNameCorrection:
         correction = build_name_correction(["leche entera"], ["Leche", "Pan"])
 
         assert "Son solo los primeros" not in correction
+
+
+class TestToday:
+    """The agent could not reason about dates at all: asked for "el 5" it
+    answered "sí, se puede" and then quoted a two-day rule that ruled the date
+    out, in the same sentence. It had the policy and no idea what day it was.
+    """
+
+    def test_todays_date_is_stated_in_the_tenants_timezone(self) -> None:
+        # 03:30 UTC on the 5th is still the 4th in Lima. The tenant's own
+        # timezone decides, not the server's.
+        prompt = build_system_prompt(
+            profile=_profile(timezone="America/Lima"),
+            config=_config(),
+            now=datetime(2026, 8, 5, 3, 30, tzinfo=UTC),
+        )
+        assert "martes 4 de agosto de 2026" in prompt
+
+    def test_a_different_timezone_moves_the_date(self) -> None:
+        prompt = build_system_prompt(
+            profile=_profile(timezone="Asia/Tokyo"),
+            config=_config(),
+            now=datetime(2026, 8, 5, 3, 30, tzinfo=UTC),
+        )
+        assert "miércoles 5 de agosto de 2026" in prompt
+
+    def test_an_unknown_timezone_falls_back_instead_of_raising(self) -> None:
+        """The column is filled from a dropdown, but a bad value must not take
+        the agent down in front of a customer."""
+        prompt = build_system_prompt(
+            profile=_profile(timezone="Marte/Olympus"),
+            config=_config(),
+            now=datetime(2026, 8, 5, 3, 30, tzinfo=UTC),
+        )
+        assert "martes 4 de agosto de 2026" in prompt
+
+    def test_without_a_clock_there_is_no_date_line(self) -> None:
+        """Callers that pin a prompt for comparison pass no clock at all."""
+        assert "Hoy es" not in build_system_prompt(profile=_profile(), config=_config())
+
+    def test_the_same_clock_still_produces_the_same_prompt(self) -> None:
+        """Purity is what lets the evals compare prompts across changes, so the
+        date may only enter through the injected clock."""
+        now = datetime(2026, 8, 5, 3, 30, tzinfo=UTC)
+        first = build_system_prompt(profile=_profile(), config=_config(), now=now)
+        second = build_system_prompt(profile=_profile(), config=_config(), now=now)
+        assert first == second
+
+
+class TestWhatsAppFormatting:
+    def test_the_prompt_asks_for_whatsapp_markup_not_markdown(self) -> None:
+        """`**negrita**` reached the customer with the asterisks showing."""
+        prompt = build_system_prompt(profile=_profile(), config=_config())
+        assert "*negrita*" in prompt
+        assert "Nunca uses **" in prompt
+
+    def test_it_is_present_even_with_nothing_configured(self) -> None:
+        assert "*negrita*" in build_system_prompt(profile=None, config=None)
+
+
+class TestActionGuardrail:
+    """Rule 1 forbids inventing data. This forbids inventing *actions* - the
+    agent told a customer "queda registrado" for an order no table ever
+    received, and she left believing it existed.
+    """
+
+    def test_the_agent_is_told_it_cannot_register_anything(self) -> None:
+        prompt = build_system_prompt(profile=_profile(), config=_config())
+        assert "No puedes registrar" in prompt
+
+    def test_it_is_given_the_permitted_alternative(self) -> None:
+        """A rule with no escape hatch is one the model routes around."""
+        prompt = build_system_prompt(profile=_profile(), config=_config())
+        assert "una persona del negocio lo confirmará" in prompt
+
+    def test_it_survives_every_combination_of_settings(self) -> None:
+        for tone in ("profesional", "cercano", "juvenil"):
+            for objective in ("vender", "atender", "ambos"):
+                prompt = build_system_prompt(
+                    profile=None, config=_config(tone=tone, objective=objective)
+                )
+                assert "No puedes registrar" in prompt

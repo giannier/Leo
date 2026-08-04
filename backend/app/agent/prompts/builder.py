@@ -29,7 +29,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.agent.catalog_guard import words
 from app.models.business import AgentConfig, BusinessProfile
@@ -37,6 +39,7 @@ from app.models.business import AgentConfig, BusinessProfile
 DEFAULT_AGENT_NAME = "Leo"
 DEFAULT_TONE = "cercano"
 DEFAULT_OBJECTIVE = "ambos"
+DEFAULT_TIMEZONE = "America/Lima"
 
 _TONE_GUIDANCE = {
     "profesional": "Trata de usted. Frases completas, sin jerga ni emojis.",
@@ -75,6 +78,24 @@ _ESCALATION_PHRASES = {
     "fuera_de_catalogo": "te preguntan por algo que no está en el catálogo ni en tu información",
 }
 
+# `datetime.weekday()` order, Monday first.
+_WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+_MONTHS = (
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
+
 
 def _format_hours(opening_hours: dict[str, Any] | None) -> str | None:
     """Turn the stored `{"mon": [["09:00", "18:00"]]}` into a readable line.
@@ -100,16 +121,40 @@ def _format_hours(opening_hours: dict[str, Any] | None) -> str | None:
     return "; ".join(parts) if parts else None
 
 
+def _format_today(now: datetime, timezone: str) -> str:
+    """Today's date, in the tenant's own timezone, spelled out in Spanish.
+
+    Spelled out rather than ISO because the model has to reason about it in
+    prose - "el 5" means nothing without knowing that today is the 4th, and a
+    customer who asks for "mañana" is asking about a date the agent otherwise
+    has no way to compute.
+
+    An unknown timezone falls back rather than raising: the column is filled
+    from a wizard dropdown, but a bad value must not take the agent down in
+    front of a customer.
+    """
+    try:
+        local = now.astimezone(ZoneInfo(timezone))
+    except (ZoneInfoNotFoundError, ValueError):
+        local = now.astimezone(ZoneInfo(DEFAULT_TIMEZONE))
+    return (
+        f"{_WEEKDAYS[local.weekday()]} {local.day} de "
+        f"{_MONTHS[local.month - 1]} de {local.year}, {local:%H:%M}"
+    )
+
+
 def build_system_prompt(
     *,
     profile: BusinessProfile | None,
     config: AgentConfig | None,
     tool_names: tuple[str, ...] = (),
+    now: datetime | None = None,
 ) -> str:
     """Assemble the instructions for one tenant's agent.
 
-    Pure: given the same rows it returns the same string, which is what lets
-    the evals in TASK-016 compare prompts across changes.
+    Pure: given the same rows *and the same `now`* it returns the same string,
+    which is what lets the evals in TASK-016 compare prompts across changes.
+    The clock is injected rather than read here precisely to keep that true.
     """
     name = (config.agent_name if config else None) or DEFAULT_AGENT_NAME
     tone = (config.tone if config else None) or DEFAULT_TONE
@@ -119,7 +164,7 @@ def build_system_prompt(
     industry = profile.industry if profile else None
     description = profile.description if profile else None
     currency = (profile.currency if profile else None) or "PEN"
-    timezone = (profile.timezone if profile else None) or "America/Lima"
+    timezone = (profile.timezone if profile else None) or DEFAULT_TIMEZONE
     hours = _format_hours(profile.opening_hours if profile else None)
 
     lines: list[str] = [
@@ -130,10 +175,24 @@ def build_system_prompt(
     if description:
         lines.append(f"Así describe el dueño su negocio: {description}")
 
+    if now is not None:
+        lines.append("")
+        lines.append(f"Hoy es {_format_today(now, timezone)}.")
+
     lines.append("")
     lines.append(_TONE_GUIDANCE.get(tone, _TONE_GUIDANCE[DEFAULT_TONE]))
     lines.append(_OBJECTIVE_GUIDANCE.get(objective, _OBJECTIVE_GUIDANCE[DEFAULT_OBJECTIVE]))
     lines.append("Responde en español, breve, como en un chat. Evita párrafos largos.")
+
+    # WhatsApp is not Markdown, and the model defaults to Markdown. `**negrita**`
+    # reaches the customer with the asterisks showing, which reads as a broken
+    # bot. Said here so the model aims right; `whatsapp_text()` in the agent
+    # core then guarantees it, because prompt instructions on formatting are
+    # advice a model drifts from over a long conversation.
+    lines.append(
+        "Formato de WhatsApp, no Markdown: *negrita* con un asterisco, _cursiva_ "
+        "con guion bajo, ~tachado~. Nunca uses ** ni ##, y no escribas tablas."
+    )
 
     # The guardrail. Stated before anything else the model might weigh against
     # it, and phrased as a prohibition plus a permitted alternative - a rule
@@ -158,6 +217,18 @@ def build_system_prompt(
         "con una persona del negocio. Es mejor no saber que equivocarse."
     )
     lines.append(f"4. Los precios están en {currency} y son exactamente los del catálogo.")
+    # Rule 1 forbids inventing *data*; this forbids inventing *actions*, which
+    # is a different failure and the more expensive one. A customer told "queda
+    # registrado" hangs up believing the order exists, the business never sees
+    # it, and nobody finds out until the customer arrives to collect. The agent
+    # can only read: registering, reserving, scheduling and charging are not
+    # among its tools, so claiming them is always false.
+    lines.append(
+        "5. No puedes registrar, reservar, agendar, cancelar ni cobrar nada: solo "
+        "consultas información. Nunca digas que algo quedó registrado, reservado, "
+        "agendado o pagado. Si el cliente quiere cerrar un pedido, resume lo que "
+        "pidió y dile que una persona del negocio lo confirmará."
+    )
 
     if config is not None and config.restrictions:
         lines.append("")
