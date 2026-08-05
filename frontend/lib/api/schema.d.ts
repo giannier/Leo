@@ -473,6 +473,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-admin/dead-letters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Webhooks the pipeline gave up on
+         * @description The queue that makes `dead_letter` not a discard (RF-007).
+         *
+         *     Every row is a customer's message that never got an answer. It stays here,
+         *     readable and replayable, until a person decides otherwise.
+         */
+        get: operations["list_dead_letters_api_v1_platform_admin_dead_letters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/dead-letters/{event_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put one back in the queue
+         * @description Reset the attempt count and hand it back to a worker.
+         *
+         *     A full budget rather than one last chance: whatever was fixed in between
+         *     deserves a fair run.
+         */
+        post: operations["retry_dead_letter_api_v1_platform_admin_dead_letters__event_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/tenants/{tenant_id}/channel-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Traffic and answer latency for one number
+         * @description RF-008. Latency is what the customer waited, not what the model took.
+         *
+         *     Measured from their message to the reply that answered it, so the eight
+         *     seconds of debounce and any time spent in a queue are counted - because
+         *     they were.
+         */
+        get: operations["get_channel_metrics_api_v1_platform_admin_tenants__tenant_id__channel_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-admin/tenants/{tenant_id}/extend-trial": {
         parameters: {
             query?: never;
@@ -1041,6 +1111,19 @@ export interface components {
              */
             overwrote_newer: boolean;
         };
+        /** ChannelMetricsResponse */
+        ChannelMetricsResponse: {
+            /** Messages In */
+            messages_in: number;
+            /** Messages Out */
+            messages_out: number;
+            /** Failed Sends */
+            failed_sends: number;
+            /** P50 Response Ms */
+            p50_response_ms: number | null;
+            /** P95 Response Ms */
+            p95_response_ms: number | null;
+        };
         /** ChecklistItemResponse */
         ChecklistItemResponse: {
             /** Key */
@@ -1166,6 +1249,44 @@ export interface components {
             values: {
                 [key: string]: string;
             };
+        };
+        /**
+         * DeadLetterResponse
+         * @description One abandoned webhook, flattened for an operator to scan.
+         */
+        DeadLetterResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Provider */
+            provider: string;
+            /** Provider Event Id */
+            provider_event_id: string;
+            /** Attempts */
+            attempts: number;
+            /** Error Msg */
+            error_msg: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Event Type */
+            event_type: string | null;
+            /** Phone E164 */
+            phone_e164: string | null;
+        };
+        /** DeadLetterRetryResponse */
+        DeadLetterRetryResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Queued */
+            queued: boolean;
         };
         /**
          * ErrorResponse
@@ -2880,6 +3001,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantDetailResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` - including for a caller who is not a platform admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_dead_letters_api_v1_platform_admin_dead_letters_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLetterResponse"][];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` - including for a caller who is not a platform admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    retry_dead_letter_api_v1_platform_admin_dead_letters__event_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeadLetterRetryResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` - including for a caller who is not a platform admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_channel_metrics_api_v1_platform_admin_tenants__tenant_id__channel_metrics_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelMetricsResponse"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */

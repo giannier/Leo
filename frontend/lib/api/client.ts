@@ -251,6 +251,7 @@ export type AdminRequest = Ok<
   Ops["/api/v1/platform-admin/connection-requests"]["get"]
 >[number];
 export type AdminTenant = Ok<Ops["/api/v1/platform-admin/tenants"]["get"]>[number];
+export type DeadLetter = Ok<Ops["/api/v1/platform-admin/dead-letters"]["get"]>[number];
 export type AdminTenantDetail = Ok<
   Ops["/api/v1/platform-admin/tenants/{tenant_id}"]["get"]
 >;
@@ -372,6 +373,13 @@ export const api = {
     tenants: (query?: { search?: string; status?: string }) =>
       request<AdminTenant[]>("/platform-admin/tenants", { query }),
     tenant: (id: string) => request<AdminTenantDetail>(`/platform-admin/tenants/${id}`),
+
+    deadLetters: () => request<DeadLetter[]>("/platform-admin/dead-letters"),
+
+    retryDeadLetter: (id: string) =>
+      request<{ id: string; queued: boolean }>(`/platform-admin/dead-letters/${id}/retry`, {
+        method: "POST",
+      }),
     extendTrial: (id: string, days: number, reason: string) =>
       request<AdminTenantDetail>(`/platform-admin/tenants/${id}/extend-trial`, {
         method: "POST",
