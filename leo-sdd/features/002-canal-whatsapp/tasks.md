@@ -120,7 +120,27 @@
     contador nuevo y el test fallaba por algo que no tenía nada que ver. Veinte
     logins son veinte hashes Argon2. Ahora la fixture usa una ventana larga; el
     comportamiento de la ventana ya está pineado aparte en el test unitario.
-- [ ] **TASK-207: Cuota en vivo + notificaciones 80/100%** — incremento atómico, cierre con gracia al agotar, endpoint /tenant/usage, banner en frontend. Depends: 205. Verificación: test de concurrencia (50 simultáneos, contador exacto).
+- [x] **TASK-207: Cuota en vivo + notificaciones 80/100%** — incremento atómico, cierre con gracia al agotar, endpoint /tenant/usage, banner en frontend. Depends: 205. Verificación: test de concurrencia (50 simultáneos, contador exacto).
+  - **Verificación cumplida:** 50 respuestas simultáneas, contador exacto en 50. Con
+    conexiones reales y no la sesión compartida del resto de la suite: lo que se
+    prueba es qué se hacen dos transacciones entre sí, y una sola sesión no puede
+    competir consigo misma.
+  - **Aviso al 80%**, una sola vez (`tenant_notifications.quota_80`, migración 0011).
+    Cada respuesta pasado el 80% está pasado el 80%: sin el claim, una tarde movida
+    son cincuenta mails idénticos. El mail dice cuántas quedan, no el porcentaje:
+    es lo que decide si pagan antes o después de que el agente se calle.
+  - **Al 100% se cierra ahí mismo**, no en el próximo tick del cron horario. Para el
+    calendario una hora da igual; para un contador es hasta una hora de respuestas
+    gratis de un agente que en los papeles ya se quedó sin mensajes. Reusa
+    `pause_tenant`, que ya hace la despedida y cierra los hilos (Clarification 004).
+  - **Bug encontrado de paso:** `pause_tenant` escribía la despedida sin
+    `delivery_status`. Antes del canal real esa fila ERA la despedida; ahora es solo
+    la intención de mandarla, y sin estado nadie la enviaba nunca. El cliente se
+    quedaba justo con el silencio que esa rama existe para evitar. Ahora sale
+    `queued` y la entrega el sender.
+  - `GET /tenant/usage` + `UsageMeter` en el panel, con polling de 20s. Separado de
+    `GET /tenant` porque se leen a ritmos distintos: el panel carga el estado una
+    vez, el medidor lo mira alguien mientras su agente trabaja.
 - [ ] **TASK-208: Admin de dead-letters (API+UI) + métricas de canal** — listado, retry manual, métricas p50/p95 por tenant. Depends: 203, 205.
 - [ ] **TASK-209: Test de caos + endurecimiento** — kill de worker a mitad, replays masivos, revisión de logs sin PII. Depends: todo. Milestone humano: Giannier prueba con su propio número real end-to-end.
 

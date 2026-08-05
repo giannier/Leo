@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
+
+from sqlalchemy import func, select
 
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.repositories.base import BaseRepository, TenantScopeError
@@ -106,6 +109,27 @@ class MessageRepository(BaseRepository[Message]):
             provider_message_id=provider_message_id,
             delivery_status=delivery_status,
         )
+
+    def count_on_channel(self, channel: str, *, direction: str, since: datetime) -> int:
+        """How many messages one channel carried, one way, since a moment.
+
+        Joined to `conversations` because the channel lives there: a message
+        does not know whether it travelled over WhatsApp or was typed into the
+        sandbox, and counting sandbox traffic as real traffic would tell an
+        owner their number was busy on a day nobody wrote to them.
+        """
+        statement = (
+            select(func.count())
+            .select_from(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(
+                Message.tenant_id == self.tenant_id,
+                Conversation.channel == channel,
+                Message.direction == direction,
+                Message.created_at >= since,
+            )
+        )
+        return self._session.execute(statement).scalar_one()
 
     def by_provider_message_id(self, provider_message_id: str) -> Message | None:
         """Find the message a provider is talking about, within this tenant.

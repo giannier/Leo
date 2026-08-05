@@ -21,6 +21,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
 from app.api.errors import ApiError, error_responses
 from app.repositories.business import AgentConfigRepository
+from app.repositories.conversation import MessageRepository
 from app.repositories.payment import PaymentMethodRepository
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
@@ -52,6 +53,17 @@ class TenantResponse(BaseModel):
     status: str
     plan: str
     trial: TrialStatus | None
+
+
+class UsageResponse(BaseModel):
+    """Live consumption, for the banner that watches a busy afternoon."""
+
+    ai_messages_used: int
+    ai_messages_limit: int
+    percent_used: int
+    messages_in: int
+    messages_out: int
+    period_start: datetime
 
 
 class ChecklistItemResponse(BaseModel):
@@ -121,6 +133,45 @@ async def get_tenant(principal: MemberDep, session: SessionDep) -> TenantRespons
         status=tenant.status,
         plan=tenant.plan_id,
         trial=trial,
+    )
+
+
+@router.get(
+    "/usage",
+    summary="Live consumption on the real channel",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+async def get_usage(principal: MemberDep, session: SessionDep) -> UsageResponse:
+    """What the trial has spent, right now (HU-04).
+
+    Separate from `GET /tenant` even though the numbers overlap, because the
+    two are read at different rates. The panel loads tenant state once; the
+    usage banner polls while somebody watches their agent work through a busy
+    afternoon, and that read has no business dragging the plan, the
+    checklist and the trial dates along with it.
+
+    Counted from `messages` rather than from a stored total: `ai_messages_used`
+    is the trial's meter and resets with nothing, while the owner asking "how
+    busy were we?" means the real traffic in both directions.
+    """
+    tenant = TenantRepository(session).get(principal.tenant_id)
+    if tenant is None:  # pragma: no cover - the caller is a member of it
+        raise _not_found()
+    plan = PlanRepository(session).get(tenant.plan_id)
+    limit = plan.max_ai_messages if plan else 0
+
+    since = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    messages = MessageRepository(session, principal.tenant_id)
+
+    return UsageResponse(
+        ai_messages_used=tenant.ai_messages_used,
+        ai_messages_limit=limit,
+        # Capped at 100: an admin lowering a plan's limit must not produce a
+        # progress bar past the end of its own track.
+        percent_used=min(100, round(100 * tenant.ai_messages_used / limit)) if limit else 0,
+        messages_in=messages.count_on_channel("whatsapp", direction="inbound", since=since),
+        messages_out=messages.count_on_channel("whatsapp", direction="outbound", since=since),
+        period_start=since,
     )
 
 

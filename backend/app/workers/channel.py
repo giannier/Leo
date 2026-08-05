@@ -360,11 +360,16 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
             llm = provider_for_tenant(session.get(TenantLLMSettings, tenant))
             responder = ConversationResponder(session, tenant, llm=llm)
             answer = await responder.respond(conversation)
+            warnings = tuple(responder.pending_emails)
             # Committed before the send. The reply exists as `queued` from
             # here on, so a worker killed mid-send leaves a record of what the
             # business meant to say - and `send_queued_replies` can pick it up
             # - rather than a silence nobody can explain.
             session.commit()
+            # After the commit, always: a warning about a quota the
+            # transaction then rolled back is one the customer acts on for
+            # nothing.
+            await _send_pending(ctx.get("email"), warnings)
 
             if answer is None:
                 return OUTCOME_NOTHING_TO_SAY

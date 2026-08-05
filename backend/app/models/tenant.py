@@ -34,13 +34,23 @@ TRIAL_ENDING_SOON = "trial_ending_3d"
 TRIAL_ENDING_TOMORROW = "trial_ending_1d"
 TRIAL_ENDED = "trial_ended"
 WIZARD_REMINDER = "wizard_reminder"
+# Sent the moment the counter crosses 80% (Feature 002, HU-04). The other
+# three are about the calendar; this one is about the meter, and a trial can
+# run out of messages a week before it runs out of days.
+QUOTA_80 = "quota_80"
 
 NOTIFICATION_KINDS = (
     TRIAL_ENDING_SOON,
     TRIAL_ENDING_TOMORROW,
     TRIAL_ENDED,
     WIZARD_REMINDER,
+    QUOTA_80,
 )
+
+# Where the warning fires. Not 90%: at 250 messages that is 25 left, which on
+# a busy afternoon is an hour's notice - too late to do anything but watch the
+# agent stop.
+QUOTA_WARNING_RATIO = 0.8
 
 
 class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
