@@ -49,6 +49,18 @@ REQUIRE_REDIS_ENV_VAR = "LEO_REQUIRE_REDIS"
 IP_BUDGET = SETTINGS.auth_rate_limit_requests
 ACCOUNT_BUDGET = SETTINGS.login_attempt_limit
 
+# The configured window is 60 seconds; these tests use a much longer one and
+# the same limits. What they check is the shared budget, never the clock.
+#
+# The limiter is a *fixed* window indexed by wall time, so a run slow enough
+# to cross a boundary halfway through spending the budget starts a fresh
+# counter and the next request is allowed - a failure that says nothing
+# about the rule under test and only appears when the whole suite is busy.
+# Twenty logins are twenty Argon2 hashes, which is exactly the kind of test
+# that gets slow under load. The window's own behaviour is pinned
+# separately, on a one-second window, in tests/unit/test_rate_limiter.py.
+TEST_WINDOW_SECONDS = 3600
+
 # Any well-formed body will do: the limiter runs as a router dependency,
 # before the endpoint and before validation of what it was sent.
 CREDENTIALS = {"email": "nobody@example.com", "password": "una-clave-que-no-existe"}
@@ -115,15 +127,15 @@ async def throttled(
 ) -> AsyncIterator[AsyncClient]:
     """The `api` fixture, but with the real limiter installed.
 
-    Same 5-per-60-seconds configuration the application runs with, in a Redis
-    namespace unique to this test so parallel runs and reruns never see each
-    other's counters.
+    Same limits the application runs with, in a Redis namespace unique to
+    this test so parallel runs and reruns never see each other's counters, and
+    on a deliberately long window - see `TEST_WINDOW_SECONDS`.
     """
     provider: EmailProvider = mail
     limiter: RateLimiter = RedisRateLimiter(
         redis_client,
         limit=SETTINGS.auth_rate_limit_requests,
-        window_seconds=SETTINGS.auth_rate_limit_window_seconds,
+        window_seconds=TEST_WINDOW_SECONDS,
         namespace=f"test:ratelimit:auth:{uuid.uuid4().hex}",
     )
     app.dependency_overrides[get_db] = lambda: db
@@ -134,7 +146,7 @@ async def throttled(
     login_limiter: RateLimiter = RedisRateLimiter(
         redis_client,
         limit=SETTINGS.login_attempt_limit,
-        window_seconds=SETTINGS.login_attempt_window_seconds,
+        window_seconds=TEST_WINDOW_SECONDS,
         namespace=f"test:ratelimit:login:{uuid.uuid4().hex}",
     )
     app.dependency_overrides[get_login_limiter] = lambda: login_limiter
@@ -162,7 +174,7 @@ async def account_throttled(
     login_limiter: RateLimiter = RedisRateLimiter(
         redis_client,
         limit=SETTINGS.login_attempt_limit,
-        window_seconds=SETTINGS.login_attempt_window_seconds,
+        window_seconds=TEST_WINDOW_SECONDS,
         namespace=f"test:ratelimit:account:{uuid.uuid4().hex}",
     )
     app.dependency_overrides[get_db] = lambda: db
@@ -219,7 +231,7 @@ class TestTheAuthLimit:
             )
 
         assert response.status_code == 429
-        assert 0 < int(response.headers["retry-after"]) <= 60
+        assert 0 < int(response.headers["retry-after"]) <= TEST_WINDOW_SECONDS
 
     async def test_the_refusal_uses_the_documented_envelope(self, throttled: AsyncClient) -> None:
         for index in range(IP_BUDGET + 1):

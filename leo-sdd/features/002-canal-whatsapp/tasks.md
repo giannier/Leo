@@ -95,7 +95,31 @@
     `ORDER BY created_at` devolvía lo que quisiera el planner. Ese orden es el
     historial que se le pasa al agente y la definición de "todo lo nuevo desde la
     última respuesta". Salió como test intermitente; era un empate real.
-- [ ] **TASK-206: Ventana 24h + opt-out + quality rating** — guard de sesión, detección de STOP/BAJA configurable, webhook/poll de quality con alertas. Depends: 204.
+- [x] **TASK-206: Ventana 24h + opt-out + quality rating** — guard de sesión, detección de STOP/BAJA configurable, webhook/poll de quality con alertas. Depends: 204.
+  - **Ventana 24h:** guard en `ReplySender`, ANTES de llamar al proveedor. Pasada la
+    ventana no es una request fallida, es una violación de política que se carga
+    contra la reputación del número. La respuesta se marca `failed` y no `queued`:
+    nada la va a volver enviable después, y una respuesta atascada en cola un día
+    es peor que una que el dueño ve que no salió.
+  - **Opt-out:** coincidencia EXACTA del mensaje completo, no substring. Un cliente
+    que pregunta "tienen bajativos?" no pidió darse de baja, y silenciarlo por eso
+    es una venta perdida que además él no puede diagnosticar: simplemente nunca más
+    le contestan. Es lo mismo que decidieron todos los gateways de SMS. Palabras
+    configurables por tenant (`agent_configs.opt_out_keywords`, migración 0010),
+    default `["stop","baja"]` porque ambas se usan. Escribir cualquier otra cosa
+    después reactiva el contacto: mantenerlo callado por una palabra que tipeó en
+    marzo significa que su próximo pedido queda sin responder.
+  - **Quality:** se alerta por TRANSICIÓN, no por nivel. Alertar por nivel manda un
+    mail cada vez que el proveedor repite lo mismo, y una alerta que llega todos los
+    días es una que nadie lee el día que importa. El mail sale DESPUÉS del commit
+    (`EventOutcome.emails`): avisarle al cliente de un estado que después hace
+    rollback es peor que no avisarle, porque actúa sobre algo que no existe.
+  - **Flake preexistente arreglado:** `test_auth_rate_limit` usaba la ventana real de
+    60s. El limitador es de ventana FIJA indexada por reloj de pared, así que una
+    corrida lenta que cruzaba el minuto a mitad del presupuesto arrancaba un
+    contador nuevo y el test fallaba por algo que no tenía nada que ver. Veinte
+    logins son veinte hashes Argon2. Ahora la fixture usa una ventana larga; el
+    comportamiento de la ventana ya está pineado aparte en el test unitario.
 - [ ] **TASK-207: Cuota en vivo + notificaciones 80/100%** — incremento atómico, cierre con gracia al agotar, endpoint /tenant/usage, banner en frontend. Depends: 205. Verificación: test de concurrencia (50 simultáneos, contador exacto).
 - [ ] **TASK-208: Admin de dead-letters (API+UI) + métricas de canal** — listado, retry manual, métricas p50/p95 por tenant. Depends: 203, 205.
 - [ ] **TASK-209: Test de caos + endurecimiento** — kill de worker a mitad, replays masivos, revisión de logs sin PII. Depends: todo. Milestone humano: Giannier prueba con su propio número real end-to-end.
