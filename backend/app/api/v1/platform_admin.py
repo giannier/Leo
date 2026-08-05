@@ -19,19 +19,26 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.api.deps import EmailProviderDep, PlatformAdminDep, SessionDep, WhatsAppProviderDep
+from app.api.deps import (
+    EmailProviderDep,
+    JobQueueDep,
+    PlatformAdminDep,
+    SessionDep,
+    WhatsAppProviderDep,
+)
 from app.api.errors import ApiError, error_responses
 from app.core.config import get_settings
 from app.providers.email.base import EmailProvider
 from app.providers.whatsapp.base import NumberCredentials
 from app.services.admin import (
     CredentialsRequired,
+    DeadLetterNotFound,
     IllegalTransition,
     NumberAlreadyConnected,
     PlatformAdminService,
@@ -40,6 +47,7 @@ from app.services.admin import (
     TenantNotFound,
 )
 from app.services.emails import build_number_connected_email, build_number_rejected_email
+from app.workers.channel import PROCESS_EVENT_JOB
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +72,34 @@ ADMIN_RESPONSES = (
     (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
     (404, "`not_found` - including for a caller who is not a platform admin"),
 )
+
+
+class DeadLetterResponse(BaseModel):
+    """One abandoned webhook, flattened for an operator to scan."""
+
+    id: uuid.UUID
+    provider: str
+    provider_event_id: str
+    attempts: int
+    error_msg: str | None
+    created_at: datetime
+    event_type: str | None
+    phone_e164: str | None
+
+
+class DeadLetterRetryResponse(BaseModel):
+    id: uuid.UUID
+    queued: bool
+
+
+class ChannelMetricsResponse(BaseModel):
+    messages_in: int
+    messages_out: int
+    failed_sends: int
+    # Null rather than zero when nothing was answered: a dashboard showing
+    # 0 ms on a day nobody wrote in reads as very fast.
+    p50_response_ms: int | None
+    p95_response_ms: int | None
 
 
 class CredentialsPayload(BaseModel):
@@ -326,6 +362,87 @@ async def get_tenant(
         knowledge_chars=usage.knowledge_chars,
         has_number=usage.has_number,
     )
+
+
+@router.get(
+    "/dead-letters",
+    summary="Webhooks the pipeline gave up on",
+    responses=error_responses(*ADMIN_RESPONSES),
+)
+async def list_dead_letters(
+    actor: PlatformAdminDep,
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[DeadLetterResponse]:
+    """The queue that makes `dead_letter` not a discard (RF-007).
+
+    Every row is a customer's message that never got an answer. It stays here,
+    readable and replayable, until a person decides otherwise.
+    """
+    service = PlatformAdminService(session, actor=actor)
+    return [
+        DeadLetterResponse.model_validate(letter, from_attributes=True)
+        for letter in service.dead_letters(limit=limit, offset=offset)
+    ]
+
+
+@router.post(
+    "/dead-letters/{event_id}/retry",
+    summary="Put one back in the queue",
+    responses=error_responses((404, "`not_found`"), *ADMIN_RESPONSES),
+)
+async def retry_dead_letter(
+    event_id: uuid.UUID,
+    actor: PlatformAdminDep,
+    session: SessionDep,
+    queue: JobQueueDep,
+) -> DeadLetterRetryResponse:
+    """Reset the attempt count and hand it back to a worker.
+
+    A full budget rather than one last chance: whatever was fixed in between
+    deserves a fair run.
+    """
+    service = PlatformAdminService(session, actor=actor)
+    try:
+        restored = service.retry_dead_letter(event_id)
+    except DeadLetterNotFound as exc:
+        raise _not_found("Dead letter") from exc
+
+    # After the commit inside the service, deliberately: a job queued from
+    # inside a transaction that then rolls back is a worker reading a row that
+    # does not exist.
+    await queue.enqueue(PROCESS_EVENT_JOB, str(restored))
+    return DeadLetterRetryResponse(id=restored, queued=True)
+
+
+@router.get(
+    "/tenants/{tenant_id}/channel-metrics",
+    summary="Traffic and answer latency for one number",
+    responses=error_responses((404, "`not_found`"), *ADMIN_RESPONSES),
+)
+async def get_channel_metrics(
+    tenant_id: uuid.UUID,
+    actor: PlatformAdminDep,
+    session: SessionDep,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+) -> ChannelMetricsResponse:
+    """RF-008. Latency is what the customer waited, not what the model took.
+
+    Measured from their message to the reply that answered it, so the eight
+    seconds of debounce and any time spent in a queue are counted - because
+    they were.
+    """
+    service = PlatformAdminService(session, actor=actor)
+    try:
+        # Read for its side effect: it raises for a tenant that does not
+        # exist, so an invented id is a 404 rather than a page of zeroes that
+        # looks like a very quiet business.
+        service.tenant_usage(tenant_id)
+    except TenantNotFound as exc:
+        raise _not_found("Tenant") from exc
+    metrics = service.channel_metrics(tenant_id, since=datetime.now(UTC) - timedelta(days=days))
+    return ChannelMetricsResponse.model_validate(metrics, from_attributes=True)
 
 
 @router.post(

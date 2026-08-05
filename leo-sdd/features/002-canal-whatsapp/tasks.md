@@ -141,7 +141,25 @@
   - `GET /tenant/usage` + `UsageMeter` en el panel, con polling de 20s. Separado de
     `GET /tenant` porque se leen a ritmos distintos: el panel carga el estado una
     vez, el medidor lo mira alguien mientras su agente trabaja.
-- [ ] **TASK-208: Admin de dead-letters (API+UI) + métricas de canal** — listado, retry manual, métricas p50/p95 por tenant. Depends: 203, 205.
+- [x] **TASK-208: Admin de dead-letters (API+UI) + métricas de canal** — listado, retry manual, métricas p50/p95 por tenant. Depends: 203, 205.
+  - `GET /platform-admin/dead-letters`, `POST /platform-admin/dead-letters/{id}/retry`,
+    `GET /platform-admin/tenants/{id}/channel-metrics`, y pantalla `/admin/dead-letters`.
+  - `dead_letter` solo significa "no descartado" si alguien lo puede ver. Cada fila
+    es el mensaje de un cliente que nunca recibió respuesta. El reintento devuelve el
+    evento a `received` con `attempts=0` — presupuesto completo, no una última
+    oportunidad: lo que se haya arreglado en el medio merece una corrida justa. Va
+    al audit log, porque un operador reprocesando el mensaje de otro es exactamente
+    la acción cross-tenant que el log existe para registrar. El encolado va DESPUÉS
+    del commit del servicio.
+  - La lista saca el tipo de evento y el teléfono del payload para que la cola se
+    pueda escanear sin abrir fila por fila — leídos a la defensiva, porque un payload
+    malformado es una de las razones por las que un evento termina ahí.
+  - **Latencia = lo que esperó el cliente**, no lo que tardó el modelo: se mide desde
+    su mensaje hasta la respuesta que lo contestó, así los 8s de debounce y el tiempo
+    en cola quedan contados, porque los esperó. Una ráfaga se cuenta desde el PRIMER
+    mensaje. p50/p95 por rango percentil, y `null` (no 0) cuando no hubo nada: un
+    dashboard que muestra 0 ms un día que nadie escribió se lee como "rapidísimo".
+  - El sandbox no cuenta como tráfico real.
 - [ ] **TASK-209: Test de caos + endurecimiento** — kill de worker a mitad, replays masivos, revisión de logs sin PII. Depends: todo. Milestone humano: Giannier prueba con su propio número real end-to-end.
 
 Dependencias: 201 → 202 → 203 → 204 → 205 → 207 → 209; 204 → 206; 203/205 → 208.

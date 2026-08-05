@@ -14,6 +14,7 @@ the absence of an entry means the absence of an action.
 
 from __future__ import annotations
 
+import math
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -26,11 +27,14 @@ from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
 from app.models.business import Product
+from app.models.channel import WebhookEvent
+from app.models.conversation import Conversation, Message
 from app.models.knowledge import KnowledgeSource
 from app.models.tenant import Tenant, TenantUser
 from app.models.user import User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 from app.providers.whatsapp.base import InvalidCredentials, NumberCredentials, WhatsAppProvider
+from app.repositories.channel import WebhookEventRepository
 from app.services.connection import store_credentials
 
 OPEN_STATUSES = ("requested", "in_progress")
@@ -54,6 +58,10 @@ class AdminError(RuntimeError):
 
 class RequestNotFound(AdminError):
     """No connection request with that id."""
+
+
+class DeadLetterNotFound(AdminError):
+    """No dead-lettered webhook with that id."""
 
 
 class TenantNotFound(AdminError):
@@ -322,6 +330,121 @@ class PlatformAdminService:
             has_number=has_number,
         )
 
+    # ------------------------------------------------------- the dead letters
+
+    def dead_letters(self, *, limit: int = 50, offset: int = 0) -> Sequence[DeadLetter]:
+        """Webhooks the pipeline gave up on, newest first.
+
+        This queue is the whole reason `dead_letter` is not a discard. Every
+        row is a customer's message that never got an answer, and it stays
+        readable and replayable until a person decides otherwise (RF-007).
+        """
+        events = WebhookEventRepository(self._session).list_by_status(
+            "dead_letter", limit=limit, offset=offset
+        )
+        return [_as_dead_letter(event) for event in events]
+
+    def retry_dead_letter(self, event_id: uuid.UUID) -> uuid.UUID:
+        """Put one back in the queue. Returns the id to enqueue.
+
+        The row is moved back to `received` and its attempt count cleared, so
+        the retry gets a full budget rather than one last chance - whatever
+        was fixed in between deserves a fair run.
+
+        The enqueue itself is the caller's: this service owns the database,
+        and a job queued inside a transaction that then rolls back is a worker
+        reading a row that does not exist.
+        """
+        events = WebhookEventRepository(self._session)
+        event = events.get(event_id)
+        if event is None or event.status != "dead_letter":
+            raise DeadLetterNotFound(str(event_id))
+
+        event.status = "received"
+        event.attempts = 0
+        event.error_msg = None
+        record_audit(
+            self._session,
+            actor_id=self._actor.id,
+            action="webhook.retried",
+            detail={
+                "event_id": str(event_id),
+                "provider_event_id": event.provider_event_id,
+            },
+        )
+        self._session.commit()
+        return event.id
+
+    # ------------------------------------------------------- channel metrics
+
+    def channel_metrics(self, tenant_id: uuid.UUID, *, since: datetime) -> ChannelMetrics:
+        """Traffic and answer latency for one tenant (RF-008).
+
+        Latency is measured from the customer's message to the *first* reply
+        after it, which is what they actually experienced. Measuring from the
+        job's start would report how fast the model was and hide the eight
+        seconds of debounce and any time the message spent in a queue.
+        """
+        counted = (
+            select(func.count())
+            .select_from(Message)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(
+                Message.tenant_id == tenant_id,
+                Conversation.channel == "whatsapp",
+                Message.created_at >= since,
+            )
+        )
+        messages_in = self._session.execute(
+            counted.where(Message.direction == "inbound")
+        ).scalar_one()
+        messages_out = self._session.execute(
+            counted.where(Message.direction == "outbound")
+        ).scalar_one()
+        failed = self._session.execute(
+            counted.where(Message.delivery_status == "failed")
+        ).scalar_one()
+
+        latencies = self._response_latencies(tenant_id, since=since)
+        return ChannelMetrics(
+            messages_in=messages_in,
+            messages_out=messages_out,
+            failed_sends=failed,
+            p50_response_ms=_percentile(latencies, 50),
+            p95_response_ms=_percentile(latencies, 95),
+        )
+
+    def _response_latencies(self, tenant_id: uuid.UUID, *, since: datetime) -> list[int]:
+        """Milliseconds from each answered question to its answer."""
+        rows = (
+            self._session.execute(
+                select(Message.conversation_id, Message.direction, Message.created_at)
+                .join(Conversation, Conversation.id == Message.conversation_id)
+                .where(
+                    Message.tenant_id == tenant_id,
+                    Conversation.channel == "whatsapp",
+                    Message.created_at >= since,
+                    Message.author.in_(("customer", "agent")),
+                )
+                .order_by(Message.conversation_id, Message.created_at)
+            )
+            .tuples()
+            .all()
+        )
+
+        latencies: list[int] = []
+        asked_at: dict[uuid.UUID, datetime] = {}
+        for conversation_id, direction, created_at in rows:
+            if direction == "inbound":
+                # The *first* unanswered message of a burst. Somebody who
+                # sends four lines waited from the first one, not the last.
+                asked_at.setdefault(conversation_id, created_at)
+                continue
+            asked = asked_at.pop(conversation_id, None)
+            if asked is not None:
+                latencies.append(int((created_at - asked).total_seconds() * 1000))
+        return latencies
+
     def extend_trial(self, tenant_id: uuid.UUID, *, days: int, reason: str) -> Tenant:
         """Give a trial more time (Clarification 012).
 
@@ -359,3 +482,78 @@ class PlatformAdminService:
         )
         self._session.commit()
         return tenant
+
+
+@dataclass(frozen=True)
+class DeadLetter:
+    """One webhook the pipeline gave up on, as an operator needs to see it."""
+
+    id: uuid.UUID
+    provider: str
+    provider_event_id: str
+    attempts: int
+    error_msg: str | None
+    created_at: datetime
+    # Drawn out of the payload so the queue is scannable without expanding
+    # every row. Absent when the payload is the reason it failed.
+    event_type: str | None
+    phone_e164: str | None
+
+
+@dataclass(frozen=True)
+class ChannelMetrics:
+    """How one tenant's number behaved over a period (RF-008)."""
+
+    messages_in: int
+    messages_out: int
+    failed_sends: int
+    # Milliseconds between a customer's message and the reply to it. `None`
+    # when nothing was answered in the period - which is different from zero,
+    # and a dashboard that shows 0 ms for a silent day is worse than one that
+    # shows nothing.
+    p50_response_ms: int | None
+    p95_response_ms: int | None
+
+
+def _as_dead_letter(event: WebhookEvent) -> DeadLetter:
+    """Flatten one stored delivery into what an operator has to see.
+
+    The type and the phone number are dug out of the payload so the queue is
+    scannable without expanding every row - and read defensively, because a
+    malformed payload is one of the reasons an event lands here in the first
+    place.
+    """
+    payload = event.payload if isinstance(event.payload, dict) else {}
+    inbound = payload.get("whatsappInboundMessage")
+    outbound = payload.get("whatsappMessage")
+    named = inbound if isinstance(inbound, dict) else outbound
+    phone = named.get("from") if isinstance(named, dict) else None
+
+    return DeadLetter(
+        id=event.id,
+        provider=event.provider,
+        provider_event_id=event.provider_event_id,
+        attempts=event.attempts,
+        error_msg=event.error_msg,
+        created_at=event.created_at,
+        event_type=str(payload["type"]) if isinstance(payload.get("type"), str) else None,
+        phone_e164=str(phone) if phone else None,
+    )
+
+
+def _percentile(values: list[int], percentile: int) -> int | None:
+    """Nearest-rank percentile, or None for an empty sample.
+
+    Nearest-rank rather than interpolated: these are latencies of real
+    messages, and "the 95th slowest reply took 4.2 seconds" is a thing that
+    happened, while an interpolated 4.17 is a number nobody can go and look
+    at.
+
+    `None` rather than 0 for no data. A dashboard showing 0 ms on a day nobody
+    wrote in is worse than one showing nothing, because it reads as very fast.
+    """
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = max(1, math.ceil(percentile / 100 * len(ordered)))
+    return ordered[rank - 1]
