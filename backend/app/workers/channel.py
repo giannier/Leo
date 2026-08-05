@@ -41,9 +41,12 @@ from app.repositories.channel import WebhookEventRepository
 from app.services.channel import (
     ChannelEventProcessor,
     ConversationResponder,
+    NoConnectedNumber,
+    ReplySender,
     UnknownNumberError,
     debounce_key,
     lock_key,
+    stranded_replies,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,6 +61,11 @@ ANSWER_JOB = "answer_conversation"
 # the thing holding the lock is one model call.
 LOCK_RETRY_SECONDS = 5
 
+# How long a reply may sit `queued` before the sweep treats it as stranded.
+# Comfortably past a slow gateway plus every backoff, so a send that is merely
+# in flight is never picked up and sent a second time.
+STRANDED_AFTER_SECONDS = 120
+
 # Reported for observability; none of these are state transitions.
 OUTCOME_MISSING = "missing"
 OUTCOME_ALREADY_DONE = "already_done"
@@ -68,6 +76,7 @@ OUTCOME_UNREADABLE = "unreadable"
 OUTCOME_LOCKED = "locked"
 OUTCOME_ANSWERED = "answered"
 OUTCOME_NOTHING_TO_SAY = "nothing_to_say"
+OUTCOME_NOWHERE_TO_SEND = "nowhere_to_send"
 
 
 @dataclass(frozen=True)
@@ -219,6 +228,55 @@ async def schedule_answer(
     return True
 
 
+async def retry_stranded_replies(ctx: dict[str, Any]) -> str:
+    """Send replies that were written down and never handed to the provider.
+
+    The gap is narrow and real: the answer is committed `queued` before the
+    send is attempted, so a worker killed in between leaves a reply the
+    customer never receives. From their side that is indistinguishable from
+    being ignored, and nothing else would ever notice.
+
+    Runs on a timer rather than as a retry of the original job, because the
+    original job is gone - that is the whole scenario.
+    """
+    settings = ctx["settings"]
+    session_factory = ctx["session_factory"]
+    sent = 0
+    failed = 0
+    with session_factory() as session:
+        for message in stranded_replies(
+            session,
+            now=datetime.now(UTC),
+            older_than_seconds=STRANDED_AFTER_SECONDS,
+        ):
+            sender = ReplySender(
+                session,
+                message.tenant_id,
+                provider=ctx["whatsapp"],
+                max_attempts=settings.channel_send_max_attempts,
+            )
+            try:
+                await sender.send(message)
+                session.commit()
+            except NoConnectedNumber:
+                # Left `queued` on purpose: reconnecting the number is what
+                # fixes it, and marking it failed would hide that.
+                session.rollback()
+                failed += 1
+                continue
+            except Exception:  # noqa: BLE001 - one bad row must not stop the sweep
+                session.rollback()
+                logger.exception(
+                    "could not re-send a stranded reply",
+                    extra={"message_id": str(message.id)},
+                )
+                failed += 1
+                continue
+            sent += 1
+    logger.info("stranded reply sweep", extra={"sent": sent, "skipped": failed})
+    return f"sent={sent} skipped={failed}"
+
+
 async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     """ARQ entry point. Registered in `app/workers/settings.py`."""
     session_factory = ctx["session_factory"]
@@ -269,12 +327,38 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
         # decided what to say.
         await store.delete(debounce_key(conversation))
 
+        settings = ctx["settings"]
         session_factory = ctx["session_factory"]
         with session_factory() as session:
             llm = provider_for_tenant(session.get(TenantLLMSettings, tenant))
             responder = ConversationResponder(session, tenant, llm=llm)
             answer = await responder.respond(conversation)
+            # Committed before the send. The reply exists as `queued` from
+            # here on, so a worker killed mid-send leaves a record of what the
+            # business meant to say - and `send_queued_replies` can pick it up
+            # - rather than a silence nobody can explain.
             session.commit()
-        return OUTCOME_ANSWERED if answer is not None else OUTCOME_NOTHING_TO_SAY
+
+            if answer is None:
+                return OUTCOME_NOTHING_TO_SAY
+
+            sender = ReplySender(
+                session,
+                tenant,
+                provider=ctx["whatsapp"],
+                max_attempts=settings.channel_send_max_attempts,
+            )
+            try:
+                await sender.send(answer)
+            except NoConnectedNumber:
+                # The agent answered and there is nothing to send it from -
+                # the number was disconnected mid-conversation. The reply
+                # stays `queued` and visible rather than being marked failed,
+                # because reconnecting the number is what fixes it.
+                logger.warning("a reply has nowhere to go", extra={"tenant_id": str(tenant)})
+                session.rollback()
+                return OUTCOME_NOWHERE_TO_SEND
+            session.commit()
+        return OUTCOME_ANSWERED
     finally:
         await lock.release()

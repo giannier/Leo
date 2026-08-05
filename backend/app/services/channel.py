@@ -15,6 +15,7 @@ and will simply conclude the business ignored them.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections.abc import Sequence
@@ -30,11 +31,14 @@ from app.models.business import AgentConfig
 from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
 from app.models.tenant import Tenant
+from app.models.whatsapp import WhatsAppNumber
 from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import (
     InboundMessage,
+    NumberCredentials,
     QualityUpdate,
     StatusUpdate,
+    WhatsAppError,
     WhatsAppProvider,
 )
 from app.repositories.channel import (
@@ -44,6 +48,7 @@ from app.repositories.channel import (
 )
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
+from app.services.connection import read_credentials
 from app.services.trial import agent_may_reply, record_ai_message
 
 logger = logging.getLogger(__name__)
@@ -410,6 +415,157 @@ class ConversationResponder:
         config = self._session.get(AgentConfig, self._tenant_id)
         configured = (config.unsupported_fallback or "").strip() if config else ""
         return configured or DEFAULT_UNSUPPORTED_FALLBACK
+
+
+class NoConnectedNumber(RuntimeError):
+    """The tenant has an answer to send and nothing to send it from."""
+
+
+class ReplySender:
+    """Hands a `queued` reply to the provider and records what happened.
+
+    Separate from producing the reply, because the two fail differently and
+    only one of them is worth retrying. Generating an answer twice costs a
+    model call and risks two different answers; handing the same finished
+    answer to the gateway again costs nothing and is exactly what a timeout
+    calls for.
+
+    The message row is the state machine. `queued` means written and not yet
+    accepted; `sent` means the provider has it and named it; `failed` means it
+    is not going to arrive and somebody has to know.
+    """
+
+    def __init__(
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        *,
+        provider: WhatsAppProvider,
+        max_attempts: int,
+    ) -> None:
+        self._session = session
+        self._tenant_id = tenant_id
+        self._provider = provider
+        self._max_attempts = max(1, max_attempts)
+        self._messages = MessageRepository(session, tenant_id)
+
+    async def send(self, message: Message) -> Message:
+        """Deliver one reply, retrying only what is worth retrying."""
+        if message.delivery_status != "queued":
+            # Already handled. A duplicate job must not send the customer the
+            # same sentence twice.
+            return message
+
+        number, credentials = self._sender()
+        recipient = self._recipient(message)
+
+        last_error: WhatsAppError | None = None
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                result = await self._provider.send_text(
+                    credentials,
+                    sender=number.phone_e164,
+                    to=recipient,
+                    body=message.content,
+                )
+            except WhatsAppError as exc:
+                last_error = exc
+                if not exc.retryable:
+                    # A rejected credential or a refused message. The
+                    # identical request produces the identical answer, so
+                    # three attempts is three times the same failure and one
+                    # customer's reply later than the first.
+                    break
+                if attempt < self._max_attempts:
+                    await asyncio.sleep(_backoff_seconds(attempt))
+                continue
+
+            message.provider_message_id = result.provider_message_id
+            self._messages.set_delivery_status(message, status=result.status or "sent")
+            MessageStatusEventRepository(self._session, self._tenant_id).append(
+                message.id, status=message.delivery_status or "sent"
+            )
+            return message
+
+        self._messages.set_delivery_status(message, status="failed")
+        MessageStatusEventRepository(self._session, self._tenant_id).append(
+            message.id, status="failed"
+        )
+        logger.error(
+            "a reply could not be handed to the provider",
+            extra={
+                "tenant_id": str(self._tenant_id),
+                "attempts": self._max_attempts,
+                "reason": str(last_error),
+            },
+        )
+        return message
+
+    def _sender(self) -> tuple[WhatsAppNumber, NumberCredentials]:
+        numbers = WhatsAppNumberRepository(self._session, self._tenant_id).list_connected()
+        if not numbers:
+            raise NoConnectedNumber(f"tenant {self._tenant_id!s} has no connected number")
+        # One number per tenant in v1 (C-005). The first is the only one.
+        number = numbers[0]
+        credentials = read_credentials(number)
+        if credentials is None:
+            raise NoConnectedNumber(
+                f"number {number.phone_e164} is connected but carries no credentials"
+            )
+        return number, credentials
+
+    def _recipient(self, message: Message) -> str:
+        """The phone number this thread belongs to."""
+        conversation = ConversationRepository(self._session, self._tenant_id).get(
+            message.conversation_id
+        )
+        if conversation is None or conversation.contact_id is None:
+            raise NoConnectedNumber("the reply is not attached to a contact")
+        contact = ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
+        if contact is None:  # pragma: no cover - the FK guarantees it
+            raise NoConnectedNumber("the conversation points at a contact that is gone")
+        return contact.phone_e164
+
+
+def stranded_replies(
+    session: Session, *, now: datetime, older_than_seconds: int, limit: int = 100
+) -> Sequence[Message]:
+    """Replies that were written down and never handed to the provider.
+
+    The gap this closes is small and real: the reply is committed `queued`
+    before the send is attempted, so a worker killed in between leaves an
+    answer the customer never receives and nothing to notice it. From the
+    outside that is indistinguishable from the agent ignoring somebody.
+
+    `older_than_seconds` keeps the sweep away from sends that are simply in
+    flight - a slow gateway plus three backoffs is tens of seconds, and
+    picking one of those up would send the same sentence twice.
+
+    Platform-wide, like the trial jobs: the caller re-scopes to each tenant
+    before touching anything.
+    """
+    cutoff = now - timedelta(seconds=older_than_seconds)
+    statement = (
+        select(Message)
+        .where(
+            Message.direction == "outbound",
+            Message.delivery_status == "queued",
+            Message.created_at < cutoff,
+        )
+        .order_by(Message.created_at)
+        .limit(limit)
+    )
+    return session.execute(statement).scalars().all()
+
+
+def _backoff_seconds(attempt: int) -> float:
+    """1s, then 2s, then 4s.
+
+    Short on purpose. This is not a batch job draining a queue overnight - a
+    customer is watching a chat window, and a delay long enough to be polite
+    to the gateway is long enough for them to give up and go elsewhere.
+    """
+    return float(2 ** (attempt - 1))
 
 
 class WebhookIntake:

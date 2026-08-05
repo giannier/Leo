@@ -71,7 +71,30 @@
     **con** texto sí es pregunta y va al agente.
   - La respuesta se guarda con `delivery_status='queued'` y se contabiliza acá
     (`record_ai_message`), donde se incurre la cuenta del modelo. TASK-205 la envía.
-- [ ] **TASK-205: Invocación del agente en canal real + envío + estados** — integración agent-core, registro sent/delivered/read/failed desde webhooks de estado, reintentos de envío con backoff. Depends: 204.
+- [x] **TASK-205: Invocación del agente en canal real + envío + estados** — integración agent-core, registro sent/delivered/read/failed desde webhooks de estado, reintentos de envío con backoff. Depends: 204.
+  - **Resultado:** `ReplySender` toma la respuesta `queued` y la entrega. Separado de
+    producirla porque fallan distinto y solo una vale la pena reintentar: generar la
+    respuesta dos veces cuesta una llamada al modelo y arriesga dos respuestas
+    distintas; entregar la MISMA respuesta ya hecha otra vez no cuesta nada.
+  - Reintentos con backoff 1s/2s/4s, y solo para lo que es reintentable
+    (`WhatsAppError.retryable`): timeout, 429 y 5xx sí; credencial rechazada o
+    mensaje refutado, no. Tres intentos contra una key mal puesta son tres veces la
+    misma respuesta, una respuesta del cliente más tarde que la primera.
+  - Estados: `queued` → `sent` → `delivered` → `read`, con `failed` terminal. Los
+    webhooks de estado ya los aplicaban desde TASK-203. `failed` gana sobre un
+    `delivered` tardío a propósito: un mensaje mal marcado como fallido le muestra al
+    dueño algo que revisar, y un fallo pisado por un éxito tardío es una venta
+    perdida que nadie le cuenta.
+  - **Barrido de respuestas varadas** (`retry_stranded_replies`, cron cada 5 min):
+    la ventana entre commitear la respuesta y enviarla. Si el worker muere ahí, el
+    job que debía enviarla ya no existe, no hay reintento que dispare ni error que
+    ver, y desde el lado del cliente es idéntico a que el negocio lo ignore.
+  - **Arreglo colateral, migración 0009:** `messages.created_at` pasa de `now()` a
+    `clock_timestamp()`. Postgres congela `now()` al inicio de la transacción, así
+    que dos mensajes escritos en la misma quedaban con el MISMO timestamp y el
+    `ORDER BY created_at` devolvía lo que quisiera el planner. Ese orden es el
+    historial que se le pasa al agente y la definición de "todo lo nuevo desde la
+    última respuesta". Salió como test intermitente; era un empate real.
 - [ ] **TASK-206: Ventana 24h + opt-out + quality rating** — guard de sesión, detección de STOP/BAJA configurable, webhook/poll de quality con alertas. Depends: 204.
 - [ ] **TASK-207: Cuota en vivo + notificaciones 80/100%** — incremento atómico, cierre con gracia al agotar, endpoint /tenant/usage, banner en frontend. Depends: 205. Verificación: test de concurrencia (50 simultáneos, contador exacto).
 - [ ] **TASK-208: Admin de dead-letters (API+UI) + métricas de canal** — listado, retry manual, métricas p50/p95 por tenant. Depends: 203, 205.
