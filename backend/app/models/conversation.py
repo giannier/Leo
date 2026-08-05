@@ -8,9 +8,10 @@ what is defined here would break the agent-core that already writes to it.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, Text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -87,6 +88,18 @@ class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
         enum_check("delivery_status", DELIVERY_STATUSES, "messages_delivery_status"),
         # Transcripts are always read in chronological order for one thread.
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
+    )
+
+    # `clock_timestamp()`, not `now()`. Postgres freezes `now()` at the start
+    # of the transaction, so two messages written in one - a customer's
+    # question and the agent's answer, a burst applied together - would carry
+    # the *same* timestamp and the transcript's order would be whatever the
+    # planner felt like. This is an append-only log whose order is read by the
+    # agent as conversation history, so ties are not survivable.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.clock_timestamp(),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(

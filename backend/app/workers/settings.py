@@ -28,7 +28,11 @@ from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.whatsapp.ycloud import YCloudProvider
-from app.workers.channel import answer_conversation, process_webhook_event
+from app.workers.channel import (
+    answer_conversation,
+    process_webhook_event,
+    retry_stranded_replies,
+)
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.trial_lifecycle import (
     tenant_archiver,
@@ -99,6 +103,10 @@ class WorkerSettings:
         cron(trial_enforcer, minute=20),
         cron(tenant_archiver, hour=11, minute=35),
         cron(wizard_reminder, hour=14, minute=50),
+        # Every five minutes, off the boundary. A reply that was written down
+        # and never sent is a customer being ignored, and nothing else in the
+        # system would ever notice: the job that should have sent it died.
+        cron(retry_stranded_replies, minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57}),
     ]
     on_startup = startup
     on_shutdown = shutdown
