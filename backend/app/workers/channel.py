@@ -27,6 +27,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.locks import LockStore, acquire_lock, claim_once
+from app.core.queue import ArqJobQueue, JobQueue
+from app.models.llm_settings import TenantLLMSettings
+from app.providers.llm.factory import provider_for_tenant
 from app.providers.whatsapp.base import (
     InboundMessage,
     QualityUpdate,
@@ -34,13 +38,25 @@ from app.providers.whatsapp.base import (
     WhatsAppProvider,
 )
 from app.repositories.channel import WebhookEventRepository
-from app.services.channel import ChannelEventProcessor, UnknownNumberError
+from app.services.channel import (
+    ChannelEventProcessor,
+    ConversationResponder,
+    UnknownNumberError,
+    debounce_key,
+    lock_key,
+)
 
 logger = logging.getLogger(__name__)
 
-# The name the API enqueues by. The web process never imports this module, so
-# it never pulls the worker's dependencies into a request handler.
+# The names the API and the worker enqueue by. The web process never imports
+# this module, so it never pulls the worker's dependencies into a request
+# handler.
 PROCESS_EVENT_JOB = "process_webhook_event"
+ANSWER_JOB = "answer_conversation"
+
+# How long to wait before trying a locked conversation again. Short, because
+# the thing holding the lock is one model call.
+LOCK_RETRY_SECONDS = 5
 
 # Reported for observability; none of these are state transitions.
 OUTCOME_MISSING = "missing"
@@ -49,6 +65,9 @@ OUTCOME_IGNORED = "ignored"
 OUTCOME_APPLIED = "applied"
 OUTCOME_UNKNOWN_NUMBER = "unknown_number"
 OUTCOME_UNREADABLE = "unreadable"
+OUTCOME_LOCKED = "locked"
+OUTCOME_ANSWERED = "answered"
+OUTCOME_NOTHING_TO_SAY = "nothing_to_say"
 
 
 @dataclass(frozen=True)
@@ -58,9 +77,11 @@ class EventOutcome:
     event_id: uuid.UUID
     outcome: str
     # Set when the event produced an inbound message that still has to be
-    # answered. The caller - TASK-204's pipeline - picks it up from here.
+    # answered. The ARQ shell reads these to schedule the reply; a stored
+    # message nobody is told about is a customer nobody answers.
     inbound_message_id: uuid.UUID | None = None
     tenant_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
 
     def __str__(self) -> str:
         return self.outcome
@@ -148,6 +169,7 @@ def _apply(processor: ChannelEventProcessor, parsed: object, event_id: uuid.UUID
             # customer the same answer twice.
             inbound_message_id=result.message_id if result.is_new else None,
             tenant_id=result.tenant_id,
+            conversation_id=result.conversation_id,
         )
     if isinstance(parsed, StatusUpdate):
         processor.apply_status(parsed)
@@ -166,9 +188,93 @@ def _reload(events: WebhookEventRepository, event_id: uuid.UUID) -> Any:
     return events.get(event_id)
 
 
+async def schedule_answer(
+    queue: JobQueue,
+    store: LockStore,
+    *,
+    tenant_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    debounce_seconds: int,
+) -> bool:
+    """Claim the burst window for this thread and schedule one reply.
+
+    The first message of a burst claims the marker and books the job for
+    `debounce_seconds` later; the ones behind it find the marker taken and
+    book nothing. That is the whole of RF-005: five messages in eight seconds
+    produce one answer.
+
+    A *fixed* window from the first message, never one that restarts on each -
+    a restarting timer means somebody who keeps typing is never answered at
+    all, and the feature's own acceptance criterion is a reply inside ten
+    seconds.
+    """
+    if not await claim_once(store, debounce_key(conversation_id), ttl_seconds=debounce_seconds):
+        return False
+    await queue.enqueue(
+        ANSWER_JOB,
+        str(tenant_id),
+        str(conversation_id),
+        defer_seconds=debounce_seconds,
+    )
+    return True
+
+
 async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     """ARQ entry point. Registered in `app/workers/settings.py`."""
     session_factory = ctx["session_factory"]
     with session_factory() as session:
         outcome = process_event(session, uuid.UUID(event_id), provider=ctx["whatsapp"])
+
+    if (
+        outcome.inbound_message_id is not None
+        and outcome.tenant_id is not None
+        and outcome.conversation_id is not None
+    ):
+        settings = ctx["settings"]
+        await schedule_answer(
+            ArqJobQueue(ctx["redis"]),
+            ctx["redis"],
+            tenant_id=outcome.tenant_id,
+            conversation_id=outcome.conversation_id,
+            debounce_seconds=settings.channel_debounce_seconds,
+        )
     return str(outcome)
+
+
+async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_id: str) -> str:
+    """Answer everything one customer has said since the last reply.
+
+    Serialised per conversation (RF-006). Different customers are answered in
+    parallel; two replies to the *same* customer computed at once would read
+    the same history and answer the same question twice.
+    """
+    tenant = uuid.UUID(tenant_id)
+    conversation = uuid.UUID(conversation_id)
+    store = ctx["redis"]
+
+    lock = await acquire_lock(store, lock_key(conversation))
+    if lock is None:
+        # Somebody else is mid-turn on this thread. Come back rather than
+        # give up: they may have read the transcript before this message
+        # landed, and dropping it would leave a customer unanswered.
+        await ArqJobQueue(store).enqueue(
+            ANSWER_JOB, tenant_id, conversation_id, defer_seconds=LOCK_RETRY_SECONDS
+        )
+        return OUTCOME_LOCKED
+
+    try:
+        # Released before the transcript is read, not after. A message that
+        # arrives from here on belongs to the *next* burst and has to be able
+        # to book its own job - otherwise it waits for one that has already
+        # decided what to say.
+        await store.delete(debounce_key(conversation))
+
+        session_factory = ctx["session_factory"]
+        with session_factory() as session:
+            llm = provider_for_tenant(session.get(TenantLLMSettings, tenant))
+            responder = ConversationResponder(session, tenant, llm=llm)
+            answer = await responder.respond(conversation)
+            session.commit()
+        return OUTCOME_ANSWERED if answer is not None else OUTCOME_NOTHING_TO_SAY
+    finally:
+        await lock.release()

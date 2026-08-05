@@ -28,7 +28,7 @@ from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.whatsapp.ycloud import YCloudProvider
-from app.workers.channel import process_webhook_event
+from app.workers.channel import answer_conversation, process_webhook_event
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.trial_lifecycle import (
     tenant_archiver,
@@ -83,7 +83,7 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
-    functions = [index_knowledge_source, process_webhook_event]
+    functions = [index_knowledge_source, process_webhook_event, answer_conversation]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
     # that fires at :00 competes with everything else that fires at :00.

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -24,8 +25,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.agent.core import AgentCore
+from app.models.business import AgentConfig
 from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
+from app.models.tenant import Tenant
+from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import (
     InboundMessage,
     QualityUpdate,
@@ -39,8 +44,26 @@ from app.repositories.channel import (
 )
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
+from app.services.trial import agent_may_reply, record_ai_message
 
 logger = logging.getLogger(__name__)
+
+# What the agent says to a voice note when the tenant has not written their
+# own answer. Spanish, because a customer of a Peruvian bakery reads it.
+DEFAULT_UNSUPPORTED_FALLBACK = (
+    "Por ahora solo puedo leer mensajes de texto. Me lo escribes, por favor? Asi te ayudo mejor."
+)
+
+
+# Redis keys. Namespaced so a `KEYS channel:*` in an incident shows the whole
+# pipeline's state at once.
+def debounce_key(conversation_id: uuid.UUID) -> str:
+    return f"channel:burst:{conversation_id}"
+
+
+def lock_key(conversation_id: uuid.UUID) -> str:
+    return f"channel:lock:{conversation_id}"
+
 
 # What a message that is not text is recorded as, so the inbox shows the
 # customer said *something* rather than an empty bubble. Spanish, because
@@ -276,6 +299,117 @@ def _tenant_of_message(session: Session, provider_message_id: str) -> uuid.UUID 
     """
     statement = select(Message.tenant_id).where(Message.provider_message_id == provider_message_id)
     return session.execute(statement).scalar_one_or_none()
+
+
+class ConversationResponder:
+    """Answers one thread, once, for everything the customer just said.
+
+    RF-005 and RF-006 in one place, because they are two halves of the same
+    promise: somebody who fires off "hola" / "buenas" / "tienen pan?" in eight
+    seconds asked *one* question, and answering it three times reads like a
+    broken robot and costs three model calls.
+
+    The burst is not tracked anywhere. It is simply every inbound message
+    since the last thing the business said, which is exactly what the agent
+    has not answered yet - and is still correct after a crash, a redelivery,
+    or a worker that picked the job up twice.
+    """
+
+    def __init__(
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        *,
+        llm: LLMProvider,
+    ) -> None:
+        self._session = session
+        self._tenant_id = tenant_id
+        self._llm = llm
+        self._messages = MessageRepository(session, tenant_id)
+
+    def pending_burst(self, conversation_id: uuid.UUID) -> list[Message]:
+        """Everything the customer has said since the last reply."""
+        transcript = list(self._messages.list_for_conversation(conversation_id))
+        burst: list[Message] = []
+        for message in reversed(transcript):
+            if message.direction == "outbound":
+                break
+            burst.append(message)
+        return list(reversed(burst))
+
+    async def respond(self, conversation_id: uuid.UUID) -> Message | None:
+        """Produce one reply for the whole burst, or None if there is nothing.
+
+        The reply is stored `queued`: written down here, handed to the
+        provider by the sender (TASK-205). Storing it first means a send that
+        fails leaves a record of what the business meant to say, rather than
+        a silence nobody can explain.
+        """
+        tenant = self._session.get(Tenant, self._tenant_id)
+        if tenant is None:  # pragma: no cover - the caller just read it
+            return None
+
+        burst = self.pending_burst(conversation_id)
+        if not burst:
+            # Already answered - by an earlier run of this job, or by a human
+            # in the inbox. Either way there is nothing left to say.
+            return None
+
+        if not agent_may_reply(self._session, tenant):
+            # The agent is off, the trial is over, or the tenant is paused.
+            # The messages stay exactly where they are: HU-01 says an
+            # unanswered message is still a message the owner must see.
+            logger.info(
+                "inbound message stored but not answered",
+                extra={"tenant_id": str(self._tenant_id), "status": tenant.status},
+            )
+            return None
+
+        text = self._as_one_question(burst)
+        if text is None:
+            reply_text = self._unsupported_fallback()
+        else:
+            core = AgentCore(self._session, self._tenant_id, llm=self._llm)
+            reply = await core.respond(conversation_id=conversation_id, customer_message=text)
+            reply_text = reply.content
+
+        answer = self._messages.append(
+            conversation_id=conversation_id,
+            direction="outbound",
+            author="agent",
+            content=reply_text,
+            # Not sent yet. The sender flips this to `sent` once the provider
+            # has taken it, and the delivery webhooks carry it onwards.
+            delivery_status="queued",
+        )
+        if text is not None:
+            core.persist_trace(message=answer, reply=reply)
+        # Counted here, where the model bill is actually incurred, and only
+        # for the real channel - `record_ai_message` ignores the sandbox by
+        # design (Clarification 002).
+        record_ai_message(self._session, self._tenant_id, channel="whatsapp")
+        return answer
+
+    @staticmethod
+    def _as_one_question(burst: Sequence[Message]) -> str | None:
+        """The burst as a single prompt, or None if none of it was readable.
+
+        Media lines are dropped rather than passed through: `[imagen]` in the
+        prompt teaches the model to talk about a placeholder it cannot see.
+        What matters is whether *anything* was text - a photo with a caption
+        is a question, a photo alone is not.
+        """
+        readable = [
+            message.content.strip()
+            for message in burst
+            if message.msg_type == "text" and message.content.strip()
+        ]
+        return "\n".join(readable) if readable else None
+
+    def _unsupported_fallback(self) -> str:
+        config = self._session.get(AgentConfig, self._tenant_id)
+        configured = (config.unsupported_fallback or "").strip() if config else ""
+        return configured or DEFAULT_UNSUPPORTED_FALLBACK
 
 
 class WebhookIntake:

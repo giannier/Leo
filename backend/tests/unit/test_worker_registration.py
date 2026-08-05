@@ -11,13 +11,13 @@ from arq.worker import Worker
 
 from app.core.config import get_settings
 from app.services.knowledge import INDEX_JOB
-from app.workers.channel import PROCESS_EVENT_JOB
+from app.workers.channel import ANSWER_JOB, PROCESS_EVENT_JOB
 from app.workers.settings import WorkerSettings
 
-# Every name any part of the API enqueues by. Adding a job means adding it
-# here, which is the point: the list is the contract between two processes
-# that never import each other.
-ENQUEUED_BY_THE_API = {INDEX_JOB, PROCESS_EVENT_JOB}
+# Every name anything enqueues by - the API, or a worker booking follow-up
+# work for itself. Adding a job means adding it here, which is the point: the
+# list is the contract between processes that never import each other.
+ENQUEUED_BY_THE_API = {INDEX_JOB, PROCESS_EVENT_JOB, ANSWER_JOB}
 
 
 def _registered_names() -> set[str]:

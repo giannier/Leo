@@ -97,6 +97,11 @@ class AgentConfig(Base):
     )
     # Sent when the trial quota runs out mid-conversation (Clarification 004).
     farewell_on_pause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sent when somebody writes something this version cannot read - a voice
+    # note, a video, a location (Feature 002, C-001). Configurable because the
+    # right answer differs by business: a bakery asks for text, a clinic may
+    # prefer to hand straight over to a person.
+    unsupported_fallback: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Global on/off switch for the agent.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
