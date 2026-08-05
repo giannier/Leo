@@ -20,18 +20,20 @@ import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.agent.core import AgentCore
+from app.core.config import get_settings
 from app.models.business import AgentConfig
 from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
 from app.models.tenant import Tenant
 from app.models.whatsapp import WhatsAppNumber
+from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import (
     InboundMessage,
@@ -45,10 +47,13 @@ from app.repositories.channel import (
     ContactRepository,
     MessageStatusEventRepository,
     WebhookEventRepository,
+    session_window_is_open,
 )
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
+from app.services.activation import owner_of
 from app.services.connection import read_credentials
+from app.services.emails import build_quality_alert_email
 from app.services.trial import agent_may_reply, record_ai_message
 
 logger = logging.getLogger(__name__)
@@ -70,6 +75,9 @@ def lock_key(conversation_id: uuid.UUID) -> str:
     return f"channel:lock:{conversation_id}"
 
 
+# Ratings that mean the number is one step from being limited or cut off.
+ALARMING_QUALITY = ("RED", "FLAGGED")
+
 # What a message that is not text is recorded as, so the inbox shows the
 # customer said *something* rather than an empty bubble. Spanish, because
 # unlike an error code this is read by the shop owner.
@@ -82,6 +90,24 @@ MEDIA_PLACEHOLDERS = {
     "contact": "[contacto]",
     "unsupported": "[mensaje no soportado]",
 }
+
+
+def is_opt_out_request(text: str | None, keywords: Sequence[str]) -> bool:
+    """Whether this message is somebody asking to be left alone (HU-03).
+
+    The whole message must be the keyword, not contain it. A customer asking
+    "tienen bajativos?" has not asked to be unsubscribed, and silencing them
+    for it is both a lost sale and impossible for them to diagnose - they
+    would simply never hear back again. Exact match is what every SMS gateway
+    settled on for the same reason.
+
+    Punctuation and case are forgiven, because "Baja." and "STOP" are the same
+    request typed by two different people.
+    """
+    if not text:
+        return False
+    normalised = text.strip().strip(".!¡?¿,;: ").casefold()
+    return any(normalised == keyword.strip().casefold() for keyword in keywords if keyword)
 
 
 class UnknownNumberError(RuntimeError):
@@ -118,6 +144,10 @@ class ChannelEventProcessor:
 
     def __init__(self, session: Session) -> None:
         self._session = session
+        # Messages to send *after* the transaction commits. Mailing a customer
+        # about a state that then rolls back is worse than not mailing them:
+        # they act on it, and there is nothing to act on.
+        self.pending_emails: list[EmailMessage] = []
 
     # --------------------------------------------------------------- inbound
 
@@ -138,12 +168,7 @@ class ChannelEventProcessor:
         # continuing a conversation or starting a new one.
         previous_inbound_at = contact.last_inbound_at
         contacts.record_inbound(contact, at=message.sent_at)
-        if contact.opted_out_at is not None:
-            # Writing to the business again is how somebody comes back
-            # (HU-03). Keeping them silenced because they once said STOP
-            # would mean their next order goes unanswered.
-            logger.info("contact re-engaged after opting out", extra={"tenant_id": str(tenant_id)})
-            contacts.set_opted_out(contact, at=None)
+        self._apply_opt_out(tenant_id, contact, message)
 
         conversation = self._resolve_conversation(
             tenant_id,
@@ -198,6 +223,31 @@ class ChannelEventProcessor:
             message_id=stored.id,
             is_new=True,
         )
+
+    def _apply_opt_out(
+        self, tenant_id: uuid.UUID, contact: Contact, message: InboundMessage
+    ) -> None:
+        """Honour STOP, and honour coming back (HU-03).
+
+        Both directions matter and only one of them is obvious. Somebody who
+        writes STOP must never hear from the agent again. Somebody who writes
+        anything *else* afterwards has restarted the conversation themselves,
+        and keeping them silenced because of a word they typed in March means
+        their next order goes unanswered.
+        """
+        contacts = ContactRepository(self._session, tenant_id)
+        config = self._session.get(AgentConfig, tenant_id)
+        keywords = config.opt_out_keywords if config else []
+
+        if is_opt_out_request(message.text, keywords):
+            if contact.opted_out_at is None:
+                logger.info("contact opted out", extra={"tenant_id": str(tenant_id)})
+            contacts.set_opted_out(contact, at=message.sent_at)
+            return
+
+        if contact.opted_out_at is not None:
+            logger.info("contact re-engaged after opting out", extra={"tenant_id": str(tenant_id)})
+            contacts.set_opted_out(contact, at=None)
 
     def _resolve_conversation(
         self,
@@ -281,9 +331,15 @@ class ChannelEventProcessor:
             )
             return None
 
+        previous = number.quality_rating
         numbers = WhatsAppNumberRepository(self._session, number.tenant_id)
         numbers.update(number.id, quality_rating=update.quality_rating)
-        if update.quality_rating in ("RED", "FLAGGED"):
+
+        # On the *transition*, not on the level. Quality drops, recovers and
+        # drops again; alerting on the level would mail the customer every
+        # time the provider repeated itself, and an alert that arrives daily
+        # is one nobody reads on the day it matters.
+        if update.quality_rating in ALARMING_QUALITY and previous != update.quality_rating:
             logger.error(
                 "a tenant's number is in trouble with Meta",
                 extra={
@@ -291,7 +347,33 @@ class ChannelEventProcessor:
                     "quality_rating": update.quality_rating,
                 },
             )
+            self._warn_the_owner(number, update.quality_rating)
         return number.tenant_id
+
+    def _warn_the_owner(self, number: WhatsAppNumber, rating: str) -> None:
+        """Queue the warning. It is sent by the caller, after the commit.
+
+        Not sent from here, and that is the point. This runs inside the
+        transaction that records the rating, and mailing a customer about a
+        state that then rolls back is worse than not mailing them at all -
+        they act on it, and there is nothing to act on.
+
+        The owner cannot learn this anywhere else: the rating lives in Meta's
+        console, which they have no access to under an assisted connection.
+        """
+        owner = owner_of(self._session, number.tenant_id)
+        tenant = self._session.get(Tenant, number.tenant_id)
+        if owner is None or tenant is None:  # pragma: no cover - both are FKs
+            return
+        self.pending_emails.append(
+            build_quality_alert_email(
+                to=owner.email,
+                tenant_name=tenant.name,
+                phone_e164=number.phone_e164,
+                quality_rating=rating,
+                panel_url=f"{get_settings().frontend_base_url}/channel",
+            )
+        )
 
 
 def _tenant_of_message(session: Session, provider_message_id: str) -> uuid.UUID | None:
@@ -370,6 +452,17 @@ class ConversationResponder:
             )
             return None
 
+        contact = self._contact(conversation_id)
+        if contact is not None and contact.opted_out_at is not None:
+            # They asked to be left alone (HU-03). The message is still
+            # stored - a person may want to read it and answer by hand - but
+            # the agent does not speak to somebody who told it not to.
+            logger.info(
+                "not answering a contact who opted out",
+                extra={"tenant_id": str(self._tenant_id)},
+            )
+            return None
+
         text = self._as_one_question(burst)
         if text is None:
             reply_text = self._unsupported_fallback()
@@ -395,6 +488,12 @@ class ConversationResponder:
         record_ai_message(self._session, self._tenant_id, channel="whatsapp")
         return answer
 
+    def _contact(self, conversation_id: uuid.UUID) -> Contact | None:
+        conversation = ConversationRepository(self._session, self._tenant_id).get(conversation_id)
+        if conversation is None or conversation.contact_id is None:
+            return None
+        return ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
+
     @staticmethod
     def _as_one_question(burst: Sequence[Message]) -> str | None:
         """The burst as a single prompt, or None if none of it was readable.
@@ -419,6 +518,17 @@ class ConversationResponder:
 
 class NoConnectedNumber(RuntimeError):
     """The tenant has an answer to send and nothing to send it from."""
+
+
+class SessionWindowClosed(RuntimeError):
+    """Meta will not carry a free-form message to this person any more.
+
+    Twenty-four hours after the customer's last message the only thing that
+    may be sent is an approved template, and templates arrive with Feature
+    011. Sending anyway is not a failed request - it is a policy violation
+    that counts against the number's standing, which is the asset the whole
+    business runs on.
+    """
 
 
 class ReplySender:
@@ -457,7 +567,27 @@ class ReplySender:
             return message
 
         number, credentials = self._sender()
-        recipient = self._recipient(message)
+        contact = self._contact_for(message)
+        if not session_window_is_open(contact, now=self._now()):
+            # HU-03. The reply is not refused because it is wrong - it is
+            # refused because Meta will not carry it, and trying anyway is a
+            # policy violation charged against the number's standing.
+            #
+            # Marked `failed` rather than left `queued`: nothing later is
+            # going to make it deliverable, and an answer stuck in the queue
+            # for a day is worse than one the owner can see did not go out.
+            self._messages.set_delivery_status(message, status="failed")
+            MessageStatusEventRepository(self._session, self._tenant_id).append(
+                message.id, status="failed"
+            )
+            logger.warning(
+                "a reply arrived after the session window closed",
+                extra={"tenant_id": str(self._tenant_id)},
+            )
+            raise SessionWindowClosed(
+                "the customer last wrote more than 24 hours ago; only a template may be sent"
+            )
+        recipient = contact.phone_e164
 
         last_error: WhatsAppError | None = None
         for attempt in range(1, self._max_attempts + 1):
@@ -514,8 +644,8 @@ class ReplySender:
             )
         return number, credentials
 
-    def _recipient(self, message: Message) -> str:
-        """The phone number this thread belongs to."""
+    def _contact_for(self, message: Message) -> Contact:
+        """The person this thread belongs to."""
         conversation = ConversationRepository(self._session, self._tenant_id).get(
             message.conversation_id
         )
@@ -524,7 +654,11 @@ class ReplySender:
         contact = ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
         if contact is None:  # pragma: no cover - the FK guarantees it
             raise NoConnectedNumber("the conversation points at a contact that is gone")
-        return contact.phone_e164
+        return contact
+
+    @staticmethod
+    def _now() -> datetime:
+        return datetime.now(UTC)
 
 
 def stranded_replies(

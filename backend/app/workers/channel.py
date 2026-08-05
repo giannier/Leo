@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -30,6 +31,7 @@ from sqlalchemy.orm import Session
 from app.core.locks import LockStore, acquire_lock, claim_once
 from app.core.queue import ArqJobQueue, JobQueue
 from app.models.llm_settings import TenantLLMSettings
+from app.providers.email.base import EmailMessage, EmailProvider
 from app.providers.llm.factory import provider_for_tenant
 from app.providers.whatsapp.base import (
     InboundMessage,
@@ -91,6 +93,10 @@ class EventOutcome:
     inbound_message_id: uuid.UUID | None = None
     tenant_id: uuid.UUID | None = None
     conversation_id: uuid.UUID | None = None
+    # Warnings the event produced, to be sent after its transaction commits.
+    # Mailing a customer about a state that then rolls back is worse than not
+    # mailing them: they act on it, and there is nothing to act on.
+    emails: tuple[EmailMessage, ...] = ()
 
     def __str__(self) -> str:
         return self.outcome
@@ -138,7 +144,7 @@ def process_event(
         outcome = _apply(processor, parsed, event_id)
         events.mark_processed(event, at=at)
         session.commit()
-        return outcome
+        return replace(outcome, emails=tuple(processor.pending_emails))
     except UnknownNumberError as exc:
         # Retrying will not conjure the number, but a human has to see it: it
         # means either a number was disconnected while somebody was still
@@ -195,6 +201,26 @@ def _apply(processor: ChannelEventProcessor, parsed: object, event_id: uuid.UUID
 def _reload(events: WebhookEventRepository, event_id: uuid.UUID) -> Any:
     """Re-read the row after a rollback discarded the in-memory copy."""
     return events.get(event_id)
+
+
+async def _send_pending(email: EmailProvider | None, messages: Sequence[EmailMessage]) -> None:
+    """Deliver the warnings an event produced, after its commit.
+
+    A failure here is logged and swallowed. The state these messages describe
+    is already recorded and already actionable from the panel; failing the job
+    over an unreachable mail provider would retry the whole event and, on the
+    fifth attempt, dead-letter a webhook that was applied perfectly.
+    """
+    if not messages:
+        return
+    if email is None:
+        logger.warning("no email provider: %d channel warning(s) not sent", len(messages))
+        return
+    for message in messages:
+        try:
+            await email.send(message)
+        except Exception:  # noqa: BLE001 - a mail outage is not this job's failure
+            logger.exception("could not send a channel warning")
 
 
 async def schedule_answer(
@@ -282,6 +308,7 @@ async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     session_factory = ctx["session_factory"]
     with session_factory() as session:
         outcome = process_event(session, uuid.UUID(event_id), provider=ctx["whatsapp"])
+        await _send_pending(ctx.get("email"), outcome.emails)
 
     if (
         outcome.inbound_message_id is not None

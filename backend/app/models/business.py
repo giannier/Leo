@@ -38,6 +38,13 @@ PAYMENT_METHODS = ("yape", "plin", "transferencia", "tarjeta", "efectivo", "link
 
 DEFAULT_ESCALATION_RULES = '["cliente_molesto", "pide_humano", "fuera_de_catalogo"]'
 
+# What somebody can write to be left alone (HU-03). Both words are here
+# because both are used: "BAJA" is what a Peruvian customer types, "STOP" is
+# what anyone who has used an English service types, and honouring only one of
+# them means ignoring a request that was perfectly clear to the person making
+# it.
+DEFAULT_OPT_OUT_KEYWORDS = '["stop", "baja"]'
+
 
 class BusinessProfile(Base):
     """Identity of the tenant's business. One row per tenant."""
@@ -102,6 +109,14 @@ class AgentConfig(Base):
     # right answer differs by business: a bakery asks for text, a clinic may
     # prefer to hand straight over to a person.
     unsupported_fallback: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # What a customer can write to be left alone (HU-03). Configurable per
+    # tenant because the word people actually use is local: "BAJA" in Peru,
+    # "STOP" from anyone who has used an English service, and a clinic may
+    # want "NO MOLESTAR" as well. Empty means "use the defaults".
+    opt_out_keywords: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=DEFAULT_OPT_OUT_KEYWORDS
+    )
 
     # Global on/off switch for the agent.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

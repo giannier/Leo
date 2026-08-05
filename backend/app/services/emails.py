@@ -413,3 +413,82 @@ El equipo de Leo
         html=html_body,
         text=text_body,
     )
+
+
+QUALITY_ALERT_SUBJECT = "Tu numero de WhatsApp esta en riesgo"
+
+
+def build_quality_alert_email(
+    *,
+    to: str,
+    tenant_name: str,
+    phone_e164: str,
+    quality_rating: str,
+    panel_url: str,
+) -> EmailMessage:
+    """Sent when Meta drops a number's quality rating to RED or FLAGGED.
+
+    The last warning before the number stops being able to send at all, and
+    the customer cannot see it coming from anywhere else: the rating lives in
+    Meta's console, which they do not have access to under an assisted
+    connection.
+
+    Written to be acted on rather than to inform. The causes are always the
+    same three - messaging people who did not ask, sending the same text to
+    many numbers, and being blocked or reported - and all three are things
+    the owner can stop doing today.
+    """
+    safe_tenant = escape(tenant_name)
+    safe_phone = escape(phone_e164)
+    safe_rating = escape(quality_rating)
+    safe_url = escape(panel_url, quote=True)
+
+    html_body = f"""\
+<p>Hola,</p>
+<p>
+  WhatsApp bajo la calificacion de calidad del numero
+  <strong>{safe_phone}</strong> de <strong>{safe_tenant}</strong> a
+  <strong>{safe_rating}</strong>.
+</p>
+<p>
+  Esto pasa cuando varias personas bloquean o reportan los mensajes. Si sigue
+  bajando, Meta puede limitar cuantos mensajes por dia envia el numero, o
+  suspenderlo.
+</p>
+<p>Que ayuda ahora:</p>
+<ul>
+  <li>Responder solo a quien escribio primero.</li>
+  <li>No enviar el mismo texto a muchos numeros.</li>
+  <li>Atender rapido a quien pide hablar con una persona.</li>
+</ul>
+<p><a href="{safe_url}">Ver el estado de mi numero</a></p>
+<p>El equipo de Leo</p>
+"""
+
+    text_body = f"""\
+Hola,
+
+WhatsApp bajo la calificacion de calidad del numero {phone_e164} de
+{tenant_name} a {quality_rating}.
+
+Esto pasa cuando varias personas bloquean o reportan los mensajes. Si sigue
+bajando, Meta puede limitar cuantos mensajes por dia envia el numero, o
+suspenderlo.
+
+Que ayuda ahora:
+- Responder solo a quien escribio primero.
+- No enviar el mismo texto a muchos numeros.
+- Atender rapido a quien pide hablar con una persona.
+
+Ver el estado de mi numero:
+{panel_url}
+
+El equipo de Leo
+"""
+
+    return EmailMessage(
+        to=(to,),
+        subject=QUALITY_ALERT_SUBJECT,
+        html=html_body,
+        text=text_body,
+    )
