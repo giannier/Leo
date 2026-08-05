@@ -213,6 +213,7 @@ export type RegisterBody = JsonBody<Ops["/api/v1/auth/register"]["post"]["reques
 export type SessionPayload = Session;
 export type TenantSummary = Ok<Ops["/api/v1/tenant"]["get"]>;
 export type Checklist = Ok<Ops["/api/v1/tenant/activation-checklist"]["get"]>;
+export type Usage = Ok<Ops["/api/v1/tenant/usage"]["get"]>;
 export type ChecklistItem = Checklist["items"][number];
 
 export type BusinessProfile = Ok<Ops["/api/v1/tenant/business-profile"]["get"]>;
@@ -303,6 +304,7 @@ export const api = {
   tenant: {
     current: () => request<TenantSummary>("/tenant"),
     checklist: () => request<Checklist>("/tenant/activation-checklist"),
+    usage: () => request<Usage>("/tenant/usage"),
   },
 
   agent: {

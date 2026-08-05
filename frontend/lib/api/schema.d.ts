@@ -777,6 +777,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live consumption on the real channel
+         * @description What the trial has spent, right now (HU-04).
+         *
+         *     Separate from `GET /tenant` even though the numbers overlap, because the
+         *     two are read at different rates. The panel loads tenant state once; the
+         *     usage banner polls while somebody watches their agent work through a busy
+         *     afternoon, and that read has no business dragging the plan, the
+         *     checklist and the trial dates along with it.
+         *
+         *     Counted from `messages` rather than from a stored total: `ai_messages_used`
+         *     is the trial's meter and resets with nothing, while the owner asking "how
+         *     busy were we?" means the real traffic in both directions.
+         */
+        get: operations["get_usage_api_v1_tenant_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/activation-checklist": {
         parameters: {
             query?: never;
@@ -1710,6 +1740,27 @@ export interface components {
             status?: ("active" | "disabled") | null;
         };
         /**
+         * UsageResponse
+         * @description Live consumption, for the banner that watches a busy afternoon.
+         */
+        UsageResponse: {
+            /** Ai Messages Used */
+            ai_messages_used: number;
+            /** Ai Messages Limit */
+            ai_messages_limit: number;
+            /** Percent Used */
+            percent_used: number;
+            /** Messages In */
+            messages_in: number;
+            /** Messages Out */
+            messages_out: number;
+            /**
+             * Period Start
+             * Format: date-time
+             */
+            period_start: string;
+        };
+        /**
          * UserSummary
          * @description The signed-in identity, as the contract shapes it.
          */
@@ -1925,6 +1976,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description `registration_unavailable` - the trial plan is misconfigured */
             503: {
                 headers: {
@@ -1958,6 +2018,15 @@ export interface operations {
             };
             /** @description `validation_error` or `invalid_or_expired_token` */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2186,6 +2255,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     login_api_v1_auth_login_post: {
@@ -2299,15 +2377,6 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
         };
     };
     logout_api_v1_auth_logout_post: {
@@ -2327,15 +2396,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description `rate_limited` - more than 20 requests in 60s from this address, or more than 10 failed sign-ins for one account in 15 minutes */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
             };
         };
     };
@@ -3760,6 +3820,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_usage_api_v1_tenant_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageResponse"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */

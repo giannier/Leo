@@ -31,7 +31,7 @@ from app.core.config import get_settings
 from app.models.business import AgentConfig
 from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
-from app.models.tenant import Tenant
+from app.models.tenant import QUOTA_80, QUOTA_WARNING_RATIO, Tenant
 from app.models.whatsapp import WhatsAppNumber
 from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
@@ -53,8 +53,14 @@ from app.repositories.conversation import ConversationRepository, MessageReposit
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
 from app.services.activation import owner_of
 from app.services.connection import read_credentials
-from app.services.emails import build_quality_alert_email
-from app.services.trial import agent_may_reply, record_ai_message
+from app.services.emails import build_quality_alert_email, build_quota_warning_email
+from app.services.trial import (
+    MeteringResult,
+    agent_may_reply,
+    claim_notification,
+    pause_tenant,
+    record_ai_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -413,6 +419,10 @@ class ConversationResponder:
         self._tenant_id = tenant_id
         self._llm = llm
         self._messages = MessageRepository(session, tenant_id)
+        # Warnings this turn produced, sent by the caller after the commit.
+        # Same reason as `ChannelEventProcessor`: mailing somebody about a
+        # state that then rolls back is worse than not mailing them.
+        self.pending_emails: list[EmailMessage] = []
 
     def pending_burst(self, conversation_id: uuid.UUID) -> list[Message]:
         """Everything the customer has said since the last reply."""
@@ -485,8 +495,50 @@ class ConversationResponder:
         # Counted here, where the model bill is actually incurred, and only
         # for the real channel - `record_ai_message` ignores the sandbox by
         # design (Clarification 002).
-        record_ai_message(self._session, self._tenant_id, channel="whatsapp")
+        metered = record_ai_message(self._session, self._tenant_id, channel="whatsapp")
+        self._react_to_the_meter(tenant, metered)
         return answer
+
+    def _react_to_the_meter(self, tenant: Tenant, metered: MeteringResult) -> None:
+        """Warn at 80%, and stop at 100% - in this reply, not in an hour.
+
+        The hourly enforcer already pauses expired trials, and on the calendar
+        that is fine: a day is a day whether it ends at 09:05 or 10:00. A
+        *counter* is not. Clarification 004 says the agent finishes the
+        conversation it is in and then stops, and waiting for the next cron
+        tick would hand out up to an hour of free replies - which is also an
+        hour of the customer talking to an agent that is, on paper, out of
+        messages.
+        """
+        if not metered.counted or metered.limit <= 0:
+            return
+
+        if metered.exhausted:
+            # The farewell and the close live in `pause_tenant`, which the
+            # enforcer uses too. Called here so it happens on the message that
+            # crossed the line rather than up to an hour later.
+            pause_tenant(self._session, tenant, now=datetime.now(UTC))
+            logger.info(
+                "trial quota spent; the agent stops here",
+                extra={"tenant_id": str(self._tenant_id), "used": metered.used},
+            )
+            return
+
+        if metered.used >= int(metered.limit * QUOTA_WARNING_RATIO) and claim_notification(
+            self._session, self._tenant_id, QUOTA_80
+        ):
+            owner = owner_of(self._session, self._tenant_id)
+            if owner is None:
+                return
+            self.pending_emails.append(
+                build_quota_warning_email(
+                    to=owner.email,
+                    tenant_name=tenant.name,
+                    used=metered.used,
+                    limit=metered.limit,
+                    panel_url=f"{get_settings().frontend_base_url}/plan",
+                )
+            )
 
     def _contact(self, conversation_id: uuid.UUID) -> Contact | None:
         conversation = ConversationRepository(self._session, self._tenant_id).get(conversation_id)

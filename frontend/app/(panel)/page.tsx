@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CheckIcon, CircleIcon } from "@/components/icons";
 import { Alert, Button, Card, Skeleton, cx } from "@/components/ui";
+import { UsageMeter } from "@/components/usage-meter";
 import { api, type Checklist } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useHasRole, useSession } from "@/lib/session";
@@ -85,6 +86,11 @@ export default function PanelHome() {
           Esto es lo que falta para que tu agente empiece a atender.
         </p>
       </header>
+
+      {/* Above the checklist on purpose: once the agent is live, "how many
+          messages have I got left" is the question somebody opens this page
+          to answer, and the checklist below it is finished. */}
+      <UsageMeter />
 
       {error ? (
         <Alert tone="danger" title="No pudimos cargar tu configuración">

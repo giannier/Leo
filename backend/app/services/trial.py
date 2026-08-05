@@ -231,6 +231,12 @@ def pause_tenant(session: Session, tenant: Tenant, *, now: datetime) -> list[Con
                 # looking for what the agent said must not find this.
                 author="system",
                 content=farewell,
+                # `queued`, since Feature 002. Before the real channel existed
+                # this row *was* the farewell; now it is only the intention to
+                # send one, and leaving it stateless meant nothing ever
+                # delivered it. The customer would be left with the silence
+                # this whole branch exists to avoid.
+                delivery_status="queued",
             )
         )
         conversation.status = "closed"

@@ -492,3 +492,70 @@ El equipo de Leo
         html=html_body,
         text=text_body,
     )
+
+
+QUOTA_WARNING_SUBJECT = "Te queda poco de tu prueba gratuita"
+
+
+def build_quota_warning_email(
+    *,
+    to: str,
+    tenant_name: str,
+    used: int,
+    limit: int,
+    panel_url: str,
+) -> EmailMessage:
+    """Sent the moment the message counter crosses 80% (HU-04).
+
+    The other trial notices are about the calendar. This one is about the
+    meter, and a busy shop can run out of messages a week before it runs out
+    of days - at which point the first sign is the agent going quiet on a real
+    customer.
+
+    Deliberately not phrased as a limit being enforced. From the owner's side
+    the useful information is how much is left and what happens when it is
+    gone, which is what decides whether they pay before or after their agent
+    stops answering.
+    """
+    safe_tenant = escape(tenant_name)
+    safe_url = escape(panel_url, quote=True)
+    remaining = max(limit - used, 0)
+
+    html_body = f"""\
+<p>Hola,</p>
+<p>
+  Tu agente de <strong>{safe_tenant}</strong> ya respondio
+  <strong>{used}</strong> de los <strong>{limit}</strong> mensajes de la
+  prueba gratuita. Te quedan <strong>{remaining}</strong>.
+</p>
+<p>
+  Cuando se acaben, el agente se despide de las conversaciones abiertas y deja
+  de responder. Los mensajes que lleguen despues se siguen guardando en tu
+  bandeja, asi que no pierdes ninguno.
+</p>
+<p><a href="{safe_url}">Ver mi consumo</a></p>
+<p>El equipo de Leo</p>
+"""
+
+    text_body = f"""\
+Hola,
+
+Tu agente de {tenant_name} ya respondio {used} de los {limit} mensajes de la
+prueba gratuita. Te quedan {remaining}.
+
+Cuando se acaben, el agente se despide de las conversaciones abiertas y deja
+de responder. Los mensajes que lleguen despues se siguen guardando en tu
+bandeja, asi que no pierdes ninguno.
+
+Ver mi consumo:
+{panel_url}
+
+El equipo de Leo
+"""
+
+    return EmailMessage(
+        to=(to,),
+        subject=QUOTA_WARNING_SUBJECT,
+        html=html_body,
+        text=text_body,
+    )
