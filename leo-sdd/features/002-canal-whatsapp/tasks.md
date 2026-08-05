@@ -160,6 +160,22 @@
     mensaje. p50/p95 por rango percentil, y `null` (no 0) cuando no hubo nada: un
     dashboard que muestra 0 ms un día que nadie escribió se lee como "rapidísimo".
   - El sandbox no cuenta como tráfico real.
-- [ ] **TASK-209: Test de caos + endurecimiento** — kill de worker a mitad, replays masivos, revisión de logs sin PII. Depends: todo. Milestone humano: Giannier prueba con su propio número real end-to-end.
+- [~] **TASK-209: Test de caos + endurecimiento** — kill de worker a mitad, replays masivos, revisión de logs sin PII. Depends: todo. Milestone humano: Giannier prueba con su propio número real end-to-end.
+  - **Hecho:** `tests/integration/test_channel_chaos.py`. El worker se mata como se
+    mata de verdad — sin cleanup, sin `finally` — abortando la transacción y
+    volviendo a correr el job desde cero, que es lo que hace ARQ cuando el proceso
+    vuelve. Las dos mitades del criterio fallan en direcciones opuestas: perder un
+    mensaje es un cliente sin respuesta, duplicarlo es un cliente respondido dos
+    veces y una cuota cobrada dos veces.
+  - Replays masivos: veinte entregas de los mismos tres mensajes siguen siendo tres
+    mensajes, un hilo, y una sola respuesta.
+  - Revisión de logs: ni el teléfono del cliente ni el texto de su mensaje aparecen
+    en ninguna línea. Lo que alguien le cuenta a un negocio es suyo; una línea de
+    debug con el texto pondría cada pedido, dirección y reclamo de la plataforma en
+    un agregador de logs. La alerta de calidad loguea los últimos cuatro dígitos.
+  - **PENDIENTE Y ES DE GIANNIER:** el milestone humano. Probar de punta a punta con
+    su propio número real. Requiere `YCLOUD_WEBHOOK_SECRET` configurado, el webhook
+    de YCloud apuntando a `/webhooks/ycloud` y un número conectado de verdad. El
+    criterio de <10s p95 solo se puede medir así.
 
 Dependencias: 201 → 202 → 203 → 204 → 205 → 207 → 209; 204 → 206; 203/205 → 208.
