@@ -30,7 +30,8 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from app.agent.prompts.builder import build_system_prompt
+from app.agent.catalog_guard import CatalogueGuard, build_catalogue_guard
+from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
 from app.agent.tools.registry import ToolContext, ToolRegistry
 from app.models.conversation import Message
@@ -43,6 +44,7 @@ from app.providers.llm.base import (
 )
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.conversation import AgentTraceRepository, MessageRepository
+from app.repositories.product import ProductRepository
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,23 @@ FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
     "¿Podrías intentarlo de nuevo en unos segundos?"
 )
+
+# Sent when the model named a product the catalogue does not have, was told
+# so, and named one again. Saying nothing useful is the right answer here:
+# the alternative is sending a product name the business cannot honour, and
+# the customer finds that out standing at the counter.
+CATALOG_GUARD_REPLY = (
+    "Disculpa, no quiero darte el nombre equivocado de un producto. "
+    "Déjame comunicarte con una persona del negocio para confirmártelo bien."
+)
+
+# The most product names the guard will hold to judge a reply against. A
+# catalogue larger than this makes the guard *stand down* rather than judge on
+# a partial list: a real product missing from the sample would look invented,
+# and a guard that apologises for a correct answer is worse than no guard.
+# Far above any catalogue a WhatsApp business actually keeps, and still
+# bounded so one turn cannot pull an unbounded result set.
+MAX_GUARDED_CATALOG_NAMES = 1000
 
 
 # Tool-call syntax that a model sometimes writes as *prose* instead of
@@ -86,29 +105,57 @@ _TOOL_BLOCK = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 
-# Below this, whatever survived the strip is a fragment rather than a reply.
+# Below this, what *survived a strip* is a fragment of the call rather than a
+# reply. It only applies when markup was actually removed: a reply that never
+# contained any is a reply however short it is. "¡De nada! 👍" is the right
+# answer to a customer who said "ok", and replacing it with an apology for a
+# failure that did not happen is the worse error of the two.
 _MIN_ANSWER_CHARS = 12
 
 
 def _usable_answer(raw: str) -> tuple[str, bool]:
     """The reply to show, and whether the model failed to produce one.
 
-    Any leftover tool-call markup is removed rather than shown. If that
-    leaves nothing substantive the answer is treated as absent - the customer
-    gets the fallback, and the trace records `degraded` so the tenant can see
-    it was the model that failed and not their configuration.
+    Any leftover tool-call markup is removed rather than shown. The answer is
+    treated as absent - the customer gets the fallback and the trace records
+    `degraded`, so the tenant can see it was the model that failed and not
+    their configuration - when nothing is left after the strip, or when the
+    strip removed markup and left too little behind to be anything but a
+    fragment of the call. A short answer that carried no markup is kept.
     """
     text = raw.strip()
     if not text:
         return FALLBACK_REPLY, True
 
-    cleaned = _TOOL_BLOCK.sub(" ", text)
-    cleaned = " ".join(cleaned.split()).strip()
+    stripped = _TOOL_BLOCK.sub(" ", text)
+    cleaned = " ".join(stripped.split()).strip()
 
-    if len(cleaned) < _MIN_ANSWER_CHARS:
+    if not cleaned:
+        return FALLBACK_REPLY, True
+    if stripped != text and len(cleaned) < _MIN_ANSWER_CHARS:
         return FALLBACK_REPLY, True
     # Prose survived alongside the markup: keep the prose.
     return cleaned if cleaned != text else text, False
+
+
+# One turn's tool results, keyed by tool name and arguments.
+_ToolCache = dict[tuple[str, str], tuple[str, list[dict[str, object]]]]
+
+
+@dataclass(frozen=True)
+class _GuardOutcome:
+    """What the catalogue post-guard decided about one reply.
+
+    `blocked` is carried rather than inferred from the content, so a model
+    that happens to write the guarded fallback word for word is not recorded
+    as having been stopped by a guard that never fired.
+    """
+
+    content: str
+    note: dict[str, object] | None = None
+    blocked: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 @dataclass
@@ -124,6 +171,9 @@ class AgentReply:
     latency_ms: int = 0
     # True when the answer is the canned fallback rather than the model's.
     degraded: bool = False
+    # What the catalogue post-guard did, or None when it had nothing to say -
+    # which is every ordinary turn. See `_enforce_catalogue_names`.
+    catalog_guard: dict[str, object] | None = None
 
 
 class AgentCore:
@@ -162,6 +212,12 @@ class AgentCore:
         ]
 
         context = ToolContext(session=self._session, tenant_id=self._tenant_id, llm=self._llm)
+        # Models repeat themselves: `consultar_catalogo` came back seven times
+        # for the same term in one conversation. Within a turn the answer
+        # cannot have changed, so it is looked up once. The cache dies with
+        # this call - a catalogue edited between two customer messages must
+        # still be seen on the next one.
+        tool_cache: _ToolCache = {}
         tools_called: list[dict[str, object]] = []
         rag_sources: list[dict[str, object]] = []
         input_tokens = 0
@@ -202,12 +258,16 @@ class AgentCore:
             # rejects outright.
             messages.append(ChatMessage("assistant", result.content, tool_calls=result.tool_calls))
             for call in result.tool_calls:
-                output, sources = await self._run_tool(context, call)
+                output, sources, cached = await self._run_tool(context, call, tool_cache)
+                # A served-from-cache call is still recorded: a model asking
+                # the same thing seven times is a prompt problem, and a trace
+                # that hides the repeats is a trace that hides it.
                 tools_called.append(
                     {
                         "tool": call.name,
                         "args_resumen": _summarise(call.arguments),
                         "ok": not output.startswith("ERROR:"),
+                        "cached": cached,
                     }
                 )
                 rag_sources.extend(sources)
@@ -218,6 +278,15 @@ class AgentCore:
         # bubble or a pile of angle brackets, and no next step either way.
         content, unusable = _usable_answer(result.content if result else "")
 
+        guard_note: dict[str, object] | None = None
+        if not unusable:
+            guarded = await self._enforce_catalogue_names(messages, content)
+            content = guarded.content
+            guard_note = guarded.note
+            input_tokens += guarded.input_tokens
+            output_tokens += guarded.output_tokens
+            unusable = guarded.blocked
+
         return AgentReply(
             content=content,
             model=result.model if result else self._llm.chat_model,
@@ -227,22 +296,128 @@ class AgentCore:
             output_tokens=output_tokens,
             latency_ms=int((time.perf_counter() - started) * 1000),
             degraded=result is None or unusable,
+            catalog_guard=guard_note,
         )
 
+    async def _enforce_catalogue_names(
+        self, messages: list[ChatMessage], content: str
+    ) -> _GuardOutcome:
+        """Refuse to send a product name the tenant's catalogue does not have.
+
+        The catalogue said "Leche" and the agent offered "Leche pausterizada".
+        Rule 1 of the prompt already forbade that and did not stop it, because
+        a name that is *almost* right does not feel invented to a model. So the
+        finished reply is checked against the real catalogue before it leaves.
+
+        On a hit the model gets **one** retry, handed the exact names it is
+        allowed to use. One and not more: a second offence after being shown
+        the list is a model that is not going to comply, and every further
+        attempt is another few seconds of a customer watching "typing...".
+        If the retry offends too, the invented name is not sent at all.
+
+        The catalogue is read **once per turn**, lazily: a turn that never
+        produces a usable answer never pays for it, and the retry is judged by
+        the same `CatalogueGuard` instance rather than a second query.
+        """
+        guard = self._catalogue_guard()
+        invented = guard.invented_names(content)
+        if not invented:
+            return _GuardOutcome(content=content)
+
+        logger.warning(
+            "agent named a product outside the catalogue",
+            extra={"tenant_id": str(self._tenant_id), "invented": invented},
+        )
+
+        messages.append(ChatMessage("assistant", content))
+        messages.append(ChatMessage("user", build_name_correction(invented, guard.catalogue)))
+        try:
+            retry = await self._llm.chat(messages, tools=())
+        except LLMError:
+            # The retry was the only thing that could have rescued this
+            # answer. Without it the original still names a product that does
+            # not exist, so it still may not be sent.
+            logger.exception(
+                "catalogue correction failed", extra={"tenant_id": str(self._tenant_id)}
+            )
+            return _GuardOutcome(
+                content=CATALOG_GUARD_REPLY,
+                note=_guard_note("blocked", invented, []),
+                blocked=True,
+            )
+
+        corrected, unusable = _usable_answer(retry.content)
+        still_invented = guard.invented_names(corrected)
+        blocked = unusable or bool(still_invented)
+
+        return _GuardOutcome(
+            content=CATALOG_GUARD_REPLY if blocked else corrected,
+            note=_guard_note("blocked" if blocked else "corrected", invented, still_invented),
+            blocked=blocked,
+            # The correction is a real model call on a real bill. A trace that
+            # hides it under-reports the cost of a prompt that keeps slipping.
+            input_tokens=retry.input_tokens,
+            output_tokens=retry.output_tokens,
+        )
+
+    def _catalogue_guard(self) -> CatalogueGuard:
+        """This tenant's catalogue names, in a form that can judge a reply.
+
+        Called exactly once per turn - `_enforce_catalogue_names` holds the
+        result and checks both the first answer and the retried one against
+        it - so a turn costs one short indexed read however the guard goes,
+        and none at all when the model never produced a usable answer. The
+        result is deliberately *not* kept on the instance: a catalogue edited
+        between two customer messages must be seen on the next one, the same
+        rule the per-turn tool cache follows.
+
+        Names only, and never another tenant's: `ProductRepository` is bound
+        to one `tenant_id` and filters on it, so there is no way to reach a
+        catalogue this agent is not answering for.
+
+        The catalogue *tool*'s output is not reused for this even when the
+        turn already ran it. That listing is capped and filtered by whatever
+        the model searched for, so a real product missing from it would look
+        invented - the guard would then apologise for a correct answer, which
+        is the failure this whole file is arranged to avoid.
+        """
+        names = ProductRepository(self._session, self._tenant_id).active_names(
+            limit=MAX_GUARDED_CATALOG_NAMES + 1
+        )
+        if len(names) > MAX_GUARDED_CATALOG_NAMES:
+            logger.warning(
+                "catalogue too large to guard; standing down",
+                extra={"tenant_id": str(self._tenant_id), "names": len(names)},
+            )
+            names = []
+        # No vocabulary: at runtime the agent knows its catalogue and nothing
+        # else, so the introduced-name half of the detector would fire on
+        # "Miraflores", "Yape" and the customer's own name.
+        return build_catalogue_guard(names)
+
     async def _run_tool(
-        self, context: ToolContext, call: ToolCall
-    ) -> tuple[str, list[dict[str, object]]]:
+        self, context: ToolContext, call: ToolCall, cache: _ToolCache
+    ) -> tuple[str, list[dict[str, object]], bool]:
         """Execute one tool call, converting any failure into text.
 
         A raised exception here would abort the whole turn over one bad tool
         argument. Handing the model the error instead lets it apologise, or
         retry with something sensible, which is what a person would do.
+
+        The third value says whether the result came from `cache` rather than
+        from the tool. Failures are never cached: an error is the one result
+        that is worth attempting again.
         """
+        key = (call.name, _cache_key(call.arguments))
+        remembered = cache.get(key)
+        if remembered is not None:
+            return remembered[0], remembered[1], True
+
         tool = self._registry.get(call.name)
         if tool is None:
             # Models do hallucinate tool names. Saying so is more useful than
             # silence, and it is a real signal in the trace.
-            return f"ERROR: la herramienta '{call.name}' no existe.", []
+            return f"ERROR: la herramienta '{call.name}' no existe.", [], False
 
         try:
             output = await tool.handler(context, call.arguments)
@@ -250,12 +425,14 @@ class AgentCore:
             logger.exception(
                 "tool failed", extra={"tool": call.name, "tenant_id": str(self._tenant_id)}
             )
-            return f"ERROR: no se pudo consultar '{call.name}' en este momento.", []
+            return f"ERROR: no se pudo consultar '{call.name}' en este momento.", [], False
 
         sources: list[dict[str, object]] = []
         if call.name == "consultar_conocimiento" and not output.startswith("No hay información"):
             sources.append({"tool": call.name, "consulta": _summarise(call.arguments)})
-        return output, sources
+
+        cache[key] = (output, sources)
+        return output, sources, False
 
     def _history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
         """Recent turns of this conversation, oldest first."""
@@ -282,7 +459,41 @@ class AgentCore:
             input_tokens=reply.input_tokens,
             output_tokens=reply.output_tokens,
             latency_ms=reply.latency_ms,
+            catalog_guard=reply.catalog_guard,
         )
+
+
+def _guard_note(status: str, invented: list[str], still_invented: list[str]) -> dict[str, object]:
+    """What the catalogue guard did, for the trace.
+
+    Written only when the guard actually fired - an ordinary turn leaves this
+    null - so its presence on a trace is itself the signal, and there is
+    always exactly one retry behind it.
+
+    `invented` is what the first answer claimed; `still_invented` is what
+    survived the correction, and is empty when the retry came back clean or
+    never came back at all. The two are separated because "the model fixed it
+    when told" and "the model said it again" are different problems for
+    whoever reads this: the first is a prompt to tighten, the second is a
+    model to change.
+    """
+    return {
+        "status": status,
+        "invented": invented,
+        "still_invented": still_invented,
+    }
+
+
+def _cache_key(arguments: dict[str, object]) -> str:
+    """A stable identity for one set of tool arguments.
+
+    Sorted, so the same question asked with the keys in a different order is
+    recognised as the same question.
+    """
+    try:
+        return json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return str(arguments)
 
 
 def _summarise(arguments: dict[str, object], limit: int = 120) -> str:

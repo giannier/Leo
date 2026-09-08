@@ -91,6 +91,59 @@ Ver `contracts/api.md`. Grupos: `/auth`, `/tenant` (perfil, agente, productos, c
 | Divergencia sandbox vs canal real futuro | Media | Alto | Mismo agent-core, mismas tablas, mismo pipeline; solo cambia `channel` |
 | Cambios de precios/planes durante desarrollo | Media | Bajo | Límites en tabla `plans`, nunca hardcodeados |
 
+## Decisiones Posteriores
+
+### 2026-09-08 — Post-guard de nombres de catálogo en agent-core (TASK-025)
+
+**Problema.** El catálogo decía "Leche" y el agente ofreció "Leche pausterizada".
+La regla 1 del prompt ("Nunca inventes productos") ya lo prohibía y no lo evitó:
+un nombre *casi* correcto no le parece inventado al modelo. Para el cliente sí lo
+es — llega al negocio a pedir algo que no se vende. La única detección existente
+vivía dentro de los evals (`backend/evals/dataset.py`), corría solo contra el
+fixture demo y nunca en producción; además reconocía el descriptor por una lista
+blanca de terminaciones, que capturaba "helada" y "pausterizada" y dejaba pasar
+"fresca", "entera" y "light" — el mismo error con otro sufijo.
+
+**Decisión (aprobada por Giannier).**
+
+| Punto | Elegido | Razón | Alternativa descartada |
+|-------|---------|-------|----------------------|
+| Dónde vive el detector | `backend/app/agent/catalog_guard.py`, código de producción; los evals lo importan | Una sola fuente de verdad: una copia privada en `evals/` se desviaría, y la que se desviaría es la que protege a clientes reales | Copia en los evals (deriva garantizada) |
+| Cómo conoce el catálogo | Los nombres son un **parámetro**; el eval pasa `DEMO_PRODUCTS`, el runtime pasa los del tenant | El detector no debe saber de dónde vienen; `app/` nunca importa de `evals/` | Detector acoplado al fixture |
+| Lectura del catálogo | `ProductRepository.active_names()` — filtrado por `tenant_id` en la capa de repositorio, solo activos y no borrados | Constitution: toda query de negocio filtra por tenant en el repositorio. Un producto desactivado ya no se vende, y citarlo genera un pedido que no se puede cumplir | Reusar la salida de `consultar_catalogo` (viene truncada y filtrada por la búsqueda del modelo ⇒ productos reales parecerían inventados) |
+| Costo/latencia | Una sola lectura por turno, perezosa: `_enforce_catalogue_names` construye el guard una vez y juzga con él la respuesta original y la reintentada | A6 (latencia media 3364 ms) ya es un problema; un turno que nunca produce respuesta usable no paga la lectura | Consultar por cada verificación |
+| Detección del descriptor | Lista blanca de terminaciones **reemplazada** por: longitud mínima + lista cerrada de palabras función y verbos del dominio + terminaciones verbales `-an/-en/-ando/-iendo` | Las palabras que siguen a un nombre de producto *en prosa* son clases cerradas y sí se pueden enumerar; los adjetivos del español no | Ampliar la lista de sufijos (deja el mismo hueco con otro sufijo) |
+| Al detectar | **Un** reintento con instrucción correctiva que le nombra los nombres exactos (`build_name_correction`, en `prompts/builder.py`); si reincide, respuesta segura que deriva a una persona | Repetir "no inventes" no cambia nada — ya está en la regla 1; darle las cadenas a copiar sí. Un segundo intento tras ver la lista es un modelo que no va a cumplir, y cada intento más son segundos de "escribiendo..." | Bloquear a la primera (pierde respuestas recuperables) o reintentar N veces (costo y espera) |
+| Trazabilidad | Columna `agent_traces.catalog_guard` (JSONB, nullable; migración `0012`), expuesta en la traza del sandbox | El dueño necesita distinguir "el modelo renombró un producto y se corrigió" de "el modelo respondió normal". Nullable a propósito: un valor no nulo *es* la señal | Meterlo en `tools_called` (contamina un contrato ya definido) |
+
+**Riesgo principal: falsos positivos.** Un guard que dispara sobre una respuesta
+correcta la degrada a una disculpa y enseña a todo el mundo a desactivarlo, que
+vale menos que no tener guard. Por eso el detector solo reporta frases
+*ancladas* en el catálogo del propio tenant, la tabla de prosa en
+`backend/tests/unit/test_catalog_guard.py` es más larga que la de renombres, y
+un catálogo vacío o mayor que `MAX_GUARDED_CATALOG_NAMES` hace que el guard se
+**abstenga** en lugar de juzgar con datos incompletos.
+
+**Límites conocidos, asumidos a conciencia.**
+1. Un nombre inventado **entero y en minúsculas** ("tenemos sushi variado") no se
+   detecta en runtime. Detectarlo exigiría marcar cualquier palabra en minúscula
+   que el tenant no haya escrito, y en prosa española eso es casi todo
+   ("pedido", "delivery", "promoción", "rápido"): sería un falso positivo por
+   respuesta correcta. La mitad cara de ese caso — un **precio** inventado sin
+   negación — la siguen capturando los evals de forma estructural.
+2. La mitad "nombre introducido de la nada" (palabra capitalizada fuera del
+   vocabulario del tenant) solo corre en los evals, que tienen el fixture
+   completo. En runtime el agente conoce su catálogo y nada más, así que
+   dispararía contra "Miraflores", "Yape" o el nombre del propio cliente.
+3. `-an/-en` como terminación verbal cuesta descriptores como "virgen" o
+   "joven". Es una omisión, no una falsa alarma, y ese es el lado por el que
+   este código se equivoca a propósito.
+
+**Verificación.** `make test`, `make isolation`, `make lint` y `make coverage` en
+verde; la suite de aislamiento comprueba que el guard juzga contra el catálogo de
+su propio tenant y contra ningún otro. Cambio de prompt ⇒ `make evals` adjunto al
+PR (Constitution).
+
 ## Estimación
 - **Esfuerzo total:** 3–4 semanas calendario supervisando a Claude Code (≈ 26 tasks de 1 sesión c/u; varias paralelizables).
 - **Complejidad:** Alta (es la feature fundacional: define auth, multi-tenancy, adaptadores y el esqueleto del agente para todo lo demás).

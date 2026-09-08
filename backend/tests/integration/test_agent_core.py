@@ -9,18 +9,26 @@ tool is the evals' job in TASK-016, not this file's.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from sqlalchemy.orm import Session
 
-from app.agent.core import FALLBACK_REPLY, AgentCore, _usable_answer
+from app.agent.core import (
+    CATALOG_GUARD_REPLY,
+    FALLBACK_REPLY,
+    AgentCore,
+    _usable_answer,
+)
 from app.agent.tools.registry import ToolRegistry
 from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.conversation import Conversation, Message
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.tenant import Tenant
 from app.providers.llm import ChatResult, LLMError, MockLLMProvider, ToolCall
+from app.repositories.conversation import AgentTraceRepository
+from app.repositories.product import ProductRepository
 
 
 @pytest.fixture
@@ -91,6 +99,19 @@ class TestPlainAnswer:
             conversation_id=conversation.id, customer_message="hola"
         )
         assert reply.content == FALLBACK_REPLY
+
+    async def test_a_short_answer_is_delivered_not_treated_as_a_failure(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """A customer who says "ok" gets a short reply back. Replacing it with
+        an apology, and marking the turn degraded, blames the model for a
+        failure that never happened."""
+        llm = MockLLMProvider(responses=[ChatResult(content="¡De nada! 👍")])
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="ok"
+        )
+        assert reply.content == "¡De nada! 👍"
+        assert reply.degraded is False
 
 
 class TestToolLoop:
@@ -197,6 +218,146 @@ class TestToolLoop:
         )
         assert reply.tools_called[0]["ok"] is False
         assert reply.content == "Disculpa, tuve un problema."
+
+
+class TestRepeatedToolCalls:
+    """A model asking the same thing twice must not be billed for it twice.
+
+    `consultar_catalogo` came back seven times for the same term in a single
+    conversation. Every repeat was another database round trip and another
+    second of a customer waiting for an answer that could not have changed.
+    """
+
+    @staticmethod
+    def _counting_registry(counter: list[int]) -> ToolRegistry:
+        registry = ToolRegistry()
+
+        async def count(context: object, arguments: dict[str, object]) -> str:
+            counter.append(1)
+            return f"resultado para {arguments.get('consulta')}"
+
+        registry.register(
+            name="consultar_catalogo",
+            description="",
+            parameters={"type": "object"},
+            handler=count,
+        )
+        return registry
+
+    async def test_the_same_call_twice_runs_the_tool_once(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        runs: list[int] = []
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(
+                    content="",
+                    tool_calls=(_tool_call("consultar_catalogo", consulta="lomo"),),
+                ),
+                ChatResult(
+                    content="",
+                    tool_calls=(_tool_call("consultar_catalogo", consulta="lomo"),),
+                ),
+                ChatResult(content="El lomo saltado cuesta S/ 32.00."),
+            ]
+        )
+        reply = await AgentCore(
+            db, tenant.id, llm=llm, registry=self._counting_registry(runs)
+        ).respond(conversation_id=conversation.id, customer_message="cuanto cuesta el lomo?")
+
+        assert len(runs) == 1
+        # Both repeats stay in the trace: hiding them would hide the fact
+        # that the model asked seven times.
+        assert len(reply.tools_called) == 2
+        assert reply.tools_called[0]["cached"] is False
+        assert reply.tools_called[1]["cached"] is True
+
+        # The model still got an answer for its second call, not an empty one.
+        tool_messages = [m for m in llm.chat_calls[2].messages if m.role == "tool"]
+        assert len(tool_messages) == 2
+        assert tool_messages[0].content == tool_messages[1].content
+
+    async def test_different_arguments_are_a_different_call(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """The cache keys on the arguments, so a second question is asked."""
+        runs: list[int] = []
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(
+                    content="",
+                    tool_calls=(
+                        _tool_call("consultar_catalogo", consulta="lomo"),
+                        _tool_call("consultar_catalogo", consulta="ceviche"),
+                    ),
+                ),
+                ChatResult(content="Tenemos ambos."),
+            ]
+        )
+        reply = await AgentCore(
+            db, tenant.id, llm=llm, registry=self._counting_registry(runs)
+        ).respond(conversation_id=conversation.id, customer_message="que tienen?")
+
+        assert len(runs) == 2
+        assert [entry["cached"] for entry in reply.tools_called] == [False, False]
+
+    async def test_a_failure_is_retried_rather_than_remembered(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """An error is the one result worth trying again: the second attempt
+        is how a transient database blip stops being the customer's problem."""
+        attempts: list[int] = []
+        registry = ToolRegistry()
+
+        async def flaky(context: object, arguments: dict[str, object]) -> str:
+            attempts.append(1)
+            if len(attempts) == 1:
+                raise RuntimeError("boom")
+            return "Lomo saltado - S/ 32.00"
+
+        registry.register(
+            name="consultar_catalogo",
+            description="",
+            parameters={"type": "object"},
+            handler=flaky,
+        )
+
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(
+                    content="", tool_calls=(_tool_call("consultar_catalogo", consulta="lomo"),)
+                ),
+                ChatResult(
+                    content="", tool_calls=(_tool_call("consultar_catalogo", consulta="lomo"),)
+                ),
+                ChatResult(content="Cuesta S/ 32.00."),
+            ]
+        )
+        reply = await AgentCore(db, tenant.id, llm=llm, registry=registry).respond(
+            conversation_id=conversation.id, customer_message="cuanto cuesta el lomo?"
+        )
+
+        assert len(attempts) == 2
+        assert [entry["ok"] for entry in reply.tools_called] == [False, True]
+        assert [entry["cached"] for entry in reply.tools_called] == [False, False]
+
+    async def test_the_cache_does_not_outlive_the_turn(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """A catalogue edited between two customer messages must be seen on
+        the next one, so the memo is scoped to a single `respond`."""
+        runs: list[int] = []
+        one_turn = [
+            ChatResult(content="", tool_calls=(_tool_call("consultar_catalogo", consulta="lomo"),)),
+            ChatResult(content="Cuesta S/ 32.00."),
+        ]
+        llm = MockLLMProvider(responses=[*one_turn, *one_turn])
+        core = AgentCore(db, tenant.id, llm=llm, registry=self._counting_registry(runs))
+
+        await core.respond(conversation_id=conversation.id, customer_message="precio del lomo?")
+        await core.respond(conversation_id=conversation.id, customer_message="y ahora?")
+
+        assert len(runs) == 2
 
 
 class TestKnowledgeTool:
@@ -441,6 +602,36 @@ class TestToolSyntaxNeverReachesTheCustomer:
         assert "tool_call" not in content
         assert "S/ 8.50" in content
 
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "¡De nada! 👍",
+            "Gracias",
+            "👍",
+            "Si.",
+            "S/ 32.00",
+        ],
+    )
+    def test_a_short_reply_without_markup_is_a_real_reply(self, raw: str) -> None:
+        """The length rule guards against a *fragment left by the strip*, not
+        against brevity. A customer who says "ok" gets "¡De nada! 👍", and
+        answering that with an apology for a failure that never happened is
+        the worse of the two errors."""
+        content, unusable = _usable_answer(raw)
+
+        assert content == raw
+        assert unusable is False
+
+    def test_a_short_fragment_left_by_the_strip_still_falls_back(self) -> None:
+        """The case the rule exists for: the markup went, and what is left is
+        a shard of the call rather than something to send anybody."""
+        raw = "<function=consultar_catalogo>pan</function>"
+
+        content, unusable = _usable_answer(raw)
+
+        assert content == FALLBACK_REPLY
+        assert unusable is True
+
     def test_a_less_than_sign_in_ordinary_prose_is_not_stripped(self) -> None:
         """The guard keys on tool-call *names*, not on angle brackets. A reply
         that happens to contain one is not a leak."""
@@ -465,3 +656,367 @@ class TestToolSyntaxNeverReachesTheCustomer:
 
         assert reply.degraded is True
         assert reply.content == FALLBACK_REPLY
+
+
+class TestTheCatalogueGuard:
+    """A product name the catalogue does not have never reaches a customer.
+
+    The catalogue said "Leche"; the agent offered "Leche pausterizada". Prompt
+    rule 1 already forbade that and did not stop it, so the finished reply is
+    checked against the tenant's real catalogue before it is sent. On a hit
+    the model gets one retry with the exact names it may use; if it offends
+    again the invented name is dropped rather than delivered.
+
+    The tenant fixture sells exactly one thing, "Lomo saltado", which is what
+    makes "Lomo saltado criollo" a product that does not exist.
+    """
+
+    async def test_an_invented_name_is_retried_and_the_correction_is_delivered(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Claro, tenemos Lomo saltado criollo a S/ 32.00."),
+                ChatResult(content="Claro, tenemos Lomo saltado a S/ 32.00."),
+            ]
+        )
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == "Claro, tenemos Lomo saltado a S/ 32.00."
+        assert "criollo" not in reply.content
+        assert reply.degraded is False
+        assert reply.catalog_guard == {
+            "status": "corrected",
+            "invented": ["lomo saltado criollo"],
+            "still_invented": [],
+        }
+        assert len(llm.chat_calls) == 2
+
+    async def test_the_correction_hands_the_model_the_real_names(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """ "No inventes productos" is already rule 1 and the model broke it.
+        Repeating it changes nothing; the exact strings it may copy do."""
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Claro, tenemos Lomo saltado criollo a S/ 32.00."),
+                ChatResult(content="Claro, tenemos Lomo saltado a S/ 32.00."),
+            ]
+        )
+        await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        correction = llm.chat_calls[1].messages[-1]
+        assert correction.role == "user"
+        assert "«lomo saltado criollo»" in correction.content
+        assert "- Lomo saltado" in correction.content
+        # The offending answer is replayed, or the model is being corrected
+        # for something it cannot see.
+        assert any(
+            m.role == "assistant" and "criollo" in m.content for m in llm.chat_calls[1].messages
+        )
+        # No tools on the retry: this turn is over, it needs an answer.
+        assert llm.chat_calls[1].tools == ()
+
+    async def test_a_clean_reply_is_untouched_and_costs_no_retry(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """The common case, and the one a false alarm would ruin. An ordinary
+        answer must come out byte-for-byte and cost exactly one model call."""
+        answer = "El Lomo saltado viene con papas fritas y arroz, cuesta S/ 32.00."
+        llm = MockLLMProvider(responses=[ChatResult(content=answer)])
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que trae el lomo?"
+        )
+
+        assert reply.content == answer
+        assert reply.catalog_guard is None
+        assert reply.degraded is False
+        assert len(llm.chat_calls) == 1
+
+    async def test_a_second_offence_falls_back_instead_of_sending_the_name(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """Told the real names and it invented one again. Two attempts is
+        where this stops: a third is more seconds of "typing..." for an answer
+        that is not going to arrive."""
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Claro, tenemos Lomo saltado criollo a S/ 32.00."),
+                ChatResult(content="Perdon, es el Lomo saltado especial a S/ 32.00."),
+            ]
+        )
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == CATALOG_GUARD_REPLY
+        assert "criollo" not in reply.content
+        assert "especial" not in reply.content
+        assert reply.degraded is True
+        assert reply.catalog_guard == {
+            "status": "blocked",
+            "invented": ["lomo saltado criollo"],
+            "still_invented": ["lomo saltado especial"],
+        }
+        assert len(llm.chat_calls) == 2
+
+    async def test_a_provider_failure_during_the_correction_blocks(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """The retry is the only thing that could have rescued the answer. If
+        it never happens the original still names a product that does not
+        exist, so it still may not be sent."""
+        llm = MockLLMProvider(
+            responses=[ChatResult(content="Claro, tenemos Lomo saltado criollo a S/ 32.00.")]
+        )
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == CATALOG_GUARD_REPLY
+        assert reply.degraded is True
+        assert reply.catalog_guard == {
+            "status": "blocked",
+            "invented": ["lomo saltado criollo"],
+            "still_invented": [],
+        }
+
+    async def test_the_retry_is_metered(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """A correction is a real model call on a real bill. A trace that
+        hides it under-reports the cost of a prompt that keeps slipping."""
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(
+                    content="Tenemos Lomo saltado criollo.", input_tokens=100, output_tokens=10
+                ),
+                ChatResult(content="Tenemos Lomo saltado.", input_tokens=140, output_tokens=8),
+            ]
+        )
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.input_tokens == 240
+        assert reply.output_tokens == 18
+
+    async def test_an_empty_catalogue_never_fires(
+        self, db: Session, conversation: Conversation
+    ) -> None:
+        """A tenant mid-onboarding has no products yet. Judging an answer
+        against nothing and finding it wanting would replace every reply with
+        an apology on the day they are still setting up."""
+        bare = Tenant(name="Sin catalogo")
+        db.add(bare)
+        db.flush()
+        db.add(BusinessProfile(tenant_id=bare.id, business_name="Sin catalogo"))
+        db.flush()
+        empty_conversation = Conversation(tenant_id=bare.id, channel="sandbox")
+        db.add(empty_conversation)
+        db.flush()
+
+        answer = "Tenemos Inca Kola fresca y Lomo saltado criollo."
+        llm = MockLLMProvider(responses=[ChatResult(content=answer)])
+
+        reply = await AgentCore(db, bare.id, llm=llm).respond(
+            conversation_id=empty_conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == answer
+        assert reply.catalog_guard is None
+        assert len(llm.chat_calls) == 1
+
+    async def test_a_switched_off_product_does_not_bless_the_name(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """A product the owner switched off is one they stopped selling.
+
+        If the guard read deleted or inactive rows it would treat this name as
+        legitimate and stay quiet, and the customer would order something the
+        kitchen no longer makes - the same damage as an invented name, with a
+        row in the database to make it look correct.
+        """
+        db.add_all(
+            [
+                Product(
+                    tenant_id=tenant.id,
+                    name="Lomo saltado criollo",
+                    price=Decimal("35.00"),
+                    is_active=False,
+                ),
+                Product(
+                    tenant_id=tenant.id,
+                    name="Lomo saltado marino",
+                    price=Decimal("35.00"),
+                    is_active=True,
+                    deleted_at=datetime.now(UTC),
+                ),
+            ]
+        )
+        db.flush()
+
+        assert _guard_names(db, tenant.id) == ["Lomo saltado"]
+
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Tenemos Lomo saltado criollo a S/ 35.00."),
+                ChatResult(content="Tenemos Lomo saltado a S/ 32.00."),
+            ]
+        )
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == "Tenemos Lomo saltado a S/ 32.00."
+        assert reply.catalog_guard is not None
+        assert reply.catalog_guard["invented"] == ["lomo saltado criollo"]
+
+    async def test_the_catalogue_is_read_once_per_turn(
+        self, db: Session, tenant: Tenant, conversation: Conversation, monkeypatch
+    ) -> None:
+        """The guard checks the first answer and then the retried one, and
+        both go through the same read. Latency is already the agent's worst
+        number; a guard that queried per check would make it worse for the
+        turns that are going badly anyway."""
+        reads: list[int] = []
+        original = ProductRepository.active_names
+
+        def counted(self, **kwargs):  # type: ignore[no-untyped-def]
+            reads.append(1)
+            return original(self, **kwargs)
+
+        monkeypatch.setattr(ProductRepository, "active_names", counted)
+
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Tenemos Lomo saltado criollo."),
+                ChatResult(content="Tenemos Lomo saltado."),
+            ]
+        )
+        await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert len(reads) == 1
+
+    async def test_the_read_does_not_outlive_the_turn(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """A product added between two customer messages must be sayable on
+        the next one. The guard is rebuilt per turn for the same reason the
+        tool cache is."""
+        invented = ChatResult(content="Tenemos Lomo saltado criollo.")
+        # Two for the first turn - the offence and a retry that offends again
+        # - and one for the second, which by then is telling the truth.
+        llm = MockLLMProvider(responses=[invented, invented, invented])
+        core = AgentCore(db, tenant.id, llm=llm)
+
+        blocked = await core.respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+        assert blocked.content == CATALOG_GUARD_REPLY
+
+        db.add(
+            Product(
+                tenant_id=tenant.id,
+                name="Lomo saltado criollo",
+                price=Decimal("35.00"),
+                is_active=True,
+            )
+        )
+        db.flush()
+
+        allowed = await core.respond(conversation_id=conversation.id, customer_message="y ahora?")
+        assert allowed.content == "Tenemos Lomo saltado criollo."
+        assert allowed.catalog_guard is None
+
+    async def test_a_catalogue_too_large_to_hold_makes_the_guard_stand_down(
+        self, db: Session, tenant: Tenant, conversation: Conversation, monkeypatch
+    ) -> None:
+        """Judging on a partial list would flag real products as invented.
+        Standing down is a miss; firing on a correct answer is a wrong
+        apology plus a tenant who switches the guard off."""
+        monkeypatch.setattr("app.agent.core.MAX_GUARDED_CATALOG_NAMES", 0)
+
+        answer = "Tenemos Lomo saltado criollo."
+        llm = MockLLMProvider(responses=[ChatResult(content=answer)])
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="que tienen?"
+        )
+
+        assert reply.content == answer
+        assert reply.catalog_guard is None
+
+    async def test_the_trace_records_what_the_guard_did(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """When the owner asks why their agent apologised instead of
+        answering, this row is the only thing that can tell them."""
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(content="Tenemos Lomo saltado criollo.", model="test-model"),
+                ChatResult(content="Tenemos Lomo saltado.", model="test-model"),
+            ]
+        )
+        core = AgentCore(db, tenant.id, llm=llm)
+        reply = await core.respond(conversation_id=conversation.id, customer_message="que tienen?")
+
+        message = Message(
+            tenant_id=tenant.id,
+            conversation_id=conversation.id,
+            direction="outbound",
+            author="agent",
+            content=reply.content,
+        )
+        db.add(message)
+        db.flush()
+        core.persist_trace(message=message, reply=reply)
+        db.flush()
+
+        trace = AgentTraceRepository(db, tenant.id).for_message(message.id)[0]
+        assert trace.catalog_guard == {
+            "status": "corrected",
+            "invented": ["lomo saltado criollo"],
+            "still_invented": [],
+        }
+
+    async def test_an_ordinary_turn_leaves_the_trace_column_null(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """Null on the turns that went fine, so a non-null value is itself the
+        signal rather than something to filter out."""
+        llm = MockLLMProvider(responses=[ChatResult(content="El Lomo saltado cuesta S/ 32.00.")])
+        core = AgentCore(db, tenant.id, llm=llm)
+        reply = await core.respond(
+            conversation_id=conversation.id, customer_message="cuanto cuesta?"
+        )
+
+        message = Message(
+            tenant_id=tenant.id,
+            conversation_id=conversation.id,
+            direction="outbound",
+            author="agent",
+            content=reply.content,
+        )
+        db.add(message)
+        db.flush()
+        core.persist_trace(message=message, reply=reply)
+        db.flush()
+
+        trace = AgentTraceRepository(db, tenant.id).for_message(message.id)[0]
+        assert trace.catalog_guard is None
+
+
+def _guard_names(db: Session, tenant_id: uuid.UUID) -> list[str]:
+    return ProductRepository(db, tenant_id).active_names(limit=100)

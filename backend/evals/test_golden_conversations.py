@@ -62,7 +62,7 @@ def llm(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
 
 class TestGoldenConversations:
     async def test_the_agent_holds_the_line(self, db: Session, llm) -> None:  # type: ignore[no-untyped-def]
-        """Five conversations, one report.
+        """Every golden conversation, one report.
 
         Run as a single test rather than parametrised so a failure prints the
         whole picture: which cases held and which did not, with the rationale

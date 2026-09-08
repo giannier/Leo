@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from app.agent.prompts.builder import build_system_prompt
+from app.agent.prompts.builder import (
+    MAX_CORRECTION_NAMES,
+    build_name_correction,
+    build_system_prompt,
+)
 from app.models.business import AgentConfig, BusinessProfile
 
 
@@ -78,6 +82,13 @@ class TestGuardrail:
             profile=_profile(), config=_config(tone=tone, objective=objective)
         )
         assert "Nunca inventes" in prompt
+
+    def test_product_names_must_be_reproduced_as_the_tool_returned_them(self) -> None:
+        """Forbidding invention was not enough: the catalogue said "Leche" and
+        the agent offered "Leche pausterizada". A name that is almost right is
+        a product the business does not sell, so the rule now says so."""
+        prompt = build_system_prompt(profile=_profile(), config=_config())
+        assert "tal cual te lo devolvió la herramienta" in prompt
 
     def test_the_tools_are_named_as_the_only_source_of_truth(self) -> None:
         prompt = build_system_prompt(
@@ -162,3 +173,45 @@ class TestDeterminism:
         first = build_system_prompt(profile=_profile(), config=_config())
         second = build_system_prompt(profile=_profile(), config=_config())
         assert first == second
+
+
+class TestTheNameCorrection:
+    """What a model that renamed a product is handed before its one retry.
+
+    "No inventes productos" is already rule 1 of the system prompt and the
+    model broke it, so repeating it changes nothing. The correction works by
+    being concrete: the exact string it wrote, and the exact strings it may
+    copy instead.
+    """
+
+    def test_it_names_the_offence_and_the_real_names(self) -> None:
+        correction = build_name_correction(["leche pausterizada"], ["Leche", "Yogurt griego"])
+
+        assert "«leche pausterizada»" in correction
+        assert "- Leche" in correction
+        assert "- Yogurt griego" in correction
+
+    def test_it_is_written_in_spanish_like_the_rest_of_the_prompt(self) -> None:
+        """Correcting in one language what must be rewritten in another
+        measurably degrades adherence."""
+        correction = build_name_correction(["leche pausterizada"], ["Leche"])
+
+        assert correction.startswith("ALTO.")
+        assert "derivar con una persona del negocio" in correction
+
+    def test_the_mangled_name_survives_a_truncated_catalogue(self) -> None:
+        """A catalogue can hold thousands and the whole list would cost more
+        than the turn it is fixing. The name the model actually mangled must
+        not be the one dropped, or the correction says nothing useful."""
+        catalogue = [f"Producto {index}" for index in range(200)] + ["Leche"]
+
+        correction = build_name_correction(["leche pausterizada"], catalogue)
+
+        assert "\n- Leche\n" in correction
+        assert f"de {len(catalogue)}" in correction
+        assert correction.count("\n- ") == MAX_CORRECTION_NAMES
+
+    def test_a_short_catalogue_is_quoted_whole_without_a_caveat(self) -> None:
+        correction = build_name_correction(["leche entera"], ["Leche", "Pan"])
+
+        assert "Son solo los primeros" not in correction

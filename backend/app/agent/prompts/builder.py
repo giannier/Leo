@@ -17,13 +17,21 @@ when somebody arrives expecting a dish that does not exist. So the prompt
 states the rule, names the tools as the only source of truth, and gives an
 explicit escape hatch - escalate - because a model with no permitted way to
 fail will invent one.
+
+**And the prompt alone is not enough.** Rule 1 already said "nunca inventes
+productos" the day the catalogue said "Leche" and the agent offered "Leche
+pausterizada". So `app/agent/catalog_guard.py` checks the finished reply
+against the tenant's real catalogue, and `build_name_correction` below is what
+a model that slipped is handed before it gets its one retry.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
+from app.agent.catalog_guard import words
 from app.models.business import AgentConfig, BusinessProfile
 
 DEFAULT_AGENT_NAME = "Leo"
@@ -134,7 +142,9 @@ def build_system_prompt(
     lines.append("REGLAS QUE NO PUEDES ROMPER:")
     lines.append(
         "1. Nunca inventes productos, precios, promociones, plazos ni políticas. "
-        "Si un dato no aparece en el resultado de tus herramientas, no lo sabes."
+        "Si un dato no aparece en el resultado de tus herramientas, no lo sabes. "
+        "Escribe el nombre de cada producto tal cual te lo devolvió la herramienta, "
+        "sin agregarle palabras."
     )
     if tool_names:
         lines.append(
@@ -164,6 +174,67 @@ def build_system_prompt(
         lines.append(f"Horario de atención ({timezone}): {hours}.")
 
     return "\n".join(lines)
+
+
+# How many catalogue names the correction quotes back. A catalogue can hold
+# thousands, and pasting all of them would cost more than the turn it is
+# fixing. The names related to what the model just invented go first, so the
+# ones it most needs survive the cut.
+MAX_CORRECTION_NAMES = 30
+
+
+def build_name_correction(invented: Sequence[str], catalogue: Sequence[str]) -> str:
+    """The instruction handed back to a model that renamed a product.
+
+    Spanish, like the rest of the prompt, and for the same reason: correcting
+    in one language what must be rewritten in another measurably degrades
+    adherence.
+
+    It is deliberately concrete. "No inventes productos" is already rule 1 and
+    the model broke it, so repeating it changes nothing; naming the exact
+    string it wrote and the exact strings it is allowed to write instead gives
+    it something to copy rather than something to interpret.
+    """
+    offending = ", ".join(f"«{name}»" for name in invented)
+    names = _correction_names(invented, catalogue)
+    listing = "\n".join(f"- {name}" for name in names)
+
+    lines = [
+        f"ALTO. Escribiste {offending}, y eso no es un producto del catálogo.",
+        "Un nombre parecido no sirve: el cliente vendría a pedir algo que el negocio no vende.",
+        "",
+        "Estos son los nombres del catálogo, tal cual están escritos:",
+        listing,
+    ]
+    if len(names) < len(catalogue):
+        lines.append(
+            f"(Son solo los primeros {len(names)} de {len(catalogue)}. "
+            "Usa únicamente nombres que te haya devuelto una herramienta.)"
+        )
+    lines.extend(
+        [
+            "",
+            "Vuelve a responderle al cliente copiando esos nombres exactamente, "
+            "sin agregarles ni quitarles palabras.",
+            "Si lo que pidió no está en la lista, dilo con honestidad y ofrécele "
+            "derivar con una persona del negocio.",
+            "Responde solo con el mensaje para el cliente.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _correction_names(invented: Sequence[str], catalogue: Sequence[str]) -> list[str]:
+    """Catalogue names to quote back, the relevant ones first.
+
+    "Relevant" is a shared word with what the model wrote: it renamed
+    something, so the real name is almost always the one it mangled, and a
+    truncated list that dropped it would be worse than useless.
+    """
+    wanted = {word for phrase in invented for word in words(phrase)}
+    related = [name for name in catalogue if wanted & set(words(name))]
+    rest = [name for name in catalogue if name not in related]
+    return [*related, *rest][:MAX_CORRECTION_NAMES]
 
 
 def _escalation_rules(config: AgentConfig | None) -> list[str]:
