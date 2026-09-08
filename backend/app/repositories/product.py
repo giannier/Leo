@@ -6,6 +6,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
+from sqlalchemy import select
+
 from app.models.business import Product
 from app.repositories.base import BaseRepository
 
@@ -18,6 +20,26 @@ class ProductRepository(BaseRepository[Product]):
     """
 
     model = Product
+
+    def active_names(self, *, limit: int) -> list[str]:
+        """Just the names of live products - what the agent may say aloud.
+
+        A column read rather than `list_active()` because the caller is the
+        per-reply catalogue guard and runs on the customer's latency: it needs
+        the strings, not hydrated rows with prices, stock and descriptions.
+
+        Built from `_tenant_predicate` for the same reason every other read
+        here is - the Constitution requires the tenant filter at this layer -
+        but it cannot go through `_scoped()`, which selects whole entities.
+        The filter is applied before any other criterion, exactly as there.
+        """
+        statement = (
+            select(Product.name)
+            .where(self._tenant_predicate)
+            .where(Product.deleted_at.is_(None), Product.is_active.is_(True))
+            .limit(limit)
+        )
+        return list(self._session.execute(statement).scalars().all())
 
     def list_active(self, *, limit: int | None = None) -> Sequence[Product]:
         """Live, sellable products - what the agent is allowed to quote."""

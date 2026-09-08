@@ -13,12 +13,13 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from app.agent.core import AgentCore
+from app.agent.core import CATALOG_GUARD_REPLY, AgentCore
 from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.conversation import Conversation
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.tenant import Tenant
 from app.providers.llm import ChatResult, MockLLMProvider, ToolCall
+from app.repositories.product import ProductRepository
 
 
 def _tool_call(name: str, **arguments: object) -> ToolCall:
@@ -156,6 +157,70 @@ class TestTheAgentNeverQuotesAnotherBusiness:
         )
         contents = " ".join(m.content for m in llm.chat_calls[0].messages)
         assert "confidencial de B" not in contents
+
+    async def test_the_catalogue_guard_judges_against_its_own_catalogue_only(
+        self, db: Session, business_a: Tenant, business_b: Tenant
+    ) -> None:
+        """The post-guard decides whether a product name is real. If it read
+        the wrong catalogue it would get that backwards in both directions:
+        blessing a name A does not sell because B does, and blocking a name B
+        does sell because A does not.
+
+        The same sentence is put to both agents. It is a lie for one of them
+        and the truth for the other, and only a correctly scoped guard can
+        tell which is which.
+        """
+        db.add(
+            Product(
+                tenant_id=business_b.id,
+                name="Lomo saltado premium",
+                price=Decimal("55.00"),
+                is_active=True,
+            )
+        )
+        db.flush()
+
+        claim = "Tenemos Lomo saltado premium a S/ 55.00."
+
+        # A does not sell it, so A's agent may not say it. The retry offends
+        # again, which is what makes the reply the guarded fallback.
+        conversation_a = Conversation(tenant_id=business_a.id, channel="sandbox")
+        db.add(conversation_a)
+        db.flush()
+        llm_a = MockLLMProvider(responses=[ChatResult(content=claim), ChatResult(content=claim)])
+        reply_a = await AgentCore(db, business_a.id, llm=llm_a).respond(
+            conversation_id=conversation_a.id, customer_message="que tienen?"
+        )
+        assert reply_a.content == CATALOG_GUARD_REPLY
+        assert reply_a.catalog_guard == {
+            "status": "blocked",
+            "invented": ["lomo saltado premium"],
+            "still_invented": ["lomo saltado premium"],
+        }
+
+        # B does sell it. A guard that had leaked A's catalogue into B's turn
+        # would replace a correct answer with an apology.
+        conversation_b = Conversation(tenant_id=business_b.id, channel="sandbox")
+        db.add(conversation_b)
+        db.flush()
+        llm_b = MockLLMProvider(responses=[ChatResult(content=claim)])
+        reply_b = await AgentCore(db, business_b.id, llm=llm_b).respond(
+            conversation_id=conversation_b.id, customer_message="que tienen?"
+        )
+        assert reply_b.content == claim
+        assert reply_b.catalog_guard is None
+
+    async def test_the_names_the_guard_reads_are_scoped(
+        self, db: Session, business_a: Tenant, business_b: Tenant
+    ) -> None:
+        """The read behind the guard, at the repository layer where the
+        Constitution puts the filter."""
+        names_a = ProductRepository(db, business_a.id).active_names(limit=100)
+        names_b = ProductRepository(db, business_b.id).active_names(limit=100)
+
+        assert names_a == ["Lomo saltado"]
+        assert names_b == ["Secreto de B"]
+        assert "Secreto de B" not in names_a
 
     async def test_traces_are_written_under_the_acting_tenant(
         self, db: Session, business_a: Tenant, business_b: Tenant

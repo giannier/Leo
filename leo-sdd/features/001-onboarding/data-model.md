@@ -313,7 +313,7 @@ CREATE TABLE agent_traces (
   tenant_id       UUID NOT NULL REFERENCES tenants(id),
   message_id      UUID NOT NULL REFERENCES messages(id),
   model           TEXT NOT NULL,
-  tools_called    JSONB NOT NULL DEFAULT '[]',      -- [{tool, args_resumen, ok}]
+  tools_called    JSONB NOT NULL DEFAULT '[]',      -- [{tool, args_resumen, ok, cached}]
   rag_sources     JSONB NOT NULL DEFAULT '[]',      -- [{source_id, chunk_id, score}]
   input_tokens    INT NOT NULL DEFAULT 0,
   output_tokens   INT NOT NULL DEFAULT 0,

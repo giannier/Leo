@@ -141,7 +141,7 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
         PgUUID(as_uuid=True), ForeignKey("messages.id"), nullable=False
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
-    # [{"tool": ..., "args_resumen": ..., "ok": ...}]
+    # [{"tool": ..., "args_resumen": ..., "ok": ..., "cached": ...}]
     tools_called: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )
@@ -152,3 +152,11 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # What the catalogue post-guard did, when it did anything:
+    # {"status": "corrected"|"blocked", "invented": [...], "still_invented": [...]}
+    #
+    # Null on an ordinary turn, which is nearly all of them, so a non-null
+    # value is itself the signal that the model named a product the tenant
+    # does not sell. Nullable rather than defaulted for exactly that reason -
+    # "{}" everywhere would bury the handful of rows worth reading.
+    catalog_guard: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)

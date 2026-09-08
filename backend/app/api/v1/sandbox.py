@@ -55,6 +55,10 @@ class TraceResponse(BaseModel):
     # Surfaced so the panel can say "something went wrong" instead of
     # presenting an apology as if the agent chose to write it.
     degraded: bool
+    # Present only when the agent named a product the catalogue does not have
+    # and the post-guard stepped in. Null on an ordinary turn, so the owner
+    # sees it exactly when there is something to see.
+    catalog_guard: dict[str, object] | None = None
 
 
 class ReplyResponse(BaseModel):
@@ -162,6 +166,7 @@ async def send_message(
             output_tokens=turn.reply.output_tokens,
             latency_ms=turn.reply.latency_ms,
             degraded=turn.reply.degraded,
+            catalog_guard=turn.reply.catalog_guard,
         ),
     )
 

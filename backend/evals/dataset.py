@@ -1,4 +1,4 @@
-"""Five golden conversations for a demo restaurant (TASK-016).
+"""The golden conversations for a demo restaurant (TASK-016).
 
 Seed set, per plan.md: the full per-industry dataset needs the media and
 vision tools that do not exist yet, so this covers the three behaviours the
@@ -22,6 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from app.agent.catalog_guard import build_catalogue_guard, words
 from app.agent.core import AgentReply
 
 
@@ -191,6 +192,57 @@ def _check_escalates(reply: AgentReply) -> str | None:
     return None
 
 
+# Proper nouns the demo tenant legitimately uses that are not in the catalogue
+# or the knowledge base: the agent's own name and the business's.
+_KNOWN_PROPER_NOUNS = ("Leo", "Restaurante", "Demo")
+
+# Every word the demo tenant actually gave the agent. A capitalised word from
+# outside it is a word the model brought itself.
+#
+# The golden set can supply this because it *is* the fixture - it holds the
+# whole catalogue, the descriptions and the uploaded documents. The runtime
+# guard cannot, which is why `build_catalogue_guard` treats the vocabulary as
+# optional and switches the introduced-name check off without one.
+_TENANT_VOCABULARY = frozenset(
+    word
+    for text in (
+        *(product.name for product in DEMO_PRODUCTS),
+        *(product.category for product in DEMO_PRODUCTS),
+        *(product.description or "" for product in DEMO_PRODUCTS),
+        *(entry.title for entry in DEMO_KNOWLEDGE),
+        *(entry.content for entry in DEMO_KNOWLEDGE),
+        *_KNOWN_PROPER_NOUNS,
+    )
+    for word in words(text)
+)
+
+# The detector itself lives in `app/agent/catalog_guard.py`, which is
+# production code: `AgentCore` runs the same function over every reply before
+# it is sent, against the tenant's live catalogue. This file only supplies the
+# demo fixture's names and vocabulary.
+#
+# It is imported rather than reimplemented on purpose. A private copy here
+# would drift from the one guarding real customers, and the eval would then be
+# certifying a detector that is not the one in production.
+DEMO_GUARD = build_catalogue_guard(
+    (product.name for product in DEMO_PRODUCTS), vocabulary=_TENANT_VOCABULARY
+)
+
+
+def _check_names_products_verbatim(reply: AgentReply) -> str | None:
+    """The catalogue's wording, not something close to it.
+
+    A name that is almost right is a product the business does not sell. The
+    customer arrives asking for it, and somebody has to explain that the
+    agent made it up - which is the same damage as an invented price, minus
+    the number.
+    """
+    invented = DEMO_GUARD.invented_names(reply.content)
+    if invented:
+        return f"named products the catalogue does not have: {invented}; said: {reply.content!r}"
+    return None
+
+
 def _check_no_invented_delivery_zone(reply: AgentReply) -> str | None:
     """Delivery is Miraflores only. Saying yes to anywhere else is a promise
     the kitchen cannot keep, and the customer finds out when nobody arrives."""
@@ -244,6 +296,18 @@ GOLDEN_CASES: tuple[EvalCase, ...] = (
             "es la tercera vez que me llega el pedido frio, estoy harto, quiero una solucion ahora"
         ),
         check=_check_escalates,
+    ),
+    EvalCase(
+        name="names_products_as_the_catalogue_names_them",
+        rationale=(
+            "The catalogue said 'Leche' and the agent offered 'Leche "
+            "pausterizada'. Rule 1 already forbids inventing a product and "
+            "did not stop it, because a name that is *almost* right does not "
+            "feel invented to the model. It is: the customer arrives asking "
+            "for a product the business does not sell."
+        ),
+        customer_message="hola, que bebidas tienen?",
+        check=_check_names_products_verbatim,
     ),
     EvalCase(
         name="does_not_promise_delivery_outside_the_zone",
