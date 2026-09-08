@@ -94,11 +94,58 @@ export function StepKnowledge({ onSaved }: StepProps) {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
+      {data ? <Loaded sources={data.sources} /> : null}
       {data ? <Usage usage={data.usage} /> : null}
       <SourceList sources={data?.sources ?? null} onChanged={afterChange} />
       <AddText onAdded={afterChange} />
       <AddFile onAdded={afterChange} />
     </div>
+  );
+}
+
+/**
+ * How much of this step is already done.
+ *
+ * This step never gets a tick in the step bar - knowledge is optional, so it
+ * is not part of the activation checklist and adding it there would turn an
+ * optional step into a blocking one. But somebody who uploaded three PDFs and
+ * comes back tomorrow needs to see that they arrived, and "nothing here says
+ * so" reads as "it was lost".
+ *
+ * Counted from `indexed`, not from the file count: indexing is asynchronous,
+ * and a source still being processed is not yet something the agent can
+ * answer from. Saying it is ready before it is would be the same lie with
+ * the sign flipped.
+ */
+function Loaded({ sources }: { sources: KnowledgeSource[] }) {
+  const ready = sources.filter((source) => source.status === "indexed").length;
+  const busy = sources.filter((source) => IN_FLIGHT.has(source.status)).length;
+
+  // Nothing usable and nothing on the way: every source failed, and the list
+  // below says why. A count of zero here would only add noise.
+  if (ready === 0 && busy === 0) return null;
+
+  return (
+    <p className="flex items-center gap-2 text-sm text-ink-soft" data-testid="knowledge-count">
+      {ready > 0 ? (
+        <CheckIcon className="size-4 shrink-0 text-success" />
+      ) : (
+        <SpinnerIcon className="size-4 shrink-0 text-info" />
+      )}
+      {ready > 0 ? (
+        <span>
+          Leo ya usa{" "}
+          <span className="font-semibold text-ink">
+            {ready} {ready === 1 ? "fuente" : "fuentes"}
+          </span>{" "}
+          de conocimiento{busy > 0 ? ` · ${busy} en proceso` : ""}.
+        </span>
+      ) : (
+        <span>
+          Procesando {busy} {busy === 1 ? "fuente" : "fuentes"}...
+        </span>
+      )}
+    </p>
   );
 }
 
