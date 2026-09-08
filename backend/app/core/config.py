@@ -93,9 +93,21 @@ class Settings(BaseSettings):
     # --- LLM providers ----------------------------------------------------
     # Which profile the platform itself uses. Tenants may override the *chat*
     # side with their own paid credentials; see `providers/llm/factory.py`.
-    llm_profile: LLMProfile = "nvidia"
+    #
+    # OpenAI rather than NVIDIA, since 8/9/2026. `nvidia/nv-embedqa-e5-v5`
+    # reached end of life on 25/8/2026 and answers HTTP 410, so the previous
+    # default could not index knowledge at all: a first deploy would come up
+    # with retrieval dead and nothing saying why. Of the embedding models this
+    # account can still reach on NVIDIA Build, only `nemotron-3-embed-1b`
+    # responds, and it returns 2048 dimensions against a `Vector(1024)`
+    # column - a schema migration and a full reindex, to keep a provider that
+    # is not the one this platform actually runs on.
+    llm_profile: LLMProfile = "openai"
 
-    # NVIDIA Build - free tier, OpenAI-compatible endpoint.
+    # NVIDIA Build - free tier, OpenAI-compatible endpoint. Chat still works;
+    # the embedding model below is dead and left as a marker. Moving back
+    # means picking a live model, changing `EMBEDDING_DIMENSIONS` to match it,
+    # migrating the vector column and running `make reindex`.
     nvidia_api_key: str | None = None
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_chat_model: str = "nvidia/nemotron-3-super-120b-a12b"
