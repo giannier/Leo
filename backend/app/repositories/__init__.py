@@ -22,7 +22,7 @@ from app.repositories.tenant import (
     TenantMembership,
     TenantRepository,
     TenantUserRepository,
-    TrialPhoneLockRepository,
+    TrialPhoneRepository,
     UserMembershipRepository,
 )
 from app.repositories.user import (
@@ -48,7 +48,7 @@ __all__ = [
     "TenantRepository",
     "TenantScopeError",
     "TenantUserRepository",
-    "TrialPhoneLockRepository",
+    "TrialPhoneRepository",
     "UserMembershipRepository",
     "UserRepository",
     "WebhookEventRepository",

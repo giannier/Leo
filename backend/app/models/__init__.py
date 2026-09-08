@@ -23,7 +23,6 @@ from app.models.tenant import (
     Tenant,
     TenantNotification,
     TenantUser,
-    TrialPhoneLock,
 )
 from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
@@ -52,7 +51,6 @@ __all__ = [
     "TenantLLMSettings",
     "TenantNotification",
     "TenantUser",
-    "TrialPhoneLock",
     "User",
     "WebhookEvent",
     "WhatsAppNumber",

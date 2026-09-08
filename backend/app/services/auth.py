@@ -6,12 +6,14 @@ it are created together or not at all.
 Two design points worth stating, because both look like mistakes until you
 know why:
 
-**Uniqueness is enforced by the database, never by a prior read.** Checking
-"is this email free?" and then inserting is two statements with a gap in
-between; two registrations landing in that gap both see "free". So the
-service inserts and translates the resulting `IntegrityError`. The unique
-index on `users.email` and the primary key on `trial_phone_locks.phone_e164`
-are the actual rules; this module only names the failure.
+**Email uniqueness is enforced by the database, never by a prior read.**
+Checking "is this email free?" and then inserting is two statements with a
+gap in between; two registrations landing in that gap both see "free". So
+the service inserts and translates the resulting `IntegrityError`. The unique
+index on `users.email` is the actual rule; this module only names the
+failure. The contact-phone rule cannot be an index - its condition spans
+three tables - so `TrialPhoneRepository` closes the same gap with an
+advisory lock instead.
 
 **Email is sent after the commit, never inside it.** Sending first would
 mean a rolled-back transaction still produced a verification link for an
@@ -39,7 +41,7 @@ from app.repositories.tenant import (
     OWNER_ROLE,
     TenantRepository,
     TenantUserRepository,
-    TrialPhoneLockRepository,
+    TrialPhoneRepository,
 )
 from app.repositories.user import VERIFY_EMAIL, EmailTokenRepository, UserRepository
 from app.services.emails import build_verification_email
@@ -60,7 +62,12 @@ class EmailAlreadyRegisteredError(RegistrationError):
 
 
 class PhoneInActiveTrialError(RegistrationError):
-    """The phone already holds a live trial (`409 phone_in_active_trial`)."""
+    """Another tenant currently in trial has this phone (`409`).
+
+    Carries the phone the caller sent, never anything about the tenant that
+    already has it. Which business holds a number is not the registrant's to
+    know, and the endpoint's message says only that the number is taken.
+    """
 
 
 class TrialPlanUnavailableError(RegistrationError):
@@ -117,7 +124,7 @@ class AuthService:
         business_name: str,
         phone_e164: str | None = None,
     ) -> RegistrationResult:
-        """Create the user, the trial tenant, the ownership and the lock."""
+        """Create the user, the trial tenant and the ownership."""
         now = datetime.now(UTC)
         trial_ends_at = now + timedelta(days=self._trial_days())
 
@@ -142,14 +149,17 @@ class AuthService:
         TenantUserRepository(self._session, tenant.id).add_member(user_id=user.id, role=OWNER_ROLE)
 
         if phone_e164 is not None:
-            try:
-                TrialPhoneLockRepository(self._session, tenant.id).claim(phone_e164)
-            except IntegrityError as exc:
-                # The only constraint that can fire is the primary key: the
-                # tenant was created a statement ago, so the foreign key
-                # cannot be the cause.
+            # Clarification 005, read literally: the number may not sit in two
+            # tenants that are in trial *at the same time*. So the question is
+            # asked of the tenants that are in trial now, and a business whose
+            # trial has ended - paused, archived, or converted to a paid plan -
+            # is simply not among them. Nothing has to be released for its
+            # owner to register again with the same number.
+            phones = TrialPhoneRepository(self._session)
+            phones.hold(phone_e164)
+            if phones.held_by_another_trial(phone_e164, excluding_tenant_id=tenant.id):
                 self._session.rollback()
-                raise PhoneInActiveTrialError(phone_e164) from exc
+                raise PhoneInActiveTrialError(phone_e164)
 
         token = self._issue_verification_token(user.id, now=now)
 

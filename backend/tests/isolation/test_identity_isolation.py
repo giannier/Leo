@@ -1,10 +1,15 @@
 """Isolation suite for the tables TASK-006 added repositories for.
 
-`tenant_users` and `trial_phone_locks` both carry `tenant_id`, so they go
-through `BaseRepository` and must obey the same rule as the catalog: one
-tenant can neither read nor unmake the other's rows. Memberships are the
-higher-value target of the two - a leak there is a leak of who has access to
-a business account.
+`tenant_users` carries `tenant_id`, so it goes through `BaseRepository` and
+must obey the same rule as the catalog: one tenant can neither read nor
+unmake the other's rows. A leak there is a leak of who has access to a
+business account.
+
+`TrialPhoneRepository` is the opposite shape and gets its own class below.
+Its question - "is another business, in trial today, using this number?" -
+is cross-tenant on purpose, so it cannot be bound to one `tenant_id`. What
+is tested instead is that the answer is a bare boolean: knowing that a
+number is taken must never become knowing who has it.
 
 Rows are created inline rather than in the shared fixture so that the
 existing meta-tests, which assert exact row counts, keep meaning what they
@@ -17,15 +22,15 @@ import uuid
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import TenantUser, TrialPhoneLock, User
+from app.models import TenantUser, User
 from app.repositories import (
     TenantScopeError,
     TenantUserRepository,
-    TrialPhoneLockRepository,
+    TrialPhoneRepository,
 )
+from app.repositories.base import BaseRepository
 from tests.isolation.conftest import TenantFixture
 
 
@@ -98,61 +103,94 @@ class TestMembershipsAreScoped:
         assert db.get(TenantUser, victim.id) is not None
 
 
-class TestTrialPhoneLocksAreScoped:
-    def test_held_phones_are_listed_per_tenant(
+def _owns(db: Session, tenant_id: uuid.UUID, label: str, phone: str) -> User:
+    """Give a tenant an active owner whose contact phone is `phone`."""
+    user = _user(db, label)
+    user.phone_e164 = phone
+    db.flush()
+    TenantUserRepository(db, tenant_id).add_member(user_id=user.id, role="owner")
+    return user
+
+
+class TestTheContactPhoneCheckLeaksNothing:
+    """Clarification 005 asks about other tenants, so it must answer sparely.
+
+    The rule cannot be tenant-scoped - it exists to find a *different*
+    business - so the boundary is held by what comes back rather than by
+    what is read. These tests fail if the answer ever grows richer than
+    `True` or `False`.
+    """
+
+    def test_a_number_held_by_another_live_trial_is_reported_taken(
         self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
     ) -> None:
-        phone_a, phone_b = _phone(), _phone()
-        TrialPhoneLockRepository(db, tenant_a.tenant_id).claim(phone_a)
-        TrialPhoneLockRepository(db, tenant_b.tenant_id).claim(phone_b)
-
-        assert list(TrialPhoneLockRepository(db, tenant_a.tenant_id).held_phones()) == [phone_a]
-
-    def test_releasing_another_tenants_lock_is_refused(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
-    ) -> None:
-        """Otherwise anyone could free a phone and re-register a fresh trial."""
-        phone_b = _phone()
-        TrialPhoneLockRepository(db, tenant_b.tenant_id).claim(phone_b)
-
-        assert TrialPhoneLockRepository(db, tenant_a.tenant_id).release(phone_b) is False
-        assert db.get(TrialPhoneLock, phone_b) is not None
-
-    def test_a_tenant_can_release_its_own_lock(self, db: Session, tenant_a: TenantFixture) -> None:
         phone = _phone()
-        repo = TrialPhoneLockRepository(db, tenant_a.tenant_id)
-        repo.claim(phone)
+        _owns(db, tenant_b.tenant_id, "b", phone)
 
-        assert repo.release(phone) is True
-        assert db.get(TrialPhoneLock, phone) is None
+        assert (
+            TrialPhoneRepository(db).held_by_another_trial(
+                phone, excluding_tenant_id=tenant_a.tenant_id
+            )
+            is True
+        )
 
-    def test_the_lock_is_stamped_with_the_bound_tenant(
+    def test_the_answer_is_a_bare_boolean_and_never_the_other_tenant(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        """The identity of the business holding a number is not ours to hand out."""
+        phone = _phone()
+        _owns(db, tenant_b.tenant_id, "b", phone)
+
+        answer = TrialPhoneRepository(db).held_by_another_trial(
+            phone, excluding_tenant_id=tenant_a.tenant_id
+        )
+
+        assert type(answer) is bool
+        assert str(tenant_b.tenant_id) not in repr(answer)
+
+    def test_a_tenant_is_never_blocked_by_its_own_number(
         self, db: Session, tenant_a: TenantFixture
     ) -> None:
-        lock = TrialPhoneLockRepository(db, tenant_a.tenant_id).claim(_phone())
-        assert lock.tenant_id == tenant_a.tenant_id
+        phone = _phone()
+        _owns(db, tenant_a.tenant_id, "a", phone)
 
-    def test_lookup_by_uuid_is_refused_rather_than_silently_wrong(
-        self, db: Session, tenant_a: TenantFixture
-    ) -> None:
-        """The table is keyed by phone number; there is no `id` column."""
-        repo = TrialPhoneLockRepository(db, tenant_a.tenant_id)
-        with pytest.raises(NotImplementedError, match="phone_e164"):
-            repo.get(uuid.uuid4())
+        assert (
+            TrialPhoneRepository(db).held_by_another_trial(
+                phone, excluding_tenant_id=tenant_a.tenant_id
+            )
+            is False
+        )
 
-    def test_a_second_tenant_cannot_take_a_held_phone(
+    def test_a_number_nobody_uses_is_free(self, db: Session, tenant_a: TenantFixture) -> None:
+        assert (
+            TrialPhoneRepository(db).held_by_another_trial(
+                _phone(), excluding_tenant_id=tenant_a.tenant_id
+            )
+            is False
+        )
+
+    def test_only_the_owner_of_a_tenant_holds_a_number(
         self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
     ) -> None:
-        """Clarification 005, enforced by the primary key and nothing else.
-
-        Left as the last statement in the test on purpose: the failed insert
-        aborts the transaction, and the fixture rolls it back.
-        """
+        """An operator is not the business's contact, so their phone is not it."""
         phone = _phone()
-        TrialPhoneLockRepository(db, tenant_a.tenant_id).claim(phone)
+        operator = _user(db, "b")
+        operator.phone_e164 = phone
+        db.flush()
+        TenantUserRepository(db, tenant_b.tenant_id).add_member(
+            user_id=operator.id, role="operator"
+        )
 
-        with pytest.raises(IntegrityError):
-            TrialPhoneLockRepository(db, tenant_b.tenant_id).claim(phone)
+        assert (
+            TrialPhoneRepository(db).held_by_another_trial(
+                phone, excluding_tenant_id=tenant_a.tenant_id
+            )
+            is False
+        )
+
+    def test_the_check_is_deliberately_not_a_tenant_repository(self) -> None:
+        """Binding it to one tenant would make its question unanswerable."""
+        assert not issubclass(TrialPhoneRepository, BaseRepository)
 
 
 class TestIdentityTablesStayOutOfBaseRepository:
@@ -185,9 +223,8 @@ def test_the_new_repositories_are_bound_to_a_tenant_at_construction(
     tenant_a: TenantFixture, db: Session
 ) -> None:
     """No query method is reachable without having supplied a tenant."""
-    for repository in (TenantUserRepository, TrialPhoneLockRepository):
-        with pytest.raises(TypeError):
-            repository(db)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        TenantUserRepository(db)  # type: ignore[call-arg]
 
 
 def test_membership_rows_are_really_written(db: Session, tenant_a: TenantFixture) -> None:

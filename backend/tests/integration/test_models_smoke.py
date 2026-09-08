@@ -22,7 +22,6 @@ from app.models import (
     Product,
     Tenant,
     TenantUser,
-    TrialPhoneLock,
     User,
 )
 from app.models.knowledge import EMBEDDING_DIMENSIONS
@@ -125,15 +124,11 @@ class TestUniqueness:
         with pytest.raises(IntegrityError):
             db.flush()
 
-    def test_one_live_trial_per_verified_phone(self, db: Session) -> None:
-        """Clarification 005, enforced by the trial_phone_locks primary key."""
-        first = _make_tenant(db, "First")
-        second = _make_tenant(db, "Second")
-        db.add(TrialPhoneLock(phone_e164="+51999888777", tenant_id=first.id))
-        db.flush()
-        db.add(TrialPhoneLock(phone_e164="+51999888777", tenant_id=second.id))
-        with pytest.raises(IntegrityError):
-            db.flush()
+    # Clarification 005 - one live trial per contact phone - is deliberately
+    # absent from this file. It is no longer a schema constraint: the rule
+    # depends on `tenants.status` at the moment it is asked, so it lives in
+    # `TrialPhoneRepository` and is covered where behaviour is, in
+    # `test_auth_registration.py` and `test_auth_phone_otp.py`.
 
 
 class TestMoneyPrecision:

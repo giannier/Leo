@@ -50,7 +50,7 @@
 
 - [x] **TASK-006: Registro + verificación de email**
   - **Input:** `contracts/api.md` (§auth), TASK-003/004/005
-  - **Output:** `POST /auth/register` (transacción user+tenant trial+trial_ends_at), `verify-email`, `resend-verification`, emails transaccionales, validación `phone_in_active_trial` con `trial_phone_locks`
+  - **Output:** `POST /auth/register` (transacción user+tenant trial+trial_ends_at), `verify-email`, `resend-verification`, emails transaccionales, validación `phone_in_active_trial` (desde 2026-09-08, query sobre tenants en trial en `TrialPhoneRepository`; antes tabla `trial_phone_locks`)
   - **Depends on:** TASK-003, TASK-005
   - **Verification:** integration tests del flujo completo, incl. duplicados de email/teléfono
 
@@ -200,11 +200,14 @@
     contador por cuenta **es el email del cliente** (Ley 29733); ahora registra un
     digest. Rate limiting revisado contra el contrato: las cuatro capas coinciden y
     el esquema OpenAPI anunciaba 429 donde no lo había y lo omitía donde sí.
-  - **Pendiente de decisión de Giannier (no implementado a propósito):** el lock de
-    `trial_phone_locks` (Clarification 005) se toma al registrarse y **nunca se
-    libera**. Un cliente cuyo trial venció no puede volver a registrarse con su mismo
-    teléfono. Liberar al `paused` habilitaría trials infinitos; liberar al `archived`
-    (30 días) parece lo correcto, pero la decisión es suya.
+  - **Resuelto el 2026-09-08 (ver plan.md, "Decisiones Posteriores"):** el lock de
+    `trial_phone_locks` se tomaba al registrarse y nunca se liberaba. La tabla se
+    elimina (migración `0013`) y la regla pasa a ser una consulta sobre estado vivo
+    en `TrialPhoneRepository`. El número se retiene mientras el tenant está en
+    `trial` **o** `paused`, y se libera en `archived` (30 días) o si el tenant
+    convierte a plan pagado. Liberar en `paused` —la lectura literal de la
+    Clarification 005— habilitaba trials infinitos, tal como advertía la nota
+    original de esta task; por eso no se hizo.
 
 - [ ] **TASK-026: Deploy a producción en Contabo**
   - **Input:** TASK-025, `deploy/`

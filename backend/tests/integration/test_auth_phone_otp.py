@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -20,8 +21,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_otp_request_limiter, get_otp_sender
 from app.core.rate_limit import NullRateLimiter, RateLimitDecision
+from app.models.tenant import Tenant, TenantUser
 from app.models.user import OtpCode, User
 from app.providers.otp.mock import MockOtpSender
+from app.services.trial import archive_tenant, pause_tenant
 
 AUTH = "/api/v1/auth"
 PASSWORD = "una-clave-suficientemente-larga"
@@ -244,3 +247,155 @@ class TestRequestThrottling:
         assert throttled.status_code == 429
         assert throttled.json()["error"] == "rate_limited"
         assert throttled.headers["Retry-After"] == "3600"
+
+
+def _give_phone(db: Session, user_id: str, phone: str) -> None:
+    """Attach a contact phone to an account that registered without one.
+
+    Written straight to the row because there is no endpoint that changes a
+    contact phone: registration is the only place one is ever set. The guard
+    in `OtpService` exists precisely for the account that acquires its number
+    later, so testing it needs the state that path produces.
+    """
+    user = db.get(User, uuid.UUID(user_id))
+    assert user is not None
+    user.phone_e164 = phone
+    db.flush()
+
+
+async def _verified(api: AsyncClient, headers: dict[str, str], otp: MockOtpSender) -> Any:
+    """Request a code and spend it. Returns the verify response."""
+    requested = await api.post(f"{AUTH}/phone/request-otp", headers=headers)
+    assert requested.status_code == 204, requested.text
+    return await api.post(f"{AUTH}/phone/verify-otp", headers=headers, json={"code": otp.last.code})
+
+
+def _leave_trial(db: Session, tenant_id: str, status: str) -> None:
+    """Move a tenant out of trial through the domain's own transition."""
+    tenant = db.get(Tenant, uuid.UUID(tenant_id))
+    assert tenant is not None
+    now = datetime.now(UTC)
+
+    if status == "active":
+        # No conversion service until Feature 009; the state itself is real.
+        tenant.status = "active"
+        db.flush()
+        return
+
+    pause_tenant(db, tenant, now=now)
+    if status == "archived":
+        archive_tenant(tenant, now=now)
+    db.flush()
+
+
+class TestOneLiveTrialPerContactPhone:
+    """Clarification 005, at the verification step.
+
+    Registration is the other gate; this one catches the account that comes
+    by its number afterwards. Both ask the same question - is any tenant
+    that is in trial *right now* using this number - so both stop blocking
+    the moment the tenant holding it leaves trial.
+    """
+
+    async def test_a_number_another_live_trial_has_is_refused(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session
+    ) -> None:
+        holder, _ = await _signed_in(api, mail)
+        latecomer, headers = await _signed_in(api, mail, phone_e164=None)
+        _give_phone(db, latecomer["user_id"], holder["phone_e164"])
+
+        response = await _verified(api, headers, otp)
+
+        assert response.status_code == 409
+        assert response.json()["error"] == "phone_in_active_trial"
+
+    @pytest.mark.parametrize("exit_status", ["active", "archived"])
+    async def test_the_number_frees_up_once_the_tenant_is_done_with_it(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session, exit_status: str
+    ) -> None:
+        """`archived` is thirty days past a trial that nobody came back to.
+
+        `active` is a business that started paying, and holding their number
+        against them would stop a real customer from opening a second shop -
+        the rule exists to stop trials being farmed, not to punish the people
+        who converted.
+        """
+        holder, _ = await _signed_in(api, mail)
+        latecomer, headers = await _signed_in(api, mail, phone_e164=None)
+        _give_phone(db, latecomer["user_id"], holder["phone_e164"])
+        _leave_trial(db, holder["tenant_id"], exit_status)
+
+        response = await _verified(api, headers, otp)
+
+        assert response.status_code == 204, response.text
+        user = db.get(User, uuid.UUID(latecomer["user_id"]))
+        assert user is not None and user.phone_verified_at is not None
+
+    async def test_an_expired_trial_still_holds_its_number(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session
+    ) -> None:
+        """The whole point of the rule, and the easy way to lose it.
+
+        A trial that simply runs out lands in `paused`, so freeing the number
+        there hands it back at the exact moment the trial ends - and the same
+        person opens another trial on the same phone a second later, then
+        another. The number waits until `archived`.
+        """
+        holder, _ = await _signed_in(api, mail)
+        latecomer, headers = await _signed_in(api, mail, phone_e164=None)
+        _give_phone(db, latecomer["user_id"], holder["phone_e164"])
+        _leave_trial(db, holder["tenant_id"], "paused")
+
+        response = await _verified(api, headers, otp)
+
+        assert response.status_code == 409
+        assert response.json()["error"] == "phone_in_active_trial"
+
+    async def test_a_tenant_is_never_blocked_by_its_own_number(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session
+    ) -> None:
+        """Verifying twice must not make the second attempt a conflict."""
+        account, headers = await _signed_in(api, mail)
+
+        assert (await _verified(api, headers, otp)).status_code == 204
+        assert (await _verified(api, headers, otp)).status_code == 204
+
+        user = db.get(User, uuid.UUID(account["user_id"]))
+        assert user is not None and user.phone_verified_at is not None
+
+    async def test_an_invited_operator_is_not_blocked_by_the_business_number(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session
+    ) -> None:
+        """An operator is not their employer's contact, so nothing collides."""
+        holder, _ = await _signed_in(api, mail)
+        operator, headers = await _signed_in(api, mail, phone_e164=None)
+        _give_phone(db, operator["user_id"], holder["phone_e164"])
+        membership = db.execute(
+            select(TenantUser).where(TenantUser.user_id == uuid.UUID(operator["user_id"]))
+        ).scalar_one()
+        membership.role = "operator"
+        db.flush()
+
+        response = await _verified(api, headers, otp)
+
+        assert response.status_code == 204, response.text
+
+    async def test_the_conflict_never_names_the_business_that_has_the_number(
+        self, api: AsyncClient, mail: Any, otp: MockOtpSender, db: Session
+    ) -> None:
+        """A 409 must not turn a phone number into a customer lookup."""
+        holder, _ = await _signed_in(api, mail, business_name=f"Bodega {uuid.uuid4().hex[:10]}")
+        latecomer, headers = await _signed_in(api, mail, phone_e164=None)
+        _give_phone(db, latecomer["user_id"], holder["phone_e164"])
+
+        response = await _verified(api, headers, otp)
+
+        assert response.status_code == 409
+        disclosed = response.text.lower()
+        for secret in (
+            holder["business_name"],
+            holder["email"],
+            holder["tenant_id"],
+            holder["user_id"],
+        ):
+            assert secret.lower() not in disclosed

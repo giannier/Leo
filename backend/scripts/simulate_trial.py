@@ -26,7 +26,7 @@ from app.models.audit import AuditLog
 from app.models.business import AgentConfig
 from app.models.conversation import Conversation, Message
 from app.models.plan import Plan
-from app.models.tenant import Tenant, TenantNotification, TenantUser, TrialPhoneLock
+from app.models.tenant import Tenant, TenantNotification, TenantUser
 from app.models.user import User
 from app.providers.email.mock import MockEmailProvider
 from app.services.trial import agent_may_reply, record_ai_message
@@ -205,7 +205,6 @@ async def main(*, keep: bool) -> int:
         session.execute(delete(TenantNotification).where(TenantNotification.tenant_id == tenant_id))
         session.execute(delete(AgentConfig).where(AgentConfig.tenant_id == tenant_id))
         session.execute(delete(TenantUser).where(TenantUser.tenant_id == tenant_id))
-        session.execute(delete(TrialPhoneLock).where(TrialPhoneLock.tenant_id == tenant_id))
         session.execute(delete(User).where(User.id == user.id))
         session.execute(delete(Tenant).where(Tenant.id == tenant_id))
         session.commit()

@@ -58,13 +58,20 @@ CREATE UNIQUE INDEX uq_trial_owner_phone ON tenants (plan_id, (
   SELECT u.phone_e164 FROM tenant_users tu JOIN users u ON u.id = tu.user_id
   WHERE tu.tenant_id = tenants.id AND tu.role='owner' LIMIT 1
 )) WHERE status = 'trial';
--- NOTA IMPLEMENTACIÓN: Postgres no permite subqueries en índices; este intento se
--- reemplaza por validación en el servicio de registro + tabla trial_phone_locks:
-CREATE TABLE trial_phone_locks (
-  phone_e164 TEXT PRIMARY KEY,
-  tenant_id  UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+-- NOTA IMPLEMENTACIÓN: Postgres no permite subqueries en índices, así que la regla
+-- no vive en el esquema. Primero se implementó como tabla `trial_phone_locks`
+-- (una fila por teléfono), pero esa fila se tomaba al registrarse y nunca se
+-- devolvía: un negocio cuyo trial terminó no podía volver con su propio número.
+-- Desde la migración 0013 la tabla no existe y la regla es exactamente la query
+-- de arriba, ejecutada en el momento de preguntar (`TrialPhoneRepository`):
+SELECT EXISTS (
+  SELECT 1 FROM tenants t
+  JOIN tenant_users tu ON tu.tenant_id = t.id AND tu.role='owner' AND tu.status='active'
+  JOIN users u ON u.id = tu.user_id
+  WHERE t.status = 'trial' AND t.id <> :tenant_id AND u.phone_e164 = :phone
 );
+-- Serializada por número con pg_advisory_xact_lock, que es lo que sustituye a la
+-- atomicidad que antes daba la PRIMARY KEY. Ver plan.md, decisión del 2026-09-08.
 ```
 
 ### tenant_users
@@ -350,5 +357,6 @@ users(admin) 1──N audit_logs
 ## Notas de Migración
 - Migración 0001: extensiones (`pgcrypto` opcional para gen_random_uuid en PG16 ya nativo, `vector`, `citext`) + `plans` con seed de los 4 planes.
 - Orden: plans → users → tenants → tenant_users → resto (respetar FKs).
-- La nota dentro de `tenants` sobre el índice imposible es intencional: documenta por qué existe `trial_phone_locks`; no intentar crear ese índice.
+- La nota dentro de `tenants` sobre el índice imposible es intencional: documenta por qué la Clarification 005 se resuelve con una query y no con una constraint; no intentar crear ese índice.
+- Migración 0013: elimina `trial_phone_locks`. Su `downgrade` recrea la tabla y la repuebla desde los tenants en trial, no desde las filas borradas.
 - `conversations/messages/agent_traces` nacen aquí pero son compartidas: las Features 002/007 solo agregan columnas vía nuevas migraciones (nunca renombran las existentes).
