@@ -79,26 +79,6 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class TrialPhoneLock(Base, CreatedAtMixin):
-    """One live trial per verified contact phone (Clarification 005).
-
-    The data model first sketches this as a partial unique index over a
-    subquery. PostgreSQL does not allow subqueries in index expressions, so
-    the rule is enforced by this table instead: the registration service
-    inserts the lock in the same transaction that creates the trial tenant,
-    and the primary key is what actually rejects the second attempt.
-    """
-
-    __tablename__ = "trial_phone_locks"
-
-    phone_e164: Mapped[str] = mapped_column(Text, primary_key=True)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        PgUUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-
 class TenantNotification(Base, CreatedAtMixin):
     """A one-shot notice that has already been sent (TASK-019).
 
@@ -110,8 +90,8 @@ class TenantNotification(Base, CreatedAtMixin):
 
     The composite primary key *is* the guarantee. An `INSERT` either succeeds
     or violates the key, and that violation is the answer to "was this already
-    sent?" - the same reasoning as `trial_phone_locks` and the connection
-    request indexes: let the database decide, never a check in front of it.
+    sent?" - the same reasoning as the connection request indexes: let the
+    database decide, never a check in front of it.
     """
 
     __tablename__ = "tenant_notifications"

@@ -21,9 +21,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_email_provider
 from app.core.config import get_settings
-from app.models import EmailToken, Plan, Tenant, TenantUser, TrialPhoneLock, User
+from app.models import EmailToken, Plan, Tenant, TenantUser, User
 from app.providers.email.base import EmailError, EmailMessage
 from app.providers.email.mock import MockEmailProvider
+from app.services.trial import archive_tenant, pause_tenant
 
 AUTH = f"{get_settings().api_v1_prefix}/auth"
 
@@ -68,10 +69,34 @@ def _count(db: Session, model: Any) -> int:
     return db.execute(select(func.count()).select_from(model)).scalar_one()
 
 
+def _leave_trial(db: Session, tenant_id: uuid.UUID, status: str) -> None:
+    """Move a tenant out of trial the way the domain itself would.
+
+    Every exit is driven through the real transition where one exists, so
+    these tests keep testing the product rather than a status column a test
+    helper happens to write.
+    """
+    tenant = db.get(Tenant, tenant_id)
+    assert tenant is not None
+    now = datetime.now(UTC)
+
+    if status == "active":
+        # Conversion to a paid plan is Feature 009 and has no service yet.
+        # The state is real - `tenants.status` allows it and `agent_may_reply`
+        # already treats it as live - so it is set directly, and this is the
+        # only exit in the table that has no transition to call.
+        tenant.status = "active"
+        db.flush()
+        return
+
+    pause_tenant(db, tenant, now=now)
+    if status == "archived":
+        archive_tenant(tenant, now=now)
+    db.flush()
+
+
 class TestRegister:
-    async def test_creates_user_tenant_membership_and_phone_lock(
-        self, api: AsyncClient, db: Session
-    ) -> None:
+    async def test_creates_user_tenant_and_membership(self, api: AsyncClient, db: Session) -> None:
         body = _payload()
         response = await api.post(f"{AUTH}/register", json=body)
 
@@ -103,10 +128,6 @@ class TestRegister:
         assert membership.user_id == user.id
         assert membership.role == "owner"
         assert membership.status == "active"
-
-        lock = db.get(TrialPhoneLock, body["phone_e164"])
-        assert lock is not None
-        assert lock.tenant_id == tenant.id
 
     async def test_trial_length_is_read_from_the_plans_row(
         self, api: AsyncClient, db: Session
@@ -183,10 +204,10 @@ class TestRegister:
         expected = timedelta(hours=get_settings().email_verification_token_ttl_hours)
         assert abs((record.expires_at - before) - expected) < timedelta(seconds=5)
 
-    async def test_registration_without_a_phone_takes_no_lock(
+    async def test_registration_without_a_phone_is_accepted(
         self, api: AsyncClient, db: Session
     ) -> None:
-        locks_before = _count(db, TrialPhoneLock)
+        """The phone is only required before a number connection request."""
         body = _payload()
         del body["phone_e164"]
 
@@ -195,7 +216,15 @@ class TestRegister:
         assert response.status_code == 201
         user = _user_by_email(db, body["email"])
         assert user is not None and user.phone_e164 is None
-        assert _count(db, TrialPhoneLock) == locks_before
+
+    async def test_two_accounts_without_a_phone_do_not_collide(self, api: AsyncClient) -> None:
+        """A missing number is not a number every account shares."""
+        first, second = _payload(), _payload()
+        del first["phone_e164"]
+        del second["phone_e164"]
+
+        assert (await api.post(f"{AUTH}/register", json=first)).status_code == 201
+        assert (await api.post(f"{AUTH}/register", json=second)).status_code == 201
 
 
 class TestDuplicates:
@@ -212,7 +241,11 @@ class TestDuplicates:
         assert "message" in response.json()
         # The whole second registration was rolled back, not half-written.
         assert _count(db, Tenant) == tenants_before
-        assert db.get(TrialPhoneLock, second["phone_e164"]) is None
+        # Its phone - unique to this run - reached nobody either.
+        orphans = db.execute(
+            select(func.count()).select_from(User).where(User.phone_e164 == second["phone_e164"])
+        ).scalar_one()
+        assert orphans == 0
 
     async def test_duplicate_email_detection_is_case_insensitive(self, api: AsyncClient) -> None:
         """`users.email` is CITEXT: Ana@ and ana@ are one account."""
@@ -251,7 +284,7 @@ class TestDuplicates:
         ).scalar_one()
         assert surviving_tenants == 1
 
-    async def test_the_lock_stays_with_the_first_tenant(
+    async def test_a_refused_registration_leaves_the_first_tenant_untouched(
         self, api: AsyncClient, db: Session
     ) -> None:
         first = _payload()
@@ -260,9 +293,123 @@ class TestDuplicates:
 
         await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
 
-        lock = db.get(TrialPhoneLock, first["phone_e164"])
-        assert lock is not None
-        assert lock.tenant_id == first_tenant_id
+        tenant = db.get(Tenant, first_tenant_id)
+        assert tenant is not None
+        assert tenant.status == "trial"
+        owner = _user_by_email(db, first["email"])
+        assert owner is not None and owner.phone_e164 == first["phone_e164"]
+
+    async def test_the_rejection_never_names_the_business_that_has_the_number(
+        self, api: AsyncClient
+    ) -> None:
+        """Otherwise registration becomes a phone-to-customer lookup service.
+
+        Anyone could type a number they suspect belongs to a competitor and
+        read back who they bank with. The answer says the number is taken and
+        stops there.
+        """
+        holder = _payload(business_name=f"Bodega {uuid.uuid4().hex[:10]}")
+        created = await api.post(f"{AUTH}/register", json=holder)
+        assert created.status_code == 201
+
+        response = await api.post(
+            f"{AUTH}/register", json=_payload(phone_e164=holder["phone_e164"])
+        )
+
+        assert response.status_code == 409
+        assert response.json()["error"] == "phone_in_active_trial"
+        disclosed = response.text.lower()
+        for secret in (
+            holder["business_name"],
+            holder["email"],
+            holder["full_name"],
+            created.json()["tenant_id"],
+            created.json()["user_id"],
+        ):
+            assert secret.lower() not in disclosed
+
+
+class TestWhenTheNumberComesBack:
+    """Clarification 005: "en mas de un tenant **en trial** simultaneamente".
+
+    Taken to the letter that frees the number the moment a tenant stops being
+    `trial` - but a trial that expires *becomes* `paused`, so the letter hands
+    the number back at the exact instant the trial ends, and the same person
+    opens the next one a second later. The number is therefore held through
+    `paused` and released at `archived`, thirty days on.
+
+    There is one test per exit state because a rule that is right for two of
+    three states either locks somebody out of their own number or gives away
+    unlimited trials, and neither shows up in a passing happy path.
+    """
+
+    @pytest.mark.parametrize("exit_status", ["active", "archived"])
+    async def test_a_tenant_done_with_its_number_releases_it(
+        self, api: AsyncClient, db: Session, exit_status: str
+    ) -> None:
+        """`archived` is a trial nobody came back to. `active` is a customer
+        who started paying, and holding their number against them would stop a
+        real business from opening a second shop - the rule is against farming
+        trials, not against the people who converted."""
+        first = _payload()
+        created = await api.post(f"{AUTH}/register", json=first)
+        assert created.status_code == 201
+        _leave_trial(db, uuid.UUID(created.json()["tenant_id"]), exit_status)
+
+        second = await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
+
+        assert second.status_code == 201, second.text
+        reused = db.get(Tenant, uuid.UUID(second.json()["tenant_id"]))
+        assert reused is not None and reused.status == "trial"
+
+    async def test_an_expired_trial_still_holds_its_number(
+        self, api: AsyncClient, db: Session
+    ) -> None:
+        """The rule's whole purpose, and the easy way to lose it.
+
+        `paused` is where a trial lands when it simply runs out. Releasing the
+        number here is unlimited free trials on one phone, one pause at a
+        time."""
+        first = _payload()
+        created = await api.post(f"{AUTH}/register", json=first)
+        _leave_trial(db, uuid.UUID(created.json()["tenant_id"]), "paused")
+
+        second = await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
+
+        assert second.status_code == 409
+        assert second.json()["error"] == "phone_in_active_trial"
+
+    async def test_the_exit_states_covered_here_are_all_of_them(self) -> None:
+        """A new tenant status must not quietly skip the tests above."""
+        from app.models.tenant import TENANT_STATUSES
+
+        assert set(TENANT_STATUSES) - {"trial"} == {"active", "paused", "archived"}
+
+    async def test_a_tenant_still_in_trial_keeps_blocking(self, api: AsyncClient) -> None:
+        """The other half of the rule: it is scoping, not switching off."""
+        first = _payload()
+        assert (await api.post(f"{AUTH}/register", json=first)).status_code == 201
+
+        second = await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
+
+        assert second.status_code == 409
+        assert second.json()["error"] == "phone_in_active_trial"
+
+    async def test_a_number_freed_by_an_archive_is_blocked_again_by_its_new_trial(
+        self, api: AsyncClient, db: Session
+    ) -> None:
+        """The number moves; it does not become free forever."""
+        first = _payload()
+        created = await api.post(f"{AUTH}/register", json=first)
+        _leave_trial(db, uuid.UUID(created.json()["tenant_id"]), "archived")
+        assert (
+            await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
+        ).status_code == 201
+
+        third = await api.post(f"{AUTH}/register", json=_payload(phone_e164=first["phone_e164"]))
+
+        assert third.status_code == 409
+        assert third.json()["error"] == "phone_in_active_trial"
 
 
 class TestValidation:

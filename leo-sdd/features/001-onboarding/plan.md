@@ -144,6 +144,62 @@ verde; la suite de aislamiento comprueba que el guard juzga contra el catálogo 
 su propio tenant y contra ningún otro. Cambio de prompt ⇒ `make evals` adjunto al
 PR (Constitution).
 
+### 2026-09-08 — El teléfono de contacto se libera al archivar el tenant (Clarification 005)
+
+**Problema.** `trial_phone_locks` tomaba la fila al registrarse y **nunca la
+devolvía**. Un negocio que empezaba un trial, lo abandonaba y volvía meses
+después no podía registrarse otra vez con su propio número: lo único que habría
+liberado el teléfono era un `DELETE` que nadie escribió. La nota de TASK-025 lo
+dejó pendiente de decisión precisamente porque los docs no decían cuándo se
+libera.
+
+**Lectura aprobada.** La restricción se evalúa contra estado vivo, no contra
+una fila guardada. Pero *no* contra `status = 'trial'` a secas, y el motivo
+importa: el ciclo de vida es `trial → paused → archived`, así que un trial que
+simplemente vence **se convierte en `paused`**. Leer la Clarification 005 al pie
+de la letra —"no puede estar en más de un tenant **en trial simultáneamente**"—
+devuelve el número en el instante exacto en que el trial termina, y la misma
+persona abre otro trial con el mismo teléfono un segundo después, y otro. Eso es
+trials infinitos, que es precisamente lo que la regla existe para impedir; la
+propia nota de TASK-025 lo había anticipado.
+
+Por eso el número se retiene durante `trial` **y** `paused`, y se libera recién
+en `archived` — 30 días después, plazo suficiente para que farmear trials cueste
+más que pagar uno. Un tenant en `active` (convertido a plan pagado) tampoco lo
+retiene: la regla es contra el farmeo de trials, no contra el cliente que pagó,
+y bloquear su número le impediría abrir un segundo local.
+
+| Punto | Elegido | Razón | Alternativa descartada |
+|-------|---------|-------|----------------------|
+| Dónde vive la regla | `TrialPhoneRepository` (`app/repositories/tenant.py`): una query sobre estado vivo — `tenants.status IN ('trial','paused')` (constante `PHONE_HOLDING_STATUSES`) ⋈ owner en `tenant_users` ⋈ `users.phone_e164` | Un candado que hay que soltar a mano vuelve a filtrarse la primera vez que un camino de código se olvida. Preguntando por el estado actual no hay nada que soltar | Conservar la tabla y liberar en cada salida (habría que probar que las tres salidas —y las futuras— están cubiertas; `extend_trial` (paused → trial) tendría además que volver a tomarla, y esa re-toma puede fallar) |
+| La tabla | Eliminada, migración `0013`. `downgrade` la recrea **y la repuebla desde el estado vivo** (`DISTINCT ON` por teléfono: dos trials pueden compartir número si un admin reactiva uno pausado) | Nada la lee ya; dejarla sería una segunda representación que se desincroniza en silencio | Dejarla vacía "por si acaso" |
+| Atomicidad | `pg_advisory_xact_lock` por número, tomado antes de la comprobación | La tabla obtenía la atomicidad de su PK; una query no puede, porque la condición cruza tres tablas y PostgreSQL no admite subqueries en índices. Sin serializar, dos registros con el mismo número en el mismo milisegundo leerían ambos "libre" — justo el abuso que la regla existe para frenar. Se suelta con el commit/rollback: no hay nada que liberar a mano | Aceptar la carrera (regresión de seguridad silenciosa) |
+| Qué devuelve la comprobación | Un booleano y nada más (`SELECT EXISTS`) | La pregunta es intrínsecamente cross-tenant: pregunta por *otro* negocio. El límite lo sostiene lo que sale, no lo que se lee. El 409 dice que el número está tomado y se detiene ahí | Devolver el tenant/nombre (convertiría el registro en un buscador de "¿de quién es este número?") |
+
+**Estados de salida cubiertos.** El ciclo de vida del tenant tiene cuatro
+estados (`trial`, `active`, `paused`, `archived`), así que hay tres salidas y
+las tres tienen test propio, en registro y en verificación OTP:
+
+| Estado | ¿Libera el número? | Por qué |
+|--------|--------------------|---------|
+| `paused` (fin de trial por fecha o cuota, vía `pause_tenant`) | **No** | Es donde aterriza un trial vencido. Liberar acá es un trial nuevo por cada pausa, sin límite |
+| `archived` (retención de 30 días, vía `archive_tenant`) | Sí | Nadie volvió en 30 días; el número vuelve a estar disponible para su dueño |
+| `active` (conversión a plan pagado; sin servicio propio hasta la Feature 009) | Sí | Cliente que pagó. Retenerle el número le impediría abrir un segundo local, y la regla es contra el farmeo de trials |
+
+Un test extra falla si aparece un quinto estado, para que no se cuele sin
+cobertura.
+
+**Lo que deliberadamente NO añade.** Ni períodos de enfriamiento explícitos, ni
+contadores por teléfono, ni topes de por vida, ni condición sobre el estado del
+tenant que verifica. La ventana de 30 días hasta `archived` no es una política
+nueva: es el plazo de retención que el ciclo de vida del tenant ya tenía.
+
+**Verificación.** `make test`, `make isolation`, `make lint` y `make coverage`
+en verde; `make migrate` aplicado, con `downgrade`/`upgrade` probados en ambos
+sentidos. La suite de aislamiento comprueba que la respuesta es un booleano y
+que ni el 409 de registro ni el de verificación nombran al negocio que tiene el
+número.
+
 ## Estimación
 - **Esfuerzo total:** 3–4 semanas calendario supervisando a Claude Code (≈ 26 tasks de 1 sesión c/u; varias paralelizables).
 - **Complejidad:** Alta (es la feature fundacional: define auth, multi-tenancy, adaptadores y el esqueleto del agente para todo lo demás).

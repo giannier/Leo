@@ -11,8 +11,8 @@ load-bearing rather than decorative:
   attacker cannot widen the window by asking for more codes and turning
   "five attempts" into five attempts each.
 
-Verification succeeds only if the phone is not already holding another live
-trial, which is the anti-abuse rule the whole flow exists for.
+Verification succeeds only if no *other* tenant that is in trial right now
+has this phone, which is the anti-abuse rule the whole flow exists for.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import generate_otp_code, hash_token, tokens_match
@@ -28,7 +27,7 @@ from app.models.user import User
 from app.providers.otp.base import OtpSender
 from app.repositories.tenant import (
     OWNER_ROLE,
-    TrialPhoneLockRepository,
+    TrialPhoneRepository,
     UserMembershipRepository,
 )
 from app.repositories.user import OtpCodeRepository, UserRepository
@@ -60,7 +59,12 @@ class InvalidOrExpiredOtp(OtpError):
 
 
 class PhoneAlreadyInActiveTrial(OtpError):
-    """Another live trial already holds this phone (Clarification 005)."""
+    """Another tenant currently in trial has this phone (Clarification 005).
+
+    The message says only that. Naming the business that has the number
+    would hand any caller a way to map phone numbers to customers, one
+    verification attempt at a time.
+    """
 
 
 @dataclass(frozen=True)
@@ -114,8 +118,8 @@ class OtpService:
         """Consume a code and mark the phone verified.
 
         Synchronous: nothing here leaves the process, and keeping it inside
-        one transaction is what makes the attempt count and the phone lock
-        agree with each other.
+        one transaction is what makes the attempt count and the contact-phone
+        check agree with each other.
         """
         now = datetime.now(UTC)
         record = self._codes.find_live(user_id=user.id, now=now)
@@ -137,22 +141,22 @@ class OtpService:
             raise InvalidOrExpiredOtp("That code is not valid.")
 
         self._codes.consume(record, at=now)
-        self._claim_phone(user)
+        self._refuse_if_another_trial_has_it(user)
         self._users.mark_phone_verified(user, at=now)
         self._session.commit()
 
-    def _claim_phone(self, user: User) -> None:
-        """Take the one-live-trial-per-phone lock for the tenant this user owns.
+    def _refuse_if_another_trial_has_it(self, user: User) -> None:
+        """Clarification 005, for the tenant this user owns.
 
-        Registration already claims the lock when a phone is given at signup,
-        so this covers the account that added its phone afterwards. Claiming
-        for the owned tenant only: a user invited into somebody else's
-        business must not consume that business's phone slot.
+        Asked of the tenants that are in trial *right now*: a business whose
+        trial has ended - paused, archived, or converted to a paid plan - is
+        no longer one of them and no longer has its owner's number. That is
+        the sentence read literally ("en trial simultaneamente"), and it is
+        why nothing anywhere has to remember to hand a number back.
 
-        Inserts and lets the primary key reject a duplicate, rather than
-        asking whether the phone is free and then inserting. The two-step
-        version races - two verifications a millisecond apart both read free,
-        which is precisely the abuse Clarification 005 exists to stop.
+        Only for the owned tenant. A user invited into somebody else's
+        business is not that business's contact, so verifying their own phone
+        cannot put it in anybody's trial.
         """
         phone = user.phone_e164
         if phone is None:  # pragma: no cover - guarded in `request`
@@ -163,17 +167,11 @@ class OtpService:
         if not owned:
             return
 
-        tenant_id = owned[0]
-        locks = TrialPhoneLockRepository(self._session, tenant_id)
-        if phone in locks.held_phones():
-            return
-
-        try:
-            # A savepoint, so a rejected claim does not poison the outer
-            # transaction that still has the consumed code in it.
-            with self._session.begin_nested():
-                locks.claim(phone)
-        except IntegrityError as exc:
+        phones = TrialPhoneRepository(self._session)
+        # Held until this transaction ends, so two verifications of the same
+        # number cannot both read "free" and both commit.
+        phones.hold(phone)
+        if phones.held_by_another_trial(phone, excluding_tenant_id=owned[0]):
             raise PhoneAlreadyInActiveTrial(
                 "This phone number is already verified on another trial account."
-            ) from exc
+            )
