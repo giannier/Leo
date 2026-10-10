@@ -209,3 +209,27 @@ Esto sin decisión no bloquea TASK-402 (0014 es solo `conversation_state` y even
 - No se confirmó si `runner.py` aplica ya el umbral del 90 %, ni qué hace `tenant_archiver` con los datos (afecta la decisión de `CASCADE`).
 - El dato "Meta cobra cada mensaje desde el 1 de octubre de 2026" (spec, historia 7) no se verificó.
 - No se abrió `.env` ni ningún secreto.
+
+---
+
+## 8. Adaptaciones
+
+Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api.md`, con la autorización del dueño (clarifications C-01…C-22 ratificadas; si el repo resuelve algo distinto, manda el repo). Se completa task a task.
+
+### 8.0 Criterios generales
+
+| Tema | Decisión | Motivo |
+|---|---|---|
+| `ON DELETE CASCADE` | No se usa en `tenant_id` ni en `conversation_id`. Solo en `order_items.order_id` (hijo que no tiene vida sin su pedido). Los `ON DELETE SET NULL` del data-model se respetan. | El repo no hace cascade desde `tenants` ni `conversations` (§3.1). Es el criterio más conservador: un DELETE suelto no borra historial de ventas. El reinicio del simulador (TASK-422) borrará en código, en orden. |
+| Nombres de índices y checks | `ix_<tabla>_<columnas>` y `ck_<tabla>_<nombre>` (`op.f` en las migraciones). | Convención de `NAMING_CONVENTION`. Se verifica con `alembic check` (sin diferencias entre modelos y migraciones). |
+| Paridad modelos y migración | Cada migración se probó con `upgrade head`, `downgrade -1`, `upgrade head` y `alembic check` contra la BD de desarrollo. | |
+| Repositorios | Cada tabla nueva tiene un repositorio que hereda `BaseRepository`. Las de clave compuesta o sin `id` (`conversation_state`, `business_info`, `process_stage_overrides`, `tenant_sequences`) sobreescriben `get` o lo prohíben. | `BaseRepository.get` asume una columna `id`. |
+
+### 8.1 Migración 0014 (TASK-402)
+
+- `conversation_stage_events.created_at` usa `clock_timestamp()` (ya anotado en §3.1).
+- `template_key`, `stage_key` y `reason` sin CHECK: las plantillas viven en código (C-05) y el vocabulario de `reason` crece con cada feature; un CHECK convertiría cada uno en una migración.
+- `conversation_state` no tiene columna `id`: la PK es `conversation_id`. `ConversationStateRepository.get(x)` recibe el id de la conversación.
+- `FunnelCode` (enum compartido, C-18) está en `app/models/conversation_state.py`.
+- La FK `conversation_id` no garantiza por sí sola que la conversación sea del mismo tenant (no hay FK compuesta). La garantía es de servicio: `StateRepo` (TASK-412) recibe la conversación ya leída con el repositorio del tenant.
+
