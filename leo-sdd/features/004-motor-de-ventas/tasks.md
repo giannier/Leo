@@ -21,7 +21,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Giannier lee `conciliacion.md`. Ningún cambio de código en esta task
   - Parallel: false
 
-- [ ] TASK-402: Migración 0014 — `conversation_state` y `conversation_stage_events`
+- [x] TASK-402: Migración 0014 — `conversation_state` y `conversation_stage_events`
   - Input: `data-model.md §0014`, `conciliacion.md`
   - Output: modelos SQLAlchemy, migración Alembic (upgrade y downgrade) y tests de aislamiento de las 2 tablas
   - Depends on: TASK-401
