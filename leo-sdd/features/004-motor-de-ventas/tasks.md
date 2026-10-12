@@ -108,7 +108,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests por prefijo; un `camino:` con una clave que no existe se ignora y queda en el log
   - Parallel: true
 
-- [ ] TASK-414: Prompt builder por secciones
+- [x] TASK-414: Prompt builder por secciones
   - Input: `plantillas.md §4`, `plan.md` (presupuesto de tokens)
   - Output:
     - `process/service.py`, lado lectura: `ProcessConfigService.effective(tenant)` (plantilla, opciones, overrides y caché de 60 s);
