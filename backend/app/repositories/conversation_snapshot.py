@@ -33,6 +33,8 @@ class OrderLine:
     item: OrderItem
     # False when the product is gone: asking for an address is the safe side.
     es_digital: bool
+    # The product's category, for the promotions whose scope is a category.
+    categoria: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,10 +163,10 @@ class ConversationSnapshotRepository:
         return row[0], row[1], row[2]
 
     def _lines(self, order_id: uuid.UUID) -> list[OrderLine]:
-        """Statement 3: the order's lines with their product's `es_digital`."""
+        """Statement 3: the order's lines with their product's `es_digital` and category."""
         tenant = self._tenant_id
         statement = (
-            select(OrderItem, Product.es_digital)
+            select(OrderItem, Product.es_digital, Product.category)
             .outerjoin(
                 Product, and_(Product.id == OrderItem.product_id, Product.tenant_id == tenant)
             )
@@ -172,6 +174,6 @@ class ConversationSnapshotRepository:
             .order_by(OrderItem.created_at, OrderItem.id)
         )
         return [
-            OrderLine(item=item, es_digital=bool(es_digital))
-            for item, es_digital in self._session.execute(statement).all()
+            OrderLine(item=item, es_digital=bool(es_digital), categoria=categoria)
+            for item, es_digital, categoria in self._session.execute(statement).all()
         ]

@@ -196,7 +196,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 ## Fase B · Venta
 
-- [ ] TASK-424: Pricing y promociones (`orders/pricing.py`)
+- [x] TASK-424: Pricing y promociones (`orders/pricing.py`)
   - Input: C-10, `data-model.md §0015` (promotions)
   - Output: función pura `price(items, promociones_vigentes, promos_ofrecidas, now) -> Totales` que elige la de mayor ahorro sin acumular; incluye envío por zona y envío gratis desde un monto
   - Depends on: TASK-403, TASK-406
