@@ -203,7 +203,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de tabla (porcentaje, monto fijo, 2×1, 3×2, precio por cantidad, monto mínimo, vigencia, cierre no ofrecido, cierre vencido, envío gratis). Cobertura de 100 %
   - Parallel: true (con Fase A desde TASK-410)
 
-- [ ] TASK-425: OrderService
+- [x] TASK-425: OrderService
   - Input: `data-model.md §0019` (transiciones), C-06, C-07
   - Output: pedido activo, crear pedido nuevo después de confirmado, numeración por tenant, transiciones válidas (`InvalidTransition`), snapshot de `datos_cliente` al pasar a `por_confirmar`, `is_sandbox`
   - Depends on: TASK-407, TASK-424
