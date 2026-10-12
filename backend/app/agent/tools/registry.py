@@ -29,12 +29,13 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 from sqlalchemy.orm import Session
 
 from app.agent.budget import TurnBudget
+from app.agent.outbound import TurnOutbound
 from app.process.facts import Facts
 from app.process.templates.base import GLOBAL_TOOLS, EffectiveOptions, Stage, Template
 from app.process.turn import TurnContext
@@ -125,9 +126,14 @@ class ToolContext:
     conversation_id: uuid.UUID | None = None
     # Outbound messages this turn may still send (C-11).
     budget: TurnBudget = field(default_factory=TurnBudget)
-    # The outbound adapter the sending tools use (TASK-418 and TASK-420 define
-    # its interface; until then nothing calls it).
-    adapter: Any = None
+    # The outbound adapter the sending tools use (`agent/outbound.py`). None
+    # when the turn cannot send anything, which the tools answer as
+    # `no_disponible`.
+    adapter: TurnOutbound | None = None
+    # The tenant's effective process options (paths, required data). Filled in
+    # by `ToolCatalog.for_stage` from the stage's scope, so a handler always
+    # reads the options its schema was built from.
+    options: EffectiveOptions | None = None
     # In the simulator nothing leaves for the provider (C-19).
     sandbox: bool = False
     # What holds only for this turn: the tapped option, the receipt result.
@@ -282,14 +288,19 @@ class ToolCatalog:
 
 
 def _guarded(definition: ToolDefinition, scope: ToolScope) -> ToolHandler:
+    """Bind a definition to the scope of one turn.
+
+    Runs the stage guard before the handler and hands the handler a context that
+    carries the scope's options. `replace` copies references, so the budget and
+    `facts_patch` the handler writes to are still the turn's own.
+    """
     guard = definition.guard
-    if guard is None:
-        return definition.handler
 
     async def run(context: ToolContext, arguments: dict[str, Any]) -> str | ToolResult:
-        refusal = guard(scope, arguments)
-        if refusal is not None:
-            return refusal
-        return await definition.handler(context, arguments)
+        if guard is not None:
+            refusal = guard(scope, arguments)
+            if refusal is not None:
+                return refusal
+        return await definition.handler(replace(context, options=scope.options), arguments)
 
     return run

@@ -8,8 +8,8 @@ Which ones do something today:
 
 * `buscar_productos`, `ver_producto`, `consultar_conocimiento`: real
   (`tools/catalog.py`).
-* `enviar_recurso`, `mostrar_opciones`, `elegir_camino` (TASK-420) and
-  `gestionar_pedido`, `registrar_datos_cliente`, `enviar_metodos_pago`,
+* `enviar_recurso`, `mostrar_opciones`, `elegir_camino` (`tools/sales.py`).
+* `gestionar_pedido`, `registrar_datos_cliente`, `enviar_metodos_pago`,
   `derivar_a_humano` (Phase B and D): declared with their final schema and bound
   to a stub that answers `no_disponible`. The schema is final on purpose, so the
   prompt budget and the per-stage rules are tested against the real thing, and
@@ -40,6 +40,7 @@ from app.agent.tools.registry import (
     ToolResult,
     ToolScope,
 )
+from app.agent.tools.sales import elegir_camino, enviar_recurso, mostrar_opciones
 from app.process.facts import Facts
 from app.process.templates.base import EffectiveOptions, Stage, Template
 
@@ -135,7 +136,7 @@ def _options_schema(scope: ToolScope) -> dict[str, Any]:
         {
             "tipo": {"type": "string", "enum": list(_options_types(scope))},
             "texto": _text("Mensaje que acompaña las opciones.", maxLength=_MAX_OPTION_BODY),
-            "filtro": _text("Filtro opcional (por ejemplo, paquetes)."),
+            "filtro": _text('Solo con tipo=productos: "paquetes" o el nombre de una categoría.'),
         },
         ["tipo", "texto"],
     )
@@ -263,13 +264,13 @@ def _definitions() -> list[ToolDefinition]:
             name="enviar_recurso",
             description="Envía al cliente un archivo del negocio (imagen, PDF) por su clave.",
             parameters=_resource_schema,
-            handler=_stub("enviar_recurso"),
+            handler=enviar_recurso,
         ),
         ToolDefinition(
             name="mostrar_opciones",
             description="Envía botones o una lista para que el cliente toque una opción.",
             parameters=_options_schema,
-            handler=_stub("mostrar_opciones"),
+            handler=mostrar_opciones,
             guard=_options_guard,
         ),
         ToolDefinition(
@@ -298,7 +299,7 @@ def _definitions() -> list[ToolDefinition]:
             name="elegir_camino",
             description="Registra el camino que el cliente escogió escribiendo.",
             parameters=_path_schema,
-            handler=_stub("elegir_camino"),
+            handler=elegir_camino,
             available=_has_paths,
         ),
         ToolDefinition(

@@ -23,6 +23,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Protocol, runtime_checkable
 
+# WhatsApp's own limits for interactive messages, whichever gateway carries
+# them. The sales tools truncate to these before sending; the adapter checks them
+# again so a request Meta would refuse never leaves the building.
+MAX_BUTTONS = 3
+MAX_LIST_ROWS = 10
+MAX_BUTTON_TITLE = 20
+MAX_ROW_TITLE = 24
+MAX_ROW_DESCRIPTION = 72
+MAX_BODY = 1024
+MAX_HEADER_FOOTER = 60
+MAX_LIST_BUTTON = 20
+
 
 class WhatsAppError(RuntimeError):
     """The provider could not complete the operation.

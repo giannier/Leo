@@ -158,7 +158,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests con el proveedor simulado: la primera vez sube, la segunda reutiliza, si vence vuelve a subir y si la subida falla usa el link
   - Parallel: false
 
-- [ ] TASK-420: Tools `enviar_recurso`, `mostrar_opciones`, `elegir_camino` y extensión del catálogo
+- [x] TASK-420: Tools `enviar_recurso`, `mostrar_opciones`, `elegir_camino` y extensión del catálogo
   - Input: `contracts/api.md §7`
   - Output: las 3 tools; `buscar_productos` y `ver_producto` devuelven `modo_venta`, `bundle_size`, `destacado`, recursos y promociones automáticas aplicables, y fijan `vio_productos` cuando hay resultados
   - Depends on: TASK-417, TASK-405, TASK-406, TASK-418

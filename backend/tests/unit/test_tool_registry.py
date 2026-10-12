@@ -8,6 +8,7 @@ a guard refuses are checked without a database.
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any, cast
 
 import pytest
@@ -51,8 +52,9 @@ def _tool_args(registry: ToolRegistry, name: str) -> dict[str, Any]:
 async def _call(registry: ToolRegistry, name: str, **arguments: Any) -> str | ToolResult:
     tool = registry.get(name)
     assert tool is not None, f"{name} is not offered"
-    # The stubs and the guards never touch the context.
-    return await tool.handler(cast(ToolContext, None), arguments)
+    # The stubs and the guards never touch the database or the model.
+    context = ToolContext(session=cast(Any, None), tenant_id=uuid.uuid4(), llm=cast(Any, None))
+    return await tool.handler(context, arguments)
 
 
 # -------------------------------------------------------------------- envelope
@@ -320,14 +322,16 @@ class TestTheOptionsTool:
         assert result.status == "no_disponible"
         assert "caminos" in (result.decir or "")
 
-    async def test_other_types_reach_the_handler(self) -> None:
-        registry = registry_for_stage(SHOP, Stage.IDENTIFICAR, Facts(), SHOP_OPTIONS)
+    async def test_a_configured_paths_call_reaches_the_handler(self) -> None:
+        registry = registry_for_stage(CERT, Stage.CALIFICAR, Facts(), CERT_OPTIONS)
 
-        result = await _call(registry, "mostrar_opciones", tipo="categorias", texto="Elige")
+        result = await _call(registry, "mostrar_opciones", tipo="caminos", texto="¿Qué buscas?")
 
-        # Not yet implemented (TASK-420): the stub answers, the guard did not.
+        # The guard let it through; the handler found nothing to send with (this
+        # context has no adapter), which is its own refusal, not the guard's.
         assert isinstance(result, ToolResult)
-        assert result.data == {"herramienta": "mostrar_opciones"}
+        assert result.status == "no_disponible"
+        assert "caminos" not in (result.decir or "")
 
 
 class TestConfirmingAnOrder:
@@ -471,9 +475,6 @@ class TestTheToolsOfLaterTasksAnswerNotAvailable:
     @pytest.mark.parametrize(
         ("tool", "stage"),
         [
-            ("enviar_recurso", Stage.IDENTIFICAR),
-            ("mostrar_opciones", Stage.IDENTIFICAR),
-            ("elegir_camino", Stage.CALIFICAR),
             ("gestionar_pedido", Stage.PEDIDO),
             ("registrar_datos_cliente", Stage.DATOS),
             ("enviar_metodos_pago", Stage.COBRO),
