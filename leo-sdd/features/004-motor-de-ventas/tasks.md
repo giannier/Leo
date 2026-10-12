@@ -35,7 +35,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: upgrade/downgrade; tests de validación de cada esquema (casos válidos e inválidos)
   - Parallel: false (las migraciones 0014–0020 van en cadena; en paralelo pueden avanzar 409, 410, 415 y 416)
 
-- [ ] TASK-404: Migración 0016 — comportamiento, proceso y niveles por plan
+- [x] TASK-404: Migración 0016 — comportamiento, proceso y niveles por plan
   - Input: `data-model.md §0016`
   - Output: columnas nuevas en `agent_configs` y `plans`, tabla `process_stage_overrides` y tests de aislamiento
   - Depends on: TASK-403
