@@ -34,6 +34,7 @@ from app.workers.channel import (
     retry_stranded_replies,
 )
 from app.workers.knowledge_indexer import index_knowledge_source
+from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
 from app.workers.trial_lifecycle import (
     tenant_archiver,
     trial_enforcer,
@@ -107,6 +108,10 @@ class WorkerSettings:
         # and never sent is a customer being ignored, and nothing else in the
         # system would ever notice: the job that should have sent it died.
         cron(retry_stranded_replies, minute={2, 7, 12, 17, 22, 27, 32, 37, 42, 47, 52, 57}),
+        # Daily, in the small hours of Lima (08:25 UTC is 03:25). A file the
+        # provider still holds for 48 hours has time to be uploaded again
+        # before it lapses, even if one run fails.
+        cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
     ]
     on_startup = startup
     on_shutdown = shutdown
