@@ -286,3 +286,13 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
   3. Una línea cuyo producto fue borrado (`product_id` nulo) cuenta como física (se pide dirección): es el lado seguro.
 - `motivo_rechazo` solo se expone mientras el pedido activo está en `borrador` (rechazo de comprobante o de contra entrega, plantillas §5 COBRO); un pedido confirmado no arrastra el motivo viejo.
 
+### 8.8 Estado persistente (TASK-412)
+
+- `StateRepo` (`backend/app/process/state.py`): `get`, `get_or_create(conversation, template)` y `save(conversation_id, *, stage, funnel, facts_patch, reason, expected_version, snapshot=None)`. `get_or_create` rechaza una conversación de otro tenant (`TenantScopeError`) y crea la fila con `INSERT ... ON CONFLICT DO NOTHING`, así dos workers no chocan en la clave primaria.
+- `get_or_create` **no escribe evento**: un evento registra un cambio y el primero es el paso de INICIO a donde caiga el primer turno (si el cliente solo saluda y la etapa sigue en INICIO, no hay evento).
+- `save`: `UPDATE ... WHERE version = :v` (`version + 1`). Si el UPDATE no toca ninguna fila, reintenta **una vez** sobre la fila fresca (re-aplica el parche del llamador, que es su intención) y, si vuelve a chocar, lanza `StateConflict`; nunca descarta una escritura en silencio. El evento se compara contra la fila fresca, no contra la que el llamador creía: dos escritores que llegan a la misma etapa dejan **un** evento.
+- `facts_patch` mezcla clave a clave sobre los hechos guardados; `None` borra la clave (así se limpia `derivado` al reanudar el bot). Solo acepta `STORED_KEYS`: un hecho derivado o desconocido lanza `ValueError` (C-03).
+- `facts_snapshot(facts)` arma el `facts_snapshot` del evento: hechos guardados y derivados sin `nombre_cliente` ni `derivado.resumen` (datos personales, C-20). `datos_faltantes` lleva solo nombres de campo.
+- "Recalcula una vez" del `plan.md` queda del lado del pipeline (TASK-421): `save` re-aplica la misma etapa y el mismo parche; si el pipeline quiere recalcular la etapa con los hechos nuevos, atrapa `StateConflict` o lee `SaveResult.retried`.
+- Pruebas: la contención se prueba con versiones viejas y, además, con dos conexiones reales (un escritor mantiene el candado de fila sin confirmar mientras el otro intenta guardar). Este último test confirma filas reales y las borra él mismo.
+

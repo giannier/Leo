@@ -94,7 +94,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests con pedidos en cada estado, comprobantes y datos parciales; `datos_faltantes` respeta entrega (delivery, recojo, zonas vacías) y productos digitales; `rechazo_vigente` determina `rechazado`; `metodos_pago_enviados` por pedido y después del último rechazo
   - Parallel: false
 
-- [ ] TASK-412: Estado persistente (`state.py`)
+- [x] TASK-412: Estado persistente (`state.py`)
   - Input: `data-model.md §0014`
   - Output: `StateRepo.get_or_create()` y `StateRepo.save(stage, funnel, facts_patch, reason, expected_version)`, que inserta un evento solo si cambia la etapa o el embudo y reintenta una vez si choca la versión
   - Depends on: TASK-411
