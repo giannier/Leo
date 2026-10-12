@@ -87,7 +87,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: los 34 casos de la referencia portados a un test parametrizado de pytest con las plantillas reales. Cobertura de 100 % en `engine.py`
   - Parallel: false
 
-- [ ] TASK-411: Hechos (`facts.py`)
+- [x] TASK-411: Hechos (`facts.py`)
   - Input: `data-model.md` (hechos guardados y derivados), C-03, tabla de `pago_estado`
   - Output: modelo `Facts` y `FactsLoader.load(conversation)` en 1–3 queries
   - Depends on: TASK-407, TASK-408, TASK-410

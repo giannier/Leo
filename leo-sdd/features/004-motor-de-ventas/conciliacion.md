@@ -275,3 +275,14 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - El modelo `Facts` (guardados + derivados, `backend/app/process/facts.py`) se define aquí porque el motor lo necesita; TASK-411 agrega `FactsLoader` y las derivaciones. En el modelo, el hecho guardado `metodos_pago_enviados` ({order_id, en}) es `metodos_pago_registro` y `metodos_pago_enviados` es el booleano derivado.
 - `backend/scripts/coverage_gate.py` aún no cuenta `app/process/` ni `app/orders/` como grupo crítico (§3.5): cambio de script pendiente de aprobación; hoy caen en el 70 % de "el resto".
 
+### 8.7 Hechos (TASK-411)
+
+- `FactsLoader(session, tenant_id, FactsConfig).load(conversation, now=None)` lee en **3 sentencias como máximo** (2 si no hay pedido): (1) contacto + estado de la conversación (outer join), (2) pedido activo + último comprobante + fecha del último rechazo (sub-selects correlacionados), (3) líneas del pedido con `products.es_digital`. Lo hace `ConversationSnapshotRepository` (`backend/app/repositories/conversation_snapshot.py`), que no hereda `BaseRepository` porque cruza seis tablas; el `tenant_id` es argumento del constructor y va en el WHERE/ON de cada tabla. Una conversación de otro tenant se lee como vacía. Un test cuenta las sentencias.
+- La configuración que necesitan los hechos derivados (opciones efectivas, sección Entregas, promociones vigentes) entra como `FactsConfig`: la sirve `ProcessConfigService` con su caché de 60 s (TASK-414), así el loader no suma consultas.
+- `build_facts` es pura y concentra las reglas: `pago_estado` (tabla de `data-model.md §0019`), `datos_faltantes` (el teléfono desde el que escribe cuenta como `telefono`; un contacto solo con BSUID debe darlo), entrega (`tipo_entrega`, `direccion`, `zona_envio` solo si hay zonas), `metodos_pago_enviados` (del pedido activo y posterior al último comprobante rechazado, C-21), nombre confirmado frente a nombre de perfil, `promos_cierre`.
+- **Decisiones abiertas para Giannier:**
+  1. Un negocio que ofrece **solo delivery** (sin recojo) igual obliga a elegir `tipo_entrega`: `plantillas.md §1` solo fija el tipo solo cuando el negocio ofrece únicamente recojo. Parece una asimetría; si se quiere que `delivery` también se fije solo, es una línea en `_missing_data`.
+  2. `promos_cierre` lista **todas** las promociones de cierre vigentes. El filtro "que aplique al pedido" (productos, categorías, monto mínimo) queda para `pricing` (TASK-424) y el prompt builder (TASK-414).
+  3. Una línea cuyo producto fue borrado (`product_id` nulo) cuenta como física (se pide dirección): es el lado seguro.
+- `motivo_rechazo` solo se expone mientras el pedido activo está en `borrador` (rechazo de comprobante o de contra entrega, plantillas §5 COBRO); un pedido confirmado no arrastra el motivo viejo.
+
