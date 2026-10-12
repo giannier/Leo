@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from sqlalchemy import func, select, text
@@ -108,6 +109,32 @@ class TestCheckConstraints:
         db.add(Product(tenant_id=tenant.id, name="Broken", price=Decimal("-1.00")))
         with pytest.raises(IntegrityError):
             db.flush()
+
+    @pytest.mark.parametrize(
+        "overrides", [{"modo_venta": "regalo"}, {"bundle_size": 1}, {"bundle_size": 51}]
+    )
+    def test_invalid_sale_columns_are_rejected(
+        self, db: Session, overrides: dict[str, Any]
+    ) -> None:
+        tenant = _make_tenant(db)
+        db.add(Product(tenant_id=tenant.id, name="Broken", price=Decimal("1.00"), **overrides))
+        with pytest.raises(IntegrityError):
+            db.flush()
+
+    def test_a_product_defaults_to_fixed_price_and_single(self, db: Session) -> None:
+        tenant = _make_tenant(db)
+        product = Product(tenant_id=tenant.id, name="Plain", price=Decimal("1.00"))
+        db.add(product)
+        db.flush()
+        db.refresh(product)
+
+        assert product.modo_venta == "precio_fijo"
+        assert (product.es_digital, product.bundle_permite_libres, product.destacado) == (
+            False,
+            False,
+            False,
+        )
+        assert product.bundle_size is None
 
 
 class TestUniqueness:

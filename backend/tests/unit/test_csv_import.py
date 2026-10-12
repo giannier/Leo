@@ -14,9 +14,11 @@ import pytest
 from app.services.csv_import import (
     MAX_ROWS,
     ImportError_,
+    InvalidRow,
     decode,
     neutralise_formula,
     parse_catalogue,
+    parse_flag,
     parse_price,
     sniff_delimiter,
 )
@@ -308,3 +310,79 @@ class TestXlsx:
         parsed = parse_catalogue(raw)
         assert parsed.valid_rows == 1
         assert parsed.invalid[0].row == 3
+
+
+class TestSaleColumns:
+    """Feature 004: the columns that make a product fit for sale are optional."""
+
+    SALE_HEADER = "nombre,precio,modo_venta,es_digital,paquete,permite_libres,destacado\n"
+
+    def _sale(self, *rows: str) -> bytes:
+        return (self.SALE_HEADER + "\n".join(rows)).encode("utf-8")
+
+    def test_a_file_without_them_imports_with_the_defaults(self) -> None:
+        row = parse_catalogue(_csv("Lomo,,10.00,,Platos")).valid[0]
+
+        assert row["modo_venta"] == "precio_fijo"
+        assert row["bundle_size"] is None
+        assert (row["es_digital"], row["bundle_permite_libres"], row["destacado"]) == (
+            False,
+            False,
+            False,
+        )
+
+    def test_every_column_is_read(self) -> None:
+        row = parse_catalogue(self._sale("Paquete 5,500.00,cotizacion,si,5,x,1")).valid[0]
+
+        assert row["modo_venta"] == "cotizacion"
+        assert row["es_digital"] is True
+        assert row["bundle_size"] == 5
+        assert row["bundle_permite_libres"] is True
+        assert row["destacado"] is True
+
+    @pytest.mark.parametrize("mode", ["precio fijo", "Precio_Fijo", "fijo"])
+    def test_fixed_price_spellings(self, mode: str) -> None:
+        parsed = parse_catalogue(self._sale(f"A,1.00,{mode},,,,"))
+
+        assert parsed.valid[0]["modo_venta"] == "precio_fijo"
+
+    def test_quote_spelled_with_an_accent(self) -> None:
+        parsed = parse_catalogue(self._sale("A,1.00,Cotización,,,,"))
+
+        assert parsed.valid[0]["modo_venta"] == "cotizacion"
+
+    @pytest.mark.parametrize(
+        ("cells", "reason"),
+        [
+            ("A,1.00,regalo,,,,", "modo_venta_invalido"),
+            ("A,1.00,,quizas,,,", "es_digital_invalido"),
+            ("A,1.00,,,1,,", "paquete_invalido"),
+            ("A,1.00,,,51,,", "paquete_invalido"),
+            ("A,1.00,,,cinco,,", "paquete_invalido"),
+            ("A,1.00,,,,tal vez,", "bundle_permite_libres_invalido"),
+            ("A,1.00,,,,,jamas", "destacado_invalido"),
+        ],
+    )
+    def test_a_bad_value_rejects_only_that_row(self, cells: str, reason: str) -> None:
+        parsed = parse_catalogue(self._sale(cells, "Bueno,2.00,,,,,"))
+
+        assert parsed.valid_rows == 1
+        assert parsed.invalid == [InvalidRow(row=2, reason=reason)]
+
+    @pytest.mark.parametrize(("size", "expected"), [("2", 2), ("50", 50), ("2.0", 2)])
+    def test_bundle_size_limits_are_accepted(self, size: str, expected: int) -> None:
+        parsed = parse_catalogue(self._sale(f"A,1.00,,,{size},,"))
+
+        assert parsed.valid[0]["bundle_size"] == expected
+
+    @pytest.mark.parametrize("word", ["si", "sí", "SI", "true", "1", "x", "yes"])
+    def test_flag_true_words(self, word: str) -> None:
+        assert parse_flag(word) is True
+
+    @pytest.mark.parametrize("word", ["", " ", "no", "false", "0", "N"])
+    def test_flag_false_words(self, word: str) -> None:
+        assert parse_flag(word) is False
+
+    def test_flag_unknown_word_raises(self) -> None:
+        with pytest.raises(ValueError, match="quizas"):
+            parse_flag("quizas")

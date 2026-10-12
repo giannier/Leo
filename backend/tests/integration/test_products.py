@@ -258,3 +258,144 @@ class TestImport:
 
         stored = (await api.get(PRODUCTS, headers=headers)).json()["items"][0]["name"]
         assert stored.startswith("'")
+
+
+class TestSaleColumns:
+    """Feature 004, TASK-406: products fit for sale."""
+
+    async def test_a_new_product_defaults_to_a_plain_fixed_price_item(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "X", "price": "1.00"})
+
+        body = created.json()
+        assert body["modo_venta"] == "precio_fijo"
+        assert body["es_digital"] is False
+        assert body["bundle_size"] is None
+        assert body["bundle_permite_libres"] is False
+        assert body["destacado"] is False
+
+    async def test_create_a_bundle_and_read_it_back(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={
+                "name": "Paquete 5",
+                "price": "500.00",
+                "modo_venta": "precio_fijo",
+                "es_digital": True,
+                "bundle_size": 5,
+                "bundle_permite_libres": True,
+                "destacado": True,
+            },
+        )
+        assert created.status_code == 201
+
+        fetched = (await api.get(f"{PRODUCTS}/{created.json()['id']}", headers=headers)).json()
+        assert (fetched["es_digital"], fetched["bundle_size"], fetched["destacado"]) == (
+            True,
+            5,
+            True,
+        )
+        assert fetched["bundle_permite_libres"] is True
+
+    @pytest.mark.parametrize(
+        "extra",
+        [{"modo_venta": "regalo"}, {"bundle_size": 1}, {"bundle_size": 51}],
+    )
+    async def test_invalid_sale_values_are_rejected(
+        self, api: AsyncClient, mail: Any, extra: dict[str, Any]
+    ) -> None:
+        headers = await _owner(api, mail)
+        response = await api.post(
+            PRODUCTS, headers=headers, json={"name": "X", "price": "1.00", **extra}
+        )
+
+        assert response.status_code == 400
+
+    async def test_an_update_changes_only_what_it_sends(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={"name": "Hosting", "price": "99.00", "destacado": True, "bundle_size": 3},
+        )
+        product_id = created.json()["id"]
+
+        updated = await api.put(
+            f"{PRODUCTS}/{product_id}", headers=headers, json={"modo_venta": "cotizacion"}
+        )
+
+        body = updated.json()
+        assert body["modo_venta"] == "cotizacion"
+        assert body["destacado"] is True
+        assert body["bundle_size"] == 3
+
+    async def test_a_package_can_become_a_single_product_again(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS, headers=headers, json={"name": "P", "price": "1.00", "bundle_size": 4}
+        )
+
+        updated = await api.put(
+            f"{PRODUCTS}/{created.json()['id']}", headers=headers, json={"bundle_size": None}
+        )
+
+        assert updated.json()["bundle_size"] is None
+
+    async def test_a_null_for_a_required_column_is_rejected_not_a_server_error(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "P", "price": "1.00"})
+
+        response = await api.put(
+            f"{PRODUCTS}/{created.json()['id']}", headers=headers, json={"modo_venta": None}
+        )
+
+        assert response.status_code == 400
+
+    async def test_the_import_accepts_the_new_columns(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        csv = (
+            b"nombre,precio,modo_venta,es_digital,paquete,libres,destacado\n"
+            b"Paquete 5,500.00,precio_fijo,si,5,si,si\n"
+            b"Hosting,0,cotizacion,,,,\n"
+        )
+        preview = await api.post(
+            f"{PRODUCTS}/import", headers=headers, files={"file": ("c.csv", csv, "text/csv")}
+        )
+        assert preview.json()["valid_rows"] == 2
+        await api.post(f"{PRODUCTS}/import/{preview.json()['preview_id']}/confirm", headers=headers)
+
+        items = {
+            item["name"]: item
+            for item in (await api.get(PRODUCTS, headers=headers)).json()["items"]
+        }
+        assert items["Paquete 5"]["bundle_size"] == 5
+        assert items["Paquete 5"]["es_digital"] is True
+        assert items["Paquete 5"]["bundle_permite_libres"] is True
+        assert items["Paquete 5"]["destacado"] is True
+        assert items["Hosting"]["modo_venta"] == "cotizacion"
+        assert items["Hosting"]["bundle_size"] is None
+
+    async def test_the_import_still_works_without_them(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        preview = await api.post(
+            f"{PRODUCTS}/import",
+            headers=headers,
+            files={"file": ("c.csv", b"nombre,precio\nX,1.00\n", "text/csv")},
+        )
+        await api.post(f"{PRODUCTS}/import/{preview.json()['preview_id']}/confirm", headers=headers)
+
+        item = (await api.get(PRODUCTS, headers=headers)).json()["items"][0]
+        assert item["modo_venta"] == "precio_fijo"
+        assert item["destacado"] is False

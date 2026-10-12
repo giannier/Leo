@@ -41,6 +41,11 @@ AGENT_PACES = ("directo", "equilibrado", "paso_a_paso")
 AGENT_DETAIL_LEVELS = ("breve", "moderado", "extenso")
 INTELLIGENCE_LEVELS = ("economico", "medio", "mejor")
 DEFAULT_PROCESS_TEMPLATE = "productos"
+# How a product is sold: `precio_fijo` goes into an order, `cotizacion` is handed
+# to a person with a summary (Feature 004).
+SALE_MODES = ("precio_fijo", "cotizacion")
+BUNDLE_MIN_SIZE = 2
+BUNDLE_MAX_SIZE = 50
 
 PAYMENT_METHODS = ("yape", "plin", "transferencia", "tarjeta", "efectivo", "link")
 
@@ -203,6 +208,20 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Object storage keys, not URLs: the bucket may be private.
     image_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Fit for sale (Feature 004, migration 0018).
+    modo_venta: Mapped[str] = mapped_column(Text, nullable=False, server_default="precio_fijo")
+    # A digital product needs no delivery address.
+    es_digital: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # A bundle ("paquete") is a product with a size: the N selections that
+    # complete it are catalogue products or, with `bundle_permite_libres`, names
+    # the customer said ("certificamos cualquier tema").
+    bundle_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bundle_permite_libres: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    # The assistant pushes a highlighted product first.
+    destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

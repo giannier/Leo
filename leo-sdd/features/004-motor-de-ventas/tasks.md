@@ -49,7 +49,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: upgrade/downgrade; una `clave` duplicada en el mismo tenant falla y en otro tenant pasa
   - Parallel: false
 
-- [ ] TASK-406: Migración 0018 — productos aptos para venta
+- [x] TASK-406: Migración 0018 — productos aptos para venta
   - Input: `data-model.md §0018`
   - Output: columnas en `products`, esquemas de la API de catálogo actualizados (crear, editar e importar CSV/XLSX)
   - Depends on: TASK-405

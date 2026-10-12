@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Query, Response, UploadFile, status
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from app.api.deps import ConfigurationManagerDep, MemberDep, RedisDep, SessionDep
 from app.api.errors import ApiError, error_responses
+from app.models.business import BUNDLE_MAX_SIZE, BUNDLE_MIN_SIZE
 from app.services.catalog import CatalogService, PreviewNotFound
 from app.services.csv_import import (
     MAX_BYTES,
@@ -30,6 +31,8 @@ router = APIRouter(prefix="/tenant/products", tags=["products"])
 
 ProductName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
+SaleMode = Literal["precio_fijo", "cotizacion"]
+BundleSize = Annotated[int, Field(ge=BUNDLE_MIN_SIZE, le=BUNDLE_MAX_SIZE)]
 
 AUTH_RESPONSES = (
     (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
@@ -48,6 +51,12 @@ class ProductRequest(BaseModel):
     stock: int | None = Field(default=None, ge=0)
     category: ShortText | None = None
     is_active: bool = True
+    # Fit for sale (Feature 004). A bundle is a product with a `bundle_size`.
+    modo_venta: SaleMode = "precio_fijo"
+    es_digital: bool = False
+    bundle_size: BundleSize | None = None
+    bundle_permite_libres: bool = False
+    destacado: bool = False
 
 
 class ProductPatch(BaseModel):
@@ -57,6 +66,21 @@ class ProductPatch(BaseModel):
     stock: int | None = Field(default=None, ge=0)
     category: ShortText | None = None
     is_active: bool | None = None
+    modo_venta: SaleMode | None = None
+    es_digital: bool | None = None
+    # Unlike the other new fields, `bundle_size` may be sent as null: that turns
+    # a package back into a single product.
+    bundle_size: BundleSize | None = None
+    bundle_permite_libres: bool | None = None
+    destacado: bool | None = None
+
+    @field_validator("modo_venta", "es_digital", "bundle_permite_libres", "destacado")
+    @classmethod
+    def _not_null(cls, value: Any) -> Any:
+        """These columns are NOT NULL: omit the field to leave it as it is."""
+        if value is None:
+            raise ValueError("must not be null")
+        return value
 
 
 class ProductResponse(BaseModel):
@@ -67,6 +91,11 @@ class ProductResponse(BaseModel):
     stock: int | None
     category: str | None
     is_active: bool
+    modo_venta: SaleMode
+    es_digital: bool
+    bundle_size: int | None
+    bundle_permite_libres: bool
+    destacado: bool
 
 
 class ProductPage(BaseModel):

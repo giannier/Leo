@@ -45,8 +45,35 @@ MAX_FIELD_CHARS = 2_000
 # first visible character, so "\t=SUM(...)" is a formula.
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
-CANONICAL_COLUMNS = ("name", "description", "price", "stock", "category")
+CANONICAL_COLUMNS = (
+    "name",
+    "description",
+    "price",
+    "stock",
+    "category",
+    # Fit for sale (Feature 004). All optional: a file without them imports as
+    # fixed-price, physical, single, not highlighted products.
+    "modo_venta",
+    "es_digital",
+    "bundle_size",
+    "bundle_permite_libres",
+    "destacado",
+)
 REQUIRED_COLUMNS = ("name", "price")
+
+BUNDLE_MIN_SIZE = 2
+BUNDLE_MAX_SIZE = 50
+
+_TRUE_WORDS = frozenset({"si", "sí", "s", "yes", "y", "true", "verdadero", "1", "x"})
+_FALSE_WORDS = frozenset({"no", "n", "false", "falso", "0"})
+_SALE_MODES = {
+    "precio_fijo": "precio_fijo",
+    "precio fijo": "precio_fijo",
+    "fijo": "precio_fijo",
+    "cotizacion": "cotizacion",
+    "cotización": "cotizacion",
+    "cotizar": "cotizacion",
+}
 
 # Spanish headers as a customer's own spreadsheet would spell them.
 _HEADER_ALIASES = {
@@ -66,6 +93,19 @@ _HEADER_ALIASES = {
     "categoría": "category",
     "category": "category",
     "rubro": "category",
+    "modo_venta": "modo_venta",
+    "modo de venta": "modo_venta",
+    "modo": "modo_venta",
+    "es_digital": "es_digital",
+    "digital": "es_digital",
+    "bundle_size": "bundle_size",
+    "paquete": "bundle_size",
+    "tamano_paquete": "bundle_size",
+    "tamaño_paquete": "bundle_size",
+    "bundle_permite_libres": "bundle_permite_libres",
+    "permite_libres": "bundle_permite_libres",
+    "libres": "bundle_permite_libres",
+    "destacado": "destacado",
 }
 
 _CURRENCY_NOISE = re.compile(r"[^\d,.\-]")
@@ -172,6 +212,20 @@ def parse_price(raw: str) -> Decimal:
     if price < 0:
         raise InvalidOperation("negative")
     return price
+
+
+def parse_flag(raw: str) -> bool:
+    """A yes/no cell as a customer writes it: `si`, `no`, `1`, `x`, blank.
+
+    A blank cell is "no", because an optional column left empty must not reject
+    the row. Anything else that is not a recognised word raises `ValueError`.
+    """
+    word = raw.strip().lower()
+    if not word or word in _FALSE_WORDS:
+        return False
+    if word in _TRUE_WORDS:
+        return True
+    raise ValueError(word)
 
 
 def _normalise_header(cell: str) -> str:
@@ -304,6 +358,29 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         if stock < 0:
             return InvalidRow(row=number, reason="stock_negativo")
 
+    sale_mode = _SALE_MODES.get((record.get("modo_venta") or "").strip().lower())
+    if sale_mode is None:
+        if (record.get("modo_venta") or "").strip():
+            return InvalidRow(row=number, reason="modo_venta_invalido")
+        sale_mode = "precio_fijo"
+
+    bundle_size: int | None = None
+    bundle_raw = (record.get("bundle_size") or "").strip()
+    if bundle_raw:
+        try:
+            bundle_size = int(Decimal(bundle_raw))
+        except (InvalidOperation, ArithmeticError, ValueError):
+            return InvalidRow(row=number, reason="paquete_invalido")
+        if not BUNDLE_MIN_SIZE <= bundle_size <= BUNDLE_MAX_SIZE:
+            return InvalidRow(row=number, reason="paquete_invalido")
+
+    flags: dict[str, bool] = {}
+    for column in ("es_digital", "bundle_permite_libres", "destacado"):
+        try:
+            flags[column] = parse_flag(record.get(column) or "")
+        except ValueError:
+            return InvalidRow(row=number, reason=f"{column}_invalido")
+
     description = (record.get("description") or "").strip()[:MAX_FIELD_CHARS]
     category = (record.get("category") or "").strip()[:MAX_FIELD_CHARS]
 
@@ -315,6 +392,9 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         "price": str(price.quantize(Decimal("0.01"))),
         "stock": stock,
         "category": neutralise_formula(category) or None,
+        "modo_venta": sale_mode,
+        "bundle_size": bundle_size,
+        **flags,
     }
 
 
