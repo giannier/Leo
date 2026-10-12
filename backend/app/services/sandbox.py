@@ -13,6 +13,11 @@ same tools, same tables; only the channel differs. A sandbox that answered with
 canned text would demo something the customer will never receive, and the
 divergence would be discovered on the day the number connects.
 
+Feature 004 (C-19) adds the rest of what makes it a simulator rather than a chat
+box: the customer is a synthetic contact (`sandbox:{user_id}`), what the tools
+send (a file, buttons, a list) is recorded as typed outbound messages that the
+panel draws, and nothing ever reaches the provider.
+
 The cost that comes with "free and unmetered" is the LLM bill, which is real.
 The guard is a per-tenant rate limit rather than a quota, because a limit
 throttles abuse without ever telling a legitimate customer they have run out.
@@ -26,13 +31,22 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
+from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
+from app.process.inbound import interactive_of
 from app.providers.llm.base import LLMProvider
+from app.providers.whatsapp.base import InteractiveReply
+from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.repositories.sandbox_reset import SandboxResetRepository
 from app.services.activation import build_checklist
 from app.services.turn_outbound import SandboxOutbound
 
 SANDBOX_CHANNEL = "sandbox"
+
+# The identity the simulator's contact carries (C-19): one per panel user, so two
+# people trying the same business do not share a customer.
+SANDBOX_CONTACT_PREFIX = "sandbox:"
 
 
 class SandboxNotReady(RuntimeError):
@@ -86,8 +100,9 @@ class SandboxService:
         if not checklist.sandbox_ready:
             raise SandboxNotReady("the activation checklist is not complete enough")
 
+        contact = self._contact(f"{SANDBOX_CONTACT_PREFIX}{started_by}")
         conversation = self._conversations.add(
-            channel=SANDBOX_CHANNEL, started_by=started_by, status="open"
+            channel=SANDBOX_CHANNEL, started_by=started_by, contact_id=contact.id, status="open"
         )
         self._session.commit()
         return conversation
@@ -112,22 +127,66 @@ class SandboxService:
         page = list(rows)[offset : offset + limit]
         return page, total
 
-    async def send(self, conversation_id: uuid.UUID, *, content: str) -> SandboxTurn:
+    def outbound_after(
+        self, conversation_id: uuid.UUID, after_id: uuid.UUID | None
+    ) -> list[Message]:
+        """What the agent said after one message: the asynchronous outbounds.
+
+        The confirmation or rejection of a payment, a handover and the follow-ups
+        are written as outbound messages with no customer message to answer
+        (C-19). The simulator polls this while it is open.
+        """
+        if self.get(conversation_id) is None:
+            raise ConversationNotFound(str(conversation_id))
+        return list(self._messages.outbound_after(conversation_id, after_id))
+
+    def reset(self, conversation_id: uuid.UUID) -> None:
+        """Forget everything: the state, the messages and the sandbox orders."""
+        if self.get(conversation_id) is None:
+            raise ConversationNotFound(str(conversation_id))
+        SandboxResetRepository(self._session, self._tenant_id).wipe(conversation_id)
+        self._session.commit()
+
+    async def send(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        content: str,
+        interactive: InteractiveReply | None = None,
+        image: bool = False,
+    ) -> SandboxTurn:
         """Record the customer's message, answer it, record the answer.
 
         The customer's message is persisted **before** the model is called, so
         a provider failure still leaves the conversation showing what was
         asked. Losing the question along with the answer would make the
         transcript lie about what happened.
+
+        A tapped button is stored the way the real channel stores it: the title
+        the customer saw is the text, and the id travels in the payload.
         """
-        if self.get(conversation_id) is None:
+        conversation = self.get(conversation_id)
+        if conversation is None:
             raise ConversationNotFound(str(conversation_id))
+        self._ensure_contact(conversation)
 
         customer_message = self._messages.append(
             conversation_id=conversation_id,
             direction="inbound",
             author="customer",
             content=content,
+            msg_type="image" if image else "text",
+            payload=(
+                {
+                    "interactive": {
+                        "id": interactive.id,
+                        "title": interactive.title,
+                        "description": interactive.description,
+                    }
+                }
+                if interactive is not None
+                else None
+            ),
         )
         self._session.commit()
 
@@ -139,7 +198,15 @@ class SandboxService:
             sandbox=True,
             queue_text=False,
         )
-        result = await pipeline.run(conversation_id, InboundTurn(text=content))
+        tap = interactive_of(customer_message.payload)
+        result = await pipeline.run(
+            conversation_id,
+            InboundTurn(
+                text="" if image else content,
+                interactive=(tap,) if tap is not None else (),
+                image=image,
+            ),
+        )
 
         # `tenants.ai_messages_used` is deliberately untouched: the sandbox is
         # free and unmetered, during the trial and after (Clarification 002).
@@ -154,3 +221,19 @@ class SandboxService:
             outbound=result.messages,
             result=result,
         )
+
+    # ------------------------------------------------------------ the contact
+
+    def _contact(self, external_user_id: str) -> Contact:
+        """The simulator's customer: no phone, a synthetic id (C-19)."""
+        return ContactRepository(self._session, self._tenant_id).upsert(
+            external_user_id=external_user_id
+        )
+
+    def _ensure_contact(self, conversation: Conversation) -> None:
+        """Give a conversation opened before the simulator had a contact one."""
+        if conversation.contact_id is not None:
+            return
+        owner = conversation.started_by or conversation.id
+        contact = self._contact(f"{SANDBOX_CONTACT_PREFIX}{owner}")
+        self._conversations.update(conversation.id, contact_id=contact.id)

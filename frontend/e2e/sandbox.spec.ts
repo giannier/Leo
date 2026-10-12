@@ -2,6 +2,7 @@
 import { expect, test } from "./fixtures";
 
 import { freshIdentity, verificationPath, waitForEmail } from "./outbox";
+import { readyToTest } from "./ready";
 
 /**
  * Modo prueba, end to end (TASK-022).
@@ -18,51 +19,6 @@ import { freshIdentity, verificationPath, waitForEmail } from "./outbox";
  * for, and they run against a real model in their own workflow.
  */
 
-/** Registers, verifies, signs in, and completes the checklist through the
- * wizard so the sandbox unlocks. */
-async function readyToTest(page: import("@playwright/test").Page) {
-  const user = freshIdentity();
-
-  await page.goto("/register");
-  await page.getByLabel("Tu nombre").fill(user.fullName);
-  await page.getByLabel("Nombre de tu negocio").fill(user.businessName);
-  await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
-  await page.getByRole("button", { name: "Crear mi cuenta" }).click();
-  await expect(page.getByRole("heading", { name: "Revisa tu correo" })).toBeVisible();
-
-  const message = await waitForEmail(user.email);
-  await page.goto(verificationPath(message));
-  await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
-  await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("/", { timeout: 15_000 });
-
-  await page.goto("/onboarding?paso=1");
-  await page.getByLabel("Nombre comercial").fill("Panadería Quispe");
-  await page.getByLabel("Rubro").selectOption("retail");
-  await expect(page.getByText("Guardado", { exact: true })).toBeVisible({ timeout: 15_000 });
-
-  await page.goto("/onboarding?paso=2");
-  await page.getByLabel("¿Cómo se llama tu agente?").fill("Lucía");
-  await expect(page.getByText("Guardado", { exact: true })).toBeVisible({ timeout: 15_000 });
-
-  await page.goto("/onboarding?paso=3");
-  await page.getByLabel("Nombre", { exact: true }).fill("Pan ciabatta");
-  await page.getByLabel("Precio", { exact: true }).fill("8.50");
-  await page.getByRole("button", { name: "Agregar", exact: true }).click();
-  await expect(page.getByText("Pan ciabatta")).toBeVisible({ timeout: 15_000 });
-
-  await page.goto("/onboarding?paso=5");
-  await page.getByLabel("Método").selectOption("yape");
-  await page.getByLabel("Instrucciones").fill("Yape al 987654321 a nombre de Ana Quispe.");
-  await page.getByRole("button", { name: "Agregar", exact: true }).click();
-  await expect(page.getByText(/Yape al 987654321/)).toBeVisible({ timeout: 15_000 });
-
-  return user;
-}
-
 test.describe("Modo prueba", () => {
   test("el agente responde y su traza es visible", async ({ page }) => {
     await readyToTest(page);
@@ -73,7 +29,7 @@ test.describe("Modo prueba", () => {
     await expect(page.getByText("No gasta mensajes de tu prueba")).toBeVisible();
 
     await page.getByLabel("Escribe como si fueras un cliente").fill("Hola, ¿qué venden?");
-    await page.getByRole("button", { name: "Enviar" }).click();
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
 
     // The question shows immediately, before the round trip.
     await expect(page.getByText("Hola, ¿qué venden?")).toBeVisible();
@@ -100,13 +56,19 @@ test.describe("Modo prueba", () => {
     await page.goto("/sandbox");
 
     await page.getByLabel("Escribe como si fueras un cliente").fill("¿Hacen delivery?");
-    await page.getByRole("button", { name: "Enviar" }).click();
+    await page.getByRole("button", { name: "Enviar", exact: true }).click();
     await expect(page.getByTestId("trace")).toBeVisible({ timeout: 40_000 });
 
     await page.getByRole("button", { name: "Reiniciar conversación" }).click();
 
-    await expect(page.getByText("¿Hacen delivery?")).toBeHidden({ timeout: 15_000 });
-    await expect(page.getByText("Escríbele como lo haría un cliente")).toBeVisible();
+    // Clean means nothing of the old thread is left. The question is also one of
+    // the suggestion chips of the empty state, so "hidden" would only hold for the
+    // instant the skeleton shows; what is left is that chip alone, and no trace.
+    await expect(page.getByText("Escríbele como lo haría un cliente")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("trace")).toHaveCount(0);
+    await expect(page.getByText("¿Hacen delivery?")).toHaveCount(1);
   });
 
   test("una sugerencia envía el mensaje de una", async ({ page }) => {

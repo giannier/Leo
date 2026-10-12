@@ -812,11 +812,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read the transcript */
+        /**
+         * Read the transcript, or only what the agent said after a message
+         * @description With `after`, the asynchronous outbounds posterior to that message (the
+         *     confirmation or rejection of a payment, a handover, a follow-up): the
+         *     simulator asks every few seconds while it is open (C-19).
+         */
         get: operations["get_history_api_v1_tenant_sandbox_conversations__conversation_id__messages_get"];
         put?: never;
         /**
-         * Send a message and get the agent's reply
+         * Send a message, a tapped option or an image, and get the agent's reply
          * @description One turn, no streaming in v1.
          *
          *     Rate limited per tenant rather than per user: the cost being guarded is
@@ -824,6 +829,27 @@ export interface paths {
          *     typing.
          */
         post: operations["send_message_api_v1_tenant_sandbox_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/sandbox/conversations/{conversation_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the conversation over
+         * @description Deletes the state, the messages and the sandbox orders of this
+         *     conversation, so the owner can walk the sales process from the greeting.
+         */
+        post: operations["reset_conversation_api_v1_tenant_sandbox_conversations__conversation_id__reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1111,6 +1137,13 @@ export interface components {
              */
             overwrote_newer: boolean;
         };
+        /** Button */
+        Button: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
         /** ChannelMetricsResponse */
         ChannelMetricsResponse: {
             /** Messages In */
@@ -1287,6 +1320,45 @@ export interface components {
             id: string;
             /** Queued */
             queued: boolean;
+        };
+        /**
+         * DebugResponse
+         * @description The debug panel (C-19): where the conversation is and what the agent had.
+         */
+        DebugResponse: {
+            /** Etapa Antes */
+            etapa_antes: string;
+            /** Etapa Despues */
+            etapa_despues: string;
+            /** Embudo */
+            embudo: string;
+            /** Hechos */
+            hechos: {
+                [key: string]: unknown;
+            };
+            /** Herramientas Habilitadas */
+            herramientas_habilitadas: string[];
+            /** Herramientas Llamadas */
+            herramientas_llamadas: components["schemas"]["DebugTool"][];
+            tokens: components["schemas"]["DebugTokens"];
+            /** Modelo */
+            modelo?: string | null;
+            /** Silencio */
+            silencio?: string | null;
+        };
+        /** DebugTokens */
+        DebugTokens: {
+            /** Prompt */
+            prompt: number;
+            /** Completion */
+            completion: number;
+        };
+        /** DebugTool */
+        DebugTool: {
+            /** Nombre */
+            nombre: string;
+            /** Status */
+            status: string;
         };
         /**
          * ErrorResponse
@@ -1498,6 +1570,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            saliente?: components["schemas"]["Saliente"] | null;
         };
         /** PaymentMethodPatch */
         PaymentMethodPatch: {
@@ -1683,11 +1756,6 @@ export interface components {
             /** Limit */
             limit: number;
         };
-        /** SendMessageRequest */
-        SendMessageRequest: {
-            /** Content */
-            content: string;
-        };
         /** SendMessageResponse */
         SendMessageResponse: {
             /**
@@ -1695,8 +1763,11 @@ export interface components {
              * Format: uuid
              */
             message_id: string;
-            reply: components["schemas"]["ReplyResponse"];
-            trace: components["schemas"]["TraceResponse"];
+            /** Salientes */
+            salientes: components["schemas"]["Saliente"][];
+            reply?: components["schemas"]["ReplyResponse"] | null;
+            trace?: components["schemas"]["TraceResponse"] | null;
+            debug?: components["schemas"]["DebugResponse"] | null;
         };
         /**
          * SessionResponse
@@ -1722,6 +1793,58 @@ export interface components {
             /** Memberships */
             memberships: components["schemas"]["MembershipSummary"][];
             /** Active Tenant Id */
+        /** Row */
+        Row: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+        };
+        /**
+         * Saliente
+         * @description One outbound message, typed the way the panel draws it.
+         *
+         *     `tipo` says which fields are filled: `texto` -> `texto`; `imagen`, `documento`,
+         *     `video`, `audio` -> `clave`, `titulo`, `caption`, `url`; `botones` -> `body`,
+         *     `botones`; `lista` -> `body`, `boton`, `filas`.
+         */
+        Saliente: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "texto" | "imagen" | "documento" | "video" | "audio" | "botones" | "lista";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Texto */
+            texto?: string | null;
+            /** Body */
+            body?: string | null;
+            /** Caption */
+            caption?: string | null;
+            /** Clave */
+            clave?: string | null;
+            /** Titulo */
+            titulo?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Botones */
+            botones?: components["schemas"]["Button"][] | null;
+            /** Boton */
+            boton?: string | null;
+            /** Filas */
+            filas?: components["schemas"]["Row"][] | null;
+        };
             active_tenant_id: string | null;
         };
         /** StartConversationResponse */
@@ -1871,6 +1994,10 @@ export interface components {
             ai_messages_limit: number;
             /** Percent Used */
             percent_used: number;
+            /** Catalog Guard */
+            catalog_guard?: {
+                [key: string]: unknown;
+            } | null;
             /** Messages In */
             messages_in: number;
             /** Messages Out */
@@ -3976,6 +4103,7 @@ export interface operations {
                 };
             };
         };
+                after?: string | null;
     };
     send_message_api_v1_tenant_sandbox_conversations__conversation_id__messages_post: {
         parameters: {
@@ -3988,7 +4116,20 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendMessageRequest"];
+                "application/json": {
+                    /** Content */
+                    content?: string | null;
+                    /** Interactive Id */
+                    interactive_id?: string | null;
+                    /** Title */
+                    title?: string | null;
+                };
+                "multipart/form-data": {
+                    /** Format: binary */
+                    image: string;
+                    /** @description Optional caption. */
+                    content?: string;
+                };
             };
         };
         responses: {
@@ -4050,7 +4191,9 @@ export interface operations {
     };
     get_tenant_api_v1_tenant_get: {
         parameters: {
-            query?: never;
+            query?: {
+                debug?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4094,6 +4237,53 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+    reset_conversation_api_v1_tenant_sandbox_conversations__conversation_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
         responses: {
             /** @description Successful Response */
             200: {
