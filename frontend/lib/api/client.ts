@@ -262,7 +262,14 @@ export type TransitionBody = JsonBody<
 export type SandboxTurn = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["post"]
 >;
-export type SandboxTrace = SandboxTurn["trace"];
+/** The trace of a turn; null when the turn produced no model answer. */
+export type SandboxTrace = NonNullable<SandboxTurn["trace"]>;
+/** One outbound message, typed the way the simulator draws it. */
+export type Saliente = SandboxTurn["salientes"][number];
+/** The debug panel of a turn (`?debug=true`). */
+export type SandboxDebug = NonNullable<SandboxTurn["debug"]>;
+/** What the customer did: wrote, or tapped a button or a list row. */
+export type SandboxInput = { content: string } | { interactive_id: string; title: string };
 export type SandboxHistory = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["get"]
 >;
@@ -418,13 +425,31 @@ export const api = {
   sandbox: {
     start: () =>
       request<{ conversation_id: string }>("/tenant/sandbox/conversations", { method: "POST" }),
-    send: (conversationId: string, content: string) =>
+    send: (conversationId: string, input: SandboxInput, debug = false) =>
       request<SandboxTurn>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
         method: "POST",
-        body: { content },
+        body: input,
+        query: debug ? { debug: true } : undefined,
       }),
+    sendImage: (conversationId: string, image: File, debug = false) => {
+      const form = new FormData();
+      form.append("image", image);
+      return request<SandboxTurn>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
+        method: "POST",
+        body: form,
+        query: debug ? { debug: true } : undefined,
+      });
+    },
     history: (conversationId: string) =>
       request<SandboxHistory>(`/tenant/sandbox/conversations/${conversationId}/messages`),
+    /** What the agent said after a message: confirmations, handovers, follow-ups. */
+    after: (conversationId: string, messageId: string, signal?: AbortSignal) =>
+      request<SandboxHistory>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
+        query: { after: messageId },
+        signal,
+      }),
+    reset: (conversationId: string) =>
+      request<void>(`/tenant/sandbox/conversations/${conversationId}/reset`, { method: "POST" }),
   },
 
   payments: {

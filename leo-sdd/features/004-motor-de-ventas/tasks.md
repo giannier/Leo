@@ -180,7 +180,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - la suite completa existente sigue en verde.
   - Parallel: false
 
-- [ ] TASK-422: Simulador — salientes tipados y modo depuración
+- [x] TASK-422: Simulador — salientes tipados y modo depuración
   - Input: `contracts/api.md §4`
   - Output: el endpoint acepta texto, `interactive_id` o imagen; devuelve `salientes[]` y `debug`; `GET /sandbox/messages?after=` para salientes asíncronos; `POST /sandbox/reset`; contacto sandbox con `external_user_id` sintético; nada sandbox sale al proveedor; el frontend dibuja botones, listas e imágenes y el panel de depuración (etapa, hechos, tools)
   - Depends on: TASK-421
