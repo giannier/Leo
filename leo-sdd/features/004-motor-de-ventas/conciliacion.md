@@ -305,3 +305,9 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - El título se aplana a una línea de 100 caracteres máximo antes de llegar al prompt.
 - `InteractiveReply(id, title, description)` es el tipo que el adaptador (TASK-418) deberá producir al parsear `button_reply` y `list_reply`.
 - `scripts/coverage_gate.py`: `app/process/` y `app/orders/` pasan al grupo crítico "sales engine" (80 %), cierra el pendiente de §3.5 y §8.6.
+
+### 8.10 Presupuesto de mensajes (TASK-415)
+
+- `TurnBudget(max=3, reserva_texto=1)` en `backend/app/agent/budget.py`. `consume()` gasta un mensaje de una herramienta y devuelve `False` (sin gastar) cuando solo queda la reserva del texto; así una herramienta responde `no_disponible` con "ofrécelo en tu próximo mensaje" (lo arma TASK-417).
+- `remaining_text_bubbles()` = `max - gastados`: 3, 2 o 1 según se hayan enviado 0, 1 o 2 cosas. El tope por nivel de detalle (breve 1, extenso 2) lo aplica el formateador (TASK-416): con 2 cosas enviadas el texto sale en 1 burbuja (C-11).
+- El presupuesto es mutable y una instancia viaja con el turno. Un valor imposible (`max < 1`, reserva fuera de `0..max`) lanza `ValueError`.
