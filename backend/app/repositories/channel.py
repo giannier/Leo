@@ -46,20 +46,74 @@ class ContactRepository(BaseRepository[Contact]):
         statement = self._scoped().where(Contact.phone_e164 == phone_e164)
         return self._session.execute(statement).scalar_one_or_none()
 
-    def upsert(self, phone_e164: str, *, profile_name: str | None = None) -> Contact:
-        """Find or create the contact, refreshing the display name.
+    def by_external_user_id(self, external_user_id: str) -> Contact | None:
+        """The contact Meta identifies with this BSUID."""
+        statement = self._scoped().where(Contact.external_user_id == external_user_id)
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def upsert(
+        self,
+        phone_e164: str | None = None,
+        *,
+        external_user_id: str | None = None,
+        profile_name: str | None = None,
+    ) -> Contact:
+        """Find or create the contact by BSUID or phone, whichever arrived.
+
+        A message carries a phone number, a BSUID, or both. The BSUID is the
+        stable identity (a person can change number), so it is looked up first.
+        When one identifier is missing from the stored contact and the other
+        arrives, it is learned: a contact that started with a phone gains its
+        BSUID the first time Meta sends it, and the other way round. A stored
+        identifier is never overwritten.
+
+        If the phone and the BSUID each match a *different* contact, they are
+        two rows of the same person that this method does not merge (merging
+        would move conversations and orders). The BSUID contact wins and the
+        phone is not attached to it, which would violate the phone's unique
+        index.
 
         The profile name is only overwritten when the provider actually sent
         one. WhatsApp omits the field for people who have not set a name, and
         a blank in one webhook must not erase a name learned from an earlier
         one.
         """
-        contact = self.by_phone(phone_e164)
+        if phone_e164 is None and external_user_id is None:
+            raise ValueError("a contact needs a phone number or a BSUID")
+
+        by_user = self.by_external_user_id(external_user_id) if external_user_id else None
+        by_phone = self.by_phone(phone_e164) if phone_e164 else None
+        contact = by_user or by_phone
         if contact is None:
-            return self.add(phone_e164=phone_e164, profile_name=profile_name)
+            return self.add(
+                phone_e164=phone_e164,
+                external_user_id=external_user_id,
+                profile_name=profile_name,
+            )
+
+        changed = False
+        if external_user_id and contact.external_user_id is None:
+            contact.external_user_id = external_user_id
+            changed = True
+        if phone_e164 and contact.phone_e164 is None and by_phone is None:
+            contact.phone_e164 = phone_e164
+            changed = True
         if profile_name:
             contact.profile_name = profile_name
+            changed = True
+        if changed:
             self._session.flush()
+        return contact
+
+    def merge_custom_data(self, contact: Contact, values: dict[str, Any]) -> Contact:
+        """Add or replace some of the customer's data, keeping the rest.
+
+        A new dict is assigned rather than the old one mutated, so SQLAlchemy
+        sees the column change. Validation is the caller's job (TASK-427).
+        """
+        self._require_own(contact)
+        contact.custom_data = {**contact.custom_data, **values}
+        self._session.flush()
         return contact
 
     def record_inbound(self, contact: Contact, *, at: datetime) -> Contact:

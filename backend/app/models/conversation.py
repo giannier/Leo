@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, func
+from sqlalchemy import ARRAY, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -160,3 +160,13 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     # does not sell. Nullable rather than defaulted for exactly that reason -
     # "{}" everywhere would bury the handful of rows worth reading.
     catalog_guard: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
+    # Where the sales engine had the conversation on this turn (Feature 004,
+    # migration 0020). All nullable: turns written before the engine existed, and
+    # turns that never reached it, carry none.
+    stage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    funnel_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The tools the model was offered, not the ones it called (`tools_called`).
+    tools_enabled: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    outbound_count: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    model_tier: Mapped[str | None] = mapped_column(Text, nullable=True)

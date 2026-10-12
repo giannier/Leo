@@ -250,3 +250,11 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - `OrderRepository.add_numbered` toma el número de `tenant_sequences` con un único `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` (`TenantSequenceRepository.next_value`). `OrderService` (TASK-425) lo reutiliza; la prueba de numeración concurrente con conexiones reales es de esa task.
 - `OrderRepository.active_for_conversation` desempata por `numero` (dos pedidos en una misma transacción comparten `created_at`).
 
+### 8.4 Migración 0020 (TASK-408)
+
+- La columna es `contacts.phone_e164` (no `phone`) y no existe `wa_id` (§3.1). `phone_e164` pasa a nullable; el CHECK `ck_contacts_identity` exige teléfono o BSUID. El índice único parcial es `uq_contacts_tenant_id_external_user_id` (convención de nombres).
+- `ContactRepository.upsert(phone_e164=None, *, external_user_id=None, profile_name=None)`: busca primero por BSUID y luego por teléfono; si falta el otro identificador y llega, lo aprende; nunca sobrescribe uno guardado. Si el teléfono y el BSUID corresponden a dos contactos distintos, gana el del BSUID y NO se fusionan (fusionar movería conversaciones y pedidos): **decisión abierta** para Giannier.
+- `ReplySender` ya no envía a un contacto sin teléfono: marca la respuesta `failed` (con evento de estado y log) en vez de llamar al proveedor sin destinatario. El envío por BSUID (`Recipient`) llega con TASK-418; el parser del webhook sigue exigiendo `from` y `to` hasta entonces.
+- `agent_traces` suma `stage_key`, `funnel_code`, `tools_enabled`, `outbound_count` y `model_tier`, todas nullable. Las llena el pipeline (TASK-421).
+- El downgrade se niega a correr si existe algún contacto sin teléfono (restaurar NOT NULL lo perdería).
+
