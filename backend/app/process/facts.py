@@ -31,6 +31,8 @@ from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order, PaymentProof
 from app.models.sales_config import Promotion
+from app.orders.pricing import Line as PricingLine
+from app.orders.pricing import Rule, applies_to_order
 from app.process.templates.base import EffectiveOptions
 from app.repositories.conversation_snapshot import (
     ConversationSnapshot,
@@ -340,13 +342,38 @@ def _name(contact: Contact | None) -> tuple[str | None, bool]:
     return contact.profile_name or None, False
 
 
+def _pricing_lines(snapshot: ConversationSnapshot) -> list[PricingLine]:
+    return [
+        PricingLine(
+            product_id=line.item.product_id,
+            categoria=line.categoria,
+            precio_unitario=line.item.precio_unitario,
+            cantidad=line.item.cantidad,
+        )
+        for line in snapshot.lines
+    ]
+
+
 def _closing_promotions(
-    promotions: Sequence[Promotion], offered: Mapping[str, Any], now: datetime
+    promotions: Sequence[Promotion],
+    offered: Mapping[str, Any],
+    now: datetime,
+    lines: Sequence[PricingLine] = (),
 ) -> list[PromoCierre]:
-    """The closing promotions in force, each with its expiry if already offered."""
+    """The closing promotions the assistant may offer, each with its expiry if
+    already offered.
+
+    With an order that has lines, only the ones that would take something off it
+    (scope, minimum amount, quantity: `pricing.applies_to_order`) are listed, so
+    the model is never shown a coupon it cannot honour. With no lines there is
+    nothing to judge against and every one in force is listed: "I'll think about
+    it" before an order exists is exactly when a coupon is offered.
+    """
     closing: list[PromoCierre] = []
     for promotion in promotions:
         if promotion.uso != "cierre":
+            continue
+        if lines and not applies_to_order(Rule.from_promotion(promotion), lines, now):
             continue
         expiry = offered.get(str(promotion.id))
         if isinstance(expiry, str):
@@ -406,7 +433,7 @@ def build_facts(snapshot: ConversationSnapshot, config: FactsConfig, now: dateti
             else None
         ),
         promos_cierre=_closing_promotions(
-            config.promotions, stored.get("promos_ofrecidas", {}), now
+            config.promotions, stored.get("promos_ofrecidas", {}), now, _pricing_lines(snapshot)
         ),
     )
 

@@ -658,6 +658,54 @@ class TestClosingPromotions:
     def test_no_promotions(self) -> None:
         assert _build(_snapshot()).promos_cierre == []
 
+    def test_with_an_order_only_the_promotions_that_apply_to_it_are_listed(self) -> None:
+        """TASK-424: a coupon the order cannot use is not shown to the model."""
+        course = uuid.uuid4()
+        other = uuid.uuid4()
+        fits = _promo(
+            nombre="Cupón cursos",
+            tipo="porcentaje",
+            valor=Decimal("20"),
+            aplica_a="productos",
+            product_ids=[course],
+        )
+        wrong_product = _promo(
+            nombre="Cupón otro",
+            tipo="porcentaje",
+            valor=Decimal("20"),
+            aplica_a="productos",
+            product_ids=[other],
+        )
+        too_small = _promo(
+            nombre="Cupón grande", tipo="porcentaje", valor=Decimal("10"), monto_minimo=Decimal(900)
+        )
+        item = _item(product_id=course, precio_unitario=Decimal("500.00"))
+
+        facts = _build(
+            _snapshot(order=_order(), lines=[(item, False)]),
+            promotions=[fits, wrong_product, too_small],
+        )
+
+        assert [p.nombre for p in facts.promos_cierre] == ["Cupón cursos"]
+
+    def test_a_category_promotion_reads_the_category_of_the_line(self) -> None:
+        promo = _promo(
+            tipo="porcentaje", valor=Decimal("15"), aplica_a="categorias", categorias=["Gestión"]
+        )
+        item = _item(product_id=uuid.uuid4(), precio_unitario=Decimal("100.00"))
+        snapshot = ConversationSnapshot(
+            order=_order(), lines=[OrderLine(item=item, es_digital=True, categoria="gestión")]
+        )
+
+        assert len(_build(snapshot, promotions=[promo]).promos_cierre) == 1
+
+    def test_without_lines_every_closing_promotion_in_force_is_listed(self) -> None:
+        promo = _promo(tipo="porcentaje", valor=Decimal("20"), aplica_a="productos")
+
+        facts = _build(_snapshot(order=_order()), promotions=[promo])
+
+        assert [p.nombre for p in facts.promos_cierre] == ["Cupón 20 %"]
+
 
 class TestStoredFactsPassThrough:
     def test_the_stored_facts_are_read_from_the_state_row(self) -> None:
