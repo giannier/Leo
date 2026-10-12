@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -106,6 +106,18 @@ class ProductRepository(BaseRepository[Product]):
         if product is None or product.deleted_at is not None or not product.is_active:
             return None
         return product
+
+    def by_ids(self, product_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, Product]:
+        """The products of this tenant among `product_ids`, by id, in one query.
+
+        Deleted and deactivated ones are included: this serves the orders that
+        already hold a line for the product, and what was sold is read as it is,
+        not as the catalogue shows it today. Ids of other tenants are absent.
+        """
+        if not product_ids:
+            return {}
+        statement = self._scoped().where(Product.id.in_(list(product_ids)))
+        return {product.id: product for product in self._session.execute(statement).scalars()}
 
     def list_including_deleted(self) -> Sequence[Product]:
         return self.list()
