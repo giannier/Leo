@@ -233,3 +233,11 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - `FunnelCode` (enum compartido, C-18) está en `app/models/conversation_state.py`.
 - La FK `conversation_id` no garantiza por sí sola que la conversación sea del mismo tenant (no hay FK compuesta). La garantía es de servicio: `StateRepo` (TASK-412) recibe la conversación ya leída con el repositorio del tenant.
 
+### 8.2 Migración 0018 (TASK-406)
+
+- `products.category` ya existía (0001): no se agrega.
+- CHECK `ck_products_modo_venta` y `ck_products_bundle_size_range` (2 a 50) en la base; la API los valida antes (400).
+- La importación CSV/XLSX acepta cinco columnas opcionales: `modo_venta` (alias `modo`), `es_digital` (`digital`), `bundle_size` (`paquete`), `bundle_permite_libres` (`permite_libres`, `libres`) y `destacado`. Los alias y las palabras de sí/no (`si`, `sí`, `x`, `1`, `true`...) son una convención de este importador; una celda vacía vale "no" / `precio_fijo`. Un valor ilegible rechaza solo esa fila (`modo_venta_invalido`, `paquete_invalido`, `es_digital_invalido`...).
+- `PUT /tenant/products/{id}` rechaza un `null` explícito en las columnas NOT NULL nuevas (400 en lugar de un 500 de la base). `bundle_size: null` sí vale: devuelve el paquete a producto simple.
+- `TEMPLATE_CSV` queda sin cambios (las columnas nuevas son opcionales).
+

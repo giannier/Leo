@@ -166,6 +166,12 @@ class CatalogService:
                 price=Decimal(row["price"]),
                 stock=row["stock"],
                 category=row["category"],
+                # Rows staged before the sale columns existed lack them.
+                modo_venta=row.get("modo_venta", "precio_fijo"),
+                es_digital=row.get("es_digital", False),
+                bundle_size=row.get("bundle_size"),
+                bundle_permite_libres=row.get("bundle_permite_libres", False),
+                destacado=row.get("destacado", False),
             )
         self._session.commit()
         return len(rows)
