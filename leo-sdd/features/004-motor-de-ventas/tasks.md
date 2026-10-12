@@ -56,7 +56,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de catálogo existentes en verde; la importación acepta las columnas nuevas como opcionales
   - Parallel: false
 
-- [ ] TASK-407: Migración 0019 — pedidos, ítems, comprobantes y secuencias
+- [x] TASK-407: Migración 0019 — pedidos, ítems, comprobantes y secuencias
   - Input: `data-model.md §0019`
   - Output: modelos, migración y tests de aislamiento de `orders`, `order_items`, `payment_proofs` y `tenant_sequences`
   - Depends on: TASK-406
