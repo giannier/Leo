@@ -196,7 +196,8 @@ COBRO_BASE = """\
 Pedido y datos completos.
 Si el pago es previo:
 - Si los métodos de pago NO se enviaron, llama a enviar_metodos_pago y dile que cuando pague envíe la foto
-  del comprobante por aquí. Si existe {link_pago_tarjeta}, menciónalo para pago con tarjeta.
+  del comprobante por aquí.
+  Si existe {link_pago_tarjeta}, menciónalo para pago con tarjeta.
 - Si ya se enviaron y pregunta, dile que revise el mensaje anterior y pídele la foto del comprobante.
 Si el pago es contra entrega:
 - Resume el pedido (productos, total, entrega) y pregúntale si lo confirma. Cuando confirme, llama a
