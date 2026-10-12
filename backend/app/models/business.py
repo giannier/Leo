@@ -34,6 +34,14 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_chec
 INDUSTRIES = ("restaurante", "instituto", "retail", "servicios", "salud", "otros")
 AGENT_TONES = ("profesional", "cercano", "juvenil")
 AGENT_OBJECTIVES = ("vender", "atender", "ambos")
+# How fast the assistant moves a customer toward the close, how much it says
+# per message, and which model tier answers (Feature 004). `INTELLIGENCE_LEVELS`
+# is ordered from cheapest to best; a plan permits a subset (`plans.allowed_intelligence`).
+AGENT_PACES = ("directo", "equilibrado", "paso_a_paso")
+AGENT_DETAIL_LEVELS = ("breve", "moderado", "extenso")
+INTELLIGENCE_LEVELS = ("economico", "medio", "mejor")
+DEFAULT_PROCESS_TEMPLATE = "productos"
+
 PAYMENT_METHODS = ("yape", "plin", "transferencia", "tarjeta", "efectivo", "link")
 
 DEFAULT_ESCALATION_RULES = '["cliente_molesto", "pide_humano", "fuera_de_catalogo"]'
@@ -88,6 +96,12 @@ class AgentConfig(Base):
     __table_args__ = (
         enum_check("tone", AGENT_TONES, "agent_configs_tone"),
         enum_check("objective", AGENT_OBJECTIVES, "agent_configs_objective"),
+        enum_check("ritmo", AGENT_PACES, "ritmo"),
+        enum_check("detalle", AGENT_DETAIL_LEVELS, "detalle"),
+        enum_check("nivel_inteligencia", INTELLIGENCE_LEVELS, "nivel_inteligencia"),
+        CheckConstraint("seguimiento_horas BETWEEN 1 AND 20", name="seguimiento_horas"),
+        CheckConstraint("seguimiento_max BETWEEN 1 AND 3", name="seguimiento_max"),
+        CheckConstraint("derivacion_pausa_horas BETWEEN 1 AND 72", name="derivacion_pausa_horas"),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -116,6 +130,33 @@ class AgentConfig(Base):
     # want "NO MOLESTAR" as well. Empty means "use the defaults".
     opt_out_keywords: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, server_default=DEFAULT_OPT_OUT_KEYWORDS
+    )
+
+    # Sales behaviour (Feature 004). `restrictions` doubles as the tenant's
+    # "additional rules"; `agent_name`, `tone` and `is_active` are reused as is.
+    ritmo: Mapped[str] = mapped_column(Text, nullable=False, server_default="equilibrado")
+    detalle: Mapped[str] = mapped_column(Text, nullable=False, server_default="moderado")
+    seguimiento_activo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    seguimiento_horas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="4")
+    seguimiento_max: Mapped[int] = mapped_column(Integer, nullable=False, server_default="2")
+    nivel_inteligencia: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="economico"
+    )
+    # How long the assistant stays quiet after handing a conversation to a person.
+    derivacion_pausa_horas: Mapped[int] = mapped_column(Integer, nullable=False, server_default="6")
+    # Which process template drives the conversation, and its validated options
+    # (`app.schemas.process_options`). The template itself lives in code.
+    process_template_key: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=DEFAULT_PROCESS_TEMPLATE
+    )
+    process_options: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    # Edited system messages (plantillas.md section 7), by key.
+    system_messages: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
     )
 
     # Global on/off switch for the agent.
