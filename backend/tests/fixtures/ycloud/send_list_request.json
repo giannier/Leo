@@ -1,0 +1,29 @@
+{
+  "from": "+51912345678",
+  "to": "+51987654321",
+  "type": "interactive",
+  "interactive": {
+    "type": "list",
+    "body": {
+      "text": "Estos son nuestros paquetes"
+    },
+    "action": {
+      "button": "Ver paquetes",
+      "sections": [
+        {
+          "rows": [
+            {
+              "id": "producto:5f0c1c1e-8c6b-4f62-9f0e-2f4b0d9f3a11",
+              "title": "Paquete 5 certificados",
+              "description": "S/ 500.00"
+            },
+            {
+              "id": "producto:7a1d2e3f-9d7c-4a73-8a1f-3a5c1e0a4b22",
+              "title": "Paquete 10 certificados"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

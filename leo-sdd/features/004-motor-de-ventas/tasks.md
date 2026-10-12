@@ -144,7 +144,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - `gestionar_pedido(confirmar)` se rechaza fuera de COBRO o sin contra entrega.
   - Parallel: false
 
-- [ ] TASK-418: YCloud — interactivos, media, referral y BSUID
+- [x] TASK-418: YCloud — interactivos, media, referral y BSUID
   - Input: documentación oficial de YCloud (enviar interactive/buttons/list, media, webhook `whatsapp.inbound_message.received` con `interactive`, `referral` y el identificador de usuario); `contracts/api.md §8`
   - Output: `send_buttons`, `send_list` y `send_media`; `Recipient` con teléfono o BSUID; parseo de `interactive`, `referral` y `from_user_id`; fixtures JSON reales en `tests/fixtures/ycloud/`
   - Depends on: TASK-408

@@ -23,6 +23,12 @@ from typing import Any
 from app.process.facts import Facts
 from app.process.templates.base import EffectiveOptions
 
+# The type the provider adapter produces when it parses a `button_reply` or a
+# `list_reply`; re-exported here so the process engine keeps one import path.
+from app.providers.whatsapp.base import InteractiveReply
+
+__all__ = ["InteractiveOutcome", "InteractiveReply", "apply_interactive"]
+
 logger = logging.getLogger(__name__)
 
 PATH_PREFIX = "camino"
@@ -38,15 +44,6 @@ _CONTEXT_FIELDS: dict[str, str] = {
 # WhatsApp caps an id at 200 characters; ours are keys and UUIDs.
 _VALUE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 _MAX_TITLE = 100
-
-
-@dataclass(frozen=True)
-class InteractiveReply:
-    """A `button_reply` or `list_reply`, as the provider adapter parses it."""
-
-    id: str
-    title: str
-    description: str | None = None
 
 
 @dataclass(frozen=True)

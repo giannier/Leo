@@ -1,0 +1,26 @@
+{
+  "id": "evt_01J8Q7Z9X00000000000LIST001",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:41:02.900Z",
+  "whatsappInboundMessage": {
+    "id": "6650a1b2c3d4e5f607182931",
+    "wamid": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBQ5RjJEM0MxQTdCOEU0RDVGMEExQwC=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "customerProfile": {
+      "name": "Ana Quispe"
+    },
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:41:01.000Z",
+    "type": "interactive",
+    "interactive": {
+      "type": "list_reply",
+      "list_reply": {
+        "id": "producto:5f0c1c1e-8c6b-4f62-9f0e-2f4b0d9f3a11",
+        "title": "Paquete 5 certificados",
+        "description": "S/ 500.00"
+      }
+    }
+  }
+}

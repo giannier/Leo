@@ -30,6 +30,7 @@ from app.models.tenant import Tenant
 from app.models.whatsapp import WhatsAppNumber
 from app.providers.whatsapp.base import (
     NumberCredentials,
+    Recipient,
     SendResult,
     WhatsAppAuthError,
     WhatsAppError,
@@ -60,10 +61,10 @@ class ScriptedProvider:
         credentials: NumberCredentials,
         *,
         sender: str,
-        to: str,
+        to: Recipient,
         body: str,
     ) -> SendResult:
-        self.calls.append({"sender": sender, "to": to, "body": body})
+        self.calls.append({"sender": sender, "to": to.phone or to.bsuid, "body": body})
         outcome = self._outcomes.pop(0) if self._outcomes else None
         if isinstance(outcome, Exception):
             raise outcome
@@ -406,11 +407,11 @@ class TestTheStatesTellTheTruth:
 
 
 class TestAContactWithoutAPhoneNumber:
-    """A customer who writes with a BSUID only (Feature 004, TASK-408). The
-    provider still addresses by phone until TASK-418, so the reply must end
-    visibly `failed` instead of reaching the provider with no recipient."""
+    """A customer who writes with a BSUID only (Feature 004, TASK-408/418). The
+    reply is addressed by BSUID, so the contact is answered instead of the
+    reply ending `failed` for want of a phone number."""
 
-    async def test_the_reply_is_marked_failed_and_nothing_is_sent(self, db: Session) -> None:
+    async def test_the_reply_is_sent_to_the_bsuid(self, db: Session) -> None:
         tenant, _ = _tenant_ready_to_send(db)
         contact = Contact(
             tenant_id=tenant.id, external_user_id="BSUID-1", last_inbound_at=datetime.now(UTC)
@@ -437,9 +438,9 @@ class TestAContactWithoutAPhoneNumber:
 
         result = await _sender(db, tenant, provider).send(message)
 
-        assert result.delivery_status == "failed"
-        assert provider.calls == []
+        assert result.delivery_status == "sent"
+        assert [call["to"] for call in provider.calls] == ["BSUID-1"]
         events = db.execute(
             select(MessageStatusEvent.status).where(MessageStatusEvent.message_id == message.id)
         ).scalars()
-        assert list(events) == ["failed"]
+        assert list(events) == ["sent"]

@@ -94,6 +94,32 @@ def _inbound(to_phone: str, *, text: str = "Hola, tienen pan integral?") -> dict
     return payload
 
 
+class TestABsuidOnlyAndAnInteractiveMessage:
+    def test_a_customer_without_a_phone_becomes_a_contact_by_bsuid(self, db: Session) -> None:
+        tenant, phone = _tenant_with_number(db)
+        payload = load("ycloud/inbound_bsuid_only.json")
+        payload["whatsappInboundMessage"]["to"] = phone
+        payload["whatsappInboundMessage"]["id"] = f"wamid.{uuid.uuid4().hex}"
+
+        outcome = process_event(db, _store(db, payload), provider=PROVIDER)
+
+        assert outcome.outcome == OUTCOME_APPLIED
+        contact = db.execute(select(Contact).where(Contact.tenant_id == tenant.id)).scalar_one()
+        assert contact.phone_e164 is None
+        assert contact.external_user_id == "US.13491208655302741918"
+
+    def test_a_button_tap_is_stored_as_the_title_the_customer_saw(self, db: Session) -> None:
+        tenant, phone = _tenant_with_number(db)
+        payload = load("ycloud/inbound_interactive_button.json")
+        payload["whatsappInboundMessage"]["to"] = phone
+        payload["whatsappInboundMessage"]["id"] = f"wamid.{uuid.uuid4().hex}"
+
+        process_event(db, _store(db, payload), provider=PROVIDER)
+
+        message = db.execute(select(Message).where(Message.tenant_id == tenant.id)).scalar_one()
+        assert (message.msg_type, message.content) == ("text", "Quiero comprar")
+
+
 class TestAnInboundMessage:
     def test_it_creates_the_contact_and_the_thread(self, db: Session) -> None:
         tenant, phone = _tenant_with_number(db)

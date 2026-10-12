@@ -20,17 +20,23 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
 
 from app.providers.whatsapp import (
+    Button,
     InboundMessage,
+    InteractiveReply,
     InvalidCredentials,
+    ListRow,
+    ListSection,
+    MediaRef,
     NumberCredentials,
     QualityUpdate,
+    Recipient,
     StatusUpdate,
     WhatsAppAuthError,
     WhatsAppError,
@@ -43,6 +49,7 @@ from tests.fixtures import load, load_raw
 SECRET = "whsec_a_test_secret_nobody_uses"
 SENDER = "+51912345678"
 CUSTOMER = "+51987654321"
+TO = Recipient(phone=CUSTOMER)
 
 ACCEPTED = {
     "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgARGBI5QjZDN0Q4RTlGMEExQjJDM0QA",
@@ -86,9 +93,7 @@ class TestSending:
     async def test_the_request_is_the_one_ycloud_documents(self) -> None:
         provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
 
-        await provider.send_text(
-            _credentials(), sender=SENDER, to=CUSTOMER, body="Hola, si tenemos."
-        )
+        await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola, si tenemos.")
 
         request = seen[0]
         assert str(request.url) == "https://api.ycloud.com/v2/whatsapp/messages"
@@ -105,7 +110,7 @@ class TestSending:
         it means the status updates arrive with nothing to attach them to."""
         provider, _ = _provider(httpx.Response(201, json=ACCEPTED))
 
-        result = await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+        result = await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
 
         assert result.provider_message_id == ACCEPTED["id"]
 
@@ -113,7 +118,7 @@ class TestSending:
         provider, _ = _provider(httpx.Response(201, json={"status": "accepted"}))
 
         with pytest.raises(WhatsAppError, match="no id"):
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
 
     async def test_credentials_are_checked_before_anything_is_sent(self) -> None:
         """A missing key would otherwise be discovered as a 401 from the
@@ -122,7 +127,7 @@ class TestSending:
         broken = _credentials(api_key="")
 
         with pytest.raises(InvalidCredentials):
-            await provider.send_text(broken, sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(broken, sender=SENDER, to=TO, body="Hola")
         assert seen == []
 
 
@@ -134,7 +139,7 @@ class TestWhenTheGatewayRefuses:
         provider, _ = _provider(httpx.Response(status, json={"message": "bad key"}))
 
         with pytest.raises(WhatsAppAuthError) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert caught.value.retryable is False
 
     async def test_the_rejection_never_echoes_the_key(self) -> None:
@@ -145,21 +150,21 @@ class TestWhenTheGatewayRefuses:
         )
 
         with pytest.raises(WhatsAppAuthError) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert "yc_live_abcdef123456" not in str(caught.value)
 
     async def test_throttling_is_retryable(self) -> None:
         provider, _ = _provider(httpx.Response(429, json={"message": "slow down"}))
 
         with pytest.raises(WhatsAppRateLimited) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert caught.value.retryable is True
 
     async def test_the_gateways_own_failure_is_retryable(self) -> None:
         provider, _ = _provider(httpx.Response(502, text="bad gateway"))
 
         with pytest.raises(WhatsAppTransientError) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert caught.value.retryable is True
 
     async def test_a_refused_message_is_not_retryable(self) -> None:
@@ -169,7 +174,7 @@ class TestWhenTheGatewayRefuses:
         provider, _ = _provider(httpx.Response(400, json={"message": "invalid recipient"}))
 
         with pytest.raises(WhatsAppError) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert caught.value.retryable is False
 
     async def test_a_timeout_is_retryable(self) -> None:
@@ -179,7 +184,7 @@ class TestWhenTheGatewayRefuses:
         provider = YCloudProvider(transport=httpx.MockTransport(handler))
 
         with pytest.raises(WhatsAppTransientError) as caught:
-            await provider.send_text(_credentials(), sender=SENDER, to=CUSTOMER, body="Hola")
+            await provider.send_text(_credentials(), sender=SENDER, to=TO, body="Hola")
         assert caught.value.retryable is True
 
 
@@ -391,3 +396,318 @@ class TestTheParserDoesNotCrashOnRubbish:
 
         assert isinstance(parsed, InboundMessage)
         assert parsed.sent_at >= before
+
+
+# ------------------------------------------------- interactive, media, BSUID
+
+BSUID = "US.13491208655302741918"
+
+
+class TestSendingInteractiveAndMedia:
+    """Contract tests: the request bodies are the recorded fixtures, so a drift
+    from YCloud's documented shape fails here."""
+
+    async def test_buttons_match_the_recorded_request(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_buttons(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            body="Hola Ana, que necesitas?",
+            buttons=[
+                Button("camino:comprar", "Quiero comprar"),
+                Button("camino:asesoria", "Necesito asesoria"),
+            ],
+        )
+
+        assert _json(seen[0]) == load("ycloud/send_buttons_request.json")
+
+    async def test_header_and_footer_are_sent_only_when_given(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_buttons(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            body="Elige",
+            buttons=[Button("a", "A")],
+            header="Titulo",
+            footer="Pie",
+        )
+
+        interactive = _json(seen[0])["interactive"]
+        assert interactive["header"] == {"type": "text", "text": "Titulo"}
+        assert interactive["footer"] == {"text": "Pie"}
+
+    async def test_a_list_matches_the_recorded_request(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_list(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            body="Estos son nuestros paquetes",
+            button_text="Ver paquetes",
+            sections=[
+                ListSection(
+                    rows=(
+                        ListRow(
+                            "producto:5f0c1c1e-8c6b-4f62-9f0e-2f4b0d9f3a11",
+                            "Paquete 5 certificados",
+                            "S/ 500.00",
+                        ),
+                        ListRow(
+                            "producto:7a1d2e3f-9d7c-4a73-8a1f-3a5c1e0a4b22",
+                            "Paquete 10 certificados",
+                        ),
+                    )
+                )
+            ],
+        )
+
+        assert _json(seen[0]) == load("ycloud/send_list_request.json")
+
+    async def test_a_document_by_media_id_matches_the_recorded_request(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_media(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            media=MediaRef("document", media_id="1642901234567891", filename="malla.pdf"),
+            caption="Malla curricular",
+        )
+
+        assert _json(seen[0]) == load("ycloud/send_media_request.json")
+
+    async def test_an_image_by_link_and_audio_never_carries_a_caption(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+        link = "https://files.example.com/a.jpg?sig=1"
+
+        await provider.send_media(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            media=MediaRef("image", link=link, filename="ignored.jpg"),
+            caption="Mira",
+        )
+        await provider.send_media(
+            _credentials(),
+            sender=SENDER,
+            to=TO,
+            media=MediaRef("audio", media_id="9"),
+            caption="no va",
+        )
+
+        assert _json(seen[0])["image"] == {"link": link, "caption": "Mira"}
+        assert _json(seen[1])["audio"] == {"id": "9"}
+
+    @pytest.mark.parametrize(
+        "case",
+        ["four_buttons", "no_buttons", "long_title", "long_body", "eleven_rows", "long_row"],
+    )
+    async def test_a_request_whatsapp_would_refuse_never_leaves(self, case: str) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+        to = Recipient(phone=CUSTOMER)
+        four = [Button(str(i), "B") for i in range(4)]
+        rows = tuple(ListRow(str(i), "R") for i in range(11))
+        credentials = _credentials()
+
+        with pytest.raises(WhatsAppError) as caught:
+            if case == "four_buttons":
+                await provider.send_buttons(
+                    credentials, sender=SENDER, to=to, body="x", buttons=four
+                )
+            elif case == "no_buttons":
+                await provider.send_buttons(credentials, sender=SENDER, to=to, body="x", buttons=[])
+            elif case == "long_title":
+                await provider.send_buttons(
+                    credentials, sender=SENDER, to=to, body="x", buttons=[Button("a", "x" * 21)]
+                )
+            elif case == "long_body":
+                await provider.send_buttons(
+                    credentials, sender=SENDER, to=to, body="x" * 1025, buttons=four[:1]
+                )
+            elif case == "eleven_rows":
+                await provider.send_list(
+                    credentials,
+                    sender=SENDER,
+                    to=to,
+                    body="x",
+                    button_text="Ver",
+                    sections=[ListSection(rows=rows)],
+                )
+            else:
+                await provider.send_list(
+                    credentials,
+                    sender=SENDER,
+                    to=to,
+                    body="x",
+                    button_text="Ver",
+                    sections=[ListSection(rows=(ListRow("a", "x" * 25),))],
+                )
+
+        assert caught.value.retryable is False
+        assert seen == []
+
+
+class TestAddressingByBsuid:
+    async def test_a_contact_without_a_phone_is_addressed_by_recipient(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_text(
+            _credentials(),
+            sender=SENDER,
+            to=Recipient(bsuid=BSUID),
+            body="Hola, con gusto te ayudo.",
+        )
+
+        assert _json(seen[0]) == load("ycloud/send_to_bsuid_request.json")
+
+    async def test_the_phone_wins_when_both_are_known(self) -> None:
+        provider, seen = _provider(httpx.Response(201, json=ACCEPTED))
+
+        await provider.send_text(
+            _credentials(),
+            sender=SENDER,
+            to=Recipient(phone=CUSTOMER, bsuid=BSUID),
+            body="Hola",
+        )
+
+        body = _json(seen[0])
+        assert body["to"] == CUSTOMER
+        assert "recipient" not in body
+
+    def test_a_recipient_needs_one_identifier(self) -> None:
+        with pytest.raises(ValueError):
+            Recipient()
+
+    def test_a_media_reference_needs_exactly_one_source(self) -> None:
+        with pytest.raises(ValueError):
+            MediaRef("image")
+        with pytest.raises(ValueError):
+            MediaRef("image", media_id="1", link="https://x.example/a.jpg")
+
+
+class TestUploadingMedia:
+    async def test_the_file_goes_up_as_multipart_to_the_senders_path(self) -> None:
+        provider, seen = _provider(
+            httpx.Response(200, json=load("ycloud/upload_media_response.json"))
+        )
+        before = datetime.now(UTC)
+
+        uploaded = await provider.upload_media(
+            _credentials(),
+            sender=SENDER,
+            data=b"%PDF-1.4 hi",
+            mime="application/pdf",
+            filename="m.pdf",
+        )
+
+        request = seen[0]
+        assert str(request.url) == "https://api.ycloud.com/v2/whatsapp/media/%2B51912345678/upload"
+        assert request.headers["x-api-key"] == "yc_live_abcdef123456"
+        assert request.headers["content-type"].startswith("multipart/form-data; boundary=")
+        assert b'name="file"; filename="m.pdf"' in request.content
+        assert b"application/pdf" in request.content
+        assert b"%PDF-1.4 hi" in request.content
+        assert uploaded.media_id == "1642901234567891"
+        # YCloud keeps the file 30 days.
+        assert before + timedelta(days=29, hours=23) < uploaded.expires_at
+
+    async def test_an_answer_without_an_id_is_not_a_success(self) -> None:
+        provider, _ = _provider(httpx.Response(200, json={}))
+
+        with pytest.raises(WhatsAppError):
+            await provider.upload_media(
+                _credentials(), sender=SENDER, data=b"x", mime="image/png", filename="a.png"
+            )
+
+    async def test_a_gateway_failure_is_retryable(self) -> None:
+        provider, _ = _provider(httpx.Response(503))
+
+        with pytest.raises(WhatsAppTransientError):
+            await provider.upload_media(
+                _credentials(), sender=SENDER, data=b"x", mime="image/png", filename="a.png"
+            )
+
+
+class TestReadingInteractiveReferralAndBsuid:
+    def test_a_button_tap_becomes_text_plus_the_tapped_option(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_interactive_button.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.msg_type == "text"
+        assert parsed.text == "Quiero comprar"
+        assert parsed.interactive == InteractiveReply("camino:comprar", "Quiero comprar")
+        assert parsed.from_user_id == "PE.13491208655302741918"
+        assert parsed.from_phone == CUSTOMER
+
+    def test_a_list_tap_keeps_the_row_description(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_interactive_list.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.interactive == InteractiveReply(
+            "producto:5f0c1c1e-8c6b-4f62-9f0e-2f4b0d9f3a11",
+            "Paquete 5 certificados",
+            "S/ 500.00",
+        )
+
+    def test_an_unreadable_interactive_message_is_unsupported_not_an_error(self) -> None:
+        payload = load("ycloud/inbound_interactive_button.json")
+        payload["whatsappInboundMessage"]["interactive"] = {"type": "nfm_reply"}
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.msg_type == "unsupported"
+        assert parsed.interactive is None
+
+    def test_an_ad_referral_is_read_with_the_documented_names(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_referral.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.text == "Hola, quiero informacion de este anuncio"
+        assert parsed.referral is not None
+        assert parsed.referral.source_id == "120210000000000001"
+        assert parsed.referral.source_type == "ad"
+        assert parsed.referral.source_url == "https://fb.me/3AbCdEf"
+        assert parsed.referral.headline == "Certificaciones SIAF con 30% de descuento"
+        assert parsed.referral.media_url == "https://scontent.xx.fbcdn.net/v/anuncio.jpg"
+        assert parsed.referral.ctwa_clid is not None
+
+    def test_camel_case_referral_keys_are_accepted_too(self) -> None:
+        payload = load("ycloud/inbound_referral.json")
+        payload["whatsappInboundMessage"]["referral"] = {
+            "sourceUrl": "https://fb.me/x",
+            "sourceId": "42",
+            "videoUrl": "https://cdn.example/v.mp4",
+        }
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.referral is not None
+        assert parsed.referral.source_id == "42"
+        assert parsed.referral.media_url == "https://cdn.example/v.mp4"
+
+    def test_a_message_without_a_referral_has_none(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_text.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.referral is None
+
+    def test_a_customer_who_never_shared_a_number_is_identified_by_bsuid(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_bsuid_only.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.from_phone is None
+        assert parsed.from_user_id == BSUID
+        assert parsed.text == "Hola, quiero ver los paquetes"
+
+    def test_a_message_with_no_sender_at_all_is_still_rejected(self) -> None:
+        payload = load("ycloud/inbound_bsuid_only.json")
+        del payload["whatsappInboundMessage"]["fromUserId"]
+
+        assert YCloudProvider().parse_event(payload) is None
