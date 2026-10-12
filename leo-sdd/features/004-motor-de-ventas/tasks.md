@@ -28,7 +28,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: `alembic upgrade head && alembic downgrade -1 && alembic upgrade head`; `pytest backend/tests/isolation -k stage`
   - Parallel: false
 
-- [ ] TASK-403: Migración 0015 — `business_info`, `faqs`, `promotions`
+- [x] TASK-403: Migración 0015 — `business_info`, `faqs`, `promotions`
   - Input: `data-model.md §0015` (incluye los esquemas Pydantic de secciones)
   - Output: modelos, migración, esquemas Pydantic de las 5 secciones y tests de aislamiento
   - Depends on: TASK-402
