@@ -108,7 +108,10 @@ class TestTheEnvelopeReachesTheModel:
     ) -> None:
         llm = MockLLMProvider(
             responses=[
-                ChatResult(content="", tool_calls=(_call("gestionar_pedido", accion="ver"),)),
+                ChatResult(
+                    content="",
+                    tool_calls=(_call("derivar_a_humano", motivo="otro", resumen="x"),),
+                ),
                 ChatResult(content="Sigo con tu consulta."),
             ]
         )

@@ -24,15 +24,22 @@ DEFAULT_CURRENCY = "PEN"
 _ELLIPSIS = "…"
 
 
+def currency_code(session: Session, tenant_id: uuid.UUID) -> str:
+    """The ISO code of the business's currency (`business_profiles.currency`).
+
+    A business that never filled in its profile is a Peruvian one (`PEN`): the
+    column's own default.
+    """
+    profile = BusinessProfileRepository(session, tenant_id).current()
+    return (profile.currency if profile else DEFAULT_CURRENCY) or DEFAULT_CURRENCY
+
+
 def currency_symbol(session: Session, tenant_id: uuid.UUID) -> str:
     """The symbol of the business's currency (`business_profiles.currency`).
 
-    An unknown code is printed as it is rather than guessed at, and a business
-    that never filled in its profile is a Peruvian one (`PEN`): the column's own
-    default.
+    An unknown code is printed as it is rather than guessed at.
     """
-    profile = BusinessProfileRepository(session, tenant_id).current()
-    code = (profile.currency if profile else DEFAULT_CURRENCY) or DEFAULT_CURRENCY
+    code = currency_code(session, tenant_id)
     return CURRENCY_SYMBOLS.get(code, code)
 
 

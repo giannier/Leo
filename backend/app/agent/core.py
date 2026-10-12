@@ -26,6 +26,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -165,8 +166,22 @@ def _usable_answer(raw: str) -> tuple[str, bool]:
     return to_whatsapp_markup(cleaned), False
 
 
-# One turn's tool results, keyed by tool name and arguments.
-_ToolCache = dict[tuple[str, str], tuple[str, list[dict[str, object]]]]
+@dataclass
+class _TurnCache:
+    """One turn's tool results, keyed by tool name and arguments.
+
+    A read-only tool is answered from here whenever it repeats. A tool that writes
+    (`RegisteredTool.effect`: the order, the customer's data) is answered from here
+    only while nothing else has written since: `writes` counts the executed writes
+    and each entry remembers the count it was stored at. So a model that repeats an
+    identical `agregar` is not adding the product twice, and `ver` after `agregar`
+    is not shown the order as it was before.
+    """
+
+    entries: dict[tuple[str, str], tuple[str, list[dict[str, object]], int]] = field(
+        default_factory=dict
+    )
+    writes: int = 0
 
 
 @dataclass(frozen=True)
@@ -282,7 +297,7 @@ class AgentCore:
         # cannot have changed, so it is looked up once. The cache dies with
         # this call - a catalogue edited between two customer messages must
         # still be seen on the next one.
-        tool_cache: _ToolCache = {}
+        tool_cache = _TurnCache()
         tools_called: list[dict[str, object]] = []
         rag_sources: list[dict[str, object]] = []
         input_tokens = 0
@@ -347,7 +362,7 @@ class AgentCore:
 
         guard_note: dict[str, object] | None = None
         if not unusable:
-            guarded = await self._enforce_catalogue_names(messages, content)
+            guarded = await self._enforce_catalogue_names(messages, content, _chosen_names(context))
             content = guarded.content
             guard_note = guarded.note
             input_tokens += guarded.input_tokens
@@ -368,7 +383,7 @@ class AgentCore:
         )
 
     async def _enforce_catalogue_names(
-        self, messages: list[ChatMessage], content: str
+        self, messages: list[ChatMessage], content: str, extra_names: Sequence[str] = ()
     ) -> _GuardOutcome:
         """Refuse to send a product name the tenant's catalogue does not have.
 
@@ -387,7 +402,7 @@ class AgentCore:
         produces a usable answer never pays for it, and the retry is judged by
         the same `CatalogueGuard` instance rather than a second query.
         """
-        guard = self._catalogue_guard()
+        guard = self._catalogue_guard(extra_names)
         invented = guard.invented_names(content)
         if not invented:
             return _GuardOutcome(content=content)
@@ -428,7 +443,7 @@ class AgentCore:
             output_tokens=retry.output_tokens,
         )
 
-    def _catalogue_guard(self) -> CatalogueGuard:
+    def _catalogue_guard(self, extra_names: Sequence[str] = ()) -> CatalogueGuard:
         """This tenant's catalogue names, in a form that can judge a reply.
 
         Called exactly once per turn - `_enforce_catalogue_names` holds the
@@ -442,6 +457,11 @@ class AgentCore:
         Names only, and never another tenant's: `ProductRepository` is bound
         to one `tenant_id` and filters on it, so there is no way to reach a
         catalogue this agent is not answering for.
+
+        `extra_names` are what the customer chose this turn or earlier in the order
+        and the catalogue does not have: the free themes of a package ("Excel
+        avanzado" when the catalogue only has "Excel"). They are the customer's own
+        words, so repeating them is not inventing a product.
 
         The catalogue *tool*'s output is not reused for this even when the
         turn already ran it. That listing is capped and filtered by whatever
@@ -461,10 +481,10 @@ class AgentCore:
         # No vocabulary: at runtime the agent knows its catalogue and nothing
         # else, so the introduced-name half of the detector would fire on
         # "Miraflores", "Yape" and the customer's own name.
-        return build_catalogue_guard(names)
+        return build_catalogue_guard([*names, *extra_names])
 
     async def _run_tool(
-        self, context: ToolContext, call: ToolCall, cache: _ToolCache
+        self, context: ToolContext, call: ToolCall, cache: _TurnCache
     ) -> tuple[str, list[dict[str, object]], bool]:
         """Execute one tool call, converting any failure into text.
 
@@ -476,16 +496,16 @@ class AgentCore:
         from the tool. Failures are never cached: an error is the one result
         that is worth attempting again.
         """
-        key = (call.name, _cache_key(call.arguments))
-        remembered = cache.get(key)
-        if remembered is not None:
-            return remembered[0], remembered[1], True
-
         tool = self._registry.get(call.name)
         if tool is None:
             # Models do hallucinate tool names. Saying so is more useful than
             # silence, and it is a real signal in the trace.
             return f"ERROR: la herramienta '{call.name}' no existe.", [], False
+
+        key = (call.name, _cache_key(call.arguments))
+        remembered = cache.entries.get(key)
+        if remembered is not None and (not tool.effect or remembered[2] == cache.writes):
+            return remembered[0], remembered[1], True
 
         try:
             produced = await tool.handler(context, call.arguments)
@@ -493,6 +513,9 @@ class AgentCore:
             logger.exception(
                 "tool failed", extra={"tool": call.name, "tenant_id": str(self._tenant_id)}
             )
+            if tool.effect:
+                # It may have written before it failed: nothing older is trustworthy.
+                cache.writes += 1
             return f"ERROR: no se pudo consultar '{call.name}' en este momento.", [], False
 
         # A tool answers with the `ToolResult` envelope or, like the v0 catalogue
@@ -509,7 +532,9 @@ class AgentCore:
         if call.name == "consultar_conocimiento" and found:
             sources.append({"tool": call.name, "consulta": _summarise(call.arguments)})
 
-        cache[key] = (output, sources)
+        if tool.effect:
+            cache.writes += 1
+        cache.entries[key] = (output, sources, cache.writes)
         return output, sources, False
 
     def _history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
@@ -554,6 +579,17 @@ class AgentCore:
                 else {}
             ),
         )
+
+
+def _chosen_names(context: ToolContext) -> list[str]:
+    """The names the customer chose that the catalogue does not hold: this turn's
+    free themes, and the selections already in the order."""
+    names = list(context.extra_names)
+    order = context.facts.pedido
+    if order is not None:
+        for item in order.items:
+            names.extend(item.selecciones)
+    return names
 
 
 def _status_of(output: str) -> str:

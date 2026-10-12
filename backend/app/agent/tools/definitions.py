@@ -9,11 +9,15 @@ Which ones do something today:
 * `buscar_productos`, `ver_producto`, `consultar_conocimiento`: real
   (`tools/catalog.py`).
 * `enviar_recurso`, `mostrar_opciones`, `elegir_camino` (`tools/sales.py`).
-* `gestionar_pedido`, `registrar_datos_cliente`, `enviar_metodos_pago`,
-  `derivar_a_humano` (Phase B and D): declared with their final schema and bound
-  to a stub that answers `no_disponible`. The schema is final on purpose, so the
-  prompt budget and the per-stage rules are tested against the real thing, and
-  each later task only replaces the handler.
+* `gestionar_pedido` (`tools/orders.py`).
+* `registrar_datos_cliente`, `enviar_metodos_pago`, `derivar_a_humano` (Phase B and
+  D): declared with their final schema and bound to a stub that answers
+  `no_disponible`. The schema is final on purpose, so the prompt budget and the
+  per-stage rules are tested against the real thing, and each later task only
+  replaces the handler.
+
+The tools that write (`gestionar_pedido`) are declared with `effect=True`, so the
+agent loop never answers one from its per-turn cache after another write.
 
 The descriptions are short: the definitions of every enabled tool share a
 1 400-token allowance of the 6 000-token prompt (`plan.md`).
@@ -32,6 +36,7 @@ from app.agent.tools.catalog import (
     consultar_conocimiento,
     ver_producto,
 )
+from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.registry import (
     ToolCatalog,
     ToolContext,
@@ -280,8 +285,9 @@ def _definitions() -> list[ToolDefinition]:
                 "totales los calcula el sistema."
             ),
             parameters=_order_schema,
-            handler=_stub("gestionar_pedido"),
+            handler=gestionar_pedido,
             guard=_order_guard,
+            effect=True,
         ),
         ToolDefinition(
             name="registrar_datos_cliente",

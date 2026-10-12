@@ -285,27 +285,54 @@ def _requires_delivery(snapshot: ConversationSnapshot, entregas: Entregas | None
     return any(not line.es_digital for line in snapshot.lines)
 
 
-def _missing_data(
-    snapshot: ConversationSnapshot, config: FactsConfig, *, requiere_entrega: bool
+def missing_customer_data(
+    contact: Contact | None,
+    datos_requeridos: Sequence[str],
+    entregas: Entregas | None,
+    *,
+    requiere_entrega: bool,
+    tipo_entrega: str | None,
+    zona_envio: str | None,
 ) -> list[str]:
-    contact = snapshot.contact
-    missing = [f for f in config.options.datos_requeridos if not _customer_has(f, contact)]
-    if not requiere_entrega or snapshot.order is None or config.entregas is None:
+    """What is still missing from the customer's data, in the order it is asked.
+
+    The fields the template requires that the customer has not given, then - only
+    when the order needs delivery (C-22) - the delivery choice: the type, the
+    address for a delivery, the zone when the business has zones. A business that
+    only offers pickup does not make the customer choose. Shared by the facts
+    (`datos_faltantes`) and by `registrar_datos_cliente`, which answers `faltan`
+    with fresh data, so the two can never disagree.
+    """
+    missing = [f for f in datos_requeridos if not _customer_has(f, contact)]
+    if not requiere_entrega or entregas is None:
         return missing
 
-    entregas = config.entregas
-    # A business that only offers pickup does not make the customer choose.
     only_pickup = entregas.recojo_en_tienda and not entregas.hace_delivery
-    tipo = snapshot.order.tipo_entrega or ("recojo" if only_pickup else None)
+    tipo = tipo_entrega or ("recojo" if only_pickup else None)
     if tipo is None:
         missing.append("tipo_entrega")
     elif tipo == "delivery":
         if "direccion" not in missing and not _customer_has("direccion", contact):
             missing.append("direccion")
         # No zones configured means the cost is "a coordinar": no zone to pick.
-        if entregas.zonas and not snapshot.order.zona_envio:
+        if entregas.zonas and not zona_envio:
             missing.append("zona_envio")
     return missing
+
+
+def _missing_data(
+    snapshot: ConversationSnapshot, config: FactsConfig, *, requiere_entrega: bool
+) -> list[str]:
+    order = snapshot.order
+    return missing_customer_data(
+        snapshot.contact,
+        config.options.datos_requeridos,
+        config.entregas,
+        # Without an order there is nothing to deliver.
+        requiere_entrega=requiere_entrega and order is not None,
+        tipo_entrega=order.tipo_entrega if order is not None else None,
+        zona_envio=order.zona_envio if order is not None else None,
+    )
 
 
 def _pedido(snapshot: ConversationSnapshot) -> Pedido | None:

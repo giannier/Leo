@@ -142,6 +142,13 @@ class ToolContext:
     facts: Facts = field(default_factory=Facts)
     # Stored facts the tools set during the turn; the pipeline saves them.
     facts_patch: dict[str, Any] = field(default_factory=dict)
+    # Most lines an order may have (services: 3). Filled by `ToolCatalog.for_stage`
+    # from the template, like `options`.
+    max_lines: int | None = None
+    # Names the customer chose this turn that are not in the catalogue (a free theme
+    # of a package). The catalogue guard accepts them in the reply, or it would
+    # mistake "Excel avanzado" for an invented product.
+    extra_names: list[str] = field(default_factory=list)
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult]]
@@ -151,6 +158,8 @@ ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult
 class RegisteredTool:
     spec: ToolSpec
     handler: ToolHandler
+    # The tool changes something (an order, the customer's data): see `ToolDefinition`.
+    effect: bool = False
 
 
 @dataclass
@@ -162,13 +171,20 @@ class ToolRegistry:
     _aliases: dict[str, str] = field(default_factory=dict)
 
     def register(
-        self, *, name: str, description: str, parameters: dict[str, Any], handler: ToolHandler
+        self,
+        *,
+        name: str,
+        description: str,
+        parameters: dict[str, Any],
+        handler: ToolHandler,
+        effect: bool = False,
     ) -> None:
         if name in self._tools:
             raise ValueError(f"tool {name!r} is already registered")
         self._tools[name] = RegisteredTool(
             spec=ToolSpec(name=name, description=description, parameters=parameters),
             handler=handler,
+            effect=effect,
         )
 
     def alias(self, old_name: str, target: str) -> None:
@@ -218,6 +234,9 @@ class ToolDefinition:
     (the path keys, the data fields the template asks for) and per stage.
     `available` hides the tool altogether (`elegir_camino` without paths).
     `guard` refuses a call the stage does not allow even if the model makes it.
+    `effect` marks a tool that writes (the order, the customer's data, a message):
+    the agent loop's per-turn cache must not serve its answer after another write
+    has happened (`ver` after `agregar` would otherwise show the old order).
     """
 
     name: str
@@ -226,6 +245,7 @@ class ToolDefinition:
     handler: ToolHandler
     available: Callable[[ToolScope], bool] | None = None
     guard: Callable[[ToolScope, dict[str, Any]], ToolResult | None] | None = None
+    effect: bool = False
 
 
 # The tool the agent had before Feature 004 and the one that replaces it. A call
@@ -280,6 +300,7 @@ class ToolCatalog:
                 description=definition.description,
                 parameters=definition.parameters(scope),
                 handler=_guarded(definition, scope),
+                effect=definition.effect,
             )
         for old_name, target in LEGACY_ALIASES.items():
             if target in registry.names():
@@ -291,8 +312,9 @@ def _guarded(definition: ToolDefinition, scope: ToolScope) -> ToolHandler:
     """Bind a definition to the scope of one turn.
 
     Runs the stage guard before the handler and hands the handler a context that
-    carries the scope's options. `replace` copies references, so the budget and
-    `facts_patch` the handler writes to are still the turn's own.
+    carries the scope's options and the template's line limit. `replace` copies
+    references, so the budget, `facts_patch` and `extra_names` the handler writes
+    to are still the turn's own.
     """
     guard = definition.guard
 
@@ -301,6 +323,7 @@ def _guarded(definition: ToolDefinition, scope: ToolScope) -> ToolHandler:
             refusal = guard(scope, arguments)
             if refusal is not None:
                 return refusal
-        return await definition.handler(replace(context, options=scope.options), arguments)
+        bound = replace(context, options=scope.options, max_lines=scope.template.max_lineas)
+        return await definition.handler(bound, arguments)
 
     return run
