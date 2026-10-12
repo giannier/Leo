@@ -63,7 +63,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: upgrade/downgrade; dos tenants generan su pedido #1 cada uno
   - Parallel: false
 
-- [ ] TASK-408: Migración 0020 — contactos con BSUID, `custom_data` y trazas
+- [x] TASK-408: Migración 0020 — contactos con BSUID, `custom_data` y trazas
   - Input: `data-model.md §0020`; revisar primero cómo `contacts` guarda hoy el teléfono y el `wa_id`
   - Output: migración ajustada a lo que existe; upsert de contacto por BSUID o teléfono (el que llegue); columnas nuevas en `agent_traces`
   - Depends on: TASK-407

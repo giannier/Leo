@@ -403,3 +403,43 @@ class TestTheStatesTellTheTruth:
         messages.set_delivery_status(message, status="delivered")
 
         assert message.delivery_status == "failed"
+
+
+class TestAContactWithoutAPhoneNumber:
+    """A customer who writes with a BSUID only (Feature 004, TASK-408). The
+    provider still addresses by phone until TASK-418, so the reply must end
+    visibly `failed` instead of reaching the provider with no recipient."""
+
+    async def test_the_reply_is_marked_failed_and_nothing_is_sent(self, db: Session) -> None:
+        tenant, _ = _tenant_ready_to_send(db)
+        contact = Contact(
+            tenant_id=tenant.id, external_user_id="BSUID-1", last_inbound_at=datetime.now(UTC)
+        )
+        db.add(contact)
+        db.flush()
+        conversation = Conversation(
+            tenant_id=tenant.id, channel="whatsapp", contact_id=contact.id, status="open"
+        )
+        db.add(conversation)
+        db.flush()
+        message = Message(
+            tenant_id=tenant.id,
+            conversation_id=conversation.id,
+            direction="outbound",
+            author="agent",
+            content="Hola",
+            msg_type="text",
+            delivery_status="queued",
+        )
+        db.add(message)
+        db.flush()
+        provider = ScriptedProvider()
+
+        result = await _sender(db, tenant, provider).send(message)
+
+        assert result.delivery_status == "failed"
+        assert provider.calls == []
+        events = db.execute(
+            select(MessageStatusEvent.status).where(MessageStatusEvent.message_id == message.id)
+        ).scalars()
+        assert list(events) == ["failed"]

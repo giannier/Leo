@@ -640,6 +640,20 @@ class ReplySender:
                 "the customer last wrote more than 24 hours ago; only a template may be sent"
             )
         recipient = contact.phone_e164
+        if recipient is None:
+            # The person wrote with a BSUID and never shared a number. The
+            # provider interface still addresses by phone; addressing by BSUID
+            # arrives with the YCloud adapter work (TASK-418). Until then the
+            # reply is recorded as failed, visibly, rather than sent to nobody.
+            self._messages.set_delivery_status(message, status="failed")
+            MessageStatusEventRepository(self._session, self._tenant_id).append(
+                message.id, status="failed"
+            )
+            logger.warning(
+                "a reply could not be sent: the contact has no phone number",
+                extra={"tenant_id": str(self._tenant_id)},
+            )
+            return message
 
         last_error: WhatsAppError | None = None
         for attempt in range(1, self._max_attempts + 1):

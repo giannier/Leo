@@ -29,7 +29,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -62,12 +62,27 @@ class Contact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         # One row per person per business. The same phone writing to two
         # different businesses is two contacts, and neither may see the other.
         Index("uq_contacts_tenant_id_phone_e164", "tenant_id", "phone_e164", unique=True),
+        # Meta's business-scoped user id (BSUID) identifies the person when no
+        # phone number is shared. Partial, so contacts without one never collide.
+        Index(
+            "uq_contacts_tenant_id_external_user_id",
+            "tenant_id",
+            "external_user_id",
+            unique=True,
+            postgresql_where=text("external_user_id IS NOT NULL"),
+        ),
+        # At least one of the two says who this is.
+        CheckConstraint("phone_e164 IS NOT NULL OR external_user_id IS NOT NULL", name="identity"),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
-    phone_e164: Mapped[str] = mapped_column(Text, nullable=False)
+    # Absent when the person writes with a BSUID only (Feature 004, 0020).
+    phone_e164: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Meta's business-scoped user id (BSUID); also `sandbox:<user_id>` for the
+    # simulator's contact (C-19). Absent for contacts that arrived by phone.
+    external_user_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     # What WhatsApp reports as the person's profile name. Absent when they
     # have none, and never trusted as an identity - only as a display label.
     profile_name: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -81,6 +96,11 @@ class Contact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # stored `window_open` flag would need a job to expire it, and would be
     # wrong for exactly as long as that job was late.
     last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # What the customer told the assistant for an order: `{"dni": "...",
+    # "correo": "..."}` (`datos_requeridos`). Validated per field when saved and
+    # masked in traces and logs (C-20); the database only guarantees it is JSON.
+    custom_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
 
 
 class WebhookEvent(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
