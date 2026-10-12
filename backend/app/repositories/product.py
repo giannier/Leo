@@ -80,6 +80,26 @@ class ProductRepository(BaseRepository[Product]):
         statement = statement.order_by(Product.destacado.desc(), Product.name).limit(limit)
         return self._session.execute(statement).scalars().all()
 
+    def active_categories(self) -> list[str]:
+        """The distinct categories of live products, in alphabetical order.
+
+        Categories are free text on the product (there is no category table),
+        so this is what the catalogue actually contains.
+        """
+        statement = (
+            select(Product.category)
+            .where(self._tenant_predicate)
+            .where(
+                Product.deleted_at.is_(None),
+                Product.is_active.is_(True),
+                Product.category.is_not(None),
+                Product.category != "",
+            )
+            .distinct()
+            .order_by(Product.category)
+        )
+        return [category for category in self._session.execute(statement).scalars() if category]
+
     def get_active(self, product_id: uuid.UUID) -> Product | None:
         """One live product of this tenant, or None (another tenant's, deleted or off)."""
         product = self.get(product_id)

@@ -47,6 +47,14 @@ from urllib.parse import quote
 import httpx
 
 from app.providers.whatsapp.base import (
+    MAX_BODY,
+    MAX_BUTTON_TITLE,
+    MAX_BUTTONS,
+    MAX_HEADER_FOOTER,
+    MAX_LIST_BUTTON,
+    MAX_LIST_ROWS,
+    MAX_ROW_DESCRIPTION,
+    MAX_ROW_TITLE,
     Button,
     InboundMessage,
     InteractiveReply,
@@ -79,16 +87,6 @@ UPLOAD_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 # YCloud (through Meta) keeps an uploaded file for 30 days.
 MEDIA_LIFETIME = timedelta(days=30)
 
-# WhatsApp's own limits. The tools truncate before sending; these are the last
-# line, so a request Meta would refuse never leaves the building.
-MAX_BUTTONS = 3
-MAX_LIST_ROWS = 10
-MAX_BUTTON_TITLE = 20
-MAX_ROW_TITLE = 24
-MAX_ROW_DESCRIPTION = 72
-MAX_BODY = 1024
-MAX_HEADER_FOOTER = 60
-MAX_LIST_BUTTON = 20
 
 # 20 seconds. A customer is watching a typing indicator, and past that the
 # retry is a better answer than continuing to wait for this attempt.

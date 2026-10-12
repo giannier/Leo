@@ -20,13 +20,27 @@ model can relay; an empty list is an absence it will be tempted to fill.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
+from app.agent.tools.shared import (
+    applies_to,
+    automatic,
+    clip,
+    currency_symbol,
+    describe_promotion,
+    money,
+)
 from app.models.business import Product
+from app.models.media import MediaAsset
+from app.models.sales_config import Promotion
 from app.repositories.knowledge import KnowledgeChunkRepository
+from app.repositories.media import MediaAssetRepository
 from app.repositories.product import ProductRepository
+from app.repositories.sales_config import PromotionRepository
 
 MAX_CATALOG_RESULTS = 12
 MAX_KNOWLEDGE_RESULTS = 4
@@ -40,6 +54,8 @@ VIEW_TOOL = "ver_producto"
 KNOWLEDGE_TOOL = "consultar_conocimiento"
 # A description in a listing; the full text is for `ver_producto`.
 MAX_LISTED_DESCRIPTION = 200
+# When to use a linked file, as the model reads it next to the product.
+MAX_RESOURCE_HINT = 90
 
 
 def _format_price(price: Decimal, currency: str) -> str:
@@ -126,7 +142,15 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
     )
 
 
-def _product_data(product: Product, *, full: bool = False) -> dict[str, Any]:
+def _product_data(
+    product: Product,
+    *,
+    full: bool = False,
+    resources: Sequence[MediaAsset] = (),
+    promotions: Sequence[Promotion] = (),
+    sent: Sequence[str] = (),
+    symbol: str = "S/",
+) -> dict[str, Any]:
     description = product.description or None
     if description is not None and not full:
         description = description[:MAX_LISTED_DESCRIPTION]
@@ -141,17 +165,38 @@ def _product_data(product: Product, *, full: bool = False) -> dict[str, Any]:
         "bundle_size": product.bundle_size,
         "destacado": product.destacado,
         "es_digital": product.es_digital,
+        # Files the owner linked to this product, and whether this conversation
+        # already received them (`enviar_recurso` answers `omitido` if so).
+        "recursos": [
+            {
+                "clave": asset.clave,
+                "titulo": asset.titulo,
+                "cuando_usar": asset.cuando_usar,
+                "enviado": asset.clave in sent,
+            }
+            for asset in resources
+        ],
+        # Automatic promotions whose scope covers this product. The discount of a
+        # given order is computed by the pricing module, not here.
+        "promociones_aplicables": [
+            {
+                "promocion_id": str(promotion.id),
+                "nombre": promotion.nombre,
+                "detalle": describe_promotion(promotion, symbol),
+            }
+            for promotion in promotions
+        ],
     }
 
 
-def _product_line(item: dict[str, Any]) -> str:
-    """One product as a line the model can quote.
+def _product_line(item: dict[str, Any], symbol: str = "S/") -> str:
+    """One product as text the model can quote, with its files and promotions.
 
     The id is there so the model can pass it to `ver_producto` and, later, to
     `gestionar_pedido`; it never needs to say it aloud.
     """
     parts = [f"- {item['nombre']} (producto_id: {item['producto_id']}):"]
-    parts.append(_format_price(Decimal(item["precio"]), "S/"))
+    parts.append(money(Decimal(item["precio"]), symbol))
     if item["bundle_size"]:
         parts.append(f"[paquete de {item['bundle_size']} selecciones]")
     if item["modo_venta"] == "cotizacion":
@@ -166,7 +211,47 @@ def _product_line(item: dict[str, Any]) -> str:
         # Stated only when tracked. "stock: None" means the business does
         # not count it, which is different from having none.
         parts.append(f"[stock: {item['stock']}]")
-    return " ".join(parts)
+    lines = [" ".join(parts)]
+    for resource in item["recursos"]:
+        state = "ya enviado en esta conversación" if resource["enviado"] else "sin enviar"
+        hint = clip(resource["cuando_usar"], MAX_RESOURCE_HINT)
+        lines.append(f"  Recurso '{resource['clave']}' ({state}): {hint}")
+    for promotion in item["promociones_aplicables"]:
+        lines.append(f"  Promoción automática '{promotion['nombre']}': {promotion['detalle']}")
+    return "\n".join(lines)
+
+
+def _sent_resources(context: ToolContext) -> Sequence[str]:
+    """Resource keys already sent in this conversation, counting this turn's."""
+    sent: Sequence[str] = context.facts_patch.get(
+        "recursos_enviados", context.facts.recursos_enviados
+    )
+    return sent
+
+
+def _enrich(
+    context: ToolContext, rows: Sequence[Product], *, full: bool = False
+) -> list[dict[str, Any]]:
+    """Products as tool data, with the linked files and automatic promotions."""
+    symbol = currency_symbol(context.session, context.tenant_id)
+    assets: Mapping[uuid.UUID, Sequence[MediaAsset]] = MediaAssetRepository(
+        context.session, context.tenant_id
+    ).for_products([row.id for row in rows])
+    promotions = automatic(
+        PromotionRepository(context.session, context.tenant_id).in_force(now=datetime.now(UTC))
+    )
+    sent = _sent_resources(context)
+    return [
+        _product_data(
+            row,
+            full=full,
+            resources=assets.get(row.id, ()),
+            promotions=[p for p in promotions if applies_to(p, row)],
+            sent=sent,
+            symbol=symbol,
+        )
+        for row in rows
+    ]
 
 
 async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
@@ -195,8 +280,9 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
             texto="El catálogo está vacío. No hay productos que ofrecer."
         )
 
-    items = [_product_data(row) for row in rows]
-    listing = "\n".join(_product_line(item) for item in items)
+    items = _enrich(context, rows)
+    symbol = currency_symbol(context.session, context.tenant_id)
+    listing = "\n".join(_product_line(item, symbol) for item in items)
     if missed:
         asked = query or categoria or "paquetes"
         texto = (
@@ -205,6 +291,10 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
         )
     else:
         texto = f"Productos disponibles:\n{listing}"
+    if not missed:
+        # The customer was shown what they asked for (a fallback listing is
+        # the model offering alternatives, not the customer having seen it).
+        context.facts_patch["vio_productos"] = True
     return ToolResult.hecho(data={"productos": items, "coincidencia": not missed}, texto=texto)
 
 
@@ -224,8 +314,10 @@ async def ver_producto(context: ToolContext, arguments: dict[str, Any]) -> ToolR
                 "Búscalo con buscar_productos."
             )
         )
-    item = _product_data(product, full=True)
-    return ToolResult.hecho(data=item, texto="Producto:\n" + _product_line(item))
+    item = _enrich(context, [product], full=True)[0]
+    symbol = currency_symbol(context.session, context.tenant_id)
+    context.facts_patch["vio_productos"] = True
+    return ToolResult.hecho(data=item, texto="Producto:\n" + _product_line(item, symbol))
 
 
 def build_default_registry() -> ToolRegistry:

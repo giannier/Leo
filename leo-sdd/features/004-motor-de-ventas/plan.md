@@ -221,4 +221,4 @@ Con Claude Code y una persona revisando, son 49 tasks (4 son milestones tuyos):
 
 **Consecuencia para TASK-421.** El pipeline arma el registry con `registry_for_stage(...)` y deja de usar `build_default_registry()`. Cuando eso pase, `consultar_catalogo` queda solo como alias y se puede retirar su handler de texto (y reescribir las pruebas que lo nombran).
 
-**Pendiente de TASK-420.** `buscar_productos` ya devuelve `modo_venta`, `bundle_size` y `destacado`, y ordena los destacados primero; faltan los recursos vinculados, las promociones automáticas aplicables (necesitan `pricing`, TASK-424) y fijar `vio_productos` (los tools ya reciben `ToolContext.facts_patch` para eso).
+**TASK-420 (hecho).** `buscar_productos` y `ver_producto` ya devuelven los recursos vinculados, las promociones automáticas cuyo alcance cubre el producto (el descuento de un pedido sigue siendo de `pricing`, TASK-424) y fijan `vio_productos`. Detalle en `conciliacion.md §8.16`.

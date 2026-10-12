@@ -34,6 +34,24 @@ class MediaAssetRepository(BaseRepository[MediaAsset]):
         )
         return self._session.execute(statement).scalars().all()
 
+    def for_products(self, product_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, list[MediaAsset]]:
+        """Active assets linked to any of these products, grouped by product.
+
+        One query for a whole search result instead of one per product.
+        """
+        if not product_ids:
+            return {}
+        statement = (
+            self._scoped()
+            .where(MediaAsset.product_id.in_(product_ids), MediaAsset.is_active.is_(True))
+            .order_by(MediaAsset.clave)
+        )
+        grouped: dict[uuid.UUID, list[MediaAsset]] = {}
+        for asset in self._session.execute(statement).scalars():
+            if asset.product_id is not None:
+                grouped.setdefault(asset.product_id, []).append(asset)
+        return grouped
+
     def for_promotion(self, promotion_id: uuid.UUID) -> Sequence[MediaAsset]:
         """Active assets linked to one promotion."""
         statement = (
