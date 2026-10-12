@@ -117,7 +117,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: snapshot del prompt por etapa en las 3 plantillas; test de presupuesto ≤ 6 000 tokens con un negocio "lleno"; sin llaves `{…}` sin resolver
   - Parallel: true
 
-- [ ] TASK-415: Presupuesto de mensajes (`budget.py`)
+- [x] TASK-415: Presupuesto de mensajes (`budget.py`)
   - Input: C-11
   - Output: `TurnBudget(max=3, reserva_texto=1)` con `consume()` y `remaining_text_bubbles()`
   - Depends on: —
