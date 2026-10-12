@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.agent.catalog_guard import CatalogueGuard, build_catalogue_guard
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
-from app.agent.tools.registry import ToolContext, ToolRegistry
+from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.conversation import Message
 from app.providers.llm.base import (
     ChatMessage,
@@ -477,15 +477,25 @@ class AgentCore:
             return f"ERROR: la herramienta '{call.name}' no existe.", [], False
 
         try:
-            output = await tool.handler(context, call.arguments)
+            produced = await tool.handler(context, call.arguments)
         except Exception:
             logger.exception(
                 "tool failed", extra={"tool": call.name, "tenant_id": str(self._tenant_id)}
             )
             return f"ERROR: no se pudo consultar '{call.name}' en este momento.", [], False
 
+        # A tool answers with the `ToolResult` envelope or, like the v0 catalogue
+        # tool, with plain text. The model reads text either way; a source is
+        # only recorded when the knowledge tool actually found something.
+        if isinstance(produced, ToolResult):
+            output = produced.render()
+            found = produced.status == "hecho"
+        else:
+            output = produced
+            found = not output.startswith("No hay información")
+
         sources: list[dict[str, object]] = []
-        if call.name == "consultar_conocimiento" and not output.startswith("No hay información"):
+        if call.name == "consultar_conocimiento" and found:
             sources.append({"tool": call.name, "consulta": _summarise(call.arguments)})
 
         cache[key] = (output, sources)

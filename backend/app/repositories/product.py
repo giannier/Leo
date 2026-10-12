@@ -12,6 +12,12 @@ from app.models.business import Product
 from app.repositories.base import BaseRepository
 
 
+def _contains(text: str) -> str:
+    """A LIKE pattern that matches `text` anywhere, taking its wildcards literally."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 class ProductRepository(BaseRepository[Product]):
     """Catalog access for one tenant.
 
@@ -48,6 +54,38 @@ class ProductRepository(BaseRepository[Product]):
             Product.is_active.is_(True),
             limit=limit,
         )
+
+    def search_active(
+        self,
+        query: str = "",
+        *,
+        categoria: str | None = None,
+        solo_paquetes: bool = False,
+        limit: int,
+    ) -> Sequence[Product]:
+        """Live products matching a customer's words, featured ones first.
+
+        `query` matches the name and `categoria` the category, both without
+        regard to case and with `%` and `_` taken literally: they come from the
+        model, which got them from a customer. `solo_paquetes` keeps only the
+        products sold as a package of N selections.
+        """
+        statement = self._scoped().where(Product.deleted_at.is_(None), Product.is_active.is_(True))
+        if query:
+            statement = statement.where(Product.name.ilike(_contains(query), escape="\\"))
+        if categoria:
+            statement = statement.where(Product.category.ilike(_contains(categoria), escape="\\"))
+        if solo_paquetes:
+            statement = statement.where(Product.bundle_size.is_not(None))
+        statement = statement.order_by(Product.destacado.desc(), Product.name).limit(limit)
+        return self._session.execute(statement).scalars().all()
+
+    def get_active(self, product_id: uuid.UUID) -> Product | None:
+        """One live product of this tenant, or None (another tenant's, deleted or off)."""
+        product = self.get(product_id)
+        if product is None or product.deleted_at is not None or not product.is_active:
+            return None
+        return product
 
     def list_including_deleted(self) -> Sequence[Product]:
         return self.list()

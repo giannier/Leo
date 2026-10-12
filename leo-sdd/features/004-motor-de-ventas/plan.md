@@ -201,3 +201,24 @@ Con Claude Code y una persona revisando, son 49 tasks (4 son milestones tuyos):
 - El webhook, el debounce, la idempotencia de `webhook_events` y el opt-out (`contacts.opted_out_at` y `opt_out_keywords`) siguen igual.
 - El `catalog_guard` sigue activo, pero las selecciones libres del pedido activo (`bundle_permite_libres`, ej. temas de certificación) entran en su lista blanca. Si no, bloquearía el "certificamos cualquier tema" de Capacita. TASK-401 confirma cómo funciona hoy el guard y TASK-426 agrega la lista blanca.
 - El simulador sigue siendo el mismo componente: solo recibe salientes tipados y el panel de depuración.
+
+## Decisiones Posteriores
+
+### 2026-10-12 — `consultar_catalogo` frente a `buscar_productos` y `ver_producto` (TASK-417)
+
+**Estado: pendiente de ratificar por Giannier.** Se implementó para no bloquear la Fase A; si no te convence, se revierte cambiando `LEGACY_ALIASES` y `build_default_registry`.
+
+**Problema.** `TOOL_NAMES` (`contracts/api.md §7`) nombra `buscar_productos` y `ver_producto`; el agente de hoy tiene una sola tool, `consultar_catalogo`, que mencionan 19 pruebas de `test_agent_core`, `test_prompt_builder`, `test_sandbox`, `test_agent_isolation`, los evals y el texto del prompt viejo (`conciliacion.md §3.4`). Renombrar sin más rompe todo eso antes de que exista el pipeline que lo reemplaza.
+
+| Punto | Elegido | Razón | Alternativa descartada |
+|---|---|---|---|
+| Registry del agente de hoy (`build_default_registry`, sin pipeline) | Sin cambios: `consultar_catalogo` y `consultar_conocimiento`, con la salida de texto de siempre para el catálogo | Las pruebas y los evals actuales siguen siendo válidos hasta TASK-421 | Renombrar ya (rompe la suite y los 5 casos dorados) |
+| Registry por etapa (`ToolCatalog.for_stage`) | Ofrece `buscar_productos` y `ver_producto`, nunca `consultar_catalogo` | Es el contrato de `§7` y de las plantillas | Ofrecer también el nombre viejo (el modelo vería dos tools para lo mismo) |
+| Llamadas al nombre viejo dentro de un registry por etapa | Un alias (`ToolRegistry.alias`) lo resuelve a `buscar_productos`; no aparece en `specs()` ni en `names()` | Un historial de conversación o un prompt escrito antes del cambio sigue funcionando; el argumento `consulta` es el mismo | Responder "la herramienta no existe" (el modelo reintentaría o inventaría) |
+| `consultar_conocimiento` | Mantiene el parámetro `consulta` (la spec decía `pregunta`) y migra al sobre `ToolResult` | `conciliacion.md §3.4`: el repo manda; los dos parámetros llaman lo mismo | Renombrar el parámetro (sin ganancia, rompe el prompt viejo) |
+| Sobre `ToolResult` | `AgentCore._run_tool` acepta `ToolResult` o texto. Un `ToolResult` se entrega al modelo como texto que **empieza con `estado: hecho\|omitido\|no_disponible`** (un error con `ERROR: …`, como detecta la traza hoy) | La regla 4 de plataforma ("nunca digas que hiciste algo si la herramienta no devolvió `hecho`") solo funciona si el modelo ve el estado. Prosa y no JSON: el comentario de `catalog.py` ya explica por qué | JSON puro (más errores de transcripción en precios) |
+| Herramientas aún sin construir | Las 10 están declaradas con su schema final; las 7 que llegan en TASK-420 y fases B/D devuelven `no_disponible` ("no la menciones") | El presupuesto de tokens y las reglas por etapa se prueban con los schemas reales; cada task posterior solo reemplaza el handler | Declarar solo las implementadas (el test de presupuesto subestimaría) |
+
+**Consecuencia para TASK-421.** El pipeline arma el registry con `registry_for_stage(...)` y deja de usar `build_default_registry()`. Cuando eso pase, `consultar_catalogo` queda solo como alias y se puede retirar su handler de texto (y reescribir las pruebas que lo nombran).
+
+**Pendiente de TASK-420.** `buscar_productos` ya devuelve `modo_venta`, `bundle_size` y `destacado`, y ordena los destacados primero; faltan los recursos vinculados, las promociones automáticas aplicables (necesitan `pricing`, TASK-424) y fijar `vio_productos` (los tools ya reciben `ToolContext.facts_patch` para eso).
