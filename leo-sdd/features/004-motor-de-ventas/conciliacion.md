@@ -241,3 +241,12 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - `PUT /tenant/products/{id}` rechaza un `null` explícito en las columnas NOT NULL nuevas (400 en lugar de un 500 de la base). `bundle_size: null` sí vale: devuelve el paquete a producto simple.
 - `TEMPLATE_CSV` queda sin cambios (las columnas nuevas son opcionales).
 
+### 8.3 Migración 0019 (TASK-407)
+
+- Sin `ON DELETE CASCADE` en `tenant_id`, `conversation_id` ni en `payment_proofs.order_id`: borrar una conversación o un pedido no debe borrar el historial de ventas ni los comprobantes. Único cascade: `order_items.order_id`. Los `SET NULL` del data-model se respetan.
+- `payment_proofs.created_at` usa `clock_timestamp()` (el "último comprobante" decide si el pago está rechazado y `now()` empata dentro de una transacción).
+- CHECK extra: montos de `orders` y `order_items` no negativos; `payment_proofs.confianza` entre 0 y 1.
+- `orders.contact_id` queda NOT NULL: el simulador usa un contacto sandbox (C-19).
+- `OrderRepository.add_numbered` toma el número de `tenant_sequences` con un único `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` (`TenantSequenceRepository.next_value`). `OrderService` (TASK-425) lo reutiliza; la prueba de numeración concurrente con conexiones reales es de esa task.
+- `OrderRepository.active_for_conversation` desempata por `numero` (dos pedidos en una misma transacción comparten `created_at`).
+
