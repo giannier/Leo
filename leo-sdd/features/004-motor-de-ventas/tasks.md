@@ -210,7 +210,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: test de la matriz completa de transiciones; numeración concurrente sin duplicados
   - Parallel: false
 
-- [ ] TASK-426: Tool `gestionar_pedido`
+- [x] TASK-426: Tool `gestionar_pedido`
   - Input: `contracts/api.md §7`
   - Output: acciones agregar, quitar, cantidad, elegir (libre o del catálogo según `bundle_permite_libres`), ver, vaciar, aplicar_promocion (registra la oferta en `promos_ofrecidas` aunque no haya pedido) y confirmar; cualquier cambio apaga `rechazo_vigente`; las selecciones libres entran en la lista blanca del `catalog_guard`; devuelve siempre el pedido completo
   - Depends on: TASK-425, TASK-417

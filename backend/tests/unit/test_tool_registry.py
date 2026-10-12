@@ -393,8 +393,10 @@ class TestConfirmingAnOrder:
 
         result = await _call(registry, "gestionar_pedido", accion="confirmar")
 
+        # Past the guard, the handler runs: with no conversation it has nothing to work on.
         assert isinstance(result, ToolResult)
-        assert result.data == {"herramienta": "gestionar_pedido"}  # the stub, not the guard
+        assert result.status == "error"
+        assert "conversación" in (result.decir or "")
 
     async def test_other_actions_are_not_guarded(self) -> None:
         registry = registry_for_stage(SHOP, Stage.PEDIDO, Facts(), SHOP_OPTIONS)
@@ -402,7 +404,8 @@ class TestConfirmingAnOrder:
         result = await _call(registry, "gestionar_pedido", accion="agregar")
 
         assert isinstance(result, ToolResult)
-        assert result.data == {"herramienta": "gestionar_pedido"}
+        assert result.status == "error"
+        assert "conversación" in (result.decir or "")
 
 
 class TestCustomerData:
@@ -475,7 +478,6 @@ class TestTheToolsOfLaterTasksAnswerNotAvailable:
     @pytest.mark.parametrize(
         ("tool", "stage"),
         [
-            ("gestionar_pedido", Stage.PEDIDO),
             ("registrar_datos_cliente", Stage.DATOS),
             ("enviar_metodos_pago", Stage.COBRO),
             ("derivar_a_humano", Stage.IDENTIFICAR),
