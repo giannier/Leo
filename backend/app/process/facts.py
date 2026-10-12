@@ -9,19 +9,57 @@
   order, the customer's data, the payment proofs) and never written back, so
   they cannot drift from it.
 
-This module is the model. `FactsLoader` (TASK-411) fills it in.
+The model comes first. `FactsLoader` at the end reads the rows (three statements,
+see `ConversationSnapshotRepository`) and `build_facts` turns them into a
+`Facts`. `build_facts` is pure, so every rule of the derived facts is a
+table-driven test.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+
+from app.models.channel import Contact
+from app.models.conversation import Conversation
+from app.models.orders import Order, PaymentProof
+from app.models.sales_config import Promotion
+from app.process.templates.base import EffectiveOptions
+from app.repositories.conversation_snapshot import (
+    ConversationSnapshot,
+    ConversationSnapshotRepository,
+)
+from app.schemas.business_info import Entregas
 
 PaymentState = Literal["por_verificar", "rechazado", "confirmado"]
+
+# Order states that mean the sale is made (the operator confirmed it).
+CONFIRMED_ORDER_STATES = frozenset({"confirmado", "en_curso", "completado"})
+
+# The keys `conversation_state.facts` may hold (C-03). Anything derived is
+# computed each turn and never written there, so `from_stored` drops it.
+STORED_KEYS = frozenset(
+    {
+        "saludo_enviado",
+        "entrada_anuncio",
+        "camino",
+        "vio_productos",
+        "recursos_enviados",
+        "opciones_mostradas",
+        "metodos_pago_enviados",
+        "derivado",
+        "asesoria_derivada_en",
+        "seguimiento",
+        "promos_ofrecidas",
+    }
+)
 
 
 class _Model(BaseModel):
@@ -142,3 +180,245 @@ class Facts(_Model):
     def derivado_activo(self, now: datetime) -> bool:
         """Whether the bot is paused for a person right now."""
         return self.derivado is not None and self.derivado.hasta > now
+
+    @classmethod
+    def from_stored(cls, stored: Mapping[str, Any], **derived: Any) -> Facts:
+        """Facts from the stored JSON plus the values derived this turn.
+
+        Only `STORED_KEYS` are read from `stored`: a derived fact that ended up
+        there by mistake must not override the one computed from its source.
+        """
+        values = {key: value for key, value in stored.items() if key in STORED_KEYS}
+        if "metodos_pago_enviados" in values:
+            values["metodos_pago_registro"] = values.pop("metodos_pago_enviados")
+        return cls.model_validate({**values, **derived})
+
+    def to_stored(self) -> dict[str, Any]:
+        """The stored facts as the JSON `conversation_state.facts` holds.
+
+        Derived facts are left out on purpose (C-03), and the payment-methods
+        record goes back under its stored key.
+        """
+        stored = self.model_dump(
+            mode="json",
+            include={
+                "saludo_enviado",
+                "entrada_anuncio",
+                "camino",
+                "vio_productos",
+                "recursos_enviados",
+                "opciones_mostradas",
+                "derivado",
+                "asesoria_derivada_en",
+                "seguimiento",
+                "promos_ofrecidas",
+            },
+            exclude_none=True,
+        )
+        if self.metodos_pago_registro is not None:
+            stored["metodos_pago_enviados"] = self.metodos_pago_registro.model_dump(mode="json")
+        return stored
+
+
+# ------------------------------------------------------------------- loader
+
+
+@dataclass(frozen=True)
+class FactsConfig:
+    """The configuration the derived facts depend on.
+
+    Passed in rather than read here: it changes rarely and the caller
+    (`ProcessConfigService`, TASK-414) caches it, so the loader stays at three
+    statements per turn.
+    """
+
+    options: EffectiveOptions
+    # `business_info` section "entregas"; None if the business never filled it.
+    entregas: Entregas | None = None
+    # The promotions currently in force (`PromotionRepository.in_force`).
+    promotions: Sequence[Promotion] = ()
+
+
+def payment_state(order: Order | None, last_proof: PaymentProof | None) -> PaymentState | None:
+    """`pago_estado` (`data-model.md`, 0019).
+
+    | order                                     | payment state |
+    | confirmado / en_curso / completado        | confirmado    |
+    | por_confirmar                             | por_verificar |
+    | borrador, rechazo_vigente, proof rejected | rechazado     |
+    | anything else                             | None          |
+    """
+    if order is None:
+        return None
+    if order.estado in CONFIRMED_ORDER_STATES:
+        return "confirmado"
+    if order.estado == "por_confirmar":
+        return "por_verificar"
+    if (
+        order.estado == "borrador"
+        and order.rechazo_vigente
+        and last_proof is not None
+        and last_proof.estado == "rechazado"
+    ):
+        return "rechazado"
+    return None
+
+
+def _customer_has(field: str, contact: Contact | None) -> bool:
+    """Whether the customer's data already holds `field`."""
+    if contact is None:
+        return False
+    if field == "telefono" and contact.phone_e164:
+        # The phone they write from is their phone: no need to ask again.
+        return True
+    value = contact.custom_data.get(field)
+    return value is not None and str(value).strip() != ""
+
+
+def _requires_delivery(snapshot: ConversationSnapshot, entregas: Entregas | None) -> bool:
+    """An order needs delivery data when something in it is physical and the
+    business offers delivery or pickup (`plantillas.md` section 1, C-22)."""
+    if entregas is None or not (entregas.hace_delivery or entregas.recojo_en_tienda):
+        return False
+    return any(not line.es_digital for line in snapshot.lines)
+
+
+def _missing_data(
+    snapshot: ConversationSnapshot, config: FactsConfig, *, requiere_entrega: bool
+) -> list[str]:
+    contact = snapshot.contact
+    missing = [f for f in config.options.datos_requeridos if not _customer_has(f, contact)]
+    if not requiere_entrega or snapshot.order is None or config.entregas is None:
+        return missing
+
+    entregas = config.entregas
+    # A business that only offers pickup does not make the customer choose.
+    only_pickup = entregas.recojo_en_tienda and not entregas.hace_delivery
+    tipo = snapshot.order.tipo_entrega or ("recojo" if only_pickup else None)
+    if tipo is None:
+        missing.append("tipo_entrega")
+    elif tipo == "delivery":
+        if "direccion" not in missing and not _customer_has("direccion", contact):
+            missing.append("direccion")
+        # No zones configured means the cost is "a coordinar": no zone to pick.
+        if entregas.zonas and not snapshot.order.zona_envio:
+            missing.append("zona_envio")
+    return missing
+
+
+def _pedido(snapshot: ConversationSnapshot) -> Pedido | None:
+    order = snapshot.order
+    if order is None:
+        return None
+    items: list[PedidoItem] = []
+    missing_selections = 0
+    for line in snapshot.lines:
+        item = line.item
+        chosen = [str(selection.get("nombre", "")) for selection in item.bundle_selections]
+        items.append(PedidoItem(nombre=item.nombre, cantidad=item.cantidad, selecciones=chosen))
+        if item.bundle_size:
+            missing_selections += max(0, item.bundle_size * item.cantidad - len(chosen))
+    return Pedido(
+        id=order.id,
+        numero=order.numero,
+        estado=order.estado,
+        items=items,
+        completo=bool(items) and missing_selections == 0,
+        faltan_selecciones=missing_selections,
+        total=order.total,
+        moneda=order.moneda,
+    )
+
+
+def _name(contact: Contact | None) -> tuple[str | None, bool]:
+    """The customer's name and whether they told us (versus WhatsApp's label)."""
+    if contact is None:
+        return None, False
+    told = contact.custom_data.get("nombres")
+    if told is not None and str(told).strip():
+        return str(told).strip(), True
+    return contact.profile_name or None, False
+
+
+def _closing_promotions(
+    promotions: Sequence[Promotion], offered: Mapping[str, Any], now: datetime
+) -> list[PromoCierre]:
+    """The closing promotions in force, each with its expiry if already offered."""
+    closing: list[PromoCierre] = []
+    for promotion in promotions:
+        if promotion.uso != "cierre":
+            continue
+        expiry = offered.get(str(promotion.id))
+        if isinstance(expiry, str):
+            expiry = datetime.fromisoformat(expiry)
+        closing.append(
+            PromoCierre(
+                id=str(promotion.id),
+                nombre=promotion.nombre,
+                vigencia_horas=promotion.vigencia_horas or 0,
+                # An offer that already expired is as good as never made.
+                ofrecida_vence=expiry if expiry is not None and expiry > now else None,
+            )
+        )
+    return closing
+
+
+def build_facts(snapshot: ConversationSnapshot, config: FactsConfig, now: datetime) -> Facts:
+    """Stored facts plus the facts derived from the rows of the snapshot."""
+    stored = snapshot.state.facts if snapshot.state is not None else {}
+    order = snapshot.order
+    registro_raw = stored.get("metodos_pago_enviados")
+    registro = MetodosPagoEnviados.model_validate(registro_raw) if registro_raw else None
+
+    requiere_entrega = _requires_delivery(snapshot, config.entregas)
+    missing = _missing_data(snapshot, config, requiere_entrega=requiere_entrega)
+    nombre, confirmado = _name(snapshot.contact)
+
+    # The methods count only for the active order and only if they were sent
+    # after the business last rejected a proof (C-21): a rejected customer is
+    # sent the methods again, once.
+    methods_sent = (
+        registro is not None
+        and order is not None
+        and registro.order_id == order.id
+        and (snapshot.last_rejection_at is None or registro.en > snapshot.last_rejection_at)
+    )
+
+    return Facts.from_stored(
+        stored,
+        nombre_cliente=nombre,
+        nombre_confirmado=confirmado,
+        pedido=_pedido(snapshot),
+        datos_completos=not missing,
+        datos_faltantes=missing,
+        requiere_entrega=requiere_entrega,
+        pago_estado=payment_state(order, snapshot.last_proof),
+        modalidad_pago=(
+            order.modalidad_pago if order is not None else config.options.modalidad_pago
+        ),
+        metodos_pago_enviados=methods_sent,
+        motivo_rechazo=(
+            order.motivo_rechazo if order is not None and order.estado == "borrador" else None
+        ),
+        comprobante=(
+            Comprobante(observaciones=list(snapshot.last_proof.observaciones))
+            if snapshot.last_proof is not None
+            else None
+        ),
+        promos_cierre=_closing_promotions(
+            config.promotions, stored.get("promos_ofrecidas", {}), now
+        ),
+    )
+
+
+class FactsLoader:
+    """Loads the facts of a conversation: stored plus derived, in three reads."""
+
+    def __init__(self, session: Session, tenant_id: uuid.UUID, config: FactsConfig) -> None:
+        self._snapshots = ConversationSnapshotRepository(session, tenant_id)
+        self._config = config
+
+    def load(self, conversation: Conversation, *, now: datetime | None = None) -> Facts:
+        """The facts of `conversation` as of `now` (default: the current time)."""
+        snapshot = self._snapshots.load(conversation)
+        return build_facts(snapshot, self._config, now or datetime.now(UTC))
