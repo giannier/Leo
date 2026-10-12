@@ -19,6 +19,7 @@ from app.models.conversation_state import ConversationStageEvent, ConversationSt
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
 from app.models.plan import Plan
+from app.models.sales_config import BusinessInfo, Faq, Promotion
 from app.models.tenant import (
     Invitation,
     Tenant,
@@ -33,6 +34,7 @@ __all__ = [
     "AgentTrace",
     "AuditLog",
     "Base",
+    "BusinessInfo",
     "BusinessProfile",
     "ConnectionRequest",
     "Contact",
@@ -40,6 +42,7 @@ __all__ = [
     "ConversationStageEvent",
     "ConversationState",
     "EmailToken",
+    "Faq",
     "Invitation",
     "KnowledgeChunk",
     "KnowledgeSource",
@@ -49,6 +52,7 @@ __all__ = [
     "PaymentMethodBusiness",
     "Plan",
     "Product",
+    "Promotion",
     "RefreshToken",
     "Tenant",
     "TenantLLMSettings",
