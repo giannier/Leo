@@ -101,7 +101,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: test de concurrencia (dos saves con la misma versión) y test de no duplicar eventos
   - Parallel: false
 
-- [ ] TASK-413: Respuestas interactivas (`interactive.py`)
+- [x] TASK-413: Respuestas interactivas (`interactive.py`)
   - Input: C-15
   - Output: `apply_interactive(reply, state)`: `camino:` fija el hecho; el resto devuelve una línea de contexto
   - Depends on: TASK-412

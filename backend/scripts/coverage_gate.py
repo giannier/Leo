@@ -39,6 +39,9 @@ BASELINE_MINIMUM = 70.0
 CRITICAL_GROUPS: dict[str, tuple[str, ...]] = {
     "agent-core and tools": ("app/agent/",),
     "channels": ("app/providers/whatsapp/",),
+    # The sales engine (Feature 004): the stage rules and the order/pricing code
+    # decide what a customer is told and charged (plan.md, Constitution Check).
+    "sales engine": ("app/process/", "app/orders/"),
     # No `services/billing.py` yet (Feature 009). What handles money today is
     # the trial's metering and quota enforcement, and the payments repository.
     "billing": ("app/services/trial.py", "app/repositories/payment.py"),

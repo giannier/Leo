@@ -296,3 +296,12 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - "Recalcula una vez" del `plan.md` queda del lado del pipeline (TASK-421): `save` re-aplica la misma etapa y el mismo parche; si el pipeline quiere recalcular la etapa con los hechos nuevos, atrapa `StateConflict` o lee `SaveResult.retried`.
 - Pruebas: la contención se prueba con versiones viejas y, además, con dos conexiones reales (un escritor mantiene el candado de fila sin confirmar mientras el otro intenta guardar). Este último test confirma filas reales y las borra él mismo.
 
+
+### 8.9 Respuestas interactivas y grupo de cobertura (TASK-413)
+
+- `apply_interactive(reply, facts, options)` en `backend/app/process/interactive.py` (la firma de `tasks.md` decía `state`; necesita los caminos configurados para validar la clave y los hechos para no reescribir el mismo camino). Devuelve `InteractiveOutcome(facts_patch, context)`: el `facts_patch` es el de `StateRepo.save`.
+- `camino:{clave}` conocido fija `{"camino": clave}` y no agrega línea de contexto. Una clave inexistente en esa plantilla se ignora y queda en el log (`warning`). Tocar el camino que ya estaba elegido no escribe nada.
+- `producto:`, `categoria:`, `promo:` y `accion:` devuelven `El cliente eligió: {título} ({campo}={valor})`. Un id sin prefijo conocido o mal formado (solo se aceptan `[A-Za-z0-9_.-]{1,64}`) devuelve `El cliente eligió: {título}` y no escribe nada: es dato de entrada.
+- El título se aplana a una línea de 100 caracteres máximo antes de llegar al prompt.
+- `InteractiveReply(id, title, description)` es el tipo que el adaptador (TASK-418) deberá producir al parsear `button_reply` y `list_reply`.
+- `scripts/coverage_gate.py`: `app/process/` y `app/orders/` pasan al grupo crítico "sales engine" (80 %), cierra el pendiente de §3.5 y §8.6.
