@@ -151,7 +151,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de contrato contra los fixtures; firma HMAC sin cambios; un contacto solo con BSUID recibe una respuesta (envío por `recipient`). Si la doc contradice `contracts/api.md`, manda la doc y se anota en `conciliacion.md`
   - Parallel: true (con 409–418)
 
-- [ ] TASK-419: YCloud — subida de media y caché
+- [x] TASK-419: YCloud — subida de media y caché
   - Input: C-17, doc de YCloud (endpoint de subida y vigencia del `media_id`)
   - Output: `upload_media()`, guardado de `provider_media_id` y su vencimiento, fallback con link firmado de 1 h, job `media.refresh_provider_ids`
   - Depends on: TASK-418, TASK-405
