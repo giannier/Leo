@@ -42,7 +42,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: upgrade/downgrade; los tenants existentes quedan con los defaults (`productos`, `equilibrado`, `moderado`)
   - Parallel: false
 
-- [ ] TASK-405: Migración 0017 — `media_assets`
+- [x] TASK-405: Migración 0017 — `media_assets`
   - Input: `data-model.md §0017`
   - Output: modelo, migración, FK de `payment_methods_business.media_asset_id` y test de aislamiento
   - Depends on: TASK-404
