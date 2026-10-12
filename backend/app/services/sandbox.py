@@ -8,8 +8,8 @@ decisions in `plan.md` and Clarification 002 shape everything here:
 suppresses exactly the experimentation that leads to a sale - Zaia caps its
 trial at ten messages and the research calls that an antipattern to avoid.
 
-**It runs the real agent, not a simulation.** Same `AgentCore`, same prompt,
-same tools, same tables; only `channel` differs. A sandbox that answered with
+**It runs the real agent, not a simulation.** Same turn pipeline, same prompt,
+same tools, same tables; only the channel differs. A sandbox that answered with
 canned text would demo something the customer will never receive, and the
 divergence would be discovered on the day the number connects.
 
@@ -25,11 +25,12 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.agent.core import AgentCore, AgentReply
+from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
 from app.models.conversation import Conversation, Message
 from app.providers.llm.base import LLMProvider
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.services.activation import build_checklist
+from app.services.turn_outbound import SandboxOutbound
 
 SANDBOX_CHANNEL = "sandbox"
 
@@ -47,8 +48,16 @@ class SandboxTurn:
     """One exchange: what the customer said, what the agent answered, and why."""
 
     customer_message: Message
-    agent_message: Message
-    reply: AgentReply
+    # Everything the agent sent, in the order the customer saw it: the files and
+    # options the tools put on the screen, then the text.
+    outbound: list[Message]
+    result: TurnResult
+
+    @property
+    def agent_message(self) -> Message | None:
+        """The first text bubble of the answer; None if the turn had none."""
+        texts = self.result.text_messages
+        return texts[0] if texts else None
 
 
 class SandboxService:
@@ -122,16 +131,15 @@ class SandboxService:
         )
         self._session.commit()
 
-        core = AgentCore(self._session, self._tenant_id, llm=self._llm)
-        reply = await core.respond(conversation_id=conversation_id, customer_message=content)
-
-        agent_message = self._messages.append(
-            conversation_id=conversation_id,
-            direction="outbound",
-            author="agent",
-            content=reply.content,
+        pipeline = TurnPipeline(
+            self._session,
+            self._tenant_id,
+            llm=self._llm,
+            outbound=SandboxOutbound(self._session, self._tenant_id, conversation_id),
+            sandbox=True,
+            queue_text=False,
         )
-        core.persist_trace(message=agent_message, reply=reply)
+        result = await pipeline.run(conversation_id, InboundTurn(text=content))
 
         # `tenants.ai_messages_used` is deliberately untouched: the sandbox is
         # free and unmetered, during the trial and after (Clarification 002).
@@ -142,5 +150,7 @@ class SandboxService:
         self._session.commit()
 
         return SandboxTurn(
-            customer_message=customer_message, agent_message=agent_message, reply=reply
+            customer_message=customer_message,
+            outbound=result.messages,
+            result=result,
         )

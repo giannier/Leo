@@ -68,8 +68,10 @@ class ReplyResponse(BaseModel):
 
 class SendMessageResponse(BaseModel):
     message_id: uuid.UUID
-    reply: ReplyResponse
-    trace: TraceResponse
+    # Null when the turn produced no text: the tools said it all (a file or a menu
+    # on the customer's screen), or a handover is in force.
+    reply: ReplyResponse | None = None
+    trace: TraceResponse | None = None
 
 
 class MessageResponse(BaseModel):
@@ -155,18 +157,24 @@ async def send_message(
     except ConversationNotFound as exc:
         raise _not_found() from exc
 
+    reply = turn.result.reply
+    first = turn.agent_message
     return SendMessageResponse(
         message_id=turn.customer_message.id,
-        reply=ReplyResponse(message_id=turn.agent_message.id, content=turn.reply.content),
-        trace=TraceResponse(
-            model=turn.reply.model,
-            tools_called=turn.reply.tools_called,
-            rag_sources=turn.reply.rag_sources,
-            input_tokens=turn.reply.input_tokens,
-            output_tokens=turn.reply.output_tokens,
-            latency_ms=turn.reply.latency_ms,
-            degraded=turn.reply.degraded,
-            catalog_guard=turn.reply.catalog_guard,
+        reply=ReplyResponse(message_id=first.id, content=first.content) if first else None,
+        trace=(
+            TraceResponse(
+                model=reply.model,
+                tools_called=reply.tools_called,
+                rag_sources=reply.rag_sources,
+                input_tokens=reply.input_tokens,
+                output_tokens=reply.output_tokens,
+                latency_ms=reply.latency_ms,
+                degraded=reply.degraded,
+                catalog_guard=reply.catalog_guard,
+            )
+            if reply is not None
+            else None
         ),
     )
 

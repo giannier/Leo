@@ -34,6 +34,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre de perfil, sin confirmar)
 - Pedido: ninguno
 - Datos del cliente: completos
@@ -84,6 +85,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido: ninguno
 - Datos del cliente: completos
@@ -134,6 +136,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Llegó por anuncio: "5 certificaciones x S/ 500"
 - Pedido: ninguno
@@ -186,6 +189,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Camino: certificacion
 - Pedido: ninguno
@@ -240,6 +244,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido #42 (borrador): 1× Paquete de certificaciones número 1 [SIAF, Gestión pública] · Total S/ 500.00 · faltan 3 selecciones
 - Datos del cliente: faltan dni, correo
@@ -290,6 +295,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido #42 (borrador): 1× Paquete de certificaciones número 1 [SIAF, Gestión pública] · Total S/ 500.00
 - Datos del cliente: faltan dni, correo
@@ -339,6 +345,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido #42 (borrador): 1× Paquete de certificaciones número 1 [SIAF, Gestión pública] · Total S/ 500.00
 - Datos del cliente: completos
@@ -395,6 +402,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido #42 (borrador): 1× Paquete de certificaciones número 1 [SIAF, Gestión pública] · Total S/ 500.00
 - Datos del cliente: completos
@@ -447,6 +455,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido #42 (confirmado): 1× Paquete de certificaciones número 1 [SIAF, Gestión pública] · Total S/ 500.00
 - Datos del cliente: completos
@@ -495,6 +504,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Camino: programa
 - Pedido: ninguno
@@ -548,6 +558,7 @@ Promoción vigente: Promo automática número 1 — Descripción de Promo autom�
 Tipos de cliente: Cliente tipo 1 (Pide más de 12 unidades de cualquier producto): Se le ofrece precio por mayor y entrega prioritaria
 
 ESTADO DE LA CONVERSACIÓN
+- Hoy: lunes 12 de octubre de 2026, 10:00
 - Cliente: Ana (nombre confirmado)
 - Pedido: ninguno
 - Datos del cliente: completos
