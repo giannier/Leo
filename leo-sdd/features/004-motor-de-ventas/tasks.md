@@ -70,7 +70,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests del webhook existentes en verde; upsert de un contacto que llega solo con BSUID (la respuesta a ese contacto se prueba en TASK-418)
   - Parallel: false
 
-- [ ] TASK-409: Plantillas de proceso en código
+- [x] TASK-409: Plantillas de proceso en código
   - Input: `plantillas.md` §1–§3 y §5–§7
   - Output: `process/templates/{base,productos,certificaciones,servicios}.py`:
     - etapas, herramientas por etapa, embudo, opciones con su JSON Schema y defaults;

@@ -258,3 +258,13 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - `agent_traces` suma `stage_key`, `funnel_code`, `tools_enabled`, `outbound_count` y `model_tier`, todas nullable. Las llena el pipeline (TASK-421).
 - El downgrade se niega a correr si existe algún contacto sin teléfono (restaurar NOT NULL lo perdería).
 
+### 8.5 Plantillas de proceso (TASK-409)
+
+- Viven en `backend/app/process/templates/` (`base.py` + una por plantilla). `base.py` tiene el vocabulario común: `Stage`, `TOOL_NAMES` (las 10 de `contracts/api.md §7`), `GLOBAL_TOOLS`, los textos `[base]`, los de seguimiento (§6) y los mensajes del sistema (§7, claves `pago_confirmado`, `pago_rechazado`, `pedido_rechazado`, `derivacion` de `contracts/api.md`).
+- `TOOL_NAMES` nombra `buscar_productos` y `ver_producto` y NO `consultar_catalogo` (la tool única que existe hoy). Dividirla o renombrarla rompe `test_agent_core`, `test_prompt_builder`, evals y el prompt (§3.4): la decisión (renombrar, alias o ampliar argumentos) queda abierta y es de TASK-417.
+- DERIVADO lleva un texto mínimo que no está en `plantillas.md` ("pausada para que la atienda una persona... No respondas"): la tabla dice "no hay turno de modelo", pero el test exige texto en todas las etapas y el texto degrada con seguridad si alguna vez se llamara.
+- Las herramientas de cada etapa excluyen las globales (se suman en el registry). `VERIFICACION` guarda aparte las del pago rechazado (`tools_if_rejected`); `COBRO` guarda su segunda columna del embudo (`funnel_with_methods_sent`).
+- Opciones: `Template.defaults` (§3), `Template.options_schema` (JSON Schema de Pydantic, sin dependencias nuevas) y `Template.resolve()` -> `EffectiveOptions`. Una sección que el tenant fija reemplaza la del default completa (una calificación a medias no la configuró nadie). `certificaciones` y `servicios` usan `PrepaidOptions`: `modalidad_pago` solo admite `previo`. Los caminos por defecto de `certificaciones` son el ejemplo de `data-model.md §0016`.
+- `servicios` limita el pedido a 3 líneas (`max_lineas`, §3); `certificaciones` es `paquete`; las otras son `carrito`.
+- Los textos conservan los saltos de línea de `plantillas.md`; por eso los módulos de plantilla llevan `# ruff: noqa: E501`.
+
