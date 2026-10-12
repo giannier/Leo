@@ -1,0 +1,12 @@
+nombre,descripcion,precio,stock,categoria,modo_venta,es_digital,paquete,permite_libres,destacado
+Certificación individual SIAF,Certificado digital de experiencia en SIAF,120.00,,Sector Público,precio_fijo,si,,,no
+Certificación individual Gestión pública,Certificado digital de experiencia en gestión pública,120.00,,Sector Público,precio_fijo,si,,,no
+Certificación individual Contrataciones con el Estado,Certificado digital de experiencia en contrataciones con el Estado y OSCE,120.00,,Contrataciones,precio_fijo,si,,,no
+Certificación individual SEACE,Certificado digital de experiencia en el uso del SEACE,120.00,,Contrataciones,precio_fijo,si,,,no
+Certificación individual Excel avanzado,Certificado digital de experiencia en Excel avanzado,120.00,,Ofimática,precio_fijo,si,,,no
+Certificación individual Power BI,Certificado digital de experiencia en Power BI,120.00,,Ofimática,precio_fijo,si,,,no
+Certificación individual Gestión de proyectos,Certificado digital de experiencia en gestión de proyectos,120.00,,Gestión,precio_fijo,si,,,no
+Certificación individual Derecho administrativo,Certificado digital de experiencia en derecho administrativo,120.00,,Derecho,precio_fijo,si,,,no
+Paquete 2 certificaciones,Elige 2 temas a certificar,200.00,,Paquetes,precio_fijo,si,2,si,no
+Paquete 5 certificaciones,Elige 5 temas a certificar. El más elegido,500.00,,Paquetes,precio_fijo,si,5,si,si
+Paquete 10 certificaciones,Elige 10 temas a certificar,900.00,,Paquetes,precio_fijo,si,10,si,no
