@@ -80,7 +80,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: test que valida que cada etapa tenga texto y embudo, que sus herramientas estén en la constante `TOOL_NAMES` (las 10 de `contracts/api.md §7`) y que los placeholders sean conocidos
   - Parallel: true
 
-- [ ] TASK-410: Motor de etapas (`engine.py`)
+- [x] TASK-410: Motor de etapas (`engine.py`)
   - Input: `plantillas.md §1`, `referencias/engine_referencia.py` (34 casos ya validados: los 18 de Capacita v21 más 16 nuevos)
   - Output: `compute_stage()` y `funnel_for()` como funciones puras
   - Depends on: TASK-409
