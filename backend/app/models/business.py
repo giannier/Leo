@@ -228,6 +228,8 @@ class PaymentMethodBusiness(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Turns on the receipt-vision tool that arrives in Feature 004.
     validate_receipts: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
-    # The QR or account image sent with this method (Feature 004). The foreign
-    # key to `media_assets` arrives with that table in migration 0017.
-    media_asset_id: Mapped[uuid.UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
+    # The QR or account image sent with this method (Feature 004). Removing the
+    # asset leaves the method in place, just without its image.
+    media_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
+    )

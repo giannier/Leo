@@ -18,6 +18,7 @@ from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
+from app.models.media import MediaAsset
 from app.models.plan import Plan
 from app.models.sales_config import BusinessInfo, Faq, ProcessStageOverride, Promotion
 from app.models.tenant import (
@@ -46,6 +47,7 @@ __all__ = [
     "Invitation",
     "KnowledgeChunk",
     "KnowledgeSource",
+    "MediaAsset",
     "Message",
     "MessageStatusEvent",
     "OtpCode",
