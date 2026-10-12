@@ -268,3 +268,10 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - `servicios` limita el pedido a 3 líneas (`max_lineas`, §3); `certificaciones` es `paquete`; las otras son `carrito`.
 - Los textos conservan los saltos de línea de `plantillas.md`; por eso los módulos de plantilla llevan `# ruff: noqa: E501`.
 
+### 8.6 Motor de etapas (TASK-410)
+
+- `compute_stage(template, options, facts, now, *, ignorar_derivacion=False)` y `funnel_for(template, stage, facts)` en `backend/app/process/engine.py`. `now` es parámetro (sin reloj propio); `ignorar_derivacion` es el `stage_previa` del paso 3 del pipeline. `template` queda en la firma de `plantillas.md §1` pero hoy no se usa en `compute_stage` (las tres plantillas comparten reglas y difieren solo por las opciones); `funnel_for` sí lee la columna del embudo de la plantilla.
+- Los 34 casos de `engine_referencia.py` están portados a `tests/unit/test_process_engine.py` contra las plantillas reales (`CERT` = defaults de `certificaciones`, `TIENDA` = defaults de `productos`). Más prioridades C-04, bordes (pausa que vence justo ahora, anuncio a exactamente 7 días), alcanzabilidad de las 11 etapas y un barrido de todas las combinaciones de hechos. Cobertura de `engine.py`: 100 % de líneas y ramas.
+- El modelo `Facts` (guardados + derivados, `backend/app/process/facts.py`) se define aquí porque el motor lo necesita; TASK-411 agrega `FactsLoader` y las derivaciones. En el modelo, el hecho guardado `metodos_pago_enviados` ({order_id, en}) es `metodos_pago_registro` y `metodos_pago_enviados` es el booleano derivado.
+- `backend/scripts/coverage_gate.py` aún no cuenta `app/process/` ni `app/orders/` como grupo crítico (§3.5): cambio de script pendiente de aprobación; hoy caen en el 70 % de "el resto".
+
