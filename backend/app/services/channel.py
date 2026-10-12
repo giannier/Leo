@@ -39,6 +39,7 @@ from app.providers.whatsapp.base import (
     InboundMessage,
     NumberCredentials,
     QualityUpdate,
+    Recipient,
     StatusUpdate,
     WhatsAppError,
     WhatsAppProvider,
@@ -168,7 +169,11 @@ class ChannelEventProcessor:
         tenant_id = number.tenant_id
 
         contacts = ContactRepository(self._session, tenant_id)
-        contact = contacts.upsert(message.from_phone, profile_name=message.profile_name)
+        contact = contacts.upsert(
+            message.from_phone,
+            external_user_id=message.from_user_id,
+            profile_name=message.profile_name,
+        )
         # Read before the stamp below moves it. This is when the customer
         # *previously* wrote, which is what decides whether they are
         # continuing a conversation or starting a new one.
@@ -639,21 +644,9 @@ class ReplySender:
             raise SessionWindowClosed(
                 "the customer last wrote more than 24 hours ago; only a template may be sent"
             )
-        recipient = contact.phone_e164
-        if recipient is None:
-            # The person wrote with a BSUID and never shared a number. The
-            # provider interface still addresses by phone; addressing by BSUID
-            # arrives with the YCloud adapter work (TASK-418). Until then the
-            # reply is recorded as failed, visibly, rather than sent to nobody.
-            self._messages.set_delivery_status(message, status="failed")
-            MessageStatusEventRepository(self._session, self._tenant_id).append(
-                message.id, status="failed"
-            )
-            logger.warning(
-                "a reply could not be sent: the contact has no phone number",
-                extra={"tenant_id": str(self._tenant_id)},
-            )
-            return message
+        # A customer who wrote through a BSUID and never shared a number is
+        # reached by the BSUID; the phone is used whenever there is one.
+        recipient = Recipient(phone=contact.phone_e164, bsuid=contact.external_user_id)
 
         last_error: WhatsAppError | None = None
         for attempt in range(1, self._max_attempts + 1):

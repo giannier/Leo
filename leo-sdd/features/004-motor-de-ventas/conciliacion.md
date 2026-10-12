@@ -204,7 +204,7 @@ Esto sin decisión no bloquea TASK-402 (0014 es solo `conversation_state` y even
 
 - No se ejecutó nada (ni `engine_referencia.py`, ni `harness21.js`, ni tests, ni `alembic`); no se leyeron `calc21.js`, `fw21.js`, `ce21.js`, `ec21.js`, `etapas.json` ni `etapas_capacita.sql`, solo `LEEME.md`.
 - No se revisó el nodo `Formato WhatsApp` de Capacita frente a `whatsapp_text`; la reutilización propuesta es por lectura.
-- Campos de YCloud para `interactive`, `referral`, BSUID, subida de media y vigencia del `media_id`: no consultados (TASK-418/419 los resuelven).
+- Campos de YCloud para `interactive`, `referral`, BSUID, subida de media y vigencia del `media_id`: resueltos en TASK-418/419 (§8.14 y §8.15).
 - No se leyó `tests/isolation/*` en detalle ni se comprobó si hay un test que compare metadata y migraciones.
 - No se confirmó si `runner.py` aplica ya el umbral del 90 %, ni qué hace `tenant_archiver` con los datos (afecta la decisión de `CASCADE`).
 - El dato "Meta cobra cada mensaje desde el 1 de octubre de 2026" (spec, historia 7) no se verificó.
@@ -254,7 +254,7 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 
 - La columna es `contacts.phone_e164` (no `phone`) y no existe `wa_id` (§3.1). `phone_e164` pasa a nullable; el CHECK `ck_contacts_identity` exige teléfono o BSUID. El índice único parcial es `uq_contacts_tenant_id_external_user_id` (convención de nombres).
 - `ContactRepository.upsert(phone_e164=None, *, external_user_id=None, profile_name=None)`: busca primero por BSUID y luego por teléfono; si falta el otro identificador y llega, lo aprende; nunca sobrescribe uno guardado. Si el teléfono y el BSUID corresponden a dos contactos distintos, gana el del BSUID y NO se fusionan (fusionar movería conversaciones y pedidos): **decisión abierta** para Giannier.
-- `ReplySender` ya no envía a un contacto sin teléfono: marca la respuesta `failed` (con evento de estado y log) en vez de llamar al proveedor sin destinatario. El envío por BSUID (`Recipient`) llega con TASK-418; el parser del webhook sigue exigiendo `from` y `to` hasta entonces.
+- (Superado por §8.14.) `ReplySender` ya no envía a un contacto sin teléfono: marca la respuesta `failed` (con evento de estado y log) en vez de llamar al proveedor sin destinatario. El envío por BSUID (`Recipient`) llega con TASK-418; el parser del webhook sigue exigiendo `from` y `to` hasta entonces.
 - `agent_traces` suma `stage_key`, `funnel_code`, `tools_enabled`, `outbound_count` y `model_tier`, todas nullable. Las llena el pipeline (TASK-421).
 - El downgrade se niega a correr si existe algún contacto sin teléfono (restaurar NOT NULL lo perdería).
 
@@ -344,3 +344,27 @@ Cambios que se hicieron al implementar frente a `data-model.md` y `contracts/api
 - Catálogo: `ProductRepository.search_active` (filtra por tenant, destacados primero, `%` y `_` literales) y `get_active`. `buscar_productos(consulta, categoria?, solo_paquetes?)` y `ver_producto(producto_id)` devuelven `modo_venta`, `bundle_size`, `destacado`, `es_digital` y el `producto_id` (para pasarlo a `ver_producto` y `gestionar_pedido`). Un `producto_id` de otro tenant se ve igual que uno inexistente. La moneda sigue siendo `S/` fija: la corrige TASK-420 (§3.1).
 - Fuera de 417 (TASK-420): recursos vinculados, `promociones_aplicables` (necesita `pricing`) y fijar `vio_productos`. Las herramientas ya reciben `ctx.facts_patch` para escribir hechos y el pipeline lo guardará con `StateRepo.save`.
 - `AgentCore._run_tool` acepta `ToolResult` o texto; una fuente RAG solo se registra si el estado es `hecho`.
+
+### 8.14 YCloud: interactivos, media, referral y BSUID (TASK-418)
+
+Fuente: documentación oficial de YCloud (`docs.ycloud.com`: ejemplos de envío, "Business-Scoped User IDs API & Webhook Updates", ejemplos de payload de webhook y "Upload media"), consultada el 2026-10-12. Donde difiere de `contracts/api.md §8`, manda la doc.
+
+| Tema | `contracts/api.md §8` | Documentación de YCloud (lo implementado) |
+|---|---|---|
+| Destinatario por BSUID | `Recipient.bsuid` | `POST /whatsapp/messages` acepta `recipient` en lugar de `to`. Si vienen los dos, YCloud usa `to` e ignora `recipient`: por eso el adaptador manda el teléfono cuando existe y el BSUID solo cuando no. |
+| BSUID entrante | `InboundMessage.from_user_id` | `whatsappInboundMessage.fromUserId` (y `fromParentUserId`, no se usa). Con BSUID `from` puede **faltar**: el parser acepta `from` o `fromUserId` y descarta el mensaje solo si faltan ambos. |
+| `referral` | `{ad_id, source_url, headline, body, media_url}` | `{source_url, source_type, source_id, headline, body, media_type, image_url, video_url, thumbnail_url, ctwa_clid}`. `Referral` usa `source_id` (no `ad_id`) y `media_url` = `image_url` o `video_url`; agrega `source_type`, `media_type` y `ctwa_clid`. Se aceptan también las claves en camelCase. |
+| Interactivos entrantes | `interactive = {id, title}` | `interactive.type` = `button_reply` / `list_reply`, con `id`, `title` y (lista) `description`. Se produce `InteractiveReply(id, title, description)`. |
+| Envío | `send_*(to: Recipient, …)` | Se mantiene la convención del adaptador: `send_*(credentials, *, sender, to: Recipient, …)`. Botones y lista usan el objeto `interactive` de Meta; media usa `type: image/document/video/audio` con `id` o `link`. |
+| Subida | `upload_media(data, mime, filename)` | `upload_media(credentials, *, sender, data, mime, filename)`: `POST /whatsapp/media/{phoneNumber}/upload`, multipart con un solo `file`; el número va en el path (E.164, el `+` codificado). Respuesta con `id`. |
+
+Decisiones de implementación:
+
+- Un toque en botón o fila llega como `msg_type="text"` con `text` = título que vio el cliente (así se guarda en `messages`, sin migración y sin que el opt-out o la memoria vean un mensaje vacío). El `id` viaja en `InboundMessage.interactive`; **TASK-421 debe volver a leerlo del evento** (`InboundResult` no lo trae) para llamar a `apply_interactive`. Un interactivo que no es `button_reply`/`list_reply` (p. ej. un Flow) sigue siendo `unsupported`.
+- `InteractiveReply` se movió a `providers/whatsapp/base.py`; `process/interactive.py` lo re-exporta (misma ruta de import).
+- `ReplySender` ya no marca `failed` a los contactos sin teléfono: envía con `Recipient(phone, bsuid)`. Queda sin efecto la salvedad de §8.4.
+- `ContactRepository.upsert` recibe ahora también el BSUID del webhook (`receive_inbound`).
+- El adaptador rechaza (error no reintentable, sin llamar a YCloud) lo que WhatsApp rechazaría: más de 3 botones, más de 10 filas, título de botón > 20, fila > 24 / descripción > 72, cuerpo > 1024, encabezado o pie > 60. Los tools (TASK-420) truncan antes; esto es la última línea.
+- Límite de la doc: los interactivos **no** aceptan media por `id` en el encabezado (solo por `link`). No se envían encabezados de media.
+- Los fixtures de `tests/fixtures/ycloud/` (`inbound_interactive_*`, `inbound_referral`, `inbound_bsuid_only`, `send_*_request`, `upload_media_response`) se construyeron **a partir de los ejemplos de la documentación**, no de capturas reales: la doc no publica un ejemplo completo de `referral` ni de `list_reply`. Cuando haya un webhook real, se pega encima del fixture (`tests/fixtures/__init__.py`).
+- **No verificado:** la ubicación exacta de `referral` (se leyó a nivel del mensaje, `whatsappInboundMessage.referral`, como en Meta) y cualquier campo de la respuesta de subida distinto de `id`.

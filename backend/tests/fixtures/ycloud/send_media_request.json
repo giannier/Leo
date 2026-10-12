@@ -1,0 +1,10 @@
+{
+  "from": "+51912345678",
+  "to": "+51987654321",
+  "type": "document",
+  "document": {
+    "id": "1642901234567891",
+    "caption": "Malla curricular",
+    "filename": "malla.pdf"
+  }
+}

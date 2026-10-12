@@ -1,0 +1,31 @@
+{
+  "id": "evt_01J8Q7Z9X000000000REFERRAL1",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:42:02.900Z",
+  "whatsappInboundMessage": {
+    "id": "6650a1b2c3d4e5f607182932",
+    "wamid": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBQ5RjJEM0MxQTdCOEU0RDVGMEExQwD=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "customerProfile": {
+      "name": "Ana Quispe"
+    },
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:42:01.000Z",
+    "type": "text",
+    "text": {
+      "body": "Hola, quiero informacion de este anuncio"
+    },
+    "referral": {
+      "source_url": "https://fb.me/3AbCdEf",
+      "source_type": "ad",
+      "source_id": "120210000000000001",
+      "headline": "Certificaciones SIAF con 30% de descuento",
+      "body": "Inscribete hoy",
+      "media_type": "image",
+      "image_url": "https://scontent.xx.fbcdn.net/v/anuncio.jpg",
+      "ctwa_clid": "ARAkLkA8rmlFeiCktEJQ-QTwRiyYHAFDLMNDBH0CD3qpjd0HR4irJ6LEkR7JwFF4XvGPtEJ4aBV_oSyH0RM"
+    }
+  }
+}

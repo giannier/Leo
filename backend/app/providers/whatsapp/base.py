@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 
 class WhatsAppError(RuntimeError):
@@ -71,6 +71,107 @@ class NumberCredentials:
 
 
 @dataclass(frozen=True)
+class Recipient:
+    """Who a message goes to: a phone number, a BSUID, or both.
+
+    Since Meta's business-scoped user ids a customer may write without ever
+    sharing a number, so the reply cannot assume one. The phone wins when both
+    are known (YCloud itself ignores `recipient` when `to` is present); the
+    BSUID is what makes a contact without a phone reachable at all.
+    """
+
+    phone: str | None = None
+    bsuid: str | None = None
+
+    def __post_init__(self) -> None:
+        if not (self.phone or self.bsuid):
+            raise ValueError("a recipient needs a phone number or a BSUID")
+
+
+MediaKind = Literal["image", "document", "video", "audio"]
+
+
+@dataclass(frozen=True)
+class MediaRef:
+    """A file to send: already uploaded (`media_id`) or reachable (`link`).
+
+    Exactly one of the two. `filename` is only meaningful for documents, where
+    it is what the customer sees on the attachment.
+    """
+
+    kind: MediaKind
+    media_id: str | None = None
+    link: str | None = None
+    filename: str | None = None
+
+    def __post_init__(self) -> None:
+        if bool(self.media_id) == bool(self.link):
+            raise ValueError("a media reference needs exactly one of media_id or link")
+
+
+@dataclass(frozen=True)
+class UploadedMedia:
+    """What the provider kept when a file was uploaded to it."""
+
+    media_id: str
+    # When the provider forgets the file; the platform re-uploads before then.
+    expires_at: datetime
+
+
+@dataclass(frozen=True)
+class Button:
+    """One reply button. WhatsApp allows 1 to 3, with titles up to 20 characters."""
+
+    id: str
+    title: str
+
+
+@dataclass(frozen=True)
+class ListRow:
+    """One selectable row of a list (title up to 24 characters, description up to 72)."""
+
+    id: str
+    title: str
+    description: str | None = None
+
+
+@dataclass(frozen=True)
+class ListSection:
+    """A group of rows. WhatsApp allows 10 rows across all the sections."""
+
+    rows: tuple[ListRow, ...]
+    title: str | None = None
+
+
+@dataclass(frozen=True)
+class InteractiveReply:
+    """A `button_reply` or `list_reply`: what the customer tapped."""
+
+    id: str
+    title: str
+    description: str | None = None
+
+
+@dataclass(frozen=True)
+class Referral:
+    """Where a customer came from when they tapped a Click-to-WhatsApp ad.
+
+    YCloud's field names, mapped onto ours. `contracts/api.md` section 8 listed
+    `ad_id` and `media_url`; the provider's documentation calls them
+    `source_id` and `image_url` / `video_url`, and the documentation wins.
+    """
+
+    source_id: str | None = None
+    source_type: str | None = None
+    source_url: str | None = None
+    headline: str | None = None
+    body: str | None = None
+    media_type: str | None = None
+    media_url: str | None = None
+    ctwa_clid: str | None = None
+
+
+@dataclass(frozen=True)
 class SendResult:
     """What the provider said when it accepted a message.
 
@@ -89,15 +190,24 @@ class InboundMessage:
 
     provider_message_id: str
     # The customer. `to_phone` is the tenant's own number, and is what the
-    # pipeline uses to work out which tenant this belongs to.
-    from_phone: str
+    # pipeline uses to work out which tenant this belongs to. The customer's
+    # phone can be absent (they wrote through a BSUID and never shared it), so
+    # at least one of `from_phone` and `from_user_id` is always set.
+    from_phone: str | None
     to_phone: str
     profile_name: str | None
     # Already mapped to `models.conversation.MESSAGE_TYPES`; anything this
     # version cannot read arrives as `unsupported` rather than being dropped.
+    # A tap on a button or a list row arrives as `text` carrying the title.
     msg_type: str
     text: str | None
     sent_at: datetime
+    # Meta's business-scoped user id (BSUID), when the webhook carries one.
+    from_user_id: str | None = None
+    # The tapped option, with the id the assistant gave it (`camino:...`).
+    interactive: InteractiveReply | None = None
+    # Present on the first message after a Click-to-WhatsApp ad.
+    referral: Referral | None = None
 
 
 @dataclass(frozen=True)
@@ -148,10 +258,61 @@ class WhatsAppProvider(Protocol):
         credentials: NumberCredentials,
         *,
         sender: str,
-        to: str,
+        to: Recipient,
         body: str,
     ) -> SendResult:
         """Send one text message, or raise a `WhatsAppError`."""
+        ...
+
+    async def send_media(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        to: Recipient,
+        media: MediaRef,
+        caption: str | None = None,
+    ) -> SendResult:
+        """Send one image, document, video or audio."""
+        ...
+
+    async def send_buttons(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        to: Recipient,
+        body: str,
+        buttons: list[Button],
+        header: str | None = None,
+        footer: str | None = None,
+    ) -> SendResult:
+        """Send a message with 1 to 3 reply buttons."""
+        ...
+
+    async def send_list(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        to: Recipient,
+        body: str,
+        button_text: str,
+        sections: list[ListSection],
+    ) -> SendResult:
+        """Send a message with a list of up to 10 selectable rows."""
+        ...
+
+    async def upload_media(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        data: bytes,
+        mime: str,
+        filename: str,
+    ) -> UploadedMedia:
+        """Store a file with the provider so it can be sent by id."""
         ...
 
     def verify_signature(self, *, raw_body: bytes, header: str | None, secret: str) -> bool:
