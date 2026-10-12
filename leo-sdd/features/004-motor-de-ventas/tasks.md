@@ -187,7 +187,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: tocar un botón del simulador cambia la etapa en el panel de depuración
   - Parallel: false
 
-- [ ] TASK-423: 🧑 Milestone A — Capacita en el simulador (sin pedidos)
+- [x] TASK-423: 🧑 Milestone A — Capacita en el simulador (sin pedidos)
   - Input: un tenant "Escuela Capacita" con la plantilla `certificaciones`, sus productos y paquetes (carga por CSV), recursos `saludo` y `flyer_paquetes`
   - Output: guion de prueba en `leo-sdd/features/004-motor-de-ventas/milestones/A.md` (escenarios 1–3 de Capacita: orgánica, calificación escrita, anuncio simulado)
   - Depends on: TASK-419, TASK-422
