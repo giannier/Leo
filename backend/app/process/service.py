@@ -61,6 +61,7 @@ DEFAULT_AGENT_NAME = "Leo"
 DEFAULT_TONE = "cercano"
 DEFAULT_PACE = "equilibrado"
 DEFAULT_DETAIL = "moderado"
+DEFAULT_INTELLIGENCE_LEVEL = "economico"
 DEFAULT_CURRENCY = "PEN"
 DEFAULT_TIMEZONE = "America/Lima"
 
@@ -99,6 +100,8 @@ class EffectiveProcessConfig:
     stage_instructions: Mapping[Stage, str]
     customized_stages: frozenset[Stage] = frozenset()
     behavior: Behavior = field(default_factory=Behavior)
+    # The tenant's configured intelligence level (`agent_configs.nivel_inteligencia`).
+    intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
     business_name: str | None = None
     business_description: str | None = None
     industry: str | None = None
@@ -256,6 +259,8 @@ class ProcessConfigService:
             stage_instructions=MappingProxyType(texts),
             customized_stages=frozenset(customized),
             behavior=_behavior(agent),
+            intelligence_level=(agent.nivel_inteligencia if agent else None)
+            or DEFAULT_INTELLIGENCE_LEVEL,
             business_name=profile.business_name if profile else None,
             business_description=profile.description if profile else None,
             industry=profile.industry if profile else None,

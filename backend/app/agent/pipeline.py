@@ -1,0 +1,420 @@
+"""The turn pipeline: one customer turn in, state and messages out (Feature 004, TASK-421).
+
+Replaces "one big prompt plus every tool" with the 14 steps of `plan.md`:
+
+     1  load      conversation, contact, effective configuration (cached 60 s)
+     2  facts     stored + derived
+     3  previa    the stage as if nobody had taken the conversation
+     4  inbound   the ad, the tapped option, the image
+     5  reload    facts again, because step 4 may have written some
+     6  stage     computed, and saved with its event when it changed
+     7  gate      assistant paused, opt-out, handover in force: save and stay quiet
+     8  prompt    the sections of the stage (`prompts/stage.py`)
+     9  tools     only the stage's, plus the global ones, and the message budget
+    10  llm       `AgentCore`, which only runs the loop
+    11  format    one or two bubbles, no model involved
+    12  send      the tools already sent their files and options; the text goes last
+    13  after     greeting recorded, stage recomputed, event if it changed
+    14  trace     stage, funnel, tools offered, messages sent, level
+
+Two decisions run through it.
+
+**The state is saved before the gate.** A handover, a paused assistant or an opt-out
+only decide whether the bot *speaks*. The ad the customer came from, the path they
+tapped and the stage they are in are still true, and the operator who picks the
+conversation up later reads them. A payment proof arriving during a pause (step 4,
+TASK-429) must not be lost either, which is why the inbound work happens before the
+gate.
+
+**Nothing here knows who is on the other side.** The tools speak through a
+`TurnOutbound`: the WhatsApp adapter in production, a recorder in the simulator
+(C-19). The pipeline only decides whether the text is stored `queued` (to be sent by
+`ReplySender`, which retries and honours the 24-hour window) or just stored.
+
+Step 4 does not yet read payment proofs (`ProofPipeline`, TASK-429): an image reaches
+the model as one line of context, "[El cliente envió una imagen]".
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any, Literal
+
+from sqlalchemy.orm import Session
+
+from app.agent.budget import TurnBudget
+from app.agent.core import AgentCore, AgentReply, TurnTrace
+from app.agent.formatter import to_bubbles
+from app.agent.outbound import TurnOutbound
+from app.agent.prompts.stage import build_stage_prompt
+from app.agent.tools.definitions import registry_for_stage
+from app.agent.tools.registry import ToolContext
+from app.models.conversation import Conversation, Message
+from app.models.conversation_state import FunnelCode
+from app.models.tenant import Tenant
+from app.process.engine import compute_stage, funnel_for
+from app.process.facts import EntradaAnuncio, Facts, FactsLoader
+from app.process.interactive import InteractiveReply, apply_interactive
+from app.process.service import EffectiveProcessConfig, ProcessConfigService
+from app.process.state import StateConflict, StateRepo, facts_snapshot
+from app.process.templates.base import Stage
+from app.process.turn import IMAGE_RECEIVED_LINE, TurnContext
+from app.providers.llm.base import LLMProvider
+from app.providers.whatsapp.base import Referral
+from app.repositories.channel import ContactRepository
+from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.services.trial import agent_may_reply
+
+logger = logging.getLogger(__name__)
+
+GateReason = Literal["paused", "opted_out", "handover"]
+Outcome = Literal["answered", "gated", "unsupported"]
+
+# Why a stage was saved. `comprobante` arrives with the proof pipeline (TASK-429).
+REASON_TURN = "turno"
+
+
+@dataclass(frozen=True)
+class InboundTurn:
+    """What the customer did since the last reply: a burst, already read."""
+
+    # The text of the burst (the title of a tapped option counts as text).
+    text: str = ""
+    # The options tapped, in order, as the webhook reported them.
+    interactive: tuple[InteractiveReply, ...] = ()
+    # The ad the customer came from, when the first message carried one.
+    referral: Referral | None = None
+    # An image arrived. Reading it is TASK-429.
+    image: bool = False
+
+    @property
+    def readable(self) -> bool:
+        """Whether there is anything the assistant can answer."""
+        return bool(self.text.strip()) or self.image or bool(self.interactive)
+
+    def for_the_model(self) -> str:
+        """The user message the model gets: the text, or the image line."""
+        return self.text.strip() or (IMAGE_RECEIVED_LINE if self.image else "")
+
+
+@dataclass
+class TurnResult:
+    """What the turn did, for the caller and for the simulator's debug panel."""
+
+    outcome: Outcome
+    stage_before: Stage
+    stage_previa: Stage
+    stage_after: Stage
+    funnel: FunnelCode
+    facts: Facts
+    gate: GateReason | None = None
+    tools_enabled: tuple[str, ...] = ()
+    reply: AgentReply | None = None
+    # Files and options the tools sent while the model was working, in order.
+    tool_messages: list[Message] = field(default_factory=list)
+    # The text bubbles of the answer, in order.
+    text_messages: list[Message] = field(default_factory=list)
+    model_tier: str | None = None
+
+    @property
+    def messages(self) -> list[Message]:
+        """Every outbound message of the turn, in the order the customer saw them."""
+        return [*self.tool_messages, *self.text_messages]
+
+
+class TurnPipeline:
+    """Runs one turn of one conversation."""
+
+    def __init__(
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        *,
+        llm: LLMProvider,
+        outbound: TurnOutbound | None = None,
+        sandbox: bool = False,
+        queue_text: bool = False,
+        model_tier_applies: bool = True,
+        process_config: ProcessConfigService | None = None,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ) -> None:
+        self._session = session
+        self._tenant_id = tenant_id
+        self._llm = llm
+        self._outbound = outbound
+        self._sandbox = sandbox
+        # The real channel stores the text `queued` and `ReplySender` sends it.
+        self._queue_text = queue_text
+        # A tenant that brings its own model has no intelligence level (C-02).
+        self._tier_applies = model_tier_applies
+        self._process = process_config or ProcessConfigService(session)
+        self._clock = clock
+        self._states = StateRepo(session, tenant_id)
+        self._messages = MessageRepository(session, tenant_id)
+
+    # --------------------------------------------------------------------- run
+
+    async def run(self, conversation_id: uuid.UUID, inbound: InboundTurn) -> TurnResult:
+        now = self._clock()
+
+        # 1-2. load
+        conversation = ConversationRepository(self._session, self._tenant_id).get(conversation_id)
+        if conversation is None:
+            raise LookupError(f"conversation {conversation_id!s} not found for this tenant")
+        config = self._process.effective(self._tenant_id)
+        template = config.template
+        state = self._states.get_or_create(conversation, template)
+        loader = FactsLoader(self._session, self._tenant_id, config.facts_config())
+        facts = loader.load(conversation, now=now)
+        stage_before = Stage(state.stage_key)
+        funnel_before = FunnelCode(state.funnel_code)
+
+        # 3. the stage if nobody had taken the conversation (the proof pipeline
+        # of TASK-429 decides on it whether an image must be read during a pause)
+        stage_previa = compute_stage(template, config.options, facts, now, ignorar_derivacion=True)
+
+        # 4-5. inbound
+        patch, turn = self._read_inbound(inbound, facts, config, now)
+        version = state.version
+        if patch:
+            version = self._save(conversation_id, stage_before, funnel_before, patch, version)
+            facts = loader.load(conversation, now=now)
+
+        # 6. stage
+        stage = compute_stage(template, config.options, facts, now)
+        funnel = funnel_for(template, stage, facts)
+        if (stage, funnel) != (stage_before, funnel_before):
+            version = self._save(
+                conversation_id, stage, funnel, None, version, snapshot=facts_snapshot(facts)
+            )
+
+        def result(outcome: Outcome, **extra: Any) -> TurnResult:
+            return TurnResult(
+                outcome=outcome,
+                stage_before=stage_before,
+                stage_previa=stage_previa,
+                stage_after=stage,
+                funnel=funnel,
+                facts=facts,
+                **extra,
+            )
+
+        # 7. gate
+        gate = self._gate(conversation, facts, now)
+        if gate is not None:
+            logger.info(
+                "turn saved without an answer",
+                extra={"tenant_id": str(self._tenant_id), "gate": gate},
+            )
+            return result("gated", gate=gate)
+        if not inbound.readable:
+            # A voice note, a sticker, a location: the stage is untouched and the
+            # caller answers with the tenant's own "I can only read text".
+            return result("unsupported")
+
+        # 8-9. prompt and tools
+        budget = TurnBudget()
+        registry = registry_for_stage(template, stage, facts, config.options)
+        context = ToolContext(
+            session=self._session,
+            tenant_id=self._tenant_id,
+            llm=self._llm,
+            conversation_id=conversation_id,
+            budget=budget,
+            adapter=self._outbound,
+            options=config.options,
+            sandbox=self._sandbox,
+            turn=turn,
+            facts=facts,
+        )
+        prompt = build_stage_prompt(
+            config, facts, stage, now=now, turn=turn, tool_specs=registry.specs()
+        )
+
+        # 10. model
+        anchor = self._messages.latest_for_conversation(conversation_id)
+        core = AgentCore(self._session, self._tenant_id, llm=self._llm, registry=registry)
+        reply = await core.respond(
+            conversation_id=conversation_id,
+            customer_message=inbound.for_the_model(),
+            system_prompt=prompt.text,
+            context=context,
+        )
+        tool_messages = list(
+            self._messages.outbound_after(conversation_id, anchor.id if anchor else None)
+        )
+
+        # 11-12. format and store the text. The files and options already went out.
+        bubbles = to_bubbles(reply.content, config.behavior.detalle, budget)
+        if reply.silent and tool_messages:
+            bubbles = []
+        text_messages = [
+            self._messages.append(
+                conversation_id=conversation_id,
+                direction="outbound",
+                author="agent",
+                content=bubble,
+                delivery_status="queued" if self._queue_text else None,
+            )
+            for bubble in bubbles
+        ]
+
+        # 13. after: the greeting, whatever the tools wrote, and the stage again
+        after: dict[str, Any] = dict(context.facts_patch)
+        if not reply.degraded and not facts.saludo_enviado:
+            after["saludo_enviado"] = True
+        if facts.seguimiento is not None:
+            after["seguimiento"] = None
+        if after:
+            version = self._save(conversation_id, stage, funnel, after, version)
+        facts_after = loader.load(conversation, now=now)
+        stage_after = compute_stage(template, config.options, facts_after, now)
+        funnel_after = funnel_for(template, stage_after, facts_after)
+        if (stage_after, funnel_after) != (stage, funnel):
+            version = self._save(
+                conversation_id,
+                stage_after,
+                funnel_after,
+                None,
+                version,
+                snapshot=facts_snapshot(facts_after),
+            )
+
+        # 14. trace
+        tier = config.intelligence_level if self._tier_applies else None
+        sent = [*tool_messages, *text_messages]
+        if sent:
+            core.persist_trace(
+                message=text_messages[0] if text_messages else sent[-1],
+                reply=reply,
+                turn=TurnTrace(
+                    stage_key=stage_after.value,
+                    funnel_code=funnel_after.value,
+                    tools_enabled=list(registry.names()),
+                    outbound_count=len(sent),
+                    model_tier=tier,
+                ),
+            )
+
+        return TurnResult(
+            outcome="answered",
+            stage_before=stage_before,
+            stage_previa=stage_previa,
+            stage_after=stage_after,
+            funnel=funnel_after,
+            facts=facts_after,
+            tools_enabled=registry.names(),
+            reply=reply,
+            tool_messages=tool_messages,
+            text_messages=text_messages,
+            model_tier=tier,
+        )
+
+    # ----------------------------------------------------------------- helpers
+
+    def _read_inbound(
+        self, inbound: InboundTurn, facts: Facts, config: EffectiveProcessConfig, now: datetime
+    ) -> tuple[dict[str, Any], TurnContext]:
+        """Step 4: what the customer's messages change.
+
+        The ad becomes a stored fact (`entrada_anuncio`). A tapped option is read
+        from the event, not from the text: the text is only the title the customer
+        saw. A path is stored even if the model never calls `elegir_camino`; any
+        other option becomes one line of context for this turn.
+        """
+        patch: dict[str, Any] = {}
+        if inbound.referral is not None:
+            patch["entrada_anuncio"] = _entry_from(inbound.referral, now)
+
+        lines: list[str] = []
+        view = facts
+        for tap in inbound.interactive:
+            outcome = apply_interactive(tap, view, config.options)
+            patch.update(outcome.facts_patch)
+            if outcome.context:
+                lines.append(outcome.context)
+            if "camino" in outcome.facts_patch:
+                view = view.model_copy(update={"camino": outcome.facts_patch["camino"]})
+
+        turn = TurnContext(
+            opcion="; ".join(lines) if lines else None,
+            imagen_recibida=inbound.image,
+        )
+        return patch, turn
+
+    def _gate(self, conversation: Conversation, facts: Facts, now: datetime) -> GateReason | None:
+        """Step 7: the reasons the assistant stays quiet.
+
+        The paused assistant and the opt-out belong to the real channel: the
+        simulator is how a paused business tries its agent (Clarification 002),
+        and its synthetic contact never asks to be left alone. A handover applies
+        to both, and it applies *even if the stage is VERIFICACION*: a pending
+        payment wins in the funnel, not in the gate (`plantillas.md` section 1).
+        """
+        if not self._sandbox:
+            tenant = self._session.get(Tenant, self._tenant_id)
+            if tenant is None or not agent_may_reply(self._session, tenant):
+                return "paused"
+            if conversation.contact_id is not None:
+                contact = ContactRepository(self._session, self._tenant_id).get(
+                    conversation.contact_id
+                )
+                if contact is not None and contact.opted_out_at is not None:
+                    return "opted_out"
+        if facts.derivado_activo(now):
+            return "handover"
+        return None
+
+    def _save(
+        self,
+        conversation_id: uuid.UUID,
+        stage: Stage,
+        funnel: FunnelCode,
+        patch: Mapping[str, Any] | None,
+        version: int,
+        *,
+        snapshot: Mapping[str, Any] | None = None,
+    ) -> int:
+        """Save and return the new version; once more on a collision that got away.
+
+        `StateRepo.save` already retries once. A second failure means two writers
+        at once (the operator confirming a payment while the model answers): the
+        row is re-read and the same intent is applied on top of it.
+        """
+        for attempt in (1, 2):
+            try:
+                saved = self._states.save(
+                    conversation_id,
+                    stage=stage,
+                    funnel=funnel,
+                    facts_patch=patch,
+                    reason=REASON_TURN,
+                    expected_version=version,
+                    snapshot=snapshot,
+                )
+            except StateConflict:
+                if attempt == 2:
+                    raise
+                fresh = self._states.get(conversation_id)
+                if fresh is None:  # pragma: no cover - the row was just written
+                    raise
+                version = fresh.version
+                continue
+            return saved.state.version
+        raise StateConflict("unreachable")  # pragma: no cover
+
+
+def _entry_from(referral: Referral, now: datetime) -> dict[str, Any]:
+    """The `entrada_anuncio` fact for an ad (`Referral` -> stored facts)."""
+    entry = EntradaAnuncio(
+        ad_id=referral.source_id,
+        source_url=referral.source_url,
+        headline=referral.headline,
+        body=referral.body,
+        recibido_en=now,
+    )
+    return entry.model_dump(mode="json")

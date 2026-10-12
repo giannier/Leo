@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -26,13 +26,15 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.agent.core import AgentCore
+from app.agent.outbound import TurnOutbound
+from app.agent.pipeline import InboundTurn, TurnPipeline
 from app.core.config import get_settings
 from app.models.business import AgentConfig
 from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
 from app.models.tenant import QUOTA_80, QUOTA_WARNING_RATIO, Tenant
 from app.models.whatsapp import WhatsAppNumber
+from app.process.inbound import interactive_of, payload_of, referral_of
 from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import (
@@ -57,7 +59,6 @@ from app.services.connection import read_credentials
 from app.services.emails import build_quality_alert_email, build_quota_warning_email
 from app.services.trial import (
     MeteringResult,
-    agent_may_reply,
     claim_notification,
     pause_tenant,
     record_ai_message,
@@ -74,6 +75,11 @@ DEFAULT_UNSUPPORTED_FALLBACK = (
 
 # Redis keys. Namespaced so a `KEYS channel:*` in an incident shows the whole
 # pipeline's state at once.
+# Builds the outbound adapter for one conversation, or None when it cannot send
+# (the number was disconnected, say). The worker supplies it; see `workers/channel.py`.
+OutboundFactory = Callable[[uuid.UUID], TurnOutbound | None]
+
+
 def debounce_key(conversation_id: uuid.UUID) -> str:
     return f"channel:burst:{conversation_id}"
 
@@ -211,6 +217,9 @@ class ChannelEventProcessor:
                     content=content,
                     msg_type=message.msg_type,
                     provider_message_id=message.provider_message_id,
+                    # The tapped option and the ad: the turn that needs them
+                    # runs after the debounce window, without the event.
+                    payload=payload_of(message),
                 )
         except IntegrityError:
             # Two workers picked up two deliveries of the same message at
@@ -419,15 +428,24 @@ class ConversationResponder:
         tenant_id: uuid.UUID,
         *,
         llm: LLMProvider,
+        outbound_for: OutboundFactory | None = None,
+        model_tier_applies: bool = True,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
         self._llm = llm
+        # Builds the adapter the sending tools use for one conversation. Without
+        # it the tools answer `no_disponible` and the turn is text only.
+        self._outbound_for = outbound_for
+        self._tier_applies = model_tier_applies
         self._messages = MessageRepository(session, tenant_id)
         # Warnings this turn produced, sent by the caller after the commit.
         # Same reason as `ChannelEventProcessor`: mailing somebody about a
         # state that then rolls back is worse than not mailing them.
         self.pending_emails: list[EmailMessage] = []
+        # How many files and options the tools sent during the last turn. They
+        # went out as the model asked for them; only the text is left to send.
+        self.sent_by_tools = 0
 
     def pending_burst(self, conversation_id: uuid.UUID) -> list[Message]:
         """Everything the customer has said since the last reply."""
@@ -440,69 +458,104 @@ class ConversationResponder:
         return list(reversed(burst))
 
     async def respond(self, conversation_id: uuid.UUID) -> Message | None:
-        """Produce one reply for the whole burst, or None if there is nothing.
+        """The first message of the answer, or None if there is nothing to say.
 
-        The reply is stored `queued`: written down here, handed to the
-        provider by the sender (TASK-205). Storing it first means a send that
-        fails leaves a record of what the business meant to say, rather than
-        a silence nobody can explain.
+        `respond_turn` returns all of them; an answer is one or two bubbles.
         """
-        tenant = self._session.get(Tenant, self._tenant_id)
-        if tenant is None:  # pragma: no cover - the caller just read it
-            return None
+        answers = await self.respond_turn(conversation_id)
+        return answers[0] if answers else None
 
+    async def respond_turn(self, conversation_id: uuid.UUID) -> list[Message]:
+        """Produce the answer for the whole burst, as the messages left to send.
+
+        Runs the turn pipeline (Feature 004): the state is updated, the gates are
+        applied (assistant off, opt-out, handover) and the model answers. The
+        text bubbles are stored `queued`: written down here, handed to the
+        provider by the sender (TASK-205). Storing them first means a send that
+        fails leaves a record of what the business meant to say, rather than
+        a silence nobody can explain. The files and options the tools sent have
+        already gone out, each with its own row.
+        """
+        self.sent_by_tools = 0
         burst = self.pending_burst(conversation_id)
         if not burst:
             # Already answered - by an earlier run of this job, or by a human
             # in the inbox. Either way there is nothing left to say.
-            return None
+            return []
 
-        if not agent_may_reply(self._session, tenant):
-            # The agent is off, the trial is over, or the tenant is paused.
+        pipeline = TurnPipeline(
+            self._session,
+            self._tenant_id,
+            llm=self._llm,
+            outbound=self._outbound_for(conversation_id) if self._outbound_for else None,
+            queue_text=True,
+            model_tier_applies=self._tier_applies,
+        )
+        result = await pipeline.run(conversation_id, self._read_burst(burst))
+
+        if result.outcome == "gated":
+            # The agent is off, the trial is over, the tenant is paused, the
+            # contact asked to be left alone or a person has the conversation.
             # The messages stay exactly where they are: HU-01 says an
             # unanswered message is still a message the owner must see.
             logger.info(
                 "inbound message stored but not answered",
-                extra={"tenant_id": str(self._tenant_id), "status": tenant.status},
+                extra={"tenant_id": str(self._tenant_id), "gate": result.gate},
             )
-            return None
+            return []
 
-        contact = self._contact(conversation_id)
-        if contact is not None and contact.opted_out_at is not None:
-            # They asked to be left alone (HU-03). The message is still
-            # stored - a person may want to read it and answer by hand - but
-            # the agent does not speak to somebody who told it not to.
-            logger.info(
-                "not answering a contact who opted out",
-                extra={"tenant_id": str(self._tenant_id)},
-            )
-            return None
-
-        text = self._as_one_question(burst)
-        if text is None:
-            reply_text = self._unsupported_fallback()
+        if result.outcome == "unsupported":
+            answers = [
+                self._messages.append(
+                    conversation_id=conversation_id,
+                    direction="outbound",
+                    author="agent",
+                    content=self._unsupported_fallback(),
+                    # Not sent yet. The sender flips this to `sent` once the
+                    # provider has taken it, and the delivery webhooks carry it
+                    # onwards.
+                    delivery_status="queued",
+                )
+            ]
         else:
-            core = AgentCore(self._session, self._tenant_id, llm=self._llm)
-            reply = await core.respond(conversation_id=conversation_id, customer_message=text)
-            reply_text = reply.content
+            answers = result.text_messages
+            self.sent_by_tools = len(result.tool_messages)
 
-        answer = self._messages.append(
-            conversation_id=conversation_id,
-            direction="outbound",
-            author="agent",
-            content=reply_text,
-            # Not sent yet. The sender flips this to `sent` once the provider
-            # has taken it, and the delivery webhooks carry it onwards.
-            delivery_status="queued",
-        )
-        if text is not None:
-            core.persist_trace(message=answer, reply=reply)
         # Counted here, where the model bill is actually incurred, and only
         # for the real channel - `record_ai_message` ignores the sandbox by
-        # design (Clarification 002).
-        metered = record_ai_message(self._session, self._tenant_id, channel="whatsapp")
-        self._react_to_the_meter(tenant, metered)
-        return answer
+        # design (Clarification 002). One turn is one message, however many
+        # bubbles it takes.
+        tenant = self._session.get(Tenant, self._tenant_id)
+        if tenant is not None:
+            metered = record_ai_message(self._session, self._tenant_id, channel="whatsapp")
+            self._react_to_the_meter(tenant, metered)
+        return answers
+
+    @staticmethod
+    def _read_burst(burst: Sequence[Message]) -> InboundTurn:
+        """The burst as one turn: the text, the taps, the ad and whether an image came.
+
+        Media lines are dropped from the text rather than passed through:
+        `[imagen]` in the prompt teaches the model to talk about a placeholder it
+        cannot see. A photo is told to the model as context instead (step 4).
+        """
+        texts = [
+            message.content.strip()
+            for message in burst
+            if message.msg_type == "text" and message.content.strip()
+        ]
+        taps = tuple(
+            tap for message in burst if (tap := interactive_of(message.payload)) is not None
+        )
+        referral = next(
+            (ad for message in burst if (ad := referral_of(message.payload)) is not None), None
+        )
+        return InboundTurn(
+            text="\n".join(texts),
+            interactive=taps,
+            referral=referral,
+            image=any(message.msg_type == "image" for message in burst),
+        )
 
     def _react_to_the_meter(self, tenant: Tenant, metered: MeteringResult) -> None:
         """Warn at 80%, and stop at 100% - in this reply, not in an hour.
@@ -544,28 +597,6 @@ class ConversationResponder:
                     panel_url=f"{get_settings().frontend_base_url}/plan",
                 )
             )
-
-    def _contact(self, conversation_id: uuid.UUID) -> Contact | None:
-        conversation = ConversationRepository(self._session, self._tenant_id).get(conversation_id)
-        if conversation is None or conversation.contact_id is None:
-            return None
-        return ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
-
-    @staticmethod
-    def _as_one_question(burst: Sequence[Message]) -> str | None:
-        """The burst as a single prompt, or None if none of it was readable.
-
-        Media lines are dropped rather than passed through: `[imagen]` in the
-        prompt teaches the model to talk about a placeholder it cannot see.
-        What matters is whether *anything* was text - a photo with a caption
-        is a question, a photo alone is not.
-        """
-        readable = [
-            message.content.strip()
-            for message in burst
-            if message.msg_type == "text" and message.content.strip()
-        ]
-        return "\n".join(readable) if readable else None
 
     def _unsupported_fallback(self) -> str:
         config = self._session.get(AgentConfig, self._tenant_id)

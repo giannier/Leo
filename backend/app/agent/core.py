@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.agent.catalog_guard import CatalogueGuard, build_catalogue_guard
+from app.agent.formatter import to_whatsapp_markup
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
@@ -118,33 +119,6 @@ _TOOL_BLOCK = re.compile(
 # failure that did not happen is the worse error of the two.
 _MIN_ANSWER_CHARS = 12
 
-# WhatsApp's markup is not Markdown, and every model defaults to Markdown.
-# `**negrita**` arrives with the asterisks showing, which reads to a customer
-# as a bot that is broken. The prompt asks for the right syntax; this converts
-# it regardless, because formatting is exactly the instruction a model drifts
-# away from once the conversation gets long.
-#
-# `(?=\S)` and `(?<=\S)` keep the delimiters glued to real text, so arithmetic
-# like `2 ** 3` and a row of `***` separators are left alone.
-_MD_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", re.DOTALL)
-_MD_BOLD_UNDERSCORE = re.compile(r"__(?=\S)(.+?)(?<=\S)__", re.DOTALL)
-_MD_STRIKE = re.compile(r"~~(?=\S)(.+?)(?<=\S)~~", re.DOTALL)
-# Headings have no equivalent at all: the marker is dropped and the text kept.
-_MD_HEADING = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+", re.MULTILINE)
-
-
-def whatsapp_text(text: str) -> str:
-    """Rewrite Markdown emphasis as the markup WhatsApp actually renders.
-
-    Single-underscore `_cursiva_` means the same thing in both, so it is left
-    untouched.
-    """
-    text = _MD_BOLD.sub(r"*\1*", text)
-    text = _MD_BOLD_UNDERSCORE.sub(r"*\1*", text)
-    text = _MD_STRIKE.sub(r"~\1~", text)
-    return _MD_HEADING.sub("", text)
-
-
 _RUN_OF_BLANKS = re.compile(r"[ \t]+")
 _TRAILING_BLANKS = re.compile(r"[ \t]+$", re.MULTILINE)
 _RUN_OF_NEWLINES = re.compile(r"\n{3,}")
@@ -174,7 +148,8 @@ def _usable_answer(raw: str) -> tuple[str, bool]:
     strip removed markup and left too little behind to be anything but a
     fragment of the call. A short answer that carried no markup is kept.
 
-    Whatever survives is rewritten into WhatsApp's markup on the way out.
+    Whatever survives is rewritten into WhatsApp's markup on the way out, by the
+    same function the turn pipeline's formatter uses (`agent/formatter.py`).
     """
     text = raw.strip()
     if not text:
@@ -187,7 +162,7 @@ def _usable_answer(raw: str) -> tuple[str, bool]:
         return FALLBACK_REPLY, True
     if stripped != text and len(cleaned) < _MIN_ANSWER_CHARS:
         return FALLBACK_REPLY, True
-    return whatsapp_text(cleaned), False
+    return to_whatsapp_markup(cleaned), False
 
 
 # One turn's tool results, keyed by tool name and arguments.
@@ -226,6 +201,23 @@ class AgentReply:
     # What the catalogue post-guard did, or None when it had nothing to say -
     # which is every ordinary turn. See `_enforce_catalogue_names`.
     catalog_guard: dict[str, object] | None = None
+    # True when the model finished the turn without writing anything (and did
+    # not fail). After a tool has already put buttons on the customer's screen
+    # that is the right answer, and the pipeline must not replace it with the
+    # apology `content` carries.
+    silent: bool = False
+
+
+@dataclass(frozen=True)
+class TurnTrace:
+    """What the turn pipeline adds to a trace (Feature 004, `plan.md` step 14)."""
+
+    stage_key: str
+    funnel_code: str
+    tools_enabled: list[str]
+    outbound_count: int
+    # The configured intelligence level; None when the tenant brings its own model.
+    model_tier: str | None = None
 
 
 class AgentCore:
@@ -259,16 +251,32 @@ class AgentCore:
             now=datetime.now(UTC),
         )
 
-    async def respond(self, *, conversation_id: uuid.UUID, customer_message: str) -> AgentReply:
-        """Produce one reply, running tools as the model asks for them."""
+    async def respond(
+        self,
+        *,
+        conversation_id: uuid.UUID,
+        customer_message: str,
+        system_prompt: str | None = None,
+        context: ToolContext | None = None,
+    ) -> AgentReply:
+        """Produce one reply, running tools as the model asks for them.
+
+        The turn pipeline hands over the prompt of the stage and the context its
+        tools run in (budget, outbound adapter, facts). Without them the agent
+        builds the prompt of before Feature 004 and runs its own registry, which
+        is what the evals and the v0 tests exercise.
+        """
         started = time.perf_counter()
         messages: list[ChatMessage] = [
-            ChatMessage("system", self.system_prompt()),
+            ChatMessage(
+                "system", system_prompt if system_prompt is not None else self.system_prompt()
+            ),
             *self._history(conversation_id),
             ChatMessage("user", customer_message),
         ]
 
-        context = ToolContext(session=self._session, tenant_id=self._tenant_id, llm=self._llm)
+        if context is None:
+            context = ToolContext(session=self._session, tenant_id=self._tenant_id, llm=self._llm)
         # Models repeat themselves: `consultar_catalogo` came back seven times
         # for the same term in one conversation. Within a turn the answer
         # cannot have changed, so it is looked up once. The cache dies with
@@ -324,6 +332,7 @@ class AgentCore:
                         "tool": call.name,
                         "args_resumen": _summarise(call.arguments),
                         "ok": not output.startswith("ERROR:"),
+                        "status": _status_of(output),
                         "cached": cached,
                     }
                 )
@@ -333,6 +342,7 @@ class AgentCore:
         # A model that answers nothing, or answers with tool-call syntax, is
         # worse than one that says it cannot help: the customer sees an empty
         # bubble or a pile of angle brackets, and no next step either way.
+        silent = result is not None and not result.content.strip()
         content, unusable = _usable_answer(result.content if result else "")
 
         guard_note: dict[str, object] | None = None
@@ -354,6 +364,7 @@ class AgentCore:
             latency_ms=int((time.perf_counter() - started) * 1000),
             degraded=result is None or unusable,
             catalog_guard=guard_note,
+            silent=silent,
         )
 
     async def _enforce_catalogue_names(
@@ -512,11 +523,15 @@ class AgentCore:
             for message in recent
         ]
 
-    def persist_trace(self, *, message: Message, reply: AgentReply) -> None:
+    def persist_trace(
+        self, *, message: Message, reply: AgentReply, turn: TurnTrace | None = None
+    ) -> None:
         """Record how this answer was produced.
 
         Written for every reply, including the degraded one - a turn that
-        failed is exactly the turn somebody will ask about later.
+        failed is exactly the turn somebody will ask about later. `turn` adds
+        what only the pipeline knows: the stage, the funnel column, the tools it
+        offered, how many messages went out and the intelligence level.
         """
         AgentTraceRepository(self._session, self._tenant_id).add(
             message_id=message.id,
@@ -527,7 +542,31 @@ class AgentCore:
             output_tokens=reply.output_tokens,
             latency_ms=reply.latency_ms,
             catalog_guard=reply.catalog_guard,
+            **(
+                {
+                    "stage_key": turn.stage_key,
+                    "funnel_code": turn.funnel_code,
+                    "tools_enabled": turn.tools_enabled,
+                    "outbound_count": turn.outbound_count,
+                    "model_tier": turn.model_tier,
+                }
+                if turn is not None
+                else {}
+            ),
         )
+
+
+def _status_of(output: str) -> str:
+    """The status a tool answered with, read back from what the model was shown.
+
+    `ToolResult.render` always opens with `estado: <status>` and an error with
+    `ERROR:`; a plain-text tool (the v0 catalogue) simply worked.
+    """
+    if output.startswith("ERROR:"):
+        return "error"
+    if output.startswith("estado: "):
+        return output.splitlines()[0].removeprefix("estado: ").strip() or "hecho"
+    return "hecho"
 
 
 def _guard_note(status: str, invented: list[str], still_invented: list[str]) -> dict[str, object]:

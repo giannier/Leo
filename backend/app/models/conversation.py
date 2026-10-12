@@ -42,6 +42,11 @@ MESSAGE_TYPES = (
     "location",
     "contact",
     "unsupported",
+    # What the sales engine sends besides text (Feature 004): reply buttons and
+    # lists are `interactive`, a library file is `image`, `document`, `audio`
+    # or `video`. The structure is in `Message.payload`.
+    "video",
+    "interactive",
 )
 
 # Where an outbound message got to. Null for anything inbound - a message the
@@ -122,6 +127,13 @@ class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     provider_message_id: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
     msg_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="text")
     delivery_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # The structure of a typed message (Feature 004, migration 0021). Outbound:
+    # the buttons, the list rows or the library file. Inbound: the tapped option
+    # (`interactive`) and the ad (`referral`), kept because the turn that reads
+    # them runs after the debounce window, when the webhook event is long gone.
+    # `content` stays the readable text either way.
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
 class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):

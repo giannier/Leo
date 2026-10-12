@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -88,12 +89,15 @@ class MessageRepository(BaseRepository[Message]):
         msg_type: str = "text",
         provider_message_id: str | None = None,
         delivery_status: str | None = None,
+        payload: dict[str, Any] | None = None,
     ) -> Message:
         """Add a message, refusing to write into another tenant's thread.
 
         The last three arguments belong to the real channel (Feature 002) and
         default to what the sandbox means: a text message that was never sent
         anywhere, so no provider ever named it and it has no delivery state.
+        `payload` is the structure of a typed message (buttons, a list, a file,
+        the option a customer tapped).
         """
         conversations = ConversationRepository(self._session, self.tenant_id)
         if not conversations.exists(conversation_id):
@@ -108,7 +112,42 @@ class MessageRepository(BaseRepository[Message]):
             msg_type=msg_type,
             provider_message_id=provider_message_id,
             delivery_status=delivery_status,
+            payload=payload,
         )
+
+    def latest_for_conversation(self, conversation_id: uuid.UUID) -> Message | None:
+        """The newest message of a thread, whoever sent it."""
+        statement = (
+            self._scoped()
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def outbound_after(
+        self, conversation_id: uuid.UUID, after_id: uuid.UUID | None = None
+    ) -> Sequence[Message]:
+        """What the business said in a thread after one message, oldest first.
+
+        With no `after_id`, everything it said. An id that is not in this
+        thread (or this tenant) reads as no anchor at all: the caller gets the
+        whole outbound history rather than an error, which is the safe side for
+        a poll that may outlive a reset.
+        """
+        anchor: Message | None = None
+        if after_id is not None:
+            anchor = self._session.execute(
+                self._scoped().where(
+                    Message.id == after_id, Message.conversation_id == conversation_id
+                )
+            ).scalar_one_or_none()
+        statement = self._scoped().where(
+            Message.conversation_id == conversation_id, Message.direction == "outbound"
+        )
+        if anchor is not None:
+            statement = statement.where(Message.created_at > anchor.created_at)
+        return self._session.execute(statement.order_by(Message.created_at)).scalars().all()
 
     def count_on_channel(self, channel: str, *, direction: str, since: datetime) -> int:
         """How many messages one channel carried, one way, since a moment.

@@ -50,6 +50,7 @@ from app.services.channel import (
     lock_key,
     stranded_replies,
 )
+from app.services.turn_outbound import live_outbound_factory
 
 logger = logging.getLogger(__name__)
 
@@ -357,9 +358,23 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
         settings = ctx["settings"]
         session_factory = ctx["session_factory"]
         with session_factory() as session:
-            llm = provider_for_tenant(session.get(TenantLLMSettings, tenant))
-            responder = ConversationResponder(session, tenant, llm=llm)
-            answer = await responder.respond(conversation)
+            llm_settings = session.get(TenantLLMSettings, tenant)
+            llm = provider_for_tenant(llm_settings)
+            responder = ConversationResponder(
+                session,
+                tenant,
+                llm=llm,
+                outbound_for=live_outbound_factory(
+                    session,
+                    tenant,
+                    provider=ctx["whatsapp"],
+                    storage=ctx.get("storage"),
+                    max_attempts=settings.channel_send_max_attempts,
+                ),
+                # A tenant that brings its own model has no intelligence level.
+                model_tier_applies=llm_settings is None or llm_settings.mode == "platform",
+            )
+            answers = await responder.respond_turn(conversation)
             warnings = tuple(responder.pending_emails)
             # Committed before the send. The reply exists as `queued` from
             # here on, so a worker killed mid-send leaves a record of what the
@@ -371,8 +386,10 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
             # nothing.
             await _send_pending(ctx.get("email"), warnings)
 
-            if answer is None:
-                return OUTCOME_NOTHING_TO_SAY
+            if not answers:
+                # Nothing for the sender to do. If the tools already put a file or
+                # options on the customer's screen, that was the answer.
+                return OUTCOME_ANSWERED if responder.sent_by_tools else OUTCOME_NOTHING_TO_SAY
 
             sender = ReplySender(
                 session,
@@ -381,7 +398,9 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 max_attempts=settings.channel_send_max_attempts,
             )
             try:
-                await sender.send(answer)
+                # In order: a second bubble must not overtake the first.
+                for answer in answers:
+                    await sender.send(answer)
             except NoConnectedNumber:
                 # The agent answered and there is nothing to send it from -
                 # the number was disconnected mid-conversation. The reply

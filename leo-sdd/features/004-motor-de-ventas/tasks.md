@@ -169,7 +169,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - con presupuesto agotado devuelve `no_disponible`.
   - Parallel: false
 
-- [ ] TASK-421: TurnPipeline
+- [x] TASK-421: TurnPipeline
   - Input: `plan.md` (pipeline de 14 pasos), `agent/core.py`
   - Output: `agent/pipeline.py` con `TurnContext`, `stage_previa` y gate (pausado, opt-out, derivación vigente aunque la etapa sea VERIFICACION); `workers/channel.py` y el simulador llaman al pipeline; `core.py` recibe el prompt y las tools ya armados; las trazas incluyen etapa, embudo, tools habilitadas, salientes y nivel
   - Depends on: TASK-412, TASK-413, TASK-414, TASK-416, TASK-420, TASK-418

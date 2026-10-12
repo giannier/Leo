@@ -24,8 +24,8 @@ Placeholders in the stage text (`{nombre_cliente}`, `{var.temas}`...) are filled
 here; when a value is missing the **whole line** is dropped, so the model never
 sees `{...}` or a sentence with a hole in it.
 
-The legacy prompt of `agent/prompts/builder.py` stays until the pipeline
-(TASK-421) switches the agent over to this one.
+The turn pipeline (TASK-421) builds every prompt here. The legacy prompt of
+`agent/prompts/builder.py` is only what the evals and the v0 agent tests still run.
 """
 
 from __future__ import annotations
@@ -40,7 +40,12 @@ from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from app.agent.prompts.builder import _TONE_GUIDANCE, DEFAULT_TONE, _format_hours
+from app.agent.prompts.builder import (
+    _TONE_GUIDANCE,
+    DEFAULT_TONE,
+    _format_hours,
+    _format_today,
+)
 from app.process.engine import anuncio_vigente
 from app.process.facts import Facts, PromoCierre
 from app.process.service import EffectiveProcessConfig
@@ -465,7 +470,11 @@ def _state_lines(
     limits: _StateLimits,
 ) -> str:
     zone = _zone(config.timezone)
-    lines = ["ESTADO DE LA CONVERSACIÓN", f"- Cliente: {_stored_name(facts)}"]
+    lines = [
+        "ESTADO DE LA CONVERSACIÓN",
+        f"- Hoy: {_format_today(now, config.timezone)}",
+        f"- Cliente: {_stored_name(facts)}",
+    ]
 
     entrada = facts.entrada_anuncio
     if entrada is not None and anuncio_vigente(facts, now):
