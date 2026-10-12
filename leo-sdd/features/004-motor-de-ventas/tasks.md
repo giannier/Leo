@@ -131,7 +131,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: los 7 casos portados a pytest más los de detalle breve/moderado/extenso y presupuesto agotado
   - Parallel: true
 
-- [ ] TASK-417: Registry de herramientas
+- [x] TASK-417: Registry de herramientas
   - Input: `contracts/api.md §7`, `plantillas.md §2`
   - Output:
     - `tools/registry.py` con el sobre `ToolResult(status, data, decir)`, `for_stage(template, stage, facts)` y un contexto de herramienta (tenant, conversación, budget, adaptador, sandbox, `TurnContext`);

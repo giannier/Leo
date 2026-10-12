@@ -1,20 +1,29 @@
-"""The two tools agent-core v0 ships with (Clarification 010).
+"""The catalogue and knowledge tools.
 
-Both return **text**, not JSON. The model reads the result as part of its
-context, and prose it can quote directly produces fewer transcription errors
-than a structure it has to re-serialise into a sentence - which is where an
-invented price comes from.
+Agent-core v0 shipped two (Clarification 010): `consultar_catalogo` and
+`consultar_conocimiento`. Feature 004 splits the first into `buscar_productos`
+and `ver_producto` (`contracts/api.md` section 7) and moves the tools to the
+`ToolResult` envelope. `consultar_catalogo` is kept exactly as it was, for the
+v0 registry and for any conversation or prompt that still names it; in the
+stage registries a call to that name is served by `buscar_productos`
+(`plan.md`, "Decisiones Posteriores").
 
-Both also say plainly when they found nothing. "No hay resultados" is a fact
-the model can relay; an empty list is an absence it will be tempted to fill.
+Every tool returns **prose** for the model, never bare JSON. The model reads the
+result as part of its context, and prose it can quote directly produces fewer
+transcription errors than a structure it has to re-serialise into a sentence -
+which is where an invented price comes from.
+
+They also say plainly when they found nothing. "No hay resultados" is a fact the
+model can relay; an empty list is an absence it will be tempted to fill.
 """
 
 from __future__ import annotations
 
+import uuid
 from decimal import Decimal
 from typing import Any
 
-from app.agent.tools.registry import ToolContext, ToolRegistry
+from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.business import Product
 from app.repositories.knowledge import KnowledgeChunkRepository
 from app.repositories.product import ProductRepository
@@ -26,7 +35,11 @@ MAX_KNOWLEDGE_RESULTS = 4
 MAX_CHUNK_CHARS = 700
 
 CATALOG_TOOL = "consultar_catalogo"
+SEARCH_TOOL = "buscar_productos"
+VIEW_TOOL = "ver_producto"
 KNOWLEDGE_TOOL = "consultar_conocimiento"
+# A description in a listing; the full text is for `ver_producto`.
+MAX_LISTED_DESCRIPTION = 200
 
 
 def _format_price(price: Decimal, currency: str) -> str:
@@ -83,7 +96,7 @@ def _render(rows: object) -> str:
     return "\n".join(lines)
 
 
-async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]) -> str:
+async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
     """Retrieve from the tenant's indexed documents.
 
     The query is embedded with `input_type="query"`. These models are trained
@@ -92,19 +105,127 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
     """
     query = str(arguments.get("consulta") or "").strip()
     if not query:
-        return "No se indicó qué buscar."
+        return ToolResult.error("No se indicó qué buscar.")
 
     vectors = await context.llm.embed([query], input_type="query")
     chunks = KnowledgeChunkRepository(context.session, context.tenant_id).search(
         vectors[0], limit=MAX_KNOWLEDGE_RESULTS
     )
     if not chunks:
-        return (
-            "No hay información sobre eso en los documentos del negocio. No inventes una respuesta."
+        return ToolResult.no_disponible(
+            texto=(
+                "No hay información sobre eso en los documentos del negocio. "
+                "No inventes una respuesta."
+            )
         )
 
     passages = [chunk.content[:MAX_CHUNK_CHARS] for chunk in chunks]
-    return "Información del negocio:\n" + "\n---\n".join(passages)
+    return ToolResult.hecho(
+        data={"fragmentos": len(passages)},
+        texto="Información del negocio:\n" + "\n---\n".join(passages),
+    )
+
+
+def _product_data(product: Product, *, full: bool = False) -> dict[str, Any]:
+    description = product.description or None
+    if description is not None and not full:
+        description = description[:MAX_LISTED_DESCRIPTION]
+    return {
+        "producto_id": str(product.id),
+        "nombre": product.name,
+        "precio": f"{product.price:.2f}",
+        "categoria": product.category,
+        "descripcion": description,
+        "stock": product.stock,
+        "modo_venta": product.modo_venta,
+        "bundle_size": product.bundle_size,
+        "destacado": product.destacado,
+        "es_digital": product.es_digital,
+    }
+
+
+def _product_line(item: dict[str, Any]) -> str:
+    """One product as a line the model can quote.
+
+    The id is there so the model can pass it to `ver_producto` and, later, to
+    `gestionar_pedido`; it never needs to say it aloud.
+    """
+    parts = [f"- {item['nombre']} (producto_id: {item['producto_id']}):"]
+    parts.append(_format_price(Decimal(item["precio"]), "S/"))
+    if item["bundle_size"]:
+        parts.append(f"[paquete de {item['bundle_size']} selecciones]")
+    if item["modo_venta"] == "cotizacion":
+        parts.append("[se cotiza con una persona, no tiene precio fijo]")
+    if item["destacado"]:
+        parts.append("[destacado]")
+    if item["categoria"]:
+        parts.append(f"(categoría: {item['categoria']})")
+    if item["descripcion"]:
+        parts.append(f"- {item['descripcion']}")
+    if item["stock"] is not None:
+        # Stated only when tracked. "stock: None" means the business does
+        # not count it, which is different from having none.
+        parts.append(f"[stock: {item['stock']}]")
+    return " ".join(parts)
+
+
+async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
+    """Search the tenant's live products, featured first.
+
+    Only active, non-deleted rows: a product the owner switched off is one they
+    have stopped selling, and quoting it produces an order they cannot fill.
+    When nothing matches the whole catalogue is offered instead, and the text
+    says the search missed so these are not presented as matches.
+    """
+    query = str(arguments.get("consulta") or "").strip()
+    categoria = str(arguments.get("categoria") or "").strip() or None
+    only_bundles = arguments.get("solo_paquetes") is True
+    products = ProductRepository(context.session, context.tenant_id)
+
+    rows = products.search_active(
+        query, categoria=categoria, solo_paquetes=only_bundles, limit=MAX_CATALOG_RESULTS
+    )
+    narrowed = bool(query or categoria or only_bundles)
+    missed = False
+    if not rows and narrowed:
+        rows = products.search_active(limit=MAX_CATALOG_RESULTS)
+        missed = True
+    if not rows:
+        return ToolResult.no_disponible(
+            texto="El catálogo está vacío. No hay productos que ofrecer."
+        )
+
+    items = [_product_data(row) for row in rows]
+    listing = "\n".join(_product_line(item) for item in items)
+    if missed:
+        asked = query or categoria or "paquetes"
+        texto = (
+            f"No hay ningún producto que coincida con '{asked}'. "
+            f"Estos son los productos disponibles:\n{listing}"
+        )
+    else:
+        texto = f"Productos disponibles:\n{listing}"
+    return ToolResult.hecho(data={"productos": items, "coincidencia": not missed}, texto=texto)
+
+
+async def ver_producto(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
+    """One product in full, by the id a previous search returned."""
+    raw = str(arguments.get("producto_id") or "").strip()
+    try:
+        product_id = uuid.UUID(raw)
+    except ValueError:
+        return ToolResult.error("producto_id no es válido: usa el que devolvió buscar_productos.")
+
+    product = ProductRepository(context.session, context.tenant_id).get_active(product_id)
+    if product is None:
+        return ToolResult.no_disponible(
+            texto=(
+                "No existe un producto disponible con ese producto_id. "
+                "Búscalo con buscar_productos."
+            )
+        )
+    item = _product_data(product, full=True)
+    return ToolResult.hecho(data=item, texto="Producto:\n" + _product_line(item))
 
 
 def build_default_registry() -> ToolRegistry:
