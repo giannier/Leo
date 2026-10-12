@@ -124,7 +124,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests unitarios
   - Parallel: true
 
-- [ ] TASK-416: Formateador WhatsApp
+- [x] TASK-416: Formateador WhatsApp
   - Input: nodo *Formato WhatsApp1* de Capacita v21 y sus 7 casos de `harness21.js`
   - Output: `formatter.to_bubbles(texto, detalle, budget) -> list[str]`
   - Depends on: TASK-415
