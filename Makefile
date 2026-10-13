@@ -1,4 +1,4 @@
-.PHONY: admin reindex seed-milestone-b simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: admin reindex mark-e2e seed-milestone-b simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -73,8 +73,12 @@ front-lint: ## Lint the frontend (ESLint).
 front-build: ## Type-check and production-build the frontend, matching CI.
 	cd frontend && npm run build
 
-front-e2e: ## Run the Playwright suite against the local stack (needs `make up`).
-	cd frontend && E2E_OUTBOX=../backend/.tmp/outbox.jsonl npx playwright test
+front-e2e: ## Run the Playwright suite against the local stack (needs `make up`), then mark its accounts.
+	cd frontend && E2E_OUTBOX=../backend/.tmp/outbox.jsonl npx playwright test; status=$$?; \
+	cd .. && $(COMPOSE) exec backend python -m scripts.mark_e2e_accounts; exit $$status
+
+mark-e2e: ## Mark the businesses the end-to-end suite created as test accounts.
+	$(COMPOSE) exec backend python -m scripts.mark_e2e_accounts
 
 front-dev: ## Run the frontend dev server outside Docker.
 	cd frontend && npm run dev
