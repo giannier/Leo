@@ -10,16 +10,12 @@ Este milestone demuestra el ciclo completo de una venta: el cliente arma el pedi
 ## 1. Requisitos previos
 
 - Stack de desarrollo arriba (`make up`): `postgres`, `redis`, `minio`, `api` y `worker`. Panel en `http://localhost:3000`. Comandos `docker compose` desde la raíz del repo.
-- Migraciones al día (`make migrate`): la base debe estar en la revisión `0022`.
+- Migraciones al día: la base debe estar en la revisión `0027`
+  (`docker compose -f deploy/docker-compose.dev.yml exec backend alembic upgrade head`).
 - El **Milestone A aprobado** y el tenant `Escuela Capacita` tal como quedó (catálogo de 11 productos, plantilla `certificaciones`, recursos `saludo` y `flyer_paquetes`). Este milestone lo reutiliza.
 - **Cada mensaje del simulador y cada comprobante son llamadas reales a un modelo de pago.** El stack corre con `LLM_PROFILE=openai`. No se corrieron los evals (`make evals`) con estos cambios.
-- **Para ver la foto del comprobante en el panel** (hallazgo de preparación): el enlace firmado lo genera el `api` con `S3_ENDPOINT_URL=http://minio:9000`, un nombre que solo existe dentro de la red de Docker. Desde tu navegador no resuelve y la pantalla mostrará "No pudimos cargar la imagen". Solución local: agrega esta línea al archivo `hosts` de Windows (`C:\Windows\System32\drivers\etc\hosts`, como administrador) y recarga el detalle del pedido:
-
-  ```text
-  127.0.0.1 minio
-  ```
-
-  Los datos que el sistema leyó del comprobante se ven igual con o sin la imagen. Ver sección 7, punto 1.
+- **Para ver la foto del comprobante en el panel:** pon `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` en tu
+  `.env` (decisión del milestone, commit `d70cc35`). Ya no hace falta tocar el archivo `hosts`.
 - Tres imágenes de prueba (PNG, JPEG o WebP, menos de 5 MB):
   1. **`comprobante-ok`**: captura de un pago de Yape o Plin armada por ti (puede ser inventada), con monto, fecha, **código de operación** y nombre de quien recibe.
   2. **`comprobante-monto`**: la misma captura con un monto distinto al del pedido (por ejemplo `S/ 450.00` cuando el pedido es de `S/ 500.00`).
@@ -108,7 +104,8 @@ Capacita cobra siempre **por adelantado** (la plantilla `certificaciones` fija `
    ```
 
    Debe mostrar `1 | 1 | 1`. El bloque no es repetible: una segunda corrida duplica la promoción y el método de pago.
-   Delivery sin recojo: el cliente **debe** elegir `delivery`, y luego zona y dirección (conciliación §8.7).
+   Delivery sin recojo: desde la decisión 11 el tipo `delivery` **se fija solo** (no se pregunta); el
+   cliente solo da zona y dirección.
 
    La caché de configuración efectiva dura 60 s por proceso: si ya habías usado el simulador, espera un minuto o reinicia el `api`.
 
@@ -188,7 +185,7 @@ Antes del T1 comprueba que el simulador usa la plantilla de la tienda (sección 
 |---|---|---|---|---|
 | 1 | `Hola` | INICIO → IDENTIFICAR | NUEVO → ATENDIDO | Saluda, **sin** pregunta de calificación (la plantilla no tiene caminos) y sin botones de camino. |
 | 2 | `Quiero 2 polos` | IDENTIFICAR → DATOS | ATENDIDO → NEGOCIACION | `buscar_productos` informa la promoción 2×1; `gestionar_pedido(agregar, cantidad 2)`. Pedido: 2 × Polo básico, **subtotal S/ 70.00, descuento S/ 35.00 (2x1 en polos), total S/ 35.00** (aún sin envío). El modelo cita esos montos tal cual. |
-| 3 | `Soy Ana Quispe, mi número es 987654321` | DATOS | NEGOCIACION | Guarda nombre y teléfono y pide lo que falta de la entrega: `delivery`, zona y dirección. Lista las zonas válidas (Miraflores, San Isidro, Callao). No pide DNI ni correo (la plantilla solo pide nombres y teléfono). |
+| 3 | `Soy Ana Quispe, mi número es 987654321` | DATOS | NEGOCIACION | Guarda nombre y teléfono; el tipo queda `delivery` solo (la tienda no tiene recojo, decisión 11) y pide zona y dirección. Lista las zonas válidas (Miraflores, San Isidro, Callao). No pide DNI ni correo (la plantilla solo pide nombres y teléfono). |
 | 4 | `Delivery en Miraflores, Av. Larco 123` | DATOS → COBRO | NEGOCIACION | `registrar_datos_cliente` con `tipo_entrega = delivery`, `zona_envio = Miraflores`, `direccion`. El pedido recalcula el envío: **subtotal 70.00, descuento 35.00, envío 8.00, total 43.00**. |
 | 5 | (mismo turno o siguiente) | COBRO | CUENTAS_ENVIADAS | `enviar_metodos_pago` con el total de **S/ 43.00**. |
 | 6 | Sube `comprobante-ok` | COBRO → VERIFICACION | EN_VERIFICACION | Pedido `Por confirmar`. Como el comprobante no dice S/ 43.00 (es una captura de prueba), aparece **El monto no coincide**: es lo esperado y sirve para ver que la marca no rechaza sola. |
