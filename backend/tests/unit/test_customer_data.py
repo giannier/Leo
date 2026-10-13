@@ -80,6 +80,12 @@ class TestPhone:
     def test_the_phone_is_stored_in_e164(self, raw: str, stored: str) -> None:
         assert validate_field("telefono", raw) == stored
 
+    def test_outside_peru_a_bare_number_is_not_given_the_peruvian_prefix(self) -> None:
+        """TASK-450, decision 10: the prefix is the business's country's."""
+        with pytest.raises(InvalidField):
+            validate_field("telefono", "987654321", pais="CO")
+        assert validate_field("telefono", "+57 301 234 5678", pais="CO") == "+573012345678"
+
     @pytest.mark.parametrize("raw", ["12345", "+0123456789", "telefono", "87654321", "+51"])
     def test_a_phone_that_is_not_e164_is_invalid(self, raw: str) -> None:
         with pytest.raises(InvalidField):

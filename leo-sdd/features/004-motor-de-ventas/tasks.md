@@ -546,7 +546,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el deploy a producción**
 (TASK-026 de la 001). Cada una lleva su test y su verificación.
 
-- [ ] TASK-450: País del negocio y prefijo telefónico (decisión 10)
+- [x] TASK-450: País del negocio y prefijo telefónico (decisión 10)
+  - **Hecho (2026-10-13):** `tenants.pais` (migración 0028; en el tenant y no en el perfil porque existe
+    desde el registro), selector de país en el registro, `+51` solo para negocios de Perú (fuera de Perú se
+    pide el número completo). Editarlo desde el panel queda en TASK-438.
   - Input: decisión 10 (prefijo según el país del negocio, Perú por defecto); hoy el tenant no tiene país
   - Output: `business_profiles.pais` (ISO 3166, por defecto `PE`, migración) en el wizard y en Información
     del negocio; `orders/customer_data.py` toma el prefijo del país (9 dígitos que empiezan en 9 → `+51`

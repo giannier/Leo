@@ -103,12 +103,17 @@ def _email(raw: str) -> str:
     return value
 
 
-def _phone(raw: str) -> str:
-    """E.164. A bare 9-digit number starting with 9 is read as a Peruvian mobile."""
+def _phone(raw: str, pais: str = "PE") -> str:
+    """E.164. A number typed without its prefix takes the business's country's.
+
+    Only Peru has a rule today (a bare 9-digit number starting with 9 is a
+    mobile); anywhere else the customer is asked for the full number, which is
+    the conservative reading of decision 10 until a country needs its own rule.
+    """
     compact = re.sub(r"[\s\-().]", "", raw)
     if compact.startswith("00"):
         compact = "+" + compact[2:]
-    if re.fullmatch(r"9\d{8}", compact):
+    if pais == "PE" and re.fullmatch(r"9\d{8}", compact):
         compact = _PERU_COUNTRY_CODE + compact
     if not _E164.match(compact):
         raise InvalidField(
@@ -134,7 +139,7 @@ def _birth_date(raw: str, *, today: date | None = None) -> str:
     return parsed.isoformat()
 
 
-def validate_field(field: str, raw: object) -> str:
+def validate_field(field: str, raw: object, *, pais: str = "PE") -> str:
     """The normalised value of one customer field, or `InvalidField`.
 
     Normalised means what gets stored: digits only for the DNI and the RUC, the
@@ -152,7 +157,7 @@ def validate_field(field: str, raw: object) -> str:
     if field == "correo":
         return _email(raw)
     if field == "telefono":
-        return _phone(raw)
+        return _phone(raw, pais)
     if field == "fecha_nacimiento":
         return _birth_date(raw)
     if field in _TEXT_BOUNDS:

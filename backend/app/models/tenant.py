@@ -10,7 +10,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, UniqueConstraint, text
+from sqlalchemy import (
+    CHAR,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -77,9 +87,15 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """
 
     __tablename__ = "tenants"
-    __table_args__ = (enum_check("status", TENANT_STATUSES, "tenants_status"),)
+    __table_args__ = (
+        enum_check("status", TENANT_STATUSES, "tenants_status"),
+        CheckConstraint("pais ~ '^[A-Z]{2}$'", name="pais_format"),
+    )
 
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # The business's country (ISO 3166-1 alpha-2). Decides the prefix of a phone
+    # a customer types without one (TASK-450, decision 10). Peru by default.
+    pais: Mapped[str] = mapped_column(CHAR(2), nullable=False, server_default="PE")
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="trial")
     plan_id: Mapped[str] = mapped_column(
         Text, ForeignKey("plans.id"), nullable=False, server_default="trial"
