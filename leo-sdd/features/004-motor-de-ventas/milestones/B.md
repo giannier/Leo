@@ -374,6 +374,9 @@ casos dorados pasan y el prompt saboteado hace fallar la suite (los evals tienen
 sobre `AgentCore` con el prompt de la 003 y `MAX_TOOL_ROUNDS = 3`; **no** cubren el pipeline por etapas,
 la línea nueva de VERIFICACION ni la instrucción de visión. Eso lo mide TASK-447 ("flujos de venta").
 
+**Evals (2026-10-13, después de TASK-450 a 455):** 2 de 2 en verde con OpenAI (38 s); suite completa
+3228 en verde.
+
 **Por confirmar con Giannier:** a qué decisión del reporte original corresponden la **14** ("Aceptado") y
 la **22** ("Anotado como tarea de la 007"); el reporte numerado no quedó en el repo.
 
