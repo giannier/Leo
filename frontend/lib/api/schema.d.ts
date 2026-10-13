@@ -1421,6 +1421,17 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** CurrencySales */
+        CurrencySales: {
+            /** Moneda */
+            moneda: string;
+            /** Conversiones */
+            conversiones: number;
+            /** Valor Total */
+            valor_total: string;
+            /** Ticket Promedio */
+            ticket_promedio: string;
+        };
         /** CustomerBrief */
         CustomerBrief: {
             /** Nombre */
@@ -1867,6 +1878,8 @@ export interface components {
             ticket_promedio: string;
             /** Moneda */
             moneda: string;
+            /** Por Moneda */
+            por_moneda: components["schemas"]["CurrencySales"][];
             /** Por Estado */
             por_estado: {
                 [key: string]: number;

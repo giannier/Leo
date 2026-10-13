@@ -83,6 +83,13 @@ export function OrderSummaryCards({ summary }: { summary: OrderSummary | null })
       </div>
     );
   }
+  // Sales in other currencies are listed apart: soles and dollars never add up.
+  const others = summary.por_moneda.filter((row) => row.moneda !== summary.moneda);
+  const othersHint = others.length
+    ? `Además: ${others
+        .map((row) => `${formatMoney(row.valor_total, row.moneda)} (${row.conversiones})`)
+        .join(" · ")}`
+    : undefined;
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
@@ -95,6 +102,7 @@ export function OrderSummaryCards({ summary }: { summary: OrderSummary | null })
         testId="stat-valor"
         label="Valor vendido"
         value={formatMoney(summary.valor_total, summary.moneda)}
+        hint={othersHint}
       />
       <StatCard
         testId="stat-ticket"
