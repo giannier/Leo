@@ -563,7 +563,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
     registrarse; los evals no bajan
   - Parallel: true
 
-- [ ] TASK-452: Visión después de los gates y nunca con el perfil gratuito (hallazgo P-1)
+- [x] TASK-452: Visión después de los gates y nunca con el perfil gratuito (hallazgo P-1)
   - Input: revisión de TASK-429 a 431, P-1 (Ley 29733, minimización)
   - Output: si la conversación está pausada, derivada o con opt-out, la imagen se guarda para el humano
     sin llamar al modelo (comprobante `sin_datos`, revisión humana); un perfil sin visión aprobada
