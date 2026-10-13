@@ -6,9 +6,9 @@ database or a model.
 
 **Why characters and not tokens.** The obvious alternative is `tiktoken`,
 counting tokens the way OpenAI does. Two reasons against it: the embedding
-model is `nvidia/nv-embedqa-e5-v5`, whose tokenizer is not OpenAI's BPE, so
-tiktoken's counts would be a confident measurement of the wrong thing; and it
-is a second dependency bought for an approximation. Characters are exact,
+model was chosen per profile (it was NVIDIA's when this was written), so a
+tokenizer would be tied to one vendor; and it is a second dependency bought
+for an approximation. Characters are exact,
 free, and the budget in the `plans` table (`max_rag_chars`) is denominated in
 them too, so one unit runs through the whole feature.
 

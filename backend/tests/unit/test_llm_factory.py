@@ -17,6 +17,7 @@ import uuid
 
 import pytest
 from cryptography.fernet import Fernet
+from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.models.knowledge import EMBEDDING_DIMENSIONS
@@ -31,7 +32,6 @@ from app.providers.llm.offline import OfflineLLMProvider
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
 # Long enough to clear the plausibility floor in `_require_key`.
-NVIDIA_KEY = "nvapi-" + "n" * 60
 OPENAI_KEY = "sk-proj-" + "o" * 60
 TENANT_KEY = "sk-tenant-" + "t" * 60
 
@@ -61,8 +61,7 @@ def _settings(**overrides: object) -> Settings:
         # file, and without this line every assertion below would depend on
         # whichever profile the developer happens to have configured - the
         # suite would pass on one machine and fail on the next.
-        "llm_profile": "nvidia",
-        "nvidia_api_key": NVIDIA_KEY,
+        "llm_profile": "openai",
         "openai_api_key": OPENAI_KEY,
     }
     base.update(overrides)
@@ -78,28 +77,18 @@ def _tenant(**overrides: object) -> TenantLLMSettings:
 
 class TestThePlatformProfile:
     def test_an_unconfigured_deployment_gets_a_profile_that_works(self) -> None:
-        """This used to be the free tier, and the intent was that nobody has
-        to opt into spending money. It cannot be, since 25/8/2026:
-        `nvidia/nv-embedqa-e5-v5` reached end of life and answers HTTP 410, so
-        a deployment taking the default came up unable to embed anything, with
-        retrieval silently dead and no line anywhere saying why.
-
-        A free default that cannot index knowledge is not free, it is broken.
-        Of the embedding models still reachable on NVIDIA Build only
-        `nemotron-3-embed-1b` responds, at 2048 dimensions against a
-        `Vector(1024)` column - a migration and a full reindex away.
+        """OpenAI is the default, and since Milestone B the only hosted profile
+        (the NVIDIA Build one was removed).
 
         Read off the field default rather than off a constructed `Settings`,
         which would pick the value up from whatever `.env` is on the machine.
         """
         assert Settings.model_fields["llm_profile"].default == "openai"
 
-    def test_the_free_profile_carries_nvidias_quirks(self) -> None:
-        profile = platform_profile(_settings())
-
-        assert profile.name == "nvidia"
-        assert profile.send_embedding_input_type is True
-        assert profile.max_tokens_field == "max_tokens"
+    def test_the_nvidia_profile_no_longer_exists(self) -> None:
+        """An old `.env` with `LLM_PROFILE=nvidia` fails at startup, by name."""
+        with pytest.raises(ValidationError, match="llm_profile"):
+            _settings(llm_profile="nvidia")
 
     def test_the_paid_profile_carries_both_vendor_quirks(self) -> None:
         """OpenAI rejects `input_type` and rejects `max_tokens`. Getting
@@ -119,8 +108,12 @@ class TestThePlatformProfile:
         )
 
     def test_a_missing_key_names_the_variable_that_is_missing(self) -> None:
-        with pytest.raises(LLMConfigurationError, match="NVIDIA_API_KEY"):
-            platform_profile(_settings(nvidia_api_key=None))
+        with pytest.raises(LLMConfigurationError, match="OPENAI_API_KEY"):
+            platform_profile(_settings(openai_api_key=None))
+
+    def test_the_offline_profile_has_no_hosted_profile(self) -> None:
+        with pytest.raises(LLMConfigurationError, match="offline"):
+            platform_profile(_settings(llm_profile="offline"))
 
     def test_a_truncated_paste_is_refused_where_it_is_read(self) -> None:
         """ "Set" is the wrong question. A ten-character value passes every
@@ -140,7 +133,7 @@ class TestThePlatformProvider:
         provider = platform_provider(_settings())
 
         assert isinstance(provider, OpenAICompatibleProvider)
-        assert provider.chat_model == _settings().nvidia_chat_model
+        assert provider.chat_model == _settings().openai_chat_model
 
 
 class TestTheTenantOverride:
@@ -148,12 +141,12 @@ class TestTheTenantOverride:
         provider = provider_for_tenant(None, settings=_settings())
 
         assert isinstance(provider, OpenAICompatibleProvider)
-        assert provider.chat_model == _settings().nvidia_chat_model
+        assert provider.chat_model == _settings().openai_chat_model
 
     def test_the_platform_mode_means_the_platform_pays(self) -> None:
         provider = provider_for_tenant(_tenant(mode="platform"), settings=_settings())
 
-        assert provider.chat_model == _settings().nvidia_chat_model
+        assert provider.chat_model == _settings().openai_chat_model
 
     def test_a_configured_tenant_gets_their_own_model(self, cipher: Fernet) -> None:
         row = _tenant(

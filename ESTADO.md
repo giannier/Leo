@@ -35,7 +35,7 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 - **Frontend:** Next.js 15.5 con React 19, Tailwind 4 y Playwright (6 specs).
 - **Compose dev** (`deploy/docker-compose.dev.yml`): postgres, redis, minio, backend, worker, frontend. Los contenedores `leo-dev-*` estaban activos al medir.
 - **WhatsApp:** YCloud. Adaptador `providers/whatsapp/ycloud.py` (envío, parseo, firma HMAC) y webhook `POST /webhooks/ycloud`. Meta Cloud API directo y Tech Provider no existen aún.
-- **LLM:** perfil `openai` por defecto, chat `gpt-5.4-mini`, embeddings `text-embedding-3-small`. Alternativas: `nvidia` (chat `nvidia/nemotron-3-super-120b-a12b`; su embedding está muerto) y `offline`. Los tenants pueden traer sus credenciales de chat (`provider_for_tenant`).
+- **LLM:** perfil `openai` por defecto, chat `gpt-5.4-mini`, embeddings `text-embedding-3-small`. Alternativa: `offline` (solo desarrollo). El perfil `nvidia` se eliminó en el Milestone B de la 004 a pedido de Giannier. Los tenants pueden traer sus credenciales de chat (`provider_for_tenant`).
 - **Secretos:** credenciales cifradas con Fernet en BD. No se inspeccionó ningún `.env`.
 
 ## 4. Modelo de datos (13 migraciones, `0001`–`0013`)

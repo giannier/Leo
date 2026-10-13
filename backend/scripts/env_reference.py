@@ -22,7 +22,6 @@ from app.core.config import Settings
 SECRETS = frozenset(
     {
         "resend_api_key",
-        "nvidia_api_key",
         "openai_api_key",
         "credentials_encryption_key",
         "secret_key",
@@ -52,10 +51,6 @@ GROUPS: list[tuple[str, list[str]]] = [
         "LLM providers",
         [
             "llm_profile",
-            "nvidia_api_key",
-            "nvidia_base_url",
-            "nvidia_chat_model",
-            "nvidia_embedding_model",
             "openai_api_key",
             "openai_base_url",
             "openai_chat_model",
