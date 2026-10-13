@@ -120,6 +120,23 @@ Los pedidos del simulador están **ocultos** en `/pedidos` salvo que marques **I
 
 ## 3. Escenarios
 
+> **Cambios del 2026-10-13 que alteran lo esperado (léelos antes de probar):**
+> - **Todo comprobante muestra "Destinatario sin verificar"** (hallazgo D-1): todavía no hay cuentas de
+>   cobro con titular para comparar (llegan en TASK-434). Donde el guion dice "sin marcas" o "ya no hay
+>   marca de monto", lo correcto ahora es **solo** "Destinatario sin verificar". Si la captura tiene una
+>   fecha anterior al día del pedido, sale también "Fecha anterior al pedido".
+> - **Montos con coma o punto:** `S/ 1.250,00` y `S/ 1,250.00` se leen igual; un monto negativo sale como
+>   "Monto negativo" (D-2).
+> - **Descartar un pedido con comprobante** pide un motivo, anula el comprobante y avisa al cliente; si
+>   estaba confirmado o en curso queda **"Devolución pendiente"** (E-2). Pruébalo después del escenario 5,
+>   paso 8: no aplica a un pedido completado (ya no tiene botones).
+> - **Pedido en revisión:** si en VERIFICACION el cliente pide un cambio (`Mejor cámbiame SIAF por
+>   SIGA`), el agente explica que no se puede y deja la nota; en Pedidos aparece "El cliente pidió
+>   cambios mientras revisabas" (decisión 8).
+> - **Monto mínimo de promociones** sobre todo el pedido (decisión 7); **tienda de solo delivery** no
+>   pregunta el tipo de entrega (decisión 11).
+> - **Modo pruebas:** el cobro de la plataforma está apagado; el panel ya no muestra la cuenta regresiva.
+
 Convenciones como en el Milestone A: **Etapa** y **Embudo** son los del panel de depuración al final del turno. Lo que se evalúa es el **comportamiento** (etapa, herramientas, hechos, pedido, mensajes), no la redacción. Cada turno debe tener **3 mensajes salientes o menos**. Reinicia la conversación antes de cada escenario.
 
 El agente **nunca** debe: decir que el pago está confirmado, calcular un total por su cuenta, ni decir que agregó algo si `gestionar_pedido` no devolvió `hecho`.
