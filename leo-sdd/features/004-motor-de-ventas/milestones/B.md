@@ -257,16 +257,16 @@ Esperado: el agente ofrece **una sola vez** el descuento y llama a `gestionar_pe
 Con un solo FALLA en **Pedido**, **Pago y comprobante** o **Pedidos (panel)**, el milestone no se aprueba.
 
 **Preparación**
-- [ ] El CSV de la tienda importa con 3 filas válidas; las entregas, la promoción 2×1 y el método de pago existen (`1 | 1 | 1`).
+- [ ] `make seed-milestone-b` deja la tienda con 3 productos, entregas, la promoción 2×1 y Yape (o el CSV y el SQL de la sección 2).
 - [ ] Capacita tiene su método Yape; la tienda usa la plantilla `productos`.
-- [ ] La foto del comprobante se ve en el detalle (con `minio` en `hosts`) o el hallazgo de la sección 7.1 queda anotado.
+- [ ] La foto del comprobante se ve en el detalle (con `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` en `.env`).
 
 **Pedido**
 - [ ] Capacita E4: el paquete de 5 con 2 temas queda en PEDIDO con "faltan 3"; con 5 pasa solo a DATOS; el tema libre se acepta.
 - [ ] T1: 2 polos dan subtotal 70.00, descuento 35.00 y total 35.00; con Miraflores el envío es 8.00 y el total 43.00.
 - [ ] T1b: con 2 mochilas el envío es 0.00. T3: 145.00 + Callao 12.00 = 157.00.
 - [ ] El agente nunca calcula, redondea ni cambia un monto; los montos que dice coinciden con el pedido del panel.
-- [ ] Los datos se piden juntos y solo lo que falta; en Capacita no se pide dirección; en la tienda sí (delivery, zona, dirección).
+- [ ] Los datos se piden juntos y solo lo que falta; en Capacita no se pide dirección; en la tienda se piden zona y dirección, pero no "delivery o recojo" (solo hace delivery, decisión 11).
 - [ ] Los datos personales no aparecen en claro en el debug (DNI, correo, teléfono enmascarados).
 
 **Pago y comprobante**
