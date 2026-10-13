@@ -129,6 +129,17 @@ class TestRegister:
         assert membership.role == "owner"
         assert membership.status == "active"
 
+    async def test_the_country_is_stored_on_the_tenant(self, api: AsyncClient, db: Session) -> None:
+        """TASK-450: it decides the prefix of a phone a customer types without one."""
+        response = await api.post(f"{AUTH}/register", json=_payload(country="CO"))
+        default = await api.post(f"{AUTH}/register", json=_payload(country="PE"))
+
+        assert response.status_code == 201
+        colombian = db.get(Tenant, uuid.UUID(response.json()["tenant_id"]))
+        peruvian = db.get(Tenant, uuid.UUID(default.json()["tenant_id"]))
+        assert colombian is not None and colombian.pais == "CO"
+        assert peruvian is not None and peruvian.pais == "PE"
+
     async def test_trial_length_is_read_from_the_plans_row(
         self, api: AsyncClient, db: Session
     ) -> None:
