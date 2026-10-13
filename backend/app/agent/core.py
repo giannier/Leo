@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.catalog_guard import CatalogueGuard, build_catalogue_guard
 from app.agent.formatter import to_whatsapp_markup
-from app.agent.privacy import mask_arguments
+from app.agent.privacy import mask_arguments, redact_registered
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
@@ -47,7 +47,12 @@ from app.providers.llm.base import (
     ToolCall,
 )
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
-from app.repositories.conversation import AgentTraceRepository, MessageRepository
+from app.repositories.channel import ContactRepository
+from app.repositories.conversation import (
+    AgentTraceRepository,
+    ConversationRepository,
+    MessageRepository,
+)
 from app.repositories.product import ProductRepository
 
 logger = logging.getLogger(__name__)
@@ -556,15 +561,33 @@ class AgentCore:
         return output, sources, False
 
     def _history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
-        """Recent turns of this conversation, oldest first."""
+        """Recent turns of this conversation, oldest first.
+
+        A DNI or RUC the customer already registered is replaced by a label
+        (decision 18): the model does not need the number again, and it is
+        personal data that would otherwise travel on every turn.
+        """
         rows = MessageRepository(self._session, self._tenant_id).list_for_conversation(
             conversation_id
         )
         recent = list(rows)[-HISTORY_TURNS:]
+        registered = self._registered_documents(conversation_id)
         return [
-            ChatMessage("user" if message.author == "customer" else "assistant", message.content)
+            ChatMessage(
+                "user" if message.author == "customer" else "assistant",
+                redact_registered(message.content, registered) if registered else message.content,
+            )
             for message in recent
         ]
+
+    def _registered_documents(self, conversation_id: uuid.UUID) -> dict[str, str]:
+        """The DNI and RUC stored for this conversation's customer, if any."""
+        conversation = ConversationRepository(self._session, self._tenant_id).get(conversation_id)
+        if conversation is None or conversation.contact_id is None:
+            return {}
+        contact = ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
+        data = (contact.custom_data or {}) if contact is not None else {}
+        return {key: str(data[key]) for key in ("dni", "ruc") if data.get(key)}
 
     def persist_trace(
         self, *, message: Message, reply: AgentReply, turn: TurnTrace | None = None

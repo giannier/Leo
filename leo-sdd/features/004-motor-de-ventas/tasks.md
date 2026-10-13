@@ -554,7 +554,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: un negocio de otro país no convierte "987654321" a `+51`; Perú sigue igual
   - Parallel: true
 
-- [ ] TASK-451: El DNI o RUC registrado no vuelve al modelo (decisión 18)
+- [x] TASK-451: El DNI o RUC registrado no vuelve al modelo (decisión 18)
   - Input: decisión 18; `conciliacion.md §8.22`
   - Output: cuando un DNI o RUC ya se guardó con `registrar_datos_cliente`, el historial que va al LLM lo
     reemplaza por `[DNI registrado]` / `[RUC registrado]` (al armar el historial, no al guardar el
