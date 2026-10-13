@@ -297,6 +297,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 - [ ] TASK-459: 🧑 Prueba con un número real de WhatsApp por túnel (antes de la Fase 1)
   - Input: sugerencia aceptada por Giannier (2026-10-13); TASK-209 de la 002 (milestone humano pendiente);
     TASK-456 (fixtures reales)
+  - **Preparado (2026-10-13):** la guía `milestones/numero-real.md` ya está escrita; falta ejecutarla.
   - Output: `milestones/numero-real.md`, guía paso a paso para correr Leo en la PC de Giannier (WSL2 o
     contenedor) con un túnel HTTPS (Cloudflare Tunnel o ngrok, herramienta de su PC, no dependencia del
     repo) apuntado a `POST /webhooks/ycloud`, con `YCLOUD_WEBHOOK_SECRET` y el número conectado desde el
@@ -588,7 +589,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: test del pipeline y del historial del pedido
   - Parallel: true
 
-- [ ] TASK-455: Cuentas de prueba de Playwright
+- [x] TASK-455: Cuentas de prueba de Playwright
   - Input: pendiente del Milestone B
   - Output: las cuentas que crean los e2e se borran al terminar o quedan marcadas como de prueba (no
     cuentan en el panel de plataforma)

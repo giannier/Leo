@@ -268,9 +268,17 @@ class PlatformAdminService:
     # ------------------------------------------------------------- tenants
 
     def list_tenants(
-        self, *, search: str | None = None, status: str | None = None, limit: int = 50
+        self,
+        *,
+        search: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        include_test: bool = False,
     ) -> Sequence[Tenant]:
         statement = select(Tenant)
+        if not include_test:
+            # The end-to-end suite's businesses (TASK-455).
+            statement = statement.where(Tenant.es_prueba.is_(False))
         if search:
             statement = statement.where(Tenant.name.ilike(f"%{search}%"))
         if status:
