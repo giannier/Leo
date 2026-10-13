@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal, Protocol
 
 from sqlalchemy.orm import Session
 
@@ -62,6 +62,23 @@ class ReasonRequired(OrderError):
     """Discarding an order the customer paid for needs a reason: the customer is told."""
 
 
+class NoticePreparer(Protocol):
+    """Writes the customer's notice in the decision's transaction (finding E-4).
+
+    `CustomerNotifier` implements it; the review service calls it right before
+    committing, so the decision and the `queued` notice are one commit.
+    """
+
+    def prepare(
+        self,
+        order: Order,
+        kind: NoticeKind,
+        *,
+        siguiente_paso: str | None = None,
+        motivo: str | None = None,
+    ) -> Any: ...
+
+
 @dataclass(frozen=True)
 class ReviewResult:
     """What a decision did, for the response and for the customer's notice."""
@@ -69,15 +86,23 @@ class ReviewResult:
     order: Order
     notice: NoticeKind | None = None
     proof: PaymentProof | None = None
+    # What the notifier prepared (a `PreparedNotice`), to deliver after the commit.
+    prepared: Any = None
 
 
 class OrderReviewService:
     """Confirms, rejects and moves the orders of one tenant."""
 
     def __init__(
-        self, session: Session, tenant_id: uuid.UUID, *, now: datetime | None = None
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        *,
+        now: datetime | None = None,
+        notifier: NoticePreparer | None = None,
     ) -> None:
         self._session = session
+        self._notifier = notifier
         self._tenant_id = tenant_id
         self._fixed_now = now
         self._orders = OrderRepository(session, tenant_id)
@@ -104,8 +129,9 @@ class OrderReviewService:
         self._service.transition(order, "confirmado", user_id=user_id)
         self._audit(user_id, ACTION_CONFIRMED, order, "por_confirmar", "confirmado", proof)
         self._restage(order, REASON_CONFIRM)
+        prepared = self._prepare(order, "pago_confirmado", siguiente_paso=order.siguiente_paso)
         self._session.commit()
-        return ReviewResult(order, "pago_confirmado", proof)
+        return ReviewResult(order, "pago_confirmado", proof, prepared)
 
     # ---------------------------------------------------------------- reject
 
@@ -131,10 +157,10 @@ class OrderReviewService:
         # A receipt rejection leaves the stage in VERIFICACION (waiting -> rejected), so
         # without `force_event` the decision would leave no event at all.
         self._restage(order, REASON_REJECT, force_event=True)
+        kind: NoticeKind = "pago_rechazado" if proof is not None else "pedido_rechazado"
+        prepared = self._prepare(order, kind, motivo=motivo)
         self._session.commit()
-        return ReviewResult(
-            order, "pago_rechazado" if proof is not None else "pedido_rechazado", proof
-        )
+        return ReviewResult(order, kind, proof, prepared)
 
     # ---------------------------------------------------------------- status
 
@@ -179,10 +205,26 @@ class OrderReviewService:
             user_id, ACTION_STATUS, order, before, estado, live[0] if live else None, reason
         )
         self._restage(order, REASON_STATUS)
+        prepared = self._prepare(order, "pedido_anulado", motivo=reason) if live else None
         self._session.commit()
-        return ReviewResult(order, "pedido_anulado" if live else None, live[0] if live else None)
+        return ReviewResult(
+            order, "pedido_anulado" if live else None, live[0] if live else None, prepared
+        )
 
     # --------------------------------------------------------------- helpers
+
+    def _prepare(
+        self,
+        order: Order,
+        kind: NoticeKind,
+        *,
+        siguiente_paso: str | None = None,
+        motivo: str | None = None,
+    ) -> Any:
+        if self._notifier is None:
+            return None
+        self._session.flush()
+        return self._notifier.prepare(order, kind, siguiente_paso=siguiente_paso, motivo=motivo)
 
     def _lock(self, order_id: uuid.UUID) -> Order:
         order = self._orders.get_for_update(order_id)

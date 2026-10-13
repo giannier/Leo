@@ -571,7 +571,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: tests de cada gate y del perfil gratuito: ninguna llamada a `read_image`
   - Parallel: true
 
-- [ ] TASK-453: Outbox transaccional del aviso al cliente (hallazgo E-4)
+- [x] TASK-453: Outbox transaccional del aviso al cliente (hallazgo E-4)
   - Input: revisión, E-4
   - Output: la fila del aviso (`queued`) se escribe en la misma transacción que confirmar, rechazar o
     anular; el worker la envía. Si el proceso muere después del commit, el aviso igual sale

@@ -21,12 +21,14 @@ import logging
 import re
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
 from sqlalchemy.orm import Session
 
 from app.models.channel import Contact
+from app.models.conversation import Message
 from app.models.orders import Order
 from app.orders.notices import OrderNotices
 from app.orders.review import NoticeKind
@@ -66,6 +68,16 @@ def render_system_message(template: str, values: Mapping[str, str | None]) -> st
     text = re.sub(r"\s+([.,;:!?])", r"\1", text).strip()
     # The first letter after an opening mark or at the start is a capital again.
     return re.sub(r"^([¡¿]?)([a-záéíóúñ])", lambda m: m.group(1) + m.group(2).upper(), text)
+
+
+@dataclass(frozen=True)
+class PreparedNotice:
+    """A notice written in the decision's transaction, still to be handed over."""
+
+    order: Order
+    outcome: CustomerNotice
+    # The `queued` row to send; None when there is nothing to send now.
+    message: Message | None = None
 
 
 class CustomerNotifier:
@@ -110,15 +122,21 @@ class CustomerNotifier:
             },
         )
 
-    async def notify(
+    def prepare(
         self,
         order: Order,
         kind: NoticeKind,
         *,
         siguiente_paso: str | None = None,
         motivo: str | None = None,
-    ) -> CustomerNotice:
-        """Tell the customer. Commits what it writes; never raises for a failed send."""
+    ) -> PreparedNotice:
+        """Write the notice **in the caller's transaction** (finding E-4: outbox).
+
+        Called before the decision commits, so the decision and its notice are
+        one commit: if the process dies right after it, the `queued` row is
+        there and `retry_stranded_replies` sends it. Nothing is sent here and
+        nothing is committed.
+        """
         conversation = ConversationRepository(self._session, self._tenant_id).get(
             order.conversation_id
         )
@@ -128,7 +146,7 @@ class CustomerNotifier:
             else None
         )
         if conversation is None or contact is None:
-            return "no_enviado"
+            return PreparedNotice(order, "no_enviado")
         text = self.text_for(
             order, kind, contact=contact, siguiente_paso=siguiente_paso, motivo=motivo
         )
@@ -140,12 +158,12 @@ class CustomerNotifier:
                 author="system",
                 content=text,
             )
-            self._session.commit()
-            return "enviado"
+            return PreparedNotice(order, "enviado")
 
         if not session_window_is_open(contact, now=datetime.now(UTC)):
-            self._tell_business(order, "ventana_cerrada")
-            return "ventana_cerrada"
+            if self._notices is not None:
+                self._notices.customer_not_notified(order, "ventana_cerrada")
+            return PreparedNotice(order, "ventana_cerrada")
 
         message = self._messages.append(
             conversation_id=conversation.id,
@@ -154,7 +172,16 @@ class CustomerNotifier:
             content=text,
             delivery_status="queued",
         )
-        self._session.commit()
+        return PreparedNotice(order, "enviado", message)
+
+    async def deliver(self, prepared: PreparedNotice) -> CustomerNotice:
+        """Hand a prepared notice to the provider, after the decision committed.
+
+        Never raises for a failed send. If this never runs, the sweep sends it.
+        """
+        if prepared.message is None:
+            return prepared.outcome
+        order = prepared.order
         sender = ReplySender(
             self._session,
             self._tenant_id,
@@ -162,7 +189,7 @@ class CustomerNotifier:
             max_attempts=self._max_attempts,
         )
         try:
-            sent = await sender.send(message)
+            sent = await sender.send(prepared.message)
         except SessionWindowClosed:
             self._tell_business(order, "ventana_cerrada")
             return "ventana_cerrada"
@@ -179,6 +206,19 @@ class CustomerNotifier:
             self._tell_business(order, "envio_fallido")
             return "no_enviado"
         return "enviado"
+
+    async def notify(
+        self,
+        order: Order,
+        kind: NoticeKind,
+        *,
+        siguiente_paso: str | None = None,
+        motivo: str | None = None,
+    ) -> CustomerNotice:
+        """Prepare, commit and deliver in one call, for a decision already committed."""
+        prepared = self.prepare(order, kind, siguiente_paso=siguiente_paso, motivo=motivo)
+        self._session.commit()
+        return await self.deliver(prepared)
 
     def _tell_business(
         self, order: Order, reason: Literal["ventana_cerrada", "envio_fallido"]
