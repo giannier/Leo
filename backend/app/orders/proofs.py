@@ -43,12 +43,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.orm import Session
 
 from app.agent.tools.shared import CURRENCY_SYMBOLS, money
+from app.core.config import get_settings
 from app.models.business import BusinessProfile
 from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order, PaymentProof
 from app.orders.service import OrderError, OrderService
-from app.orders.vision import ProofReading, read_proof
+from app.orders.vision import ProofReading, read_proof, unreadable
 from app.process.facts import missing_customer_data
 from app.process.service import ProcessConfigService
 from app.providers.llm.base import LLMProvider
@@ -164,8 +165,15 @@ class ProofPipeline:
         image: ReceivedImage,
         *,
         message_id: uuid.UUID | None = None,
+        read: bool = True,
     ) -> ProofOutcome:
-        """Record one image as a payment proof if it is one."""
+        """Record one image as a payment proof if it is one.
+
+        `read=False` (the conversation is paused, handed to a person or the
+        customer opted out: hallazgo P-1) stores the image for the operator
+        without sending it to any model. So does a platform whose vision is not
+        approved (`VISION_ENABLED=false`).
+        """
         order = self._orders.active_for(conversation.id)
         if order is None or order.estado != "borrador" or order.modalidad_pago != "previo":
             # No order to pay, one already waiting, or cash on delivery: a receipt
@@ -187,7 +195,12 @@ class ProofPipeline:
                 order=order,
             )
 
-        reading = await read_proof(self._llm, image.data, image.mime_type)
+        if not read:
+            reading = unreadable("revision_humana")
+        elif not get_settings().vision_enabled:
+            reading = unreadable("vision_no_aprobada")
+        else:
+            reading = await read_proof(self._llm, image.data, image.mime_type)
         if reading.legible and not reading.es_comprobante:
             return ProofOutcome(
                 "no_comprobante",

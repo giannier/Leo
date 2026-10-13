@@ -200,7 +200,12 @@ class TurnPipeline:
         patch, turn = self._read_inbound(inbound, facts, config, now)
         proof_made = False
         if inbound.images and self._expects_proof(stage_previa, facts):
-            turn, proof_made = await self._read_proofs(conversation, inbound.images, turn)
+            # A receipt that arrives while the bot is quiet (paused, handed over,
+            # opted out) is stored for a person without reaching any model (P-1).
+            quiet = self._gate(conversation, facts, now) is not None
+            turn, proof_made = await self._read_proofs(
+                conversation, inbound.images, turn, read=not quiet
+            )
         version = state.version
         if patch:
             version = self._save(conversation_id, stage_before, funnel_before, patch, version)
@@ -389,7 +394,12 @@ class TurnPipeline:
         )
 
     async def _read_proofs(
-        self, conversation: Conversation, images: tuple[InboundImage, ...], turn: TurnContext
+        self,
+        conversation: Conversation,
+        images: tuple[InboundImage, ...],
+        turn: TurnContext,
+        *,
+        read: bool = True,
     ) -> tuple[TurnContext, bool]:
         """Step 4, images: run each through the proof pipeline.
 
@@ -407,7 +417,7 @@ class TurnPipeline:
                 lines.append(IMAGE_UNREADABLE_LINE)
                 continue
             outcome: ProofOutcome = await self._proofs.handle(
-                conversation, received, message_id=image.message_id
+                conversation, received, message_id=image.message_id, read=read
             )
             recorded = recorded or outcome.kind == "registrado"
             if outcome.context:
