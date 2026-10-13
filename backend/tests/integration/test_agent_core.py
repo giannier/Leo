@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.agent.core import (
     CATALOG_GUARD_REPLY,
     FALLBACK_REPLY,
+    MAX_TOOL_ROUNDS,
     AgentCore,
     _usable_answer,
 )
@@ -177,6 +178,47 @@ class TestToolLoop:
         assert len(llm.chat_calls) == 3
         assert llm.chat_calls[-1].tools == ()
         assert reply.content
+
+    async def test_three_tool_rounds_are_allowed_and_each_call_records_its_round(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        """Search, add and register the customer's data fit in one turn (Milestone B)."""
+        llm = MockLLMProvider(
+            responses=[
+                ChatResult(
+                    content="", tool_calls=(_tool_call("consultar_catalogo", consulta="a"),)
+                ),
+                ChatResult(
+                    content="", tool_calls=(_tool_call("consultar_catalogo", consulta="b"),)
+                ),
+                ChatResult(
+                    content="", tool_calls=(_tool_call("consultar_catalogo", consulta="c"),)
+                ),
+                ChatResult(content="Listo."),
+            ]
+        )
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="hola"
+        )
+
+        assert MAX_TOOL_ROUNDS == 3
+        assert len(llm.chat_calls) == 4
+        assert [entry["ronda"] for entry in reply.tools_called] == [1, 2, 3]
+        assert reply.tool_rounds == 3
+        assert reply.content == "Listo."
+
+    async def test_a_turn_that_answers_straight_away_used_no_round(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        llm = MockLLMProvider(responses=[ChatResult(content="Hola.")])
+
+        reply = await AgentCore(db, tenant.id, llm=llm).respond(
+            conversation_id=conversation.id, customer_message="hola"
+        )
+
+        assert reply.tool_rounds == 0
+        assert reply.tools_called == []
 
     async def test_an_unknown_tool_is_reported_not_fatal(
         self, db: Session, tenant: Tenant, conversation: Conversation

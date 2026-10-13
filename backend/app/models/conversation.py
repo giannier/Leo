@@ -153,7 +153,7 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
         PgUUID(as_uuid=True), ForeignKey("messages.id"), nullable=False
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
-    # [{"tool": ..., "args_resumen": ..., "ok": ..., "cached": ...}]
+    # [{"tool": ..., "args_resumen": ..., "ok": ..., "cached": ..., "ronda": 1..N}]
     tools_called: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )
