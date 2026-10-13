@@ -172,6 +172,11 @@ class Settings(BaseSettings):
 
     # Object storage (S3-compatible / MinIO in dev)
     s3_endpoint_url: str | None = "http://localhost:9000"
+    # Base URL a browser can reach the object store on. Signed links (receipt
+    # photos, library files) are built with this host; empty means "same as
+    # `s3_endpoint_url`". Needed whenever the backend reaches storage on an
+    # in-network name (`minio:9000`) the browser cannot resolve.
+    s3_public_endpoint_url: str | None = None
     s3_access_key: str = "leo-minio"
     s3_secret_key: str = "leo-minio-secret"
     s3_bucket: str = "leo-storage"

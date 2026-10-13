@@ -211,3 +211,29 @@ class TestPresignedUrls:
 
         with pytest.raises(StorageError, match=KEY):
             provider.presigned_url(KEY)
+
+
+class TestPublicEndpoint:
+    def test_links_are_signed_for_the_public_host_not_the_internal_one(self) -> None:
+        provider = S3StorageProvider(
+            bucket=BUCKET,
+            endpoint_url="http://minio:9000",
+            public_endpoint_url="https://files.example.test",
+            access_key="key",
+            secret_key="secret",
+        )
+
+        url = provider.presigned_url(KEY, expires_in=60)
+
+        assert url.startswith("https://files.example.test/")
+        assert "minio" not in url
+
+    def test_without_a_public_endpoint_links_use_the_internal_one(self) -> None:
+        provider = S3StorageProvider(
+            bucket=BUCKET,
+            endpoint_url="http://minio:9000",
+            access_key="key",
+            secret_key="secret",
+        )
+
+        assert provider.presigned_url(KEY).startswith("http://minio:9000/")

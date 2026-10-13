@@ -51,6 +51,7 @@ def build_storage_provider() -> S3StorageProvider:
     return S3StorageProvider(
         bucket=settings.s3_bucket,
         endpoint_url=settings.s3_endpoint_url,
+        public_endpoint_url=settings.s3_public_endpoint_url,
         access_key=settings.s3_access_key,
         secret_key=settings.s3_secret_key,
         region=settings.s3_region,
