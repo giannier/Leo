@@ -1,4 +1,4 @@
-.PHONY: admin reindex simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: admin reindex seed-milestone-b simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -51,6 +51,9 @@ admin: ## Grant platform-admin rights. EMAIL=tu@correo.com [ARGS=--revoke]
 
 reindex: ## Re-embed knowledge whose vectors came from another model. ARGS=--dry-run to preview.
 	uv run --directory backend python -m scripts.reindex_knowledge $(ARGS)
+
+seed-milestone-b: ## Load the Milestone B test data (Tienda Demo, Yape for Capacita). Runs in the backend container.
+	$(COMPOSE) exec backend python -m scripts.seed_milestone_b
 
 simulate-trial: ## Walk a tenant through a whole 14-day trial in seconds.
 	uv run --directory backend python -m scripts.simulate_trial
