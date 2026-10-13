@@ -13,7 +13,7 @@ Este milestone demuestra el ciclo completo de una venta: el cliente arma el pedi
 - Migraciones al día: la base debe estar en la revisión `0027`
   (`docker compose -f deploy/docker-compose.dev.yml exec backend alembic upgrade head`).
 - El **Milestone A aprobado** y el tenant `Escuela Capacita` tal como quedó (catálogo de 11 productos, plantilla `certificaciones`, recursos `saludo` y `flyer_paquetes`). Este milestone lo reutiliza.
-- **Cada mensaje del simulador y cada comprobante son llamadas reales a un modelo de pago.** El stack corre con `LLM_PROFILE=openai`. No se corrieron los evals (`make evals`) con estos cambios.
+- **Cada mensaje del simulador y cada comprobante son llamadas reales a un modelo de pago.** El stack corre con `LLM_PROFILE=openai`. Los evals (`make evals`) se corrieron el 2026-10-13 sobre `AgentCore` (ver el resultado al final del documento), pero **no cubren** el pipeline por etapas, la revisión del comprobante ni la visión: ese flujo solo lo mides tú en estos escenarios.
 - **Para ver la foto del comprobante en el panel:** pon `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` en tu
   `.env` (decisión del milestone, commit `d70cc35`). Ya no hace falta tocar el archivo `hosts`.
 - Tres imágenes de prueba (PNG, JPEG o WebP, menos de 5 MB):
@@ -317,7 +317,7 @@ Anota debajo cualquier falla con el escenario, el turno y una captura del debug 
 | **API y panel de configuración** (información del negocio, entregas, promociones, proceso, mensajes del sistema, multimedia) | TASK-434 a 441 | Entregas, promociones, contra entrega y textos de aviso se cargan por SQL. |
 | **Edición del pedido por el operador, envío de mensajes libres desde el panel, exportar** | No planeado en esta feature | Pedidos solo confirma, rechaza y cambia estado. |
 | **Historial de estados propio** | Desvío de §8.25: se arma desde auditoría y comprobantes | Los cambios que haga el sistema (descarte automático) no aparecerán hasta existir su job. |
-| **Evals del motor nuevo** | TASK-447 | No se corrieron con estos cambios; hay un pendiente de PR. |
+| **Evals del motor nuevo** | TASK-447 | Corrida del 2026-10-13 en verde sobre `AgentCore` (commit `32e6787`); los flujos de venta por etapas, VERIFICACION y la visión siguen sin evals; hay un pendiente de PR. |
 | **Dashboard con ventas** | Feature 010 | Las tarjetas de Pedidos son solo un resumen del periodo. |
 
 ---
