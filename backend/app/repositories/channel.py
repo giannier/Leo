@@ -18,6 +18,7 @@ structural - there is no method here that can be called without one.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -35,6 +36,8 @@ from app.models.channel import (
 )
 from app.models.conversation import Message
 from app.repositories.base import BaseRepository, TenantScopeError
+
+logger = logging.getLogger(__name__)
 
 
 class ContactRepository(BaseRepository[Contact]):
@@ -71,7 +74,8 @@ class ContactRepository(BaseRepository[Contact]):
         two rows of the same person that this method does not merge (merging
         would move conversations and orders). The BSUID contact wins and the
         phone is not attached to it, which would violate the phone's unique
-        index.
+        index. Each row is marked with the other's id (`posible_duplicado_de`)
+        so the operator sees it (Milestone B, decision 12).
 
         The profile name is only overwritten when the provider actually sent
         one. WhatsApp omits the field for people who have not set a name, and
@@ -92,6 +96,8 @@ class ContactRepository(BaseRepository[Contact]):
             )
 
         changed = False
+        if by_user is not None and by_phone is not None and by_user.id != by_phone.id:
+            changed = _mark_duplicates(by_user, by_phone) or changed
         if external_user_id and contact.external_user_id is None:
             contact.external_user_id = external_user_id
             changed = True
@@ -290,3 +296,24 @@ class MessageStatusEventRepository:
             .order_by(MessageStatusEvent.provider_ts, MessageStatusEvent.created_at)
         )
         return self._session.execute(statement).scalars().all()
+
+
+def _mark_duplicates(one: Contact, other: Contact) -> bool:
+    """Point two rows of one person at each other; True if anything changed.
+
+    A mark already set is kept: it names the first duplicate found, which is
+    enough for the operator to look.
+    """
+    changed = False
+    if one.posible_duplicado_de is None:
+        one.posible_duplicado_de = other.id
+        changed = True
+    if other.posible_duplicado_de is None:
+        other.posible_duplicado_de = one.id
+        changed = True
+    if changed:
+        logger.warning(
+            "a BSUID and a phone matched two contacts; marked, not merged",
+            extra={"tenant_id": str(one.tenant_id)},
+        )
+    return changed

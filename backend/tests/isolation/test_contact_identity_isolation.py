@@ -105,6 +105,9 @@ class TestUpsertByWhicheverIdentifierArrives:
         assert resolved.phone_e164 is None
         phone_contact = contacts.by_phone(SHARED_CUSTOMER_PHONE)
         assert phone_contact is not None and phone_contact.id == tenant_a.contact_id
+        # Not merged, but marked for the operator (Milestone B, decision 12).
+        assert resolved.posible_duplicado_de == phone_contact.id
+        assert phone_contact.posible_duplicado_de == resolved.id
 
     def test_a_missing_name_does_not_erase_a_known_one(
         self, db: Session, tenant_a: TenantFixture

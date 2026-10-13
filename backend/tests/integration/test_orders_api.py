@@ -42,6 +42,7 @@ from app.providers.whatsapp.base import (
     SendResult,
     WhatsAppTransientError,
 )
+from app.repositories.channel import ContactRepository
 from app.repositories.notification import TenantNotificationRepository
 from app.repositories.orders import PaymentProofRepository
 from tests.integration.test_team import (
@@ -426,6 +427,22 @@ class TestListAndSummary:
 
 
 class TestDetail:
+    async def test_a_customer_with_two_contacts_is_marked(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        """Milestone B, decision 12: a BSUID and a phone of two contacts."""
+        account, headers = await _owner(api, mail)
+        tid = uuid.UUID(account["tenant_id"])
+        order, _ = seed_order(db, account["tenant_id"], phone="+51987650001")
+        other = ContactRepository(db, tid).upsert(external_user_id="PE.bsuid-dup")
+        ContactRepository(db, tid).upsert("+51987650001", external_user_id="PE.bsuid-dup")
+        db.commit()
+
+        detail = (await api.get(f"{ORDERS}/{order.id}", headers=headers)).json()
+
+        assert detail["cliente_posible_duplicado"] is True
+        assert other.posible_duplicado_de == order.contact_id
+
     async def test_it_shows_everything_the_operator_needs(
         self, api: AsyncClient, mail: Any, db: Session
     ) -> None:

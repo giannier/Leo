@@ -1818,6 +1818,8 @@ export interface components {
             rechazo_vigente: boolean;
             /** Devolucion Pendiente */
             devolucion_pendiente: boolean;
+            /** Cliente Posible Duplicado */
+            cliente_posible_duplicado: boolean;
             /** Siguiente Paso */
             siguiente_paso: string | null;
             /** Es Sandbox */
