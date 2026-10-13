@@ -143,6 +143,7 @@ class StateRepo:
         reason: str,
         expected_version: int,
         snapshot: Mapping[str, Any] | None = None,
+        force_event: bool = False,
     ) -> SaveResult:
         """Write the stage, the funnel column and a patch of the stored facts.
 
@@ -154,6 +155,10 @@ class StateRepo:
         on, the save is retried once on top of the fresh row - the patch is the
         caller's intent and is re-applied - and raises `StateConflict` if it
         collides again.
+
+        `force_event` records the event even when neither the stage nor the funnel
+        column moved. An operator's decision (rejecting a receipt leaves the stage in
+        VERIFICACION) is part of the history whether or not the stage changed.
         """
         patch = dict(facts_patch or {})
         unknown = set(patch) - STORED_KEYS
@@ -174,6 +179,7 @@ class StateRepo:
                 reason=reason,
                 version=version,
                 snapshot=snapshot,
+                force_event=force_event,
             )
             if written is not None:
                 state, event = written
@@ -211,6 +217,7 @@ class StateRepo:
         reason: str,
         version: int,
         snapshot: Mapping[str, Any] | None,
+        force_event: bool = False,
     ) -> tuple[ConversationState, ConversationStageEvent | None] | None:
         """One attempt: None means the version moved and nothing was written."""
         current = self._read_fresh(conversation_id)
@@ -247,7 +254,7 @@ class StateRepo:
             return None
 
         event: ConversationStageEvent | None = None
-        if changed:
+        if changed or force_event:
             event = self._events.add(
                 conversation_id=conversation_id,
                 from_stage=before[0],

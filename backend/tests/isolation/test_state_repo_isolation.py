@@ -257,6 +257,23 @@ class TestNotDuplicatingEvents:
 
         assert stayed.stage_entered_at == entered
 
+    def test_a_forced_event_is_written_even_when_the_stage_did_not_move(
+        self, db: Session, tenant_a: TenantFixture
+    ) -> None:
+        """Rejecting a receipt leaves VERIFICACION where it is, and the decision is history."""
+        repo = self._ready(db, tenant_a)
+        moved = _save(repo, tenant_a, version=1, reason="comprobante").state
+        entered = moved.stage_entered_at
+
+        forced = _save(repo, tenant_a, version=2, reason="operador:rechazar", force_event=True)
+
+        assert forced.event is not None
+        assert [event.reason for event in _events(db, tenant_a)] == [
+            "comprobante",
+            "operador:rechazar",
+        ]
+        assert forced.state.stage_entered_at == entered
+
     def test_a_stale_save_to_the_stage_someone_else_reached_adds_no_event(
         self, db: Session, tenant_a: TenantFixture
     ) -> None:

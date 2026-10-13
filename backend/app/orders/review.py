@@ -113,7 +113,9 @@ class OrderReviewService:
             order, "borrador", motivo=motivo, rechazo_vigente=proof is not None
         )
         self._audit(user_id, ACTION_REJECTED, order, "por_confirmar", "borrador", proof, motivo)
-        self._restage(order, REASON_REJECT)
+        # A receipt rejection leaves the stage in VERIFICACION (waiting -> rejected), so
+        # without `force_event` the decision would leave no event at all.
+        self._restage(order, REASON_REJECT, force_event=True)
         self._session.commit()
         return ReviewResult(
             order, "pago_rechazado" if proof is not None else "pedido_rechazado", proof
@@ -157,13 +159,19 @@ class OrderReviewService:
         proof = self._proofs.latest_for_order(order.id)
         return proof if proof is not None and proof.estado == "por_verificar" else None
 
-    def _restage(self, order: Order, reason: str) -> None:
+    def _restage(self, order: Order, reason: str, *, force_event: bool = False) -> None:
         conversation = ConversationRepository(self._session, self._tenant_id).get(
             order.conversation_id
         )
         if conversation is not None:
             self._session.flush()
-            recompute_stage(self._session, self._tenant_id, conversation, reason=reason)
+            recompute_stage(
+                self._session,
+                self._tenant_id,
+                conversation,
+                reason=reason,
+                force_event=force_event,
+            )
 
     def _audit(
         self,
