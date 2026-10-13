@@ -12,6 +12,7 @@ from app.models.business import (
     BusinessProfile,
     PaymentMethodBusiness,
     Product,
+    ProductCategory,
 )
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
@@ -59,6 +60,7 @@ __all__ = [
     "Plan",
     "ProcessStageOverride",
     "Product",
+    "ProductCategory",
     "Promotion",
     "RefreshToken",
     "Tenant",
