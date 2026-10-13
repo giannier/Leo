@@ -36,6 +36,9 @@ aquí antes de implementar; el plan y las tasks ya las asumen.
 **Registrado por:** Claude — por ratificar
 
 ## C-05: Plantillas en código, textos en base de datos
+> **Superada (2026-10-13) por la 017, C-01 y C-04:** el negocio ya no edita las instrucciones de etapa;
+> las apaga regla por regla. Las reglas de plantilla y rubro viven en base de datos versionadas y solo
+> las edita la plataforma. `process_stage_overrides` se elimina en TASK-460.
 **Situación:** Si el orden de etapas se pudiera editar desde el panel, un cliente podría romper su propio proceso.
 **Decisión:**
 - El **orden, las condiciones, las herramientas por etapa y la columna del embudo** viven en código, versionados por plantilla.

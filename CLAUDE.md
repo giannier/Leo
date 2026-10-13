@@ -16,6 +16,12 @@
 006-conocimiento-avanzado → 007-conversaciones-inbox → 009-billing → 010-dashboard
 (005-catalog y 08-inbox están absorbidos por 001/004 y 007 respectivamente.)
 
+### Secuencia acordada (Giannier, 2026-10-13)
+Milestone B de la 004 → prueba con número real por túnel (TASK-459) → Fase C de la 004 = Fase 1 de la 017
+(capas y situaciones) → Fases D y E de la 004 → 007 → despliegue en VPS con número real → piloto del
+holding → 017 Fases 2 a 4. Dónde quedan 006, 009 y 010 está pendiente de confirmar (ver
+`017/clarifications.md` C-05).
+
 ## Fase 2 (post-MVP) — solo tras cerrar el MVP y con ratificación de Giannier por feature
 011-campanas → 012-crm-leads → 013-analytics-csat → (014-citas o 016-pedidos-delivery,
 según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-mvp/README.md`.
@@ -33,6 +39,29 @@ según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-
 - Commits: Conventional Commits + `[TASK-XXX]`. Un commit por task como mínimo.
 
 ## Glosario
+Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/features/017-configuracion-en-capas/`).
+- **Plantilla de proceso**: **cómo** se vende. `productos`, `certificaciones` o `servicios`. Etapas,
+  condiciones, herramientas y embudo en código (`process/templates/`); sus **reglas** en base de datos,
+  versionadas (`catalog_versions` kind `proceso`, `catalog_rules`).
+- **Rubro**: **qué** se sabe del negocio típico (`business_profiles.industry` → `rubros`): reglas, preguntas
+  frecuentes, objeciones y situaciones sugeridas, versionadas (`catalog_versions` kind `rubro`). Sugiere
+  una plantilla de proceso; el negocio puede cambiarla. "Mismo rubro" no es "misma plantilla".
+- **Perfil del negocio**: lo que el negocio llena por formulario (`business_profiles`, `agent_configs`,
+  `business_info`, `payment_methods_business`, `promotions`). Nunca texto libre de reglas.
+- **Situación**: regla propia de un negocio, una tarjeta (`situations`): cuándo aplica, qué hace el
+  agente y opcionales (archivos, derivar, ejemplo, etapas, "siempre"). Estados borrador, activa, inactiva.
+- **Regla** (de plantilla o de rubro): una instrucción con id estable (`rule_key`). El negocio la
+  **apaga** (`tenant_rule_switches`), nunca la edita.
+- **Prioridad entre capas**: situación > perfil del negocio > rubro > plantilla de proceso.
+- **Novedades**: reglas nuevas de una versión publicada de plantilla o rubro; llegan activas salvo las
+  apagadas, y el revisor ve el aviso (`tenant_catalog_seen`).
+- **Revisor**: permiso por miembro del negocio (`tenant_users.puede_revisar`), no un rol. Aprueba lo que
+  el agente aprende. Hoy es Giannier en las empresas del holding.
+- **Sugerencia**: algo que el agente propone aprender (situación, ejemplo o dato); nada se aplica sin el
+  revisor (`suggestions`, Fase 3).
+- **Ejemplo ganador**: conversación de una venta confirmada, anonimizada, aprobada como ejemplo (en lote).
+- **Perfil de estilo**: cómo escribe el vendedor real, sacado de sus mensajes escritos (Fase 2).
+- **Operador de plataforma (Zentek360)**: mantiene y publica plantillas y rubros, con evals obligatorios.
 - `consultar_catalogo`: nombre viejo de la tool de catálogo (agente previo a la 004). En el registry por
   etapa es solo un **alias** de `buscar_productos` (no aparece en las tools que ve el modelo); el
   contrato usa `buscar_productos` y `ver_producto`. Ratificado por Giannier (Milestone B, decisión 6;

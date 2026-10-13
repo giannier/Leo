@@ -1,7 +1,6 @@
 # Mapeo del brief contra el repo — 017 Configuración en capas y aprendizaje
 
-**Estado:** borrador para Giannier. Pasos 1 y 2 de las instrucciones del brief. La spec, el plan y las
-tasks (paso 4) y el glosario del `CLAUDE.md` (paso 5) se escriben **después** de tu confirmación (paso 3).
+**Estado:** respondido por Giannier el 2026-10-13 (ver `clarifications.md`). Spec, plan y tasks escritos.
 Medido sobre `feat/004-motor-de-ventas` al 2026-10-13.
 
 Leyenda: ✅ existe · 🟡 existe a medias · 🆕 nuevo.

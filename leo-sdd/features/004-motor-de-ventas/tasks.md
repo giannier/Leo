@@ -285,84 +285,203 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Giannier lo recorre en el simulador y confirma desde Pedidos
   - Parallel: false
 
-## Fase C · Configuración
+## Fase C · Configuración en capas (Fase 1 de la 017)
 
-> **Antes de empezar la Fase C (Giannier, Milestone B):** Giannier entrega un brief nuevo de
-> configuración en capas y aprendizaje. No se empieza ninguna task de esta fase sin leerlo. El primer
-> paso es mapear TASK-434 a TASK-442 contra las capas "plantilla del rubro" y "perfil del negocio" y
-> proponerle los ajustes.
+> **Reemplazada por la Fase 1 de la feature 017** (Giannier, 2026-10-13; `017-configuracion-en-capas/`).
+> Cuatro capas: plantilla de proceso → rubro → perfil del negocio → situaciones; gana la más específica.
+> El negocio **apaga** reglas de plantilla y rubro, no las edita; sus reglas propias son **situaciones**.
+> Diseño en `017/plan.md`; decisiones en `017/clarifications.md`.
+> **No se empieza hasta que Giannier apruebe el Milestone B (TASK-433)**, y la primera task es la prueba
+> con número real por túnel (TASK-459).
 
-- [ ] TASK-434: API de información del negocio, FAQ y promociones
-  - Input: `contracts/api.md §1`
-  - Output: routers; las FAQ se indexan como `knowledge_source` de tipo `faq`; borrar una FAQ borra su fuente
+- [ ] TASK-459: 🧑 Prueba con un número real de WhatsApp por túnel (antes de la Fase 1)
+  - Input: sugerencia aceptada por Giannier (2026-10-13); TASK-209 de la 002 (milestone humano pendiente);
+    TASK-456 (fixtures reales)
+  - Output: `milestones/numero-real.md`, guía paso a paso para correr Leo en la PC de Giannier (WSL2 o
+    contenedor) con un túnel HTTPS (Cloudflare Tunnel o ngrok, herramienta de su PC, no dependencia del
+    repo) apuntado a `POST /webhooks/ycloud`, con `YCLOUD_WEBHOOK_SECRET` y el número conectado desde el
+    panel; guion de prueba (texto, botón, lista, imagen de comprobante, pedido completo, confirmación
+    desde Pedidos, ventana de 24 h, referral de anuncio si es posible); medición del p95 de respuesta;
+    captura de los webhooks reales que reemplazan los fixtures escritos a mano (cierra TASK-456) y
+    corrección de lo que falle
+  - Depends on: TASK-433
+  - Verification: Giannier completa el guion con su número; la suite pasa con los fixtures reales;
+    TASK-209 de la 002 queda cerrada
+  - Parallel: false
+
+- [ ] TASK-460: Catálogo versionado de plantillas y rubros
+  - Input: `017/plan.md` (modelo de datos), C-01, C-03, C-04 de la 017
+  - Output: migraciones de `catalog_versions`, `catalog_rules`, `catalog_faqs`, `catalog_objections`,
+    `catalog_suggested_situations` y `rubros`; migración de datos que parte los textos de etapa de
+    `process/templates/*` en reglas con `rule_key` estable (proceso v1 publicada); rubros v1 de los seis
+    rubros (reglas, 5 FAQ, 5 objeciones, 3 a 5 situaciones sugeridas, plantilla sugerida) para que
+    Giannier los revise; se elimina `process_stage_overrides`
+  - Depends on: TASK-459
+  - Verification: el prompt de cada etapa armado desde la BD es idéntico al de hoy (snapshots); una
+    versión publicada no se puede modificar
+  - Parallel: false
+
+- [ ] TASK-461: Resolución de capas e interruptores
+  - Input: `017/plan.md` (resolución de capas), C-04, C-09 de la 017
+  - Output: `process/layers.py` (`LayerResolver`), `tenant_rule_switches`, `tenant_catalog_seen` (aviso
+    de novedades) y la caché invalidada al publicar o al cambiar un interruptor; FAQ y objeciones del
+    rubro indexadas como conocimiento de tipo `rubro`; `tenant_users.puede_revisar` (dueño por defecto)
+  - Depends on: TASK-460
+  - Verification: una regla apagada no llega al prompt; una versión nueva trae sus reglas activas y
+    respeta las apagadas; el aviso aparece hasta marcarse visto; tests de aislamiento
+  - Parallel: false
+
+- [ ] TASK-434: API de información del negocio, FAQ, promociones y perfil
+  - Input: `contracts/api.md §1`, RF-010 de la 017
+  - Output: routers; las FAQ se indexan como `knowledge_source` de tipo `faq`; borrar una FAQ borra su
+    fuente. Perfil por formulario: tratamiento (tú o usted), emojis, saludo, política de descuentos.
+    Cuentas de cobro con titular (hallazgo D-1): `ProofPipeline(payees=...)` compara el destinatario.
+    Gestión de categorías del catálogo (decisión 13)
   - Depends on: TASK-403
-  - Verification: tests de API y aislamiento; `consultar_conocimiento` encuentra una FAQ recién creada
-  - Parallel: true (desde que termina la Fase A)
-  - **Agregado en el Milestone B (hallazgo D-1):** las cuentas de cobro del negocio (Yape/Plin, banco,
-    titular) son un campo del perfil del negocio. Con ellas `ProofPipeline(payees=...)` compara el
-    destinatario de cada comprobante de verdad (`destinatario_distinto`); hoy, sin cuentas, todo
-    comprobante sale `destinatario_no_verificado`. La gestión de categorías (renombrar, ordenar,
-    apagar; tabla de la decisión 13) entra en el panel de catálogo de esta fase.
+  - Verification: tests de API y aislamiento; `consultar_conocimiento` encuentra una FAQ recién creada; un
+    comprobante con el titular configurado sale sin `destinatario_no_verificado`
+  - Parallel: true
 
-- [ ] TASK-435: API de comportamiento y proceso
-  - Input: `contracts/api.md §1–§2`, C-05
-  - Output: behavior (con límite por plan), templates, process (opciones validadas contra el schema de la plantilla), stages (editar y restaurar, `hay_texto_nuevo`), prompt-preview; caché por tenant invalidada al guardar
-  - Depends on: TASK-404, TASK-414
-  - Verification: un nivel fuera del plan da 403 (hoy solo la prueba gratis, que solo permite `economico`: Milestone B, decisión 4); restaurar devuelve el texto por defecto; tras guardar, el siguiente mensaje del simulador usa el cambio
+- [ ] TASK-462: Situaciones
+  - Input: RF-006, RF-011, RF-013 de la 017
+  - Output: tabla `situations` con embedding; repositorio y API (crear, editar, borrador, activar,
+    desactivar, desde sugerida del rubro); embedding calculado por el worker al guardar; migración de
+    `agent_configs.restrictions` a una situación por negocio (origen `migrada`) y baja de la columna
+  - Depends on: TASK-461
+  - Verification: tests de API y aislamiento; un borrador no es visible para el canal real
+  - Parallel: true
+
+- [ ] TASK-463: Selector de situaciones en el pipeline
+  - Input: C-10 de la 017
+  - Output: `agent/situations.py`: "siempre" + coincidentes con el mensaje y la etapa hasta
+    `max_situaciones` (5 por defecto); una llamada de embedding por turno; si falla, solo las "siempre";
+    ids y puntajes en la traza
+  - Depends on: TASK-462
+  - Verification: tests con embeddings controlados: una situación de otra etapa no entra; el máximo se
+    respeta; el fallo del embedding no tira el turno
+  - Parallel: false
+
+- [ ] TASK-464: Prompt por capas
+  - Input: C-03 y C-11 de la 017
+  - Output: secciones PROCESO, RUBRO, NEGOCIO y SITUACIONES DEL NEGOCIO con la regla de prioridad; ESTILO
+    sin "reglas adicionales" y con tratamiento, emojis y saludo; topes y test de presupuesto con 5
+    situaciones largas; snapshots regenerados
+  - Depends on: TASK-461, TASK-463
+  - Verification: test de presupuesto; snapshots revisados en el diff
+  - Parallel: false
+
+- [ ] TASK-435: API de comportamiento y proceso (sin edición de etapas)
+  - Input: `contracts/api.md §1–§2`, C-01 de la 017
+  - Output: behavior, templates, process (opciones validadas contra el schema de la plantilla) y reglas
+    por etapa con su interruptor (`PUT /assistant/rules/{kind}/{rule_key}`); **se retiran** `PUT` y
+    `DELETE /assistant/process/stages/{stage_key}`; rubro con novedades; prompt-preview; caché por tenant
+    invalidada al guardar. `contracts/api.md` actualizado
+  - Depends on: TASK-404, TASK-461
+  - Verification: un nivel fuera del plan da 403 solo con `BILLING_ENFORCED` encendido; apagar una regla
+    cambia el siguiente mensaje del simulador
+  - Parallel: true
+
+- [ ] TASK-465: Simulador con situaciones en borrador
+  - Input: RF-009 de la 017, TASK-422
+  - Output: `situaciones_prueba` en el simulador; el panel de depuración muestra reglas apagadas,
+    situaciones elegidas y su puntaje
+  - Depends on: TASK-463
+  - Verification: un borrador probado en el simulador entra; en el canal real no
+  - Parallel: true
+
+- [ ] TASK-466: Panel de plataforma — catálogo, evals y publicación
+  - Input: C-04 de la 017
+  - Output: API y pantalla de versiones de plantillas y rubros (borrador editable, evals encolados,
+    publicar con 409 si no pasaron); evals de catálogo en `backend/evals/catalog/`; auditoría de plataforma
+  - Depends on: TASK-460, TASK-464
+  - Verification: publicar sin evals verdes es imposible; los negocios ven la novedad
   - Parallel: true
 
 - [ ] TASK-436: API de multimedia
   - Input: `contracts/api.md §3`, límites de `data-model.md §0017`
-  - Output: subida a MinIO privado con validación de tipo real (magic bytes) y tamaño; preview firmado; reemplazo de archivo invalida `provider_media_id`; el `PATCH` de métodos de pago acepta `media_asset_id` (QR)
+  - Output: subida a MinIO privado con validación de tipo real (magic bytes) y tamaño; preview firmado;
+    reemplazo de archivo invalida `provider_media_id`; el `PATCH` de métodos de pago acepta
+    `media_asset_id` (QR). Las situaciones adjuntan archivos de la biblioteca
   - Depends on: TASK-405, TASK-419
   - Verification: tests de límites (imagen de 6 MB rechazada; un .exe renombrado a .jpg rechazado)
   - Parallel: true
 
 - [ ] TASK-437: Overview y lista de activación
   - Input: `contracts/api.md §1` (overview)
-  - Output: cálculo de estado por sección y progreso; `probar_simulador` se marca con la primera conversación sandbox que llega a IDENTIFICAR
-  - Depends on: TASK-434, TASK-435, TASK-436
-  - Verification: tests del cálculo con un tenant vacío, uno parcial y uno completo
+  - Output: estado por sección y progreso; suma "activaste tu primera situación" y "probaste una
+    situación en el simulador"; `probar_simulador` se marca con la primera conversación sandbox que llega
+    a IDENTIFICAR
+  - Depends on: TASK-434, TASK-435, TASK-436, TASK-462
+  - Verification: tests con un tenant vacío, uno parcial y uno completo
   - Parallel: false
 
-- [ ] TASK-438: Frontend — Información del negocio
-  - Input: los 8 bloques de RF-001; referencia visual de Ventor ("Información del negocio" con tarjetas por bloque)
-  - Output: página con tarjetas por bloque (métodos de pago, que ya existe y ahora permite elegir su QR de la biblioteca, más locales y horarios, entregas, tipos de cliente, FAQ, promociones, devoluciones y contacto), cada una con estado y formulario sin texto libre obligatorio
+- [ ] TASK-438: Frontend — Información del negocio y perfil
+  - Input: los 8 bloques de RF-001; RF-010 de la 017
+  - Output: tarjetas por bloque (métodos de pago con titular y QR, locales y horarios, entregas, tipos de
+    cliente, FAQ, promociones, devoluciones, contacto, política de descuentos), sin texto libre
+    obligatorio
   - Depends on: TASK-434
   - Verification: Playwright: completar entregas y verlo reflejado en una respuesta del simulador
   - Parallel: true
 
-- [ ] TASK-439: Frontend — Comportamiento
+- [ ] TASK-439: Frontend — Comportamiento y estilo
   - Input: `contracts/api.md §1` (behavior)
-  - Output: selectores visuales de ritmo, detalle (con ejemplo de respuesta para cada uno), seguimiento, nivel de inteligencia (los planes de pago eligen cualquiera, mostrando cuántos créditos gasta cada nivel; en la prueba gratis solo `economico`, con "Mejorar plan"), pausa de derivación, mensajes de sistema editables y estado del asistente
+  - Output: ritmo, detalle (con ejemplo), seguimiento, tratamiento, emojis, saludo, nivel de inteligencia
+    (sin bloqueo mientras `BILLING_ENFORCED` esté apagado), pausa de derivación, mensajes de sistema y
+    estado del asistente; casilla "Revisor" en Equipo
   - Depends on: TASK-435
   - Verification: Playwright; `tsc` y `eslint` limpios
   - Parallel: true
 
-- [ ] TASK-440: Frontend — Proceso de venta
-  - Input: `contracts/api.md §2`
-  - Output:
-    - selector de plantilla con descripción;
-    - formulario de opciones generado desde el schema (calificación con hasta 3 caminos, modalidad de pago, datos requeridos con checkboxes);
-    - etapas en línea de tiempo con su columna del embudo;
-    - editor de instrucciones por etapa con "Restaurar por defecto" y aviso de texto nuevo;
-    - vista previa del prompt para el admin.
+- [ ] TASK-440: Frontend — Proceso de venta y rubro
+  - Input: `contracts/api.md §2`, C-01 y C-04 de la 017
+  - Output: selector de plantilla (con la sugerida por el rubro); opciones generadas desde el schema;
+    etapas en línea de tiempo con su columna del embudo y **sus reglas con interruptor** (sin editor de
+    texto); reglas, FAQ y objeciones del rubro con interruptor; aviso de novedades; vista previa del
+    prompt para el admin
   - Depends on: TASK-435
-  - Verification: Playwright: editar CALIFICAR, restaurar y verificar que vuelve el default
+  - Verification: Playwright: apagar una regla y verla desaparecer de la vista previa del prompt
+  - Parallel: true
+
+- [ ] TASK-467: Frontend — Situaciones
+  - Input: RF-006 y RF-009 de la 017
+  - Output: lista de tarjetas con filtros por estado y origen; formulario (cuándo aplica, qué hace,
+    archivos, derivar, ejemplo, etapas, siempre); "Probar en el simulador"; activar y desactivar
+  - Depends on: TASK-462, TASK-465
+  - Verification: Playwright: crear una situación, probarla en borrador, activarla
+  - Parallel: true
+
+- [ ] TASK-468: Wizard — estilo y situaciones sugeridas (toca la 001)
+  - Input: C-02 y C-03 de la 017
+  - Output: paso 2 con tratamiento, emojis y saludo en lugar de "restricciones"; el rubro sugiere la
+    plantilla; paso final con 3 a 5 situaciones sugeridas del rubro para activar o completar.
+    `001/tasks.md` y `001/spec.md` actualizados
+  - Depends on: TASK-461, TASK-462
+  - Verification: Playwright: un negocio nuevo termina el wizard con situaciones activas
   - Parallel: true
 
 - [ ] TASK-441: Frontend — Multimedia, checklist y depuración
   - Input: `contracts/api.md §3`, overview
-  - Output: biblioteca con subida (arrastrar), clave sugerida desde el título, "cuándo usarlo", vínculo a producto o promoción; widget de activación en el inicio del panel; interruptor de depuración en el simulador
+  - Output: biblioteca con subida (arrastrar), clave sugerida desde el título, "cuándo usarlo", vínculo a
+    producto, promoción o situación; widget de activación en el inicio del panel; interruptor de
+    depuración en el simulador
   - Depends on: TASK-436, TASK-437, TASK-422
   - Verification: Playwright: subir una imagen, pedirla en el simulador y verla llegar
   - Parallel: true
 
-- [ ] TASK-442: 🧑 Milestone C — Configuración en 30 minutos
-  - Input: una persona que no participó en el desarrollo, un negocio real o ficticio con 10 productos
-  - Output: `milestones/C.md` con el tiempo medido y los puntos donde se trabó
-  - Depends on: TASK-438, TASK-439, TASK-440, TASK-441
-  - Verification: llega a vender en el simulador en ≤ 30 min. Si no, se crean tasks de ajuste antes de seguir
+- [ ] TASK-469: Evals de cierre de la Fase 1
+  - Input: C-01 de la 017
+  - Output: evals del agente y de catálogo con OpenAI; resultado adjunto en `milestones/C.md`
+  - Depends on: TASK-464, TASK-466
+  - Verification: evals en verde
+  - Parallel: false
+
+- [ ] TASK-442: 🧑 Milestone C — Configuración en capas en 30 minutos
+  - Input: `017/spec.md` criterios de la Fase 1
+  - Output: `milestones/C.md`: configurar una tienda desde cero con capas y situaciones, apagar una regla,
+    probar una situación en borrador y activarla, publicar una versión de rubro con evals y ver la novedad
+  - Depends on: TASK-437 a TASK-441, TASK-467, TASK-468, TASK-469
+  - Verification: Giannier aprueba
   - Parallel: false
 
 ## Fase D · Autonomía
@@ -473,7 +592,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: correr `npx playwright test` dos veces no deja cuentas sueltas sin marca
   - Parallel: true
 
-- [ ] TASK-456: Fixtures reales de YCloud
+- [ ] TASK-456: Fixtures reales de YCloud (se cierra dentro de TASK-459)
   - Input: pendiente del Milestone B; depende de un número real conectado (TASK-209 de la 002)
   - Output: capturar webhooks reales (texto, imagen, botón, lista, **referral**) y reemplazar los fixtures
     escritos a mano en `backend/tests/fixtures/`
@@ -499,6 +618,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
                   425 ─▶ 428 (+417, 419)
                   425+421 ─▶ 429 ─▶ 430 ─▶ 431 · 432
 426 · 427 · 428 · 431 · 432 ─▶ 433 🧑
-434 · 435 · 436 ─▶ 437 ─▶ 438 · 439 · 440 · 441 ─▶ 442 🧑
+433 🧑 ─▶ 459 🧑 (número real) ─▶ 460 ─▶ 461 ─▶ 462 ─▶ 463 ─▶ 464 ─▶ 466 · 469
+          434 · 435 · 436 · 465 ─▶ 437 ─▶ 438 · 439 · 440 · 441 · 467 · 468 ─▶ 442 🧑
 443 · 444 · 445 ─▶ 446 · 447 · 448 ─▶ 449 🧑
 ```
