@@ -556,6 +556,9 @@ def _confirmar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
         turn.service.submit(order, contact)
     except (NotReady, InvalidTransition):
         return turn.result("no_disponible", order, "El pedido no se puede confirmar todavía.")
+    if context.notices is not None:
+        # The business is told in the same transaction; the email goes out after it.
+        context.notices.cash_order(order)
     return turn.result(
         "hecho",
         order,

@@ -28,6 +28,7 @@ from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, FunnelCode
 from app.models.orders import Order, PaymentProof
+from app.models.tenant import CUSTOMER_UNREACHED
 from app.models.whatsapp import WhatsAppNumber
 from app.orders.service import OrderService
 from app.process.recompute import recompute_stage
@@ -41,6 +42,7 @@ from app.providers.whatsapp.base import (
     SendResult,
     WhatsAppTransientError,
 )
+from app.repositories.notification import TenantNotificationRepository
 from app.repositories.orders import PaymentProofRepository
 from tests.integration.test_team import (
     AUTH,
@@ -516,6 +518,12 @@ class TestConfirm:
         assert outbound(db, order.conversation_id) == []
         db.refresh(order)
         assert order.estado == "confirmado"
+        # The business is told it has to reach the customer another way (C-09).
+        [notice] = TenantNotificationRepository(db, uuid.UUID(account["tenant_id"])).recent(
+            CUSTOMER_UNREACHED
+        )
+        assert notice.payload["order_id"] == str(order.id)
+        assert notice.payload["motivo"] == "ventana_cerrada"
 
     async def test_the_simulator_gets_the_notice_as_a_stored_message_only(
         self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
@@ -564,6 +572,10 @@ class TestConfirm:
         assert order.estado == "confirmado"
         [message] = outbound(db, order.conversation_id)
         assert message.delivery_status == "failed"
+        [notice] = TenantNotificationRepository(db, uuid.UUID(account["tenant_id"])).recent(
+            CUSTOMER_UNREACHED
+        )
+        assert notice.payload["motivo"] == "envio_fallido"
 
     async def test_the_owners_own_wording_and_a_missing_name_and_step(
         self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp

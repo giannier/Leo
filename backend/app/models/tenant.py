@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -39,13 +40,27 @@ WIZARD_REMINDER = "wizard_reminder"
 # run out of messages a week before it runs out of days.
 QUOTA_80 = "quota_80"
 
-NOTIFICATION_KINDS = (
+# The notices that go out once per tenant: the table refuses a second row of these
+# kinds (a partial unique index), which is how the jobs know they already sent one.
+ONE_SHOT_KINDS = (
     TRIAL_ENDING_SOON,
     TRIAL_ENDING_TOMORROW,
     TRIAL_ENDED,
     WIZARD_REMINDER,
     QUOTA_80,
 )
+
+# Events of the sales engine (Feature 004, `contracts/api.md` section 10): each one
+# happens many times and is its own row.
+NEW_RECEIPT = "nuevo_comprobante"
+CASH_ORDER = "pedido_contra_entrega"
+HANDOFF = "derivacion"
+CUSTOMER_UNREACHED = "ventana_cerrada"
+LLM_DOWN = "llm_caido"
+
+EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN)
+
+NOTIFICATION_KINDS = (*ONE_SHOT_KINDS, *EVENT_KINDS)
 
 # Where the warning fires. Not 90%: at 250 messages that is 25 left, which on
 # a busy afternoon is an hour's notice - too late to do anything but watch the
@@ -79,8 +94,16 @@ class Tenant(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class TenantNotification(Base, CreatedAtMixin):
-    """A one-shot notice that has already been sent (TASK-019).
+class TenantNotification(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
+    """A notice to the business: a one-shot one already sent, or an event.
+
+    **Events** (`EVENT_KINDS`, Feature 004, migration 0022): a receipt arrived, a
+    cash-on-delivery order waits, a conversation was handed to a person, the customer
+    could not be told, the model went down. Many per tenant, each with a `payload`
+    that says what it is about.
+
+    **One-shot kinds** (TASK-019), whose guarantee is now a partial unique index
+    instead of the primary key:
 
     The trial notifier runs daily and the wizard reminder sends "un email
     unico" (Clarification 004, contracts §jobs). Both need to know what has
@@ -88,21 +111,38 @@ class TenantNotification(Base, CreatedAtMixin):
     the customer again on every run, after every worker restart, and twice if
     two workers pick up the same tick.
 
-    The composite primary key *is* the guarantee. An `INSERT` either succeeds
-    or violates the key, and that violation is the answer to "was this already
-    sent?" - the same reasoning as the connection request indexes: let the
-    database decide, never a check in front of it.
+    The unique index *is* the guarantee. An `INSERT` either succeeds or violates
+    it, and that violation is the answer to "was this already sent?" - the same
+    reasoning as the connection request indexes: let the database decide, never a
+    check in front of it.
     """
 
     __tablename__ = "tenant_notifications"
-    __table_args__ = (enum_check("kind", NOTIFICATION_KINDS, "tenant_notifications_kind"),)
+    __table_args__ = (
+        enum_check("kind", NOTIFICATION_KINDS, "tenant_notifications_kind"),
+        Index(
+            "uq_tenant_notifications_tenant_id_kind",
+            "tenant_id",
+            "kind",
+            unique=True,
+            postgresql_where=text(
+                "kind IN (" + ", ".join(f"'{kind}'" for kind in ONE_SHOT_KINDS) + ")"
+            ),
+        ),
+        Index(
+            "ix_tenant_notifications_tenant_id_kind_created_at",
+            "tenant_id",
+            "kind",
+            text("created_at DESC"),
+        ),
+    )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
-        PgUUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        primary_key=True,
+        PgUUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
-    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the notice is about: the order number, the conversation, the motive.
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
 
 
 class TenantUser(Base, UUIDPrimaryKeyMixin, TimestampMixin):

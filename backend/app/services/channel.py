@@ -34,7 +34,8 @@ from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
 from app.models.tenant import QUOTA_80, QUOTA_WARNING_RATIO, Tenant
 from app.models.whatsapp import WhatsAppNumber
-from app.orders.proofs import InboundImage, ProofNotices, ProofPipeline
+from app.orders.notices import OrderNotices
+from app.orders.proofs import InboundImage, ProofPipeline
 from app.process.inbound import interactive_of, media_of, payload_of, referral_of, stored_image_of
 from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
@@ -435,7 +436,7 @@ class ConversationResponder:
         model_tier_applies: bool = True,
         storage: StorageProvider | None = None,
         whatsapp: WhatsAppProvider | None = None,
-        notices: ProofNotices | None = None,
+        notices: OrderNotices | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
@@ -501,6 +502,7 @@ class ConversationResponder:
             outbound=self._outbound_for(conversation_id) if self._outbound_for else None,
             queue_text=True,
             model_tier_applies=self._tier_applies,
+            notices=self._notices,
             proofs=ProofPipeline(
                 self._session,
                 self._tenant_id,

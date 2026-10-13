@@ -559,3 +559,110 @@ El equipo de Leo
         html=html_body,
         text=text_body,
     )
+
+
+# ----------------------------------------------------------- sales engine alerts
+#
+# Feature 004 (TASK-431, `contracts/api.md` section 10). The business is told by email
+# of what needs a person: a receipt, a cash-on-delivery order, a handover, the model
+# being down. Short and to the point: the panel is where the work happens.
+
+NEW_RECEIPT_SUBJECT = "Nuevo comprobante por revisar"
+CASH_ORDER_SUBJECT = "Nuevo pedido contra entrega por confirmar"
+HANDOFF_SUBJECT = "Un cliente necesita que lo atiendas"
+LLM_DOWN_SUBJECT = "Tu agente tuvo un problema y no esta respondiendo"
+
+
+def _alert_email(
+    *,
+    to: str,
+    subject: str,
+    lines: Sequence[str],
+    panel_url: str,
+    link_label: str,
+) -> EmailMessage:
+    """One alert: a few sentences and a link. Every line is escaped for the HTML body."""
+    safe_url = escape(panel_url, quote=True)
+    paragraphs = "\n".join(f"<p>{escape(line)}</p>" for line in lines)
+    html_body = f"""\
+<p>Hola,</p>
+{paragraphs}
+<p><a href="{safe_url}">{escape(link_label)}</a></p>
+<p>El equipo de Leo</p>
+"""
+    text_body = (
+        "Hola,\n\n" + "\n\n".join(lines) + f"\n\n{link_label}:\n{panel_url}\n\nEl equipo de Leo\n"
+    )
+    return EmailMessage(to=(to,), subject=subject, html=html_body, text=text_body)
+
+
+def build_new_receipt_email(
+    *, to: str, tenant_name: str, numero: int, total: str, panel_url: str
+) -> EmailMessage:
+    """A customer sent a payment receipt for an order. It waits for a person: the
+    system never confirms a payment by itself."""
+    return _alert_email(
+        to=to,
+        subject=NEW_RECEIPT_SUBJECT,
+        lines=[
+            f"Llego un comprobante de pago para el pedido #{numero} de {tenant_name} "
+            f"(total {total}).",
+            "Revisalo y confirmalo o rechazalo. Mientras tanto, tu cliente espera.",
+        ],
+        panel_url=panel_url,
+        link_label="Revisar el pedido",
+    )
+
+
+def build_cash_order_email(
+    *, to: str, tenant_name: str, numero: int, total: str, panel_url: str
+) -> EmailMessage:
+    """A customer confirmed an order they will pay on delivery."""
+    return _alert_email(
+        to=to,
+        subject=CASH_ORDER_SUBJECT,
+        lines=[
+            f"Un cliente de {tenant_name} confirmo el pedido #{numero} para pagar contra "
+            f"entrega (total {total}).",
+            "Revisalo y confirmalo para que el cliente sepa que su pedido va en camino.",
+        ],
+        panel_url=panel_url,
+        link_label="Revisar el pedido",
+    )
+
+
+def build_handoff_email(
+    *, to: str, tenant_name: str, motivo: str, resumen: str | None, panel_url: str
+) -> EmailMessage:
+    """The assistant handed a conversation to a person and paused itself."""
+    lines = [
+        f"El asistente de {tenant_name} paso una conversacion a una persona. Motivo: {motivo}.",
+    ]
+    if resumen:
+        lines.append(f"Resumen: {resumen}")
+    lines.append("El asistente no respondera en esa conversacion mientras dure la pausa.")
+    return _alert_email(
+        to=to,
+        subject=HANDOFF_SUBJECT,
+        lines=lines,
+        panel_url=panel_url,
+        link_label="Abrir el panel",
+    )
+
+
+def build_llm_down_email(*, to: str, tenant_name: str, panel_url: str) -> EmailMessage:
+    """The model failed several times in a row and the assistant stopped answering for a
+    few minutes. Sent at most once an hour."""
+    return _alert_email(
+        to=to,
+        subject=LLM_DOWN_SUBJECT,
+        lines=[
+            f"El agente de {tenant_name} fallo varias veces seguidas al pensar una respuesta "
+            "y dejo de responder unos minutos. Tus clientes recibieron el mensaje de "
+            "disculpa que configuraste.",
+            "Los mensajes que llegaron se guardaron. Si el problema sigue, revisa el modelo "
+            "que usa tu agente.",
+        ],
+        panel_url=panel_url,
+        link_label="Abrir el panel",
+    )
