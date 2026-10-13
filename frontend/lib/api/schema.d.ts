@@ -523,7 +523,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Move a confirmed order along, or discard it */
+        /**
+         * Move a confirmed order along, or discard it
+         * @description Discarding an order with a payment proof needs `motivo`, voids the proof and
+         *     tells the customer; if it was confirmed, the order owes a refund.
+         */
         post: operations["set_order_status_api_v1_tenant_orders__order_id__status_post"];
         delete?: never;
         options?: never;
@@ -1812,6 +1816,8 @@ export interface components {
             motivo_rechazo: string | null;
             /** Rechazo Vigente */
             rechazo_vigente: boolean;
+            /** Devolucion Pendiente */
+            devolucion_pendiente: boolean;
             /** Siguiente Paso */
             siguiente_paso: string | null;
             /** Es Sandbox */
@@ -1862,6 +1868,8 @@ export interface components {
             tiene_comprobante: boolean;
             /** Observaciones */
             observaciones: string[];
+            /** Devolucion Pendiente */
+            devolucion_pendiente: boolean;
             /**
              * Creado
              * Format: date-time
@@ -2276,11 +2284,20 @@ export interface components {
              * @enum {string}
              */
             estado: "en_curso" | "completado" | "descartado";
+            /** Motivo */
+            motivo?: string | null;
         };
         /** StatusResponse */
         StatusResponse: {
             /** Estado */
             estado: string;
+            /** Aviso Cliente */
+            aviso_cliente?: ("enviado" | "ventana_cerrada" | "no_enviado") | null;
+            /**
+             * Devolucion Pendiente
+             * @default false
+             */
+            devolucion_pendiente: boolean;
         };
         /** TeamResponse */
         TeamResponse: {
@@ -3723,6 +3740,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusResponse"];
+                };
+            };
+            /** @description `validation_error`: discarding an order with a payment proof needs `motivo` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */

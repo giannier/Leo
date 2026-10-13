@@ -782,8 +782,12 @@ class TestStatus:
             f"{ORDERS}/{order.id}/status", headers=headers, json={"estado": "completado"}
         )
 
-        assert started.json() == {"estado": "en_curso"}
-        assert done.json() == {"estado": "completado"}
+        assert started.json() == {
+            "estado": "en_curso",
+            "aviso_cliente": None,
+            "devolucion_pendiente": False,
+        }
+        assert done.json()["estado"] == "completado"
         # Still a closed sale: no stage change, so no extra event.
         assert events(db, order.conversation_id) == [
             ("VERIFICACION", "comprobante"),
@@ -820,17 +824,89 @@ class TestStatus:
         assert response.status_code == 409
         assert response.json()["error"] == "invalid_transition"
 
-    async def test_discarding_a_waiting_order_recomputes_the_stage(
+    async def test_discarding_an_order_with_a_proof_needs_a_reason(
         self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
     ) -> None:
+        """Milestone B review, E-2: the customer paid, so they are told why."""
         account, headers = await _owner(api, mail)
-        order, _ = seed_order(db, account["tenant_id"])
+        order, proof = seed_order(db, account["tenant_id"])
 
         response = await api.post(
             f"{ORDERS}/{order.id}/status", headers=headers, json={"estado": "descartado"}
         )
 
-        assert response.json() == {"estado": "descartado"}
+        assert response.status_code == 400
+        assert response.json()["error"] == "validation_error"
+        db.expire_all()
+        assert db.get(Order, order.id).estado == "por_confirmar"  # type: ignore[union-attr]
+        assert proof is not None and db.get(PaymentProof, proof.id).estado == "por_verificar"  # type: ignore[union-attr]
+        assert whatsapp.sent == []
+
+    async def test_discarding_a_waiting_order_voids_the_proof_and_tells_the_customer(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        account, headers = await _owner(api, mail)
+        order, proof = seed_order(db, account["tenant_id"])
+
+        response = await api.post(
+            f"{ORDERS}/{order.id}/status",
+            headers=headers,
+            json={"estado": "descartado", "motivo": "Ya no tenemos stock"},
+        )
+
+        assert response.json() == {
+            "estado": "descartado",
+            "aviso_cliente": "enviado",
+            "devolucion_pendiente": False,
+        }
+        db.expire_all()
+        assert proof is not None
+        voided = db.get(PaymentProof, proof.id)
+        assert voided is not None and voided.estado == "anulado"
+        assert voided.motivo_rechazo == "Ya no tenemos stock"
+        [(_, text)] = whatsapp.sent
+        assert f"#{order.numero} fue anulado: Ya no tenemos stock" in text
+        assert "devolución" in text
+        assert events(db, order.conversation_id)[-1][1] == "operador:estado"
+
+    async def test_discarding_a_confirmed_order_owes_a_refund(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        account, headers = await _owner(api, mail)
+        order, proof = seed_order(db, account["tenant_id"])
+        await api.post(f"{ORDERS}/{order.id}/confirm", headers=headers)
+
+        response = await api.post(
+            f"{ORDERS}/{order.id}/status",
+            headers=headers,
+            json={"estado": "descartado", "motivo": "El cliente se arrepintió"},
+        )
+
+        assert response.json()["devolucion_pendiente"] is True
+        assert response.json()["aviso_cliente"] == "enviado"
+        db.expire_all()
+        assert proof is not None and db.get(PaymentProof, proof.id).estado == "anulado"  # type: ignore[union-attr]
+        detail = (await api.get(f"{ORDERS}/{order.id}", headers=headers)).json()
+        assert detail["devolucion_pendiente"] is True
+        listed = (await api.get(ORDERS, headers=headers)).json()["items"]
+        assert [item["devolucion_pendiente"] for item in listed] == [True]
+        assert len(whatsapp.sent) == 2  # the confirmation, then the cancellation
+
+    async def test_discarding_a_cash_order_needs_no_reason_and_tells_nobody(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        account, headers = await _owner(api, mail)
+        order, _ = seed_order(db, account["tenant_id"], contra_entrega=True)
+
+        response = await api.post(
+            f"{ORDERS}/{order.id}/status", headers=headers, json={"estado": "descartado"}
+        )
+
+        assert response.json() == {
+            "estado": "descartado",
+            "aviso_cliente": None,
+            "devolucion_pendiente": False,
+        }
         assert events(db, order.conversation_id)[-1][1] == "operador:estado"
         assert whatsapp.sent == []
 

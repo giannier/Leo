@@ -43,7 +43,8 @@ from app.models.base import Base, CreatedAtMixin, TimestampMixin, UUIDPrimaryKey
 ORDER_STATES = ("borrador", "por_confirmar", "confirmado", "en_curso", "completado", "descartado")
 PAYMENT_MODES = ("previo", "contra_entrega")
 DELIVERY_TYPES = ("delivery", "recojo")
-PROOF_STATES = ("por_verificar", "aprobado", "rechazado")
+# `anulado`: the proof of an order the operator discarded (Milestone B, E-2).
+PROOF_STATES = ("por_verificar", "aprobado", "rechazado", "anulado")
 # What a proof can be flagged for. Observations are never an automatic rejection
 # (C-08): they tell the operator where to look. An empty list means every check
 # ran and passed (Milestone B, D-1).
@@ -135,6 +136,11 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # True after a payment proof was rejected; any change of items or customer
     # data turns it off, which is what lets the customer leave VERIFICACION (C-21).
     rechazo_vigente: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The order was discarded after the business confirmed the payment: the money
+    # is owed back to the customer (Milestone B, E-2).
+    devolucion_pendiente: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     # Written by the operator on confirming; goes into the notice to the customer.
     siguiente_paso: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")

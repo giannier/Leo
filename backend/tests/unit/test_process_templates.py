@@ -477,11 +477,12 @@ class TestPlaceholders:
 
 
 class TestSystemMessages:
-    def test_the_four_messages_of_the_contract(self) -> None:
+    def test_the_five_messages_of_the_contract(self) -> None:
         assert set(DEFAULT_SYSTEM_MESSAGES) == {
             "pago_confirmado",
             "pago_rechazado",
             "pedido_rechazado",
+            "pedido_anulado",
             "derivacion",
         }
 

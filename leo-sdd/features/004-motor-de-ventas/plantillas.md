@@ -344,6 +344,7 @@ Cuando el último intento menciona una promoción para seguimiento, el sistema r
 | Operador confirma el pago | "¡{nombre_cliente}, tu pago fue confirmado! ✅ Pedido #{numero}. {siguiente_paso}" |
 | Operador rechaza el pago | "{nombre_cliente}, revisamos tu comprobante y hay un detalle: {motivo}. ¿Nos ayudas a corregirlo?" |
 | Operador rechaza un pedido contra entrega | "{nombre_cliente}, revisamos tu pedido #{numero} y hay un detalle: {motivo}. ¿Lo ajustamos?" |
+| Operador anula un pedido que el cliente ya pagó | "{nombre_cliente}, tu pedido #{numero} fue anulado: {motivo}. Si ya realizaste el pago, nos comunicaremos contigo para la devolución." |
 | Derivación | "Te comunico con una persona del equipo. Te responderá en breve 🙌" |
 | Bot reanudado por vencer la pausa | (sin mensaje: espera a que el cliente escriba) |
 

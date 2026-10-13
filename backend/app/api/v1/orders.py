@@ -38,6 +38,7 @@ from app.orders.review import (
     AlreadyReviewed,
     OrderNotFound,
     OrderReviewService,
+    ReasonRequired,
 )
 from app.orders.service import InvalidTransition, customer_snapshot
 from app.providers.storage.base import StorageProvider
@@ -59,6 +60,7 @@ AUTH_RESPONSES = (
 )
 NOT_FOUND = (404, "`not_found`: the order does not exist or is another business's")
 CONFLICT = (409, "`invalid_transition` or `already_reviewed`")
+VALIDATION = (400, "`validation_error`: discarding an order with a payment proof needs `motivo`")
 
 MAX_PAGE_SIZE = 50
 # The link to a receipt opens a private object: short on purpose (C-20).
@@ -88,6 +90,8 @@ class OrderListItem(BaseModel):
     items_resumen: str
     tiene_comprobante: bool
     observaciones: list[str]
+    # Discarded after the payment was confirmed: the customer is owed a refund.
+    devolucion_pendiente: bool
     creado: datetime
 
 
@@ -170,6 +174,7 @@ class OrderDetail(BaseModel):
     comprobantes: list[ProofOut]
     motivo_rechazo: str | None
     rechazo_vigente: bool
+    devolucion_pendiente: bool
     siguiente_paso: str | None
     es_sandbox: bool
     conversation_id: uuid.UUID
@@ -193,6 +198,8 @@ class RejectRequest(BaseModel):
 
 class StatusRequest(BaseModel):
     estado: Literal["en_curso", "completado", "descartado"]
+    # Required to discard an order with a payment proof: the customer is told why.
+    motivo: Motivo | None = None
 
 
 class DecisionResponse(BaseModel):
@@ -202,6 +209,9 @@ class DecisionResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     estado: str
+    # Only when the customer was told (a discarded order they had paid for).
+    aviso_cliente: CustomerNotice | None = None
+    devolucion_pendiente: bool = False
 
 
 # ---------------------------------------------------------------- presenters
@@ -360,6 +370,7 @@ def list_orders(
             items_resumen=items_summary(lines[order.id]),
             tiene_comprobante=bool(proofs[order.id]),
             observaciones=list(proofs[order.id][0].observaciones) if proofs[order.id] else [],
+            devolucion_pendiente=order.devolucion_pendiente,
             creado=order.created_at,
         )
         for order, contact in rows
@@ -461,6 +472,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         comprobantes=[proof_out(proof) for proof in proofs],
         motivo_rechazo=order.motivo_rechazo,
         rechazo_vigente=order.rechazo_vigente,
+        devolucion_pendiente=order.devolucion_pendiente,
         siguiente_paso=order.siguiente_paso,
         es_sandbox=order.is_sandbox,
         conversation_id=order.conversation_id,
@@ -563,20 +575,46 @@ async def reject_order(
 @router.post(
     "/{order_id}/status",
     summary="Move a confirmed order along, or discard it",
-    responses=error_responses(NOT_FOUND, CONFLICT, *AUTH_RESPONSES),
+    responses=error_responses(NOT_FOUND, CONFLICT, VALIDATION, *AUTH_RESPONSES),
 )
-def set_order_status(
-    order_id: uuid.UUID, body: StatusRequest, principal: MemberDep, session: SessionDep
+async def set_order_status(
+    order_id: uuid.UUID,
+    body: StatusRequest,
+    principal: MemberDep,
+    session: SessionDep,
+    provider: WhatsAppProviderDep,
+    email: EmailProviderDep,
 ) -> StatusResponse:
+    """Discarding an order with a payment proof needs `motivo`, voids the proof and
+    tells the customer; if it was confirmed, the order owes a refund."""
     assert body.estado in OPERATOR_STATES
     review = OrderReviewService(session, principal.tenant_id)
     try:
-        result = review.set_status(order_id, principal.user_id, body.estado)
+        result = review.set_status(order_id, principal.user_id, body.estado, motivo=body.motivo)
     except OrderNotFound as exc:
         raise _not_found() from exc
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
-    return StatusResponse(estado=result.order.estado)
+    except ReasonRequired as exc:
+        raise ApiError(
+            status_code=400,
+            error="validation_error",
+            message="A reason is required to discard an order with a payment proof.",
+            fields={"motivo": "required"},
+        ) from exc
+
+    notice: CustomerNotice | None = None
+    if result.notice is not None:
+        alerts = TenantAlerts(session, principal.tenant_id)
+        notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
+            result.order, result.notice, motivo=body.motivo
+        )
+        await send_emails(email, alerts.pending_emails)
+    return StatusResponse(
+        estado=result.order.estado,
+        aviso_cliente=notice,
+        devolucion_pendiente=result.order.devolucion_pendiente,
+    )
 
 
 def _notifier(

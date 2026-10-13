@@ -76,7 +76,7 @@ export default function PedidoPage() {
 
   /** Runs a decision, then shows what the customer was told and reloads. */
   async function act(
-    run: () => Promise<{ estado: string; aviso_cliente?: CustomerNotice }>,
+    run: () => Promise<{ estado: string; aviso_cliente?: CustomerNotice | null }>,
     done: string,
   ) {
     setBusy(true);
@@ -161,8 +161,11 @@ export default function PedidoPage() {
                 onReject={(motivo) =>
                   void act(() => api.orders.reject(order.id, motivo), "Pedido rechazado.")
                 }
-                onMove={(estado: OperatorState) =>
-                  void act(() => api.orders.setStatus(order.id, estado), "Estado actualizado.")
+                onMove={(estado: OperatorState, motivo?: string) =>
+                  void act(
+                    () => api.orders.setStatus(order.id, estado, motivo),
+                    motivo ? "Pedido anulado." : "Estado actualizado.",
+                  )
                 }
               />
               <HistoryCard order={order} />

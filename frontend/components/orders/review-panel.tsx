@@ -8,6 +8,8 @@
  * them it was not; neither should be one stray tap away. The form is also where
  * the two pieces of text live: the "next step" a confirmation can carry, and the
  * reason a rejection must carry (5 to 300 characters, as the API requires).
+ * Discarding an order the customer paid for (a receipt waiting or approved) asks
+ * for a reason too: the customer is told, and the receipt is voided.
  */
 
 import { useState } from "react";
@@ -34,7 +36,10 @@ const MOVE_LABELS: Record<OperatorState, string> = {
   descartado: "Descartar pedido",
 };
 
-type Mode = "idle" | "confirm" | "reject";
+type Mode = "idle" | "confirm" | "reject" | "discard";
+
+/** Receipts that still stand for a payment; discarding the order voids them. */
+const LIVE_PROOF_STATES = new Set(["por_verificar", "aprobado"]);
 
 export function ReviewPanel({
   order,
@@ -49,7 +54,7 @@ export function ReviewPanel({
   error: string | null;
   onConfirm: (siguientePaso: string) => void;
   onReject: (motivo: string) => void;
-  onMove: (estado: OperatorState) => void;
+  onMove: (estado: OperatorState, motivo?: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("idle");
   const [nextStep, setNextStep] = useState("");
@@ -60,15 +65,34 @@ export function ReviewPanel({
   if (order.estado !== "por_confirmar" && moves.length === 0) {
     return null;
   }
+  const paid = order.comprobantes.some((proof) => LIVE_PROOF_STATES.has(proof.estado));
 
-  function submitReject() {
+  function validReason(): string | null {
     const trimmed = reason.trim();
     if (trimmed.length < MIN_REASON) {
       setReasonError(`Cuéntale al cliente el motivo, al menos ${MIN_REASON} caracteres.`);
-      return;
+      return null;
     }
     setReasonError(null);
-    onReject(trimmed);
+    return trimmed;
+  }
+
+  function submitReject() {
+    const trimmed = validReason();
+    if (trimmed) onReject(trimmed);
+  }
+
+  function submitDiscard() {
+    const trimmed = validReason();
+    if (trimmed) onMove("descartado", trimmed);
+  }
+
+  function move(state: OperatorState) {
+    if (state === "descartado" && paid) {
+      setMode("discard");
+      return;
+    }
+    onMove(state);
   }
 
   return (
@@ -159,18 +183,51 @@ export function ReviewPanel({
           <p className="text-sm text-ink-soft">
             Estado actual: <span className="font-semibold text-ink">{STATE_LABELS[order.estado]}</span>.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {moves.map((state) => (
-              <Button
-                key={state}
-                variant={state === "descartado" ? "secondary" : "primary"}
-                onClick={() => onMove(state)}
-                disabled={busy}
-              >
-                {MOVE_LABELS[state]}
-              </Button>
-            ))}
-          </div>
+          {mode === "discard" ? (
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitDiscard();
+              }}
+            >
+              <p className="text-sm text-ink-soft">
+                El cliente ya pagó: su comprobante quedará anulado y le avisaremos por WhatsApp.
+                {order.estado !== "borrador" ? " El pedido quedará marcado con devolución pendiente." : ""}
+              </p>
+              <TextArea
+                label="Motivo de la anulación"
+                hint="El cliente lo recibe por WhatsApp. Sé claro y amable."
+                rows={3}
+                required
+                maxLength={MAX_REASON}
+                value={reason}
+                error={reasonError ?? undefined}
+                onChange={(event) => setReason(event.target.value)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="danger" loading={busy}>
+                  Anular pedido
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setMode("idle")} disabled={busy}>
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {moves.map((state) => (
+                <Button
+                  key={state}
+                  variant={state === "descartado" ? "secondary" : "primary"}
+                  onClick={() => move(state)}
+                  disabled={busy}
+                >
+                  {MOVE_LABELS[state]}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </Card>

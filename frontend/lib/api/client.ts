@@ -301,6 +301,7 @@ export type ProofImage = Ok<
   Ops["/api/v1/tenant/orders/{order_id}/proofs/{proof_id}/image"]["get"]
 >;
 export type OrderDecision = Ok<Ops["/api/v1/tenant/orders/{order_id}/confirm"]["post"]>;
+export type OrderStatusResult = Ok<Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]>;
 /** What the customer was told: sent, window closed (no WhatsApp), or not sent. */
 export type CustomerNotice = OrderDecision["aviso_cliente"];
 /** The states an operator can move a confirmed order to. */
@@ -513,10 +514,10 @@ export const api = {
       }),
     reject: (id: string, motivo: string) =>
       request<OrderDecision>(`/tenant/orders/${id}/reject`, { method: "POST", body: { motivo } }),
-    setStatus: (id: string, estado: OperatorState) =>
-      request<{ estado: string }>(`/tenant/orders/${id}/status`, {
+    setStatus: (id: string, estado: OperatorState, motivo?: string) =>
+      request<OrderStatusResult>(`/tenant/orders/${id}/status`, {
         method: "POST",
-        body: { estado },
+        body: motivo ? { estado, motivo } : { estado },
       }),
   },
 };
