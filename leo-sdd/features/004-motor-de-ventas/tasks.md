@@ -235,7 +235,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - los datos no aparecen en trazas (enmascarados).
   - Parallel: true
 
-- [ ] TASK-428: Tool `enviar_metodos_pago`
+- [x] TASK-428: Tool `enviar_metodos_pago`
   - Input: `payment_methods_business`, `media_asset_id` y el recurso `metodos_pago`
   - Output: texto con los métodos activos más la imagen o QR (consume presupuesto) y el hecho `metodos_pago_enviados = {order_id, en}`
   - Depends on: TASK-417, TASK-419, TASK-425

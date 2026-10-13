@@ -10,13 +10,13 @@ Which ones do something today:
   (`tools/catalog.py`).
 * `enviar_recurso`, `mostrar_opciones`, `elegir_camino` (`tools/sales.py`).
 * `gestionar_pedido` (`tools/orders.py`), `registrar_datos_cliente`
-  (`tools/customer.py`).
-* `enviar_metodos_pago`, `derivar_a_humano` (Phase B and D): declared with their final
-  schema and bound to a stub that answers `no_disponible`. The schema is final on
-  purpose, so the prompt budget and the per-stage rules are tested against the real
-  thing, and each later task only replaces the handler.
+  (`tools/customer.py`), `enviar_metodos_pago` (`tools/payments.py`).
+* `derivar_a_humano` (Phase D): declared with its final schema and bound to a stub
+  that answers `no_disponible`. The schema is final on purpose, so the prompt budget
+  and the per-stage rules are tested against the real thing, and each later task
+  only replaces the handler.
 
-The tools that write (the order, the customer's data) are declared with
+The tools that write (the order, the customer's data, a message) are declared with
 `effect=True`, so the agent loop never answers one from its per-turn cache after
 another write.
 
@@ -39,6 +39,7 @@ from app.agent.tools.catalog import (
 )
 from app.agent.tools.customer import registrar_datos_cliente
 from app.agent.tools.orders import gestionar_pedido
+from app.agent.tools.payments import enviar_metodos_pago
 from app.agent.tools.registry import (
     ToolCatalog,
     ToolContext,
@@ -302,7 +303,8 @@ def _definitions() -> list[ToolDefinition]:
             name="enviar_metodos_pago",
             description="Envía al cliente los métodos de pago del negocio.",
             parameters=_methods_schema,
-            handler=_stub("enviar_metodos_pago"),
+            handler=enviar_metodos_pago,
+            effect=True,
         ),
         ToolDefinition(
             name="elegir_camino",

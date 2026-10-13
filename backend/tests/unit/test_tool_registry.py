@@ -478,7 +478,6 @@ class TestTheToolsOfLaterTasksAnswerNotAvailable:
     @pytest.mark.parametrize(
         ("tool", "stage"),
         [
-            ("enviar_metodos_pago", Stage.COBRO),
             ("derivar_a_humano", Stage.IDENTIFICAR),
         ],
     )

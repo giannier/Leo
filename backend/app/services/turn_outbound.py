@@ -125,7 +125,7 @@ class _RowWriter:
         *,
         msg_type: str,
         content: str,
-        payload: dict[str, Any],
+        payload: dict[str, Any] | None,
         delivery_status: str | None,
         provider_message_id: str | None = None,
     ) -> Message:
@@ -145,6 +145,9 @@ class _RowWriter:
 
 class SandboxOutbound(_RowWriter):
     """Records what the agent sends in the simulator and sends nothing (C-19)."""
+
+    async def send_text(self, body: str) -> None:
+        self._write(msg_type="text", content=body, payload=None, delivery_status=None)
 
     async def send_media(self, asset: MediaAsset) -> None:
         self._write(
@@ -236,6 +239,15 @@ class LiveOutbound(_RowWriter):
         )
 
     # ------------------------------------------------------------------ sends
+
+    async def send_text(self, body: str) -> None:
+        self._require_open_window()
+        result = await self._deliver(
+            lambda: self._provider.send_text(
+                self._credentials, sender=self._number.phone_e164, to=self._recipient(), body=body
+            )
+        )
+        self._recorded(result, msg_type="text", content=body, payload=None)
 
     async def send_media(self, asset: MediaAsset) -> None:
         self._require_open_window()
@@ -330,7 +342,7 @@ class LiveOutbound(_RowWriter):
         raise OutboundFailed(str(last)) from last
 
     def _recorded(
-        self, result: SendResult, *, msg_type: str, content: str, payload: dict[str, Any]
+        self, result: SendResult, *, msg_type: str, content: str, payload: dict[str, Any] | None
     ) -> None:
         status = result.status or "sent"
         row = self._write(

@@ -666,6 +666,9 @@ class FakeWhatsApp:
         self.sent.append((kind, fields))
         return SendResult(provider_message_id=f"wamid.{uuid.uuid4().hex}", status="sent")
 
+    async def send_text(self, credentials: Any, **fields: Any) -> SendResult:
+        return await self._record("text", **fields)
+
     async def send_media(self, credentials: Any, **fields: Any) -> SendResult:
         return await self._record("media", **fields)
 
@@ -738,6 +741,53 @@ class TestTheLiveOutbound:
         ).scalar_one()
         assert (row.msg_type, row.delivery_status) == ("interactive", "sent")
         assert row.provider_message_id is not None
+
+    async def test_a_text_goes_to_the_provider_and_leaves_a_text_row(self, db: Session) -> None:
+        tenant = _tenant(db)
+        conversation = _conversation(db, tenant, channel="whatsapp")
+        _connect_number(db, tenant)
+        provider = FakeWhatsApp()
+        outbound = live_outbound_factory(
+            db,
+            tenant.id,
+            provider=provider,
+            storage=MockStorageProvider(),  # type: ignore[arg-type]
+        )(conversation.id)
+        assert outbound is not None
+
+        await outbound.send_text("Yape al 987 000 111")
+
+        assert [kind for kind, _ in provider.sent] == ["text"]
+        assert provider.sent[0][1]["body"] == "Yape al 987 000 111"
+        row = db.execute(
+            select(Message).where(
+                Message.conversation_id == conversation.id, Message.direction == "outbound"
+            )
+        ).scalar_one()
+        assert (row.msg_type, row.delivery_status, row.payload) == ("text", "sent", None)
+
+    async def test_a_text_with_the_window_closed_is_refused(self, db: Session) -> None:
+        from app.agent.outbound import OutboundFailed
+
+        tenant = _tenant(db)
+        conversation = _conversation(db, tenant, channel="whatsapp")
+        _connect_number(db, tenant)
+        contact = db.get(Contact, conversation.contact_id)
+        assert contact is not None
+        contact.last_inbound_at = datetime.now(UTC) - timedelta(hours=30)
+        db.flush()
+        provider = FakeWhatsApp()
+        outbound = live_outbound_factory(
+            db,
+            tenant.id,
+            provider=provider,
+            storage=MockStorageProvider(),  # type: ignore[arg-type]
+        )(conversation.id)
+        assert outbound is not None
+
+        with pytest.raises(OutboundFailed):
+            await outbound.send_text("hola")
+        assert provider.sent == []
 
     async def test_a_provider_failure_tells_the_model_and_leaves_no_row(self, db: Session) -> None:
         from app.providers.whatsapp.base import WhatsAppAuthError
