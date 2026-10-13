@@ -63,6 +63,7 @@ from app.services.emails import build_quality_alert_email, build_quota_warning_e
 from app.services.inbound_media import InboundImageReader
 from app.services.trial import (
     MeteringResult,
+    billing_enforced,
     claim_notification,
     pause_tenant,
     record_ai_message,
@@ -600,7 +601,8 @@ class ConversationResponder:
         hour of the customer talking to an agent that is, on paper, out of
         messages.
         """
-        if not metered.counted or metered.limit <= 0:
+        if not metered.counted or metered.limit <= 0 or not billing_enforced():
+            # Billing off: the message was counted, nothing else happens.
             return
 
         if metered.exhausted:

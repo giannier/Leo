@@ -45,6 +45,7 @@ from app.repositories.tenant import (
 )
 from app.repositories.user import VERIFY_EMAIL, EmailTokenRepository, UserRepository
 from app.services.emails import build_verification_email
+from app.services.trial import billing_enforced
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ class AuthService:
         )
         TenantUserRepository(self._session, tenant.id).add_member(user_id=user.id, role=OWNER_ROLE)
 
-        if phone_e164 is not None:
+        if phone_e164 is not None and billing_enforced():
             # Clarification 005, read literally: the number may not sit in two
             # tenants that are in trial *at the same time*. So the question is
             # asked of the tenants that are in trial now, and a business whose

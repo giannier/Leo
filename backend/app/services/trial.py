@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.business import AgentConfig
 from app.models.conversation import Conversation, Message
 from app.models.plan import Plan
@@ -103,6 +104,16 @@ def record_ai_message(session: Session, tenant_id: uuid.UUID, *, channel: str) -
     return MeteringResult(counted=True, used=tenant.ai_messages_used, limit=limit)
 
 
+def billing_enforced() -> bool:
+    """Whether the platform charges its tenants (`BILLING_ENFORCED`).
+
+    Off, nothing here pauses, expires or limits a tenant: the trial never
+    ends, the quota is counted but not enforced. A tenant an admin paused by
+    hand stays paused.
+    """
+    return get_settings().billing_enforced
+
+
 def agent_may_reply(session: Session, tenant: Tenant) -> bool:
     """Whether the agent is allowed to answer on the real channel.
 
@@ -120,7 +131,7 @@ def agent_may_reply(session: Session, tenant: Tenant) -> bool:
     """
     if tenant.status not in ("trial", "active"):
         return False
-    if tenant.status == "trial" and quota_exhausted(session, tenant):
+    if tenant.status == "trial" and billing_enforced() and quota_exhausted(session, tenant):
         return False
     config = session.get(AgentConfig, tenant.id)
     return bool(config and config.is_active)
@@ -135,8 +146,8 @@ def quota_exhausted(session: Session, tenant: Tenant) -> bool:
 
 
 def is_expired(session: Session, tenant: Tenant, *, now: datetime) -> bool:
-    """Whether the trial is over, by either clock or counter."""
-    if tenant.status != "trial":
+    """Whether the trial is over, by either clock or counter. Never, with billing off."""
+    if tenant.status != "trial" or not billing_enforced():
         return False
     by_date = tenant.trial_ends_at is not None and tenant.trial_ends_at <= now
     return by_date or quota_exhausted(session, tenant)
@@ -153,7 +164,7 @@ def due_notice(session: Session, tenant: Tenant, *, now: datetime) -> str | None
     Returning the same kind on two consecutive days is fine and expected: the
     primary key on `tenant_notifications` refuses the second send.
     """
-    if tenant.status != "trial":
+    if tenant.status != "trial" or not billing_enforced():
         return None
     if quota_exhausted(session, tenant):
         return TRIAL_ENDED

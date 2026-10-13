@@ -43,6 +43,7 @@ from app.repositories.knowledge import (
 )
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
+from app.services.trial import billing_enforced
 
 logger = logging.getLogger(__name__)
 
@@ -326,8 +327,10 @@ class KnowledgeService:
         try:
             TenantRepository(self._session).lock(self._tenant_id)
             usage = self.usage()
+            # Billing off: the budget is shown, not enforced.
+            enforced = billing_enforced()
 
-            if usage.files_used >= usage.files_limit:
+            if enforced and usage.files_used >= usage.files_limit:
                 raise RagLimitExceededError(
                     usage,
                     reason="files",
@@ -339,7 +342,7 @@ class KnowledgeService:
                 )
 
             projected = usage.chars_used + chars
-            if projected > usage.chars_limit:
+            if enforced and projected > usage.chars_limit:
                 raise RagLimitExceededError(
                     usage,
                     reason="chars",
@@ -351,7 +354,7 @@ class KnowledgeService:
                 )
             # A PDF reserves nothing up front, so "already at the limit" has
             # to be its own check: `0 > 0` is false and it would slip past.
-            if chars == 0 and usage.chars_remaining == 0:
+            if enforced and chars == 0 and usage.chars_remaining == 0:
                 raise RagLimitExceededError(
                     usage,
                     reason="chars",

@@ -36,6 +36,7 @@ from app.repositories.tenant import (
     TenantUserRepository,
 )
 from app.repositories.user import RefreshTokenRepository, UserRepository
+from app.services.trial import billing_enforced
 
 INVITATION_TTL_DAYS = 7
 DISABLED_MEMBERSHIP = "disabled"
@@ -156,7 +157,7 @@ class TeamService:
             raise AlreadyMember("That address already has a pending invitation.")
 
         usage = self.seat_usage()
-        if usage.free <= 0:
+        if billing_enforced() and usage.free <= 0:
             raise SeatLimitReached(
                 f"This plan allows {usage.limit} seats and {usage.used} are taken."
             )
@@ -319,7 +320,7 @@ def accept_invitation(
         assert plan is not None
         # The invitation itself no longer counts once it is being accepted,
         # so only active members are compared against the ceiling here.
-        if active >= plan.max_seats:
+        if billing_enforced() and active >= plan.max_seats:
             raise SeatLimitReached("This team has no free seats left.")
         members.add_member(user_id=user.id, role=invitation.role)
 

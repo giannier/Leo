@@ -49,3 +49,18 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
+
+
+@pytest.fixture(autouse=True)
+def billing_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test runs with platform billing enforced.
+
+    The default is off while Giannier tests the product with his own
+    businesses (`BILLING_ENFORCED`), but the trial, quota and limit tests are
+    about the behaviour that will be switched on, so they get it. The tests
+    of the off switch turn it off themselves
+    (`tests/integration/test_billing_switch.py`).
+    """
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "billing_enforced", True)

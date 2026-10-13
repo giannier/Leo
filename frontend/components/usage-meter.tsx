@@ -66,6 +66,24 @@ export function UsageMeter() {
   const urgent = usage.percent_used >= URGENT_PERCENT;
   const remaining = Math.max(usage.ai_messages_limit - usage.ai_messages_used, 0);
 
+  if (!usage.cobro_activo) {
+    // Billing off: the count is still worth seeing, the limit is not enforced.
+    return (
+      <Card>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold">Consumo de tu agente</h2>
+          <p className="tabular text-sm text-ink-faint">
+            {usage.messages_in} recibidos · {usage.messages_out} enviados este mes
+          </p>
+        </div>
+        <p className="mt-3 text-sm">
+          <span className="tabular font-semibold">{usage.ai_messages_used}</span> respuestas del
+          agente por WhatsApp. Sin límite en modo pruebas.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <div className="flex flex-wrap items-baseline justify-between gap-2">

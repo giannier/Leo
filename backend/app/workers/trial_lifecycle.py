@@ -105,10 +105,12 @@ async def run_trial_notifier(
     now: datetime | None = None,
     settings: Settings | None = None,
 ) -> JobOutcome:
-    """Send the day -3 / -1 / 0 warnings (RF-005)."""
+    """Send the day -3 / -1 / 0 warnings (RF-005). Nothing, with billing off."""
     now = now or datetime.now(UTC)
     settings = settings or get_settings()
     considered = acted = skipped = 0
+    if not settings.billing_enforced:
+        return JobOutcome(considered=0, acted=0, skipped=0)
 
     for tenant in active_trials(session):
         considered += 1
@@ -162,6 +164,9 @@ async def run_trial_enforcer(
     now = now or datetime.now(UTC)
     settings = settings or get_settings()
     considered = acted = skipped = 0
+    if not settings.billing_enforced:
+        # Billing off: no trial ends, by date or by quota.
+        return JobOutcome(considered=0, acted=0, skipped=0)
 
     # Both reasons, de-duplicated: a tenant can be over on date *and* quota,
     # and pausing it twice would send two farewells into the same thread.

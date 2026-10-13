@@ -55,6 +55,16 @@ export function TrialBanner({ tenant }: { tenant: TenantSummary }) {
     );
   }
 
+  if (tenant.status === "trial" && !tenant.cobro_activo) {
+    // Billing is off while the product is tested with real businesses: no
+    // countdown, no limits to warn about.
+    return (
+      <Alert tone="info" title="Modo pruebas">
+        Sin límites ni cobros: la prueba no vence y el agente responde sin tope de mensajes.
+      </Alert>
+    );
+  }
+
   const trial = tenant.trial;
   if (tenant.status !== "trial" || !trial) {
     return null;

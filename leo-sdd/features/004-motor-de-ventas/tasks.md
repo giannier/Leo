@@ -383,7 +383,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 - [ ] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
   - Input: C-02
-  - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas. **Milestone B, decisión 4:** los planes de pago permiten los tres niveles (migración 0027) y **cada nivel descuenta créditos según su costo real** (un mensaje `mejor` gasta más que uno `economico`; la tabla de costo por nivel va en settings y la cobra la 009); la prueba gratis solo usa `economico`
+  - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas. **Milestone B, decisión 4:** los planes de pago permiten los tres niveles (migración 0027) y **cada nivel descuenta créditos según su costo real** (un mensaje `mejor` gasta más que uno `economico`; la tabla de costo por nivel va en settings y la cobra la 009); la prueba gratis solo usa `economico`. **Mientras `BILLING_ENFORCED` esté apagado** (Giannier prueba con sus negocios), ningún nivel se bloquea por plan
   - Depends on: TASK-421, TASK-431
   - Verification: tests del breaker con proveedor que falla; un nivel no permitido cae al permitido más alto; la ventana se respeta
   - Parallel: true
