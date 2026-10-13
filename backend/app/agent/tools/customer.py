@@ -13,8 +13,8 @@ Where things go:
   `contacts.custom_data`, validated field by field (`orders.customer_data`).
 * `tipo_entrega` and `zona_envio` go to the **order**, checked against what the
   business offers (*Información del negocio -> Entregas*, C-22), and the shipping is
-  recalculated. A business that only offers pickup does not make the customer
-  choose: the type is set by itself.
+  recalculated. A business that only offers pickup, or only delivers, does not
+  make the customer choose: the type is set by itself.
 * Delivery fields are only accepted when the order needs delivery: something
   physical in it and a business that delivers or lets people pick up. A digital
   product never asks for an address.
@@ -33,7 +33,7 @@ from app.agent.tools.registry import ToolContext, ToolResult
 from app.models.orders import Order
 from app.orders.customer_data import ORDER_FIELDS, InvalidField, validate_field
 from app.orders.service import InvalidDelivery, OrderService
-from app.process.facts import missing_customer_data
+from app.process.facts import missing_customer_data, only_delivery_type
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository
 
@@ -105,7 +105,7 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
         saved.extend(contact_values)
 
     valid_zones: tuple[str, ...] = ()
-    fixed_pickup = False
+    fixed_type: str | None = None
     if order is not None:
         if changed:
             service.customer_data_changed(order)
@@ -128,7 +128,7 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
             except InvalidDelivery as exc:
                 invalid["zona_envio"] = f"{exc}."
                 valid_zones = exc.valid_zones or valid_zones
-        fixed_pickup = _settle_pickup(service, order)
+        fixed_type = _settle_delivery_type(service, order)
 
     missing = missing_customer_data(
         contact,
@@ -141,30 +141,25 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
     data: dict[str, Any] = {"guardados": saved, "invalidos": invalid, "faltan": missing}
     if valid_zones:
         data["zonas_validas"] = list(valid_zones)
-    if fixed_pickup:
-        data["tipo_entrega"] = "recojo"
+    if fixed_type is not None:
+        data["tipo_entrega"] = fixed_type
 
-    text = _describe(saved, invalid, missing, valid_zones, fixed_pickup)
-    if not saved and not fixed_pickup:
+    text = _describe(saved, invalid, missing, valid_zones, fixed_type)
+    if not saved and fixed_type is None:
         if not invalid:
             return ToolResult.error("No recibí ningún dato para guardar.")
         return ToolResult("error", data, f"No se guardó nada. {text}", None)
     return ToolResult.hecho(data=data, texto=text, decir=_say(invalid, missing))
 
 
-def _settle_pickup(service: OrderService, order: Order) -> bool:
-    """A business that only offers pickup does not make the customer choose (C-22)."""
-    entregas = service.entregas()
-    if (
-        entregas is None
-        or order.tipo_entrega is not None
-        or not entregas.recojo_en_tienda
-        or entregas.hace_delivery
-        or not service.requires_delivery(order)
-    ):
-        return False
-    service.set_delivery(order, tipo_entrega="recojo")
-    return True
+def _settle_delivery_type(service: OrderService, order: Order) -> str | None:
+    """A business with a single way to deliver does not make the customer choose
+    (C-22; only delivery added in Milestone B, decision 11). Returns the type set."""
+    kind = only_delivery_type(service.entregas())
+    if kind is None or order.tipo_entrega is not None or not service.requires_delivery(order):
+        return None
+    service.set_delivery(order, tipo_entrega=kind)
+    return kind
 
 
 def _describe(
@@ -172,13 +167,15 @@ def _describe(
     invalid: dict[str, str],
     missing: list[str],
     zones: tuple[str, ...],
-    fixed_pickup: bool,
+    fixed_type: str | None,
 ) -> str:
     lines: list[str] = []
     if saved:
         lines.append("Guardado: " + ", ".join(saved) + ".")
-    if fixed_pickup:
+    if fixed_type == "recojo":
         lines.append("El negocio solo ofrece recojo en tienda: quedó como recojo.")
+    elif fixed_type == "delivery":
+        lines.append("El negocio solo hace delivery: quedó como delivery.")
     for field, reason in invalid.items():
         lines.append(f"No válido: {field} ({reason})")
     if zones:

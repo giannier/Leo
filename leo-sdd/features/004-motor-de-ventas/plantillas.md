@@ -58,7 +58,7 @@ Implementación de referencia con los casos esperados (los 18 de v21 traducidos 
 
 - `vio_productos` (hecho guardado): se fija cuando `buscar_productos` o `ver_producto` devuelven resultados, o cuando `mostrar_opciones(productos)` se envía.
 - `pedido.completo`: tiene al menos un ítem y cada paquete tiene `bundle_size × cantidad` selecciones.
-- `datos_completos`: están todos los campos de `datos_requeridos` (no se pide `telefono` si el contacto ya lo tiene). Si el pedido **requiere entrega** (algún ítem no es digital y la sección Entregas tiene delivery o recojo), además hace falta `tipo_entrega`. Si es `delivery`, también `direccion`, y `zona_envio` cuando hay zonas configuradas. Si el negocio solo ofrece recojo, `tipo_entrega = recojo` se fija solo.
+- `datos_completos`: están todos los campos de `datos_requeridos` (no se pide `telefono` si el contacto ya lo tiene). Si el pedido **requiere entrega** (algún ítem no es digital y la sección Entregas tiene delivery o recojo), además hace falta `tipo_entrega`. Si es `delivery`, también `direccion`, y `zona_envio` cuando hay zonas configuradas. Si el negocio solo ofrece recojo, `tipo_entrega = recojo` se fija solo; si solo hace delivery, `tipo_entrega = delivery` se fija solo y no se pregunta (Giannier, Milestone B, decisión 11).
 - `derivado_activo`: `facts.derivado.hasta > now()`.
 - `pago_estado = rechazado` solo mientras `orders.rechazo_vigente` sea verdadero. `OrderService` lo apaga ante cualquier cambio de ítems o de datos del cliente, con lo que el cliente sale de VERIFICACION hacia PEDIDO, DATOS o COBRO (data-model §0019).
 
@@ -345,7 +345,7 @@ Cuando el último intento menciona una promoción para seguimiento, el sistema r
 | Operador rechaza el pago | "{nombre_cliente}, revisamos tu comprobante y hay un detalle: {motivo}. ¿Nos ayudas a corregirlo?" |
 | Operador rechaza un pedido contra entrega | "{nombre_cliente}, revisamos tu pedido #{numero} y hay un detalle: {motivo}. ¿Lo ajustamos?" |
 | Operador anula un pedido que el cliente ya pagó | "{nombre_cliente}, tu pedido #{numero} fue anulado: {motivo}. Si ya realizaste el pago, nos comunicaremos contigo para la devolución." |
-| Derivación | "Te comunico con una persona del equipo. Te responderá en breve 🙌" |
+| Derivación | "Te comunico con una persona de nuestro equipo. Te responde en breve." (Giannier, Milestone B, decisión 19; cada negocio lo edita) |
 | Bot reanudado por vencer la pausa | (sin mensaje: espera a que el cliente escriba) |
 
 Placeholders exclusivos de estos mensajes: `{numero}`, `{motivo}` y `{siguiente_paso}`.
