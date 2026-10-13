@@ -100,6 +100,7 @@ def seed_order(
     phone: str | None = None,
     price: str = "120.00",
     submit: bool = True,
+    moneda: str = "PEN",
 ) -> tuple[Order, PaymentProof | None]:
     """A customer who paid and waits: order `por_confirmar`, a receipt, stage VERIFICACION."""
     tid = uuid.UUID(tenant_id)
@@ -142,7 +143,7 @@ def seed_order(
     service = OrderService(db, tid)
     order = service.open_draft(
         conversation,
-        moneda="PEN",
+        moneda=moneda,
         modalidad_pago="contra_entrega" if contra_entrega else "previo",
         is_sandbox=sandbox,
     )
@@ -166,7 +167,7 @@ def seed_order(
                 conversation_id=conversation.id,
                 storage_key=f"tenants/{tid}/proofs/{uuid.uuid4()}.jpg",
                 monto=D(price),
-                moneda="PEN",
+                moneda=moneda,
                 codigo_operacion="OP-1",
                 entidad="Yape",
                 confianza=D("0.90"),
@@ -369,6 +370,59 @@ class TestListAndSummary:
         empty = await api.get(f"{ORDERS}/summary?periodo=30d", headers=(await _owner(api, mail))[1])
         assert empty.json()["conversiones"] == 0 and empty.json()["ticket_promedio"] == "0.00"
         assert (await api.get(f"{ORDERS}/summary?periodo=1y", headers=headers)).status_code == 400
+
+    async def test_the_summary_never_adds_up_two_currencies(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        """Milestone B review, D-3: one total per currency."""
+        account, headers = await _owner(api, mail)
+        tid = account["tenant_id"]
+        sold = [
+            seed_order(db, tid, price="100.00")[0],
+            seed_order(db, tid, price="300.00")[0],
+            seed_order(db, tid, price="50.00", moneda="USD")[0],
+        ]
+        for order in sold:
+            assert (
+                await api.post(f"{ORDERS}/{order.id}/confirm", headers=headers)
+            ).status_code == 200
+
+        body = (await api.get(f"{ORDERS}/summary?periodo=7d", headers=headers)).json()
+
+        assert body["conversiones"] == 3
+        # The headline figures are the business's own currency only.
+        assert (body["valor_total"], body["ticket_promedio"], body["moneda"]) == (
+            "400.00",
+            "200.00",
+            "PEN",
+        )
+        assert body["por_moneda"] == [
+            {
+                "moneda": "PEN",
+                "conversiones": 2,
+                "valor_total": "400.00",
+                "ticket_promedio": "200.00",
+            },
+            {
+                "moneda": "USD",
+                "conversiones": 1,
+                "valor_total": "50.00",
+                "ticket_promedio": "50.00",
+            },
+        ]
+
+    async def test_sales_only_in_another_currency_leave_the_own_figures_at_zero(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        account, headers = await _owner(api, mail)
+        order, _ = seed_order(db, account["tenant_id"], price="80.00", moneda="USD")
+        assert (await api.post(f"{ORDERS}/{order.id}/confirm", headers=headers)).status_code == 200
+
+        body = (await api.get(f"{ORDERS}/summary", headers=headers)).json()
+
+        assert body["conversiones"] == 1
+        assert (body["valor_total"], body["moneda"]) == ("0.00", "PEN")
+        assert [row["moneda"] for row in body["por_moneda"]] == ["USD"]
 
 
 class TestDetail:

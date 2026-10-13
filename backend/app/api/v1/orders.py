@@ -97,11 +97,22 @@ class OrderList(BaseModel):
     page: int
 
 
-class OrderSummary(BaseModel):
+class CurrencySales(BaseModel):
+    moneda: str
     conversiones: int
     valor_total: Decimal
     ticket_promedio: Decimal
+
+
+class OrderSummary(BaseModel):
+    # Every sale, whatever its currency.
+    conversiones: int
+    # Value and average ticket in the business's currency only (`moneda`).
+    valor_total: Decimal
+    ticket_promedio: Decimal
     moneda: str
+    # One row per currency sold in the period, the business's first.
+    por_moneda: list[CurrencySales]
     por_estado: dict[str, int]
     pendientes_revision: int
 
@@ -372,16 +383,31 @@ def orders_summary(
     """
     orders = OrderRepository(session, principal.tenant_id)
     since = _period_start(periodo, session, principal.tenant_id)
-    sales, value = orders.sales_made(since=since)
+    currency = _currency(session, principal.tenant_id)
+    rows = {
+        moneda: _currency_sales(moneda, count, total)
+        for moneda, count, total in orders.sales_by_currency(since=since)
+    }
+    own = rows.pop(currency, _currency_sales(currency, 0, Decimal("0")))
     by_state = orders.totals_by_state(since=since)
-    ticket = (value / sales).quantize(Decimal("0.01"), ROUND_HALF_UP) if sales else Decimal("0.00")
     return OrderSummary(
-        conversiones=sales,
-        valor_total=value.quantize(Decimal("0.01")),
-        ticket_promedio=ticket,
-        moneda=_currency(session, principal.tenant_id),
+        conversiones=own.conversiones + sum(row.conversiones for row in rows.values()),
+        valor_total=own.valor_total,
+        ticket_promedio=own.ticket_promedio,
+        moneda=currency,
+        por_moneda=[own, *rows.values()] if own.conversiones else list(rows.values()),
         por_estado={state: by_state.get(state, 0) for state in ORDER_STATES},
         pendientes_revision=by_state.get("por_confirmar", 0),
+    )
+
+
+def _currency_sales(moneda: str, count: int, total: Decimal) -> CurrencySales:
+    ticket = (total / count).quantize(Decimal("0.01"), ROUND_HALF_UP) if count else Decimal("0.00")
+    return CurrencySales(
+        moneda=moneda,
+        conversiones=count,
+        valor_total=total.quantize(Decimal("0.01")),
+        ticket_promedio=ticket,
     )
 
 

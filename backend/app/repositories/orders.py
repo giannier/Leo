@@ -139,18 +139,28 @@ class OrderRepository(BaseRepository[Order]):
             statement = statement.where(Order.created_at < until)
         return {state: int(count) for state, count in self._session.execute(statement).all()}
 
-    def sales_made(self, *, since: datetime, until: datetime | None = None) -> tuple[int, Decimal]:
-        """`(count, total)` of the real orders that reached `confirmado` or beyond in the period."""
-        statement = select(func.count(), func.coalesce(func.sum(Order.total), 0)).where(
-            Order.tenant_id == self._tenant_id,
-            Order.is_sandbox.is_(False),
-            Order.estado.in_(("confirmado", "en_curso", "completado")),
-            Order.confirmed_at >= since,
+    def sales_by_currency(
+        self, *, since: datetime, until: datetime | None = None
+    ) -> list[tuple[str, int, Decimal]]:
+        """`(currency, count, total)` of the real orders that reached `confirmado` or
+        beyond in the period, one row per currency: soles and dollars never add up."""
+        statement = (
+            select(Order.moneda, func.count(), func.coalesce(func.sum(Order.total), 0))
+            .where(
+                Order.tenant_id == self._tenant_id,
+                Order.is_sandbox.is_(False),
+                Order.estado.in_(("confirmado", "en_curso", "completado")),
+                Order.confirmed_at >= since,
+            )
+            .group_by(Order.moneda)
+            .order_by(Order.moneda)
         )
         if until is not None:
             statement = statement.where(Order.confirmed_at < until)
-        count, total = self._session.execute(statement).one()
-        return int(count), Decimal(total)
+        return [
+            (str(moneda), int(count), Decimal(total))
+            for moneda, count, total in self._session.execute(statement).all()
+        ]
 
     def _list_criteria(
         self,
