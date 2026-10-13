@@ -457,7 +457,12 @@ class TestConfirm:
         assert order.siguiente_paso == "Te enviamos tu acceso hoy"
         assert proof.estado == "aprobado" and proof.reviewed_at is not None
         # The audit entry carries who and what, never the customer's data.
-        [entry] = db.execute(select(AuditLog).where(AuditLog.action == "order.confirmed")).scalars()
+        [entry] = db.execute(
+            select(AuditLog).where(
+                AuditLog.action == "order.confirmed",
+                AuditLog.tenant_id == uuid.UUID(account["tenant_id"]),
+            )
+        ).scalars()
         assert entry.tenant_id == uuid.UUID(account["tenant_id"])
         assert entry.detail["order_id"] == str(order.id)
         assert (entry.detail["de"], entry.detail["a"]) == ("por_confirmar", "confirmado")
@@ -619,8 +624,12 @@ class TestReject:
         assert order.motivo_rechazo == "El monto no coincide con el total"
         assert proof.estado == "rechazado"
         assert proof.motivo_rechazo == "El monto no coincide con el total"
-        # The stage was already VERIFICACION (waiting) and still is (rejected): no new event.
-        assert events(db, order.conversation_id) == [("VERIFICACION", "comprobante")]
+        # The stage was already VERIFICACION (waiting) and still is (rejected), but the
+        # decision itself is an event: the contract names `operador:rechazar`.
+        assert events(db, order.conversation_id) == [
+            ("VERIFICACION", "comprobante"),
+            ("VERIFICACION", "operador:rechazar"),
+        ]
         state = StateRepo(db, uuid.UUID(account["tenant_id"])).get(order.conversation_id)
         assert state is not None and state.stage_key == "VERIFICACION"
         [(_, body)] = whatsapp.sent
@@ -628,7 +637,12 @@ class TestReject:
             "Ana, revisamos tu comprobante y hay un detalle: El monto no coincide con el total. "
             "¿Nos ayudas a corregirlo?"
         )
-        [entry] = db.execute(select(AuditLog).where(AuditLog.action == "order.rejected")).scalars()
+        [entry] = db.execute(
+            select(AuditLog).where(
+                AuditLog.action == "order.rejected",
+                AuditLog.tenant_id == uuid.UUID(account["tenant_id"]),
+            )
+        ).scalars()
         assert entry.detail["proof_id"] == str(proof.id)
 
     async def test_cash_on_delivery_goes_back_to_checkout_with_the_reason(

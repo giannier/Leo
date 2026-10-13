@@ -33,12 +33,15 @@ def recompute_stage(
     *,
     reason: str,
     now: datetime | None = None,
+    force_event: bool = False,
 ) -> SaveResult | None:
     """Recompute and save the stage of one conversation.
 
     Returns the save, or None when neither the stage nor the funnel column changed
-    (nothing is written then, and no event). Retries once on a concurrent write: the
-    bot may be answering at the same moment.
+    (nothing is written then, and no event) unless `force_event` is set: a decision
+    that must stay in the history even when the stage did not move, such as
+    rejecting a receipt. Retries once on a concurrent write: the bot may be
+    answering at the same moment.
     """
     if conversation.tenant_id != tenant_id:
         raise TenantScopeError("the conversation belongs to another tenant")
@@ -49,7 +52,7 @@ def recompute_stage(
     facts = FactsLoader(session, tenant_id, config.facts_config()).load(conversation, now=moment)
     stage = compute_stage(config.template, config.options, facts, moment)
     funnel = funnel_for(config.template, stage, facts)
-    if (stage.value, funnel.value) == (state.stage_key, state.funnel_code):
+    if not force_event and (stage.value, funnel.value) == (state.stage_key, state.funnel_code):
         return None
 
     version = state.version
@@ -63,6 +66,7 @@ def recompute_stage(
                 reason=reason,
                 expected_version=version,
                 snapshot=facts_snapshot(facts),
+                force_event=force_event,
             )
         except StateConflict:
             if attempt == 2:
