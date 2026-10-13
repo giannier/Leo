@@ -84,7 +84,14 @@ GROUPS: list[tuple[str, list[str]]] = [
     ),
     (
         "Object storage",
-        ["s3_endpoint_url", "s3_access_key", "s3_secret_key", "s3_bucket", "s3_region"],
+        [
+            "s3_endpoint_url",
+            "s3_public_endpoint_url",
+            "s3_access_key",
+            "s3_secret_key",
+            "s3_bucket",
+            "s3_region",
+        ],
     ),
     (
         "Knowledge / RAG",

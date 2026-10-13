@@ -26,17 +26,32 @@ class S3StorageProvider:
         access_key: str,
         secret_key: str,
         region: str = "us-east-1",
+        public_endpoint_url: str | None = None,
     ) -> None:
         self._bucket = bucket
-        self._client: Any = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-            # Path addressing: MinIO does not serve virtual-host style buckets
-            # on a bare hostname, and signature v4 is what it validates.
-            config=Config(s3={"addressing_style": "path"}, signature_version="s3v4"),
+
+        def build(endpoint: str | None) -> Any:
+            return boto3.client(
+                "s3",
+                endpoint_url=endpoint,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+                # Path addressing: MinIO does not serve virtual-host style
+                # buckets on a bare hostname, and signature v4 is what it
+                # validates.
+                config=Config(s3={"addressing_style": "path"}, signature_version="s3v4"),
+            )
+
+        self._client: Any = build(endpoint_url)
+        # A presigned URL is signed over its host, so a link meant for a
+        # browser has to be signed with the host the browser will reach, not
+        # the in-network one (`minio:9000`) the backend uses. Signing is
+        # arithmetic over the credential: this second client never connects.
+        self._signer: Any = (
+            build(public_endpoint_url)
+            if public_endpoint_url and public_endpoint_url != endpoint_url
+            else self._client
         )
 
     @property
@@ -90,7 +105,7 @@ class S3StorageProvider:
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         try:
-            url: str = self._client.generate_presigned_url(
+            url: str = self._signer.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self._bucket, "Key": key},
                 ExpiresIn=expires_in,
