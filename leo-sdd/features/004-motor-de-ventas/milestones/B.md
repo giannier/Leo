@@ -30,6 +30,11 @@ Este milestone demuestra el ciclo completo de una venta: el cliente arma el pedi
 
 ## 2. Preparar los tenants
 
+> **Atajo (2026-10-13):** `make seed-milestone-b` hace todo lo de esta sección de una vez y se puede
+> correr dos veces sin duplicar nada: crea **Tienda Demo** con su dueño (`tienda.demo@leo.test` /
+> `tienda-demo-2026`), sus 3 productos, entregas, el 2×1 y Yape, y le agrega Yape a **Escuela Capacita** si
+> existe. Los pasos de abajo quedan como referencia de lo que hace.
+
 ### 2.1 Capacita: lo que falta
 
 Falta solo un **método de pago**. Si ya lo cargaste en el paso 5 del onboarding, omite el `INSERT` (devolverá `INSERT 0 0`):
