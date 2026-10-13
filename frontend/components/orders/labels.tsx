@@ -68,6 +68,22 @@ export const OBSERVATION_LABELS: Record<string, { label: string; detail: string 
     label: "No se pudo leer",
     detail: "No se extrajeron datos de la imagen. Compárala tú mismo con el pedido.",
   },
+  monto_negativo: {
+    label: "Monto negativo",
+    detail: "Parece una devolución o un reverso, no un pago. Revisa la foto antes de decidir.",
+  },
+  destinatario_distinto: {
+    label: "Pago a otra persona",
+    detail: "El destinatario del comprobante no coincide con las cuentas de cobro de tu negocio.",
+  },
+  destinatario_no_verificado: {
+    label: "Destinatario sin verificar",
+    detail: "No se pudo comprobar a quién se hizo el pago. Revisa el nombre en la foto.",
+  },
+  fecha_anterior_al_pedido: {
+    label: "Fecha anterior al pedido",
+    detail: "La operación es de un día anterior a la creación del pedido.",
+  },
 };
 
 export function observationLabel(code: string): string {

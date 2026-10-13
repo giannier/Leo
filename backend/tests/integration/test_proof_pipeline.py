@@ -13,6 +13,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import select
@@ -40,6 +41,12 @@ from app.services.turn_outbound import SandboxOutbound
 D = Decimal
 SHOP = TEMPLATES["productos"]
 PHOTO = ReceivedImage(data=b"fake-jpeg-bytes", mime_type="image/jpeg")
+# The account holder the test business collects under.
+PAYEE = "Tienda SAC"
+
+
+def today_in_lima() -> str:
+    return datetime.now(ZoneInfo("America/Lima")).date().isoformat()
 
 
 def receipt(**overrides: Any) -> dict[str, Any]:
@@ -47,7 +54,7 @@ def receipt(**overrides: Any) -> dict[str, Any]:
         "es_comprobante": True,
         "monto": "120.00",
         "moneda": "PEN",
-        "fecha": "2026-10-12",
+        "fecha": today_in_lima(),
         "codigo": "OP-777",
         "entidad": "Yape",
         "destinatario": "Tienda SAC",
@@ -164,7 +171,12 @@ class World:
         self.db.flush()
         return message
 
-    def pipeline(self, llm: MockLLMProvider, reader: ImageReader | None = None) -> TurnPipeline:
+    def pipeline(
+        self,
+        llm: MockLLMProvider,
+        reader: ImageReader | None = None,
+        payees: tuple[str, ...] = (PAYEE,),
+    ) -> TurnPipeline:
         return TurnPipeline(
             self.db,
             self.tenant.id,
@@ -173,16 +185,25 @@ class World:
             sandbox=self.sandbox,
             process_config=ProcessConfigService(self.db, cache=ProcessConfigCache()),
             proofs=ProofPipeline(
-                self.db, self.tenant.id, llm=llm, storage=self.storage, notices=self.notices
+                self.db,
+                self.tenant.id,
+                llm=llm,
+                storage=self.storage,
+                notices=self.notices,
+                payees=payees,
             ),
             images=reader or FakeReader(),
         )
 
     async def send_photo(
-        self, llm: MockLLMProvider, reader: ImageReader | None = None, text: str = "ya pagué"
+        self,
+        llm: MockLLMProvider,
+        reader: ImageReader | None = None,
+        text: str = "ya pagué",
+        payees: tuple[str, ...] = (PAYEE,),
     ) -> Any:
         message = self.say(text)
-        return await self.pipeline(llm, reader).run(
+        return await self.pipeline(llm, reader, payees).run(
             self.conversation.id,
             InboundTurn(image=True, images=(InboundImage(message_id=message.id),)),
         )
@@ -298,6 +319,147 @@ class TestWhatLooksOff:
         assert shop.stored_proofs()[0].observaciones == ["codigo_repetido"]
 
 
+class TestAnEmptyListMeansEverythingWasChecked:
+    """Milestone B, findings D-1 and D-2."""
+
+    async def test_a_negative_amount_is_flagged_and_never_matches_the_total(
+        self, world: World
+    ) -> None:
+        await world.send_photo(vision(receipt(monto="-120.00")))
+
+        [proof] = world.stored_proofs()
+        assert proof.monto == D("-120.00")
+        assert proof.observaciones == ["monto_negativo", "monto_distinto"]
+
+    async def test_an_amount_with_a_decimal_comma_matches_the_total(self, world: World) -> None:
+        await world.send_photo(vision(receipt(monto="120,00")))
+
+        assert world.stored_proofs()[0].observaciones == []
+
+    async def test_without_accounts_to_compare_the_recipient_is_not_verified(
+        self, world: World
+    ) -> None:
+        await world.send_photo(vision(receipt()), payees=())
+
+        assert world.stored_proofs()[0].observaciones == ["destinatario_no_verificado"]
+
+    async def test_a_payment_to_someone_else_is_flagged(self, world: World) -> None:
+        await world.send_photo(vision(receipt(destinatario="Carlos Quispe")))
+
+        assert world.stored_proofs()[0].observaciones == ["destinatario_distinto"]
+
+    async def test_an_unreadable_recipient_is_not_verified(self, world: World) -> None:
+        await world.send_photo(vision(receipt(destinatario=None)))
+
+        assert world.stored_proofs()[0].observaciones == ["destinatario_no_verificado"]
+
+    @pytest.mark.parametrize("shown", ["TIENDA SAC", "Tienda S*", "tienda", "Tiénda  S.A.C"])
+    async def test_a_shortened_or_masked_holder_name_still_matches(
+        self, world: World, shown: str
+    ) -> None:
+        await world.send_photo(vision(receipt(destinatario=shown)))
+
+        assert world.stored_proofs()[0].observaciones == []
+
+    async def test_an_operation_dated_before_the_order_is_flagged(self, world: World) -> None:
+        await world.send_photo(vision(receipt(fecha="2020-01-01")))
+
+        assert world.stored_proofs()[0].observaciones == ["fecha_anterior_al_pedido"]
+
+
+class TestAReceiptForAnIncompleteOrder:
+    """Milestone B, finding E-1: the proof waits on the draft, nobody is told yet."""
+
+    def proofs(self, world: World, llm: MockLLMProvider) -> ProofPipeline:
+        return ProofPipeline(
+            world.db,
+            world.tenant.id,
+            llm=llm,
+            storage=world.storage,
+            notices=world.notices,
+            payees=(PAYEE,),
+        )
+
+    async def test_the_proof_waits_and_the_model_asks_for_what_is_missing(
+        self, db: Session, world: World
+    ) -> None:
+        world.contact.custom_data = {}
+        db.flush()
+
+        outcome = await self.proofs(world, vision(receipt())).handle(world.conversation, PHOTO)
+
+        [proof] = world.stored_proofs()
+        db.refresh(world.order)
+        assert outcome.kind == "registrado" and outcome.proof is proof
+        assert proof.estado == "por_verificar"
+        assert world.order.estado == "borrador"
+        assert world.notices.proofs == []
+        assert outcome.context is not None
+        assert "falta: nombres" in outcome.context
+        assert "no digas que está en revisión" in outcome.context
+
+    async def test_another_photo_while_it_waits_is_neither_a_proof_nor_a_notice(
+        self, db: Session, world: World
+    ) -> None:
+        world.contact.custom_data = {}
+        db.flush()
+        llm = vision(receipt(), receipt(codigo="OP-888"))
+        pipeline = self.proofs(world, llm)
+        await pipeline.handle(world.conversation, PHOTO)
+
+        outcome = await pipeline.handle(world.conversation, PHOTO)
+
+        assert outcome.kind == "ignorado"
+        assert outcome.context is not None and "ya tenemos su comprobante" in outcome.context
+        assert len(world.stored_proofs()) == 1
+        assert world.notices.proofs == []
+        # The second photo was not even read.
+        assert len(llm.vision_responses) == 1
+
+    async def test_once_the_order_is_complete_it_goes_to_the_operator_and_only_then_is_told(
+        self, db: Session
+    ) -> None:
+        world = World(db, sandbox=False)
+        world.contact.custom_data = {}
+        db.flush()
+        pipeline = self.proofs(world, vision(receipt()))
+        await pipeline.handle(world.conversation, PHOTO)
+        assert pipeline.submit_waiting(world.conversation) is None
+
+        world.contact.custom_data = {"nombres": "Ana"}
+        db.flush()
+        order = pipeline.submit_waiting(world.conversation)
+
+        [proof] = world.stored_proofs()
+        assert order is not None and order.estado == "por_confirmar"
+        assert order.datos_cliente is not None and order.datos_cliente["nombres"] == "Ana"
+        assert world.notices.proofs == [proof.id]
+        # Nothing waits any more: a second call does nothing.
+        assert pipeline.submit_waiting(world.conversation) is None
+        assert world.notices.proofs == [proof.id]
+
+    async def test_the_turn_that_completes_the_order_moves_it_to_verification(
+        self, db: Session, world: World
+    ) -> None:
+        world.contact.custom_data = {}
+        db.flush()
+        await self.proofs(world, vision(receipt())).handle(world.conversation, PHOTO)
+        # The customer gave their name (a tool would write it during the turn).
+        world.contact.custom_data = {"nombres": "Ana"}
+        db.flush()
+        llm = vision()
+        world.say("me llamo Ana")
+
+        result = await world.pipeline(llm).run(world.conversation.id, InboundTurn(text="Ana"))
+
+        assert result.outcome == "answered", result.gate
+        db.refresh(world.order)
+        assert world.order.estado == "por_confirmar"
+        assert result.stage_after is Stage.VERIFICACION
+        # The model of that turn knew the receipt was already in.
+        assert "comprobante ya recibido" in the_prompt(llm)
+
+
 class TestWhatIsNotAReceipt:
     async def test_a_photo_that_is_not_a_receipt_creates_nothing_and_the_model_knows(
         self, db: Session, world: World
@@ -348,7 +510,7 @@ class TestWhenVisionFails:
         result = await world.send_photo(llm)
 
         [proof] = world.stored_proofs()
-        assert proof.observaciones == ["sin_datos"]
+        assert proof.observaciones == ["sin_datos", "destinatario_no_verificado"]
         assert proof.monto is None and proof.codigo_operacion is None
         assert proof.extraccion is not None and proof.extraccion["legible"] is False
         assert result.stage_after is Stage.VERIFICACION
@@ -363,7 +525,7 @@ class TestWhenVisionFails:
 
         await world.send_photo(llm)
 
-        assert world.stored_proofs()[0].observaciones == ["sin_datos"]
+        assert world.stored_proofs()[0].observaciones == ["sin_datos", "destinatario_no_verificado"]
 
     async def test_a_photo_that_cannot_be_downloaded_asks_for_it_again(self, world: World) -> None:
         llm = vision(receipt())

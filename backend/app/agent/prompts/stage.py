@@ -516,6 +516,11 @@ def _state_lines(
     elif facts.motivo_rechazo:
         # A rejected cash-on-delivery order goes back to COBRO with the reason.
         payment += f" (el negocio rechazó antes: {_one_line(facts.motivo_rechazo, limits.text)})"
+    if facts.comprobante_en_espera:
+        payment = (
+            "comprobante ya recibido; pasa a revisión del negocio cuando el pedido y los "
+            "datos estén completos (no lo pidas de nuevo ni reenvíes los métodos de pago)"
+        )
     lines.append(f"- Pago: {payment}")
 
     turn_lines = turn.lines()
