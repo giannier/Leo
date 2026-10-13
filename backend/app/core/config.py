@@ -45,9 +45,10 @@ DEV_CREDENTIALS_KEY = "bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE="
 # RFC 7518 §3.2: an HMAC key should be at least as long as the hash output.
 MIN_SECRET_KEY_LENGTH = 32
 
-# Which upstream the platform's own LLM calls go to. Both are hosted APIs
-# speaking the same protocol; neither runs a model on our infrastructure.
-LLMProfile = Literal["nvidia", "openai", "offline"]
+# Which upstream the platform's own LLM calls go to: OpenAI, a hosted API (no
+# model runs on our infrastructure), or the offline stand-in for development.
+# The NVIDIA Build profile was removed in Milestone B at Giannier's request.
+LLMProfile = Literal["openai", "offline"]
 
 # backend/app/core/config.py -> backend/app/core -> backend/app -> backend -> repo root
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -103,15 +104,6 @@ class Settings(BaseSettings):
     # column - a schema migration and a full reindex, to keep a provider that
     # is not the one this platform actually runs on.
     llm_profile: LLMProfile = "openai"
-
-    # NVIDIA Build - free tier, OpenAI-compatible endpoint. Chat still works;
-    # the embedding model below is dead and left as a marker. Moving back
-    # means picking a live model, changing `EMBEDDING_DIMENSIONS` to match it,
-    # migrating the vector column and running `make reindex`.
-    nvidia_api_key: str | None = None
-    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    nvidia_chat_model: str = "nvidia/nemotron-3-super-120b-a12b"
-    nvidia_embedding_model: str = "nvidia/nv-embedqa-e5-v5"
 
     # OpenAI - paid.
     openai_api_key: str | None = None

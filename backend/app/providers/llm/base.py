@@ -1,7 +1,7 @@
 """The `LLMProvider` port.
 
-The agent-core talks to this interface and nothing else. Swapping NVIDIA for
-OpenAI, or either for a mock, must never require a change above this layer -
+The agent-core talks to this interface and nothing else. Swapping OpenAI for
+another vendor, or for a mock, must never require a change above this layer -
 that is the whole point of Ports and Adapters (Constitution).
 """
 

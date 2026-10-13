@@ -26,16 +26,16 @@ from app.providers.llm.factory import (
 pytestmark = pytest.mark.evals
 
 
-# Every profile the platform can be pointed at. Both are exercised, and that
-# is not thoroughness for its own sake: two bugs shipped because the evals
-# only ever ran against NVIDIA. OpenAI rejects `max_tokens` and refuses a
-# `tool` message whose preceding assistant turn omits its `tool_calls`;
-# NVIDIA accepts both. Every tool-using turn failed the day a real OpenAI key
-# was configured, and no test we had could have said so.
+# The hosted profile the platform runs on. It used to be two (NVIDIA Build and
+# OpenAI); NVIDIA was removed in Milestone B. The lesson of running both still
+# stands: two bugs shipped while these only ran against NVIDIA, because OpenAI
+# rejects `max_tokens` and refuses a `tool` message whose preceding assistant
+# turn omits its `tool_calls`. The evals must run against the provider that
+# actually serves customers.
 #
 # `offline` is deliberately absent. It answers from a hash, so running golden
 # conversations against it would assert that a hash is not a good waiter.
-EVAL_PROFILES = ("nvidia", "openai")
+EVAL_PROFILES = ("openai",)
 
 
 @pytest.fixture(params=EVAL_PROFILES, ids=EVAL_PROFILES)
@@ -44,11 +44,10 @@ def llm(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
 
     An eval against a mock asserts that the mock returns what it was told to,
     which is worth nothing. The whole question is whether *this* model
-    behaves - and "this model" is now plural.
+    behaves.
 
     The profile is built explicitly rather than read from `LLM_PROFILE`: the
-    point is to cover both regardless of how the environment happens to be
-    configured.
+    evals run against OpenAI however the environment happens to be configured.
     """
     profile = request.param
     settings = get_settings().model_copy(update={"llm_profile": profile})

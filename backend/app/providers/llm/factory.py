@@ -2,8 +2,8 @@
 
 Two levels of configuration:
 
-* The **platform** profile, from the environment. Free NVIDIA Build by
-  default; OpenAI when `LLM_PROFILE=openai`.
+* The **platform** profile, from the environment: OpenAI (`LLM_PROFILE=openai`),
+  or the offline stand-in in development.
 * A **tenant** override, stored encrypted in `tenant_llm_settings` and edited
   from the panel, for customers who want to pay for their own model.
 
@@ -24,7 +24,7 @@ from app.providers.llm.offline import OfflineLLMProvider
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
 # Shortest thing that could plausibly be a key. Real ones are far longer -
-# an OpenAI project key is around 160 characters, an NVIDIA one about 70 - so
+# an OpenAI project key is around 160 characters - so
 # this rejects only the things that are obviously not keys: a placeholder
 # somebody tabbed past, a truncated paste, the word "changeme".
 #
@@ -58,31 +58,14 @@ class ProviderProfile:
     chat_model: str
     embedding_model: str
     # OpenAI's v3 embedding models accept `dimensions`, which is what keeps
-    # the paid profile producing vectors the same width as the free one.
-    # NVIDIA's do not, and their native width already matches.
+    # the vectors the width of the `Vector(1024)` column.
     embedding_dimensions: int | None
-    # NVIDIA requires `input_type` on embeddings; OpenAI rejects it.
+    # Some OpenAI-compatible endpoints require `input_type` on embeddings;
+    # OpenAI rejects it.
     send_embedding_input_type: bool
     # OpenAI's newer models reject `max_tokens` and require
-    # `max_completion_tokens`. NVIDIA still takes the old name.
+    # `max_completion_tokens`; some compatible endpoints still take the old name.
     max_tokens_field: str = "max_tokens"
-
-
-def _nvidia_profile(settings: Settings) -> ProviderProfile:
-    key = _require_key(
-        settings.nvidia_api_key,
-        variable="NVIDIA_API_KEY",
-        hint="Get a free key at https://build.nvidia.com and put it in .env.",
-    )
-    return ProviderProfile(
-        name="nvidia",
-        api_key=key,
-        base_url=settings.nvidia_base_url,
-        chat_model=settings.nvidia_chat_model,
-        embedding_model=settings.nvidia_embedding_model,
-        embedding_dimensions=None,
-        send_embedding_input_type=True,
-    )
 
 
 def _openai_profile(settings: Settings) -> ProviderProfile:
@@ -106,9 +89,11 @@ def _openai_profile(settings: Settings) -> ProviderProfile:
 def platform_profile(settings: Settings | None = None) -> ProviderProfile:
     """The profile the platform itself pays for."""
     settings = settings or get_settings()
-    if settings.llm_profile == "openai":
-        return _openai_profile(settings)
-    return _nvidia_profile(settings)
+    if settings.llm_profile != "openai":
+        raise LLMConfigurationError(
+            f"LLM_PROFILE={settings.llm_profile} has no hosted provider; use openai."
+        )
+    return _openai_profile(settings)
 
 
 def _offline_provider(settings: Settings) -> LLMProvider:

@@ -62,12 +62,7 @@ jobs:
       # eval run that silently skips is worse than none: it still shows green,
       # and the whole point is to block a prompt change that regressed.
       LEO_REQUIRE_LLM: "1"
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      # Both profiles are exercised. Two bugs shipped because these only
-      # ever ran against NVIDIA: OpenAI rejects `max_tokens` and refuses a
-      # `tool` message whose preceding assistant turn omits its
-      # `tool_calls`, and NVIDIA accepts both. Every tool-using turn failed
-      # the day a real OpenAI key was configured.
+      # OpenAI is the only hosted profile (NVIDIA was removed in Milestone B).
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
@@ -75,12 +70,12 @@ jobs:
 
       - name: Fail early if a credential is missing
         # Checked before spending three minutes on setup, and with the fix
-        # named rather than left as a stack trace to interpret. Both are
+        # named rather than left as a stack trace to interpret. The key is
         # required: `LEO_REQUIRE_LLM` turns a missing one into a failure
-        # anyway, and failing here says which and how to fix it.
+        # anyway, and failing here says how to fix it.
         run: |
           missing=0
-          for name in NVIDIA_API_KEY OPENAI_API_KEY; do
+          for name in OPENAI_API_KEY; do
             value="${!name}"
             if [ -z "$value" ]; then
               echo "::error::${name} is not set."
@@ -90,7 +85,7 @@ jobs:
             fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "The evals run real models against both profiles - a mocked eval asserts nothing."
+            echo "The evals run a real model - a mocked eval asserts nothing."
             echo "Add the missing secret at Settings > Secrets and variables > Actions."
             exit 1
           fi

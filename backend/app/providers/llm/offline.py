@@ -135,7 +135,7 @@ class OfflineLLMProvider:
         conclude retrieval is broken, or that it works, on no evidence.
 
         `input_type` is accepted and ignored. The port carries it because
-        NVIDIA requires it and OpenAI rejects it; here there is no provider to
+        some compatible endpoints require it and OpenAI rejects it; here there is no provider to
         tell, and a query and a passage of the same words should land in the
         same place anyway.
         """

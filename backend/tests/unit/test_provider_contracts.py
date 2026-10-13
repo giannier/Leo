@@ -264,7 +264,7 @@ class TestTheCredentialIsCheckedForPlausibility:
     every guard and failed at the embedding call, and the symptom there is a
     knowledge source stuck at `failed` with a provider error - a long way from
     the line in `.env` that caused it. Real keys are long: an OpenAI project
-    key is around 160 characters, an NVIDIA one about 70.
+    key is around 160 characters.
     """
 
     @staticmethod
@@ -296,10 +296,6 @@ class TestTheCredentialIsCheckedForPlausibility:
         what makes an eight-character placeholder look long enough."""
         with pytest.raises(LLMConfigurationError, match="too short"):
             platform_profile(self._settings(openai_api_key="  sk-abc  " + " " * 30))
-
-    def test_the_nvidia_profile_is_held_to_the_same_bar(self) -> None:
-        with pytest.raises(LLMConfigurationError, match="NVIDIA_API_KEY"):
-            platform_profile(Settings(llm_profile="nvidia", nvidia_api_key="nv-x"))
 
 
 class TestTheOfflineProvider:
@@ -393,11 +389,11 @@ class TestTheOfflineProvider:
 
 
 class TestVendorDifferencesOnTheWire:
-    """Two things OpenAI rejects and NVIDIA tolerated.
+    """Two things OpenAI rejects that the old NVIDIA profile tolerated.
 
     Both were invisible until a real OpenAI key was configured, and both made
-    the agent fall back on every tool-using turn. The evals run against
-    NVIDIA, so they could not have caught either.
+    the agent fall back on every tool-using turn: the evals then ran against
+    NVIDIA only, so they could not have caught either.
     """
 
     @staticmethod
@@ -410,13 +406,6 @@ class TestVendorDifferencesOnTheWire:
             Settings(llm_profile="openai", openai_api_key="sk-proj-" + "a" * 40)
         )
         assert profile.max_tokens_field == "max_completion_tokens"
-
-    def test_the_nvidia_profile_keeps_the_old_name(self) -> None:
-        """NVIDIA has not moved, so neither do we for that profile."""
-        profile = platform_profile(
-            Settings(llm_profile="nvidia", nvidia_api_key="nvapi-" + "a" * 40)
-        )
-        assert profile.max_tokens_field == "max_tokens"
 
     def test_an_assistant_turn_carries_the_calls_it_made(self) -> None:
         """The bug: only the assistant's *text* was replayed, so the `tool`

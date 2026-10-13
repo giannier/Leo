@@ -1,8 +1,9 @@
 """One adapter for every OpenAI-compatible chat API.
 
-NVIDIA Build (`integrate.api.nvidia.com`) and OpenAI itself speak the same
-wire protocol, so they need one implementation rather than two. Only the base
-URL, the credential and the model names differ.
+OpenAI and the endpoints that copy its protocol (Azure OpenAI, gateways, the
+`byo_openai_compatible` tenants) speak the same wire protocol, so they need one
+implementation. Only the base URL, the credential, the model names and two
+vendor quirks differ.
 
 Deliberately built on plain `httpx` instead of the `openai` SDK: the payloads
 are ordinary JSON, and a dependency whose only job is to build that JSON is
@@ -68,11 +69,12 @@ class OpenAICompatibleProvider:
         # `knowledge_chunks.embedding` column instead of forcing a migration
         # and a full re-embedding whenever a tenant switches provider.
         self._embedding_dimensions = embedding_dimensions
-        # NVIDIA requires `input_type`; OpenAI rejects the unknown field.
+        # Some compatible endpoints require `input_type`; OpenAI rejects it.
         self._send_embedding_input_type = send_embedding_input_type
         # What this vendor calls the output cap. OpenAI's newer models
         # reject `max_tokens` outright and demand
-        # `max_completion_tokens`; NVIDIA still takes `max_tokens`. Same
+        # `max_completion_tokens`; some compatible endpoints still take
+        # `max_tokens`. Same
         # kind of vendor difference as `send_embedding_input_type`, so it
         # is carried the same way rather than branched on a provider name.
         self._max_tokens_field = max_tokens_field
