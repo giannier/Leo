@@ -574,7 +574,9 @@ async def confirm_order(
 ) -> DecisionResponse:
     """Order, receipt, audit and stage in one transaction; the customer is told after."""
     next_step = body.siguiente_paso if body else None
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.confirm(order_id, principal.user_id, siguiente_paso=next_step)
     except OrderNotFound as exc:
@@ -584,10 +586,7 @@ async def confirm_order(
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
 
-    alerts = TenantAlerts(session, principal.tenant_id)
-    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-        result.order, "pago_confirmado", siguiente_paso=result.order.siguiente_paso
-    )
+    notice = await notifier.deliver(result.prepared)
     await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
@@ -605,7 +604,9 @@ async def reject_order(
     provider: WhatsAppProviderDep,
     email: EmailProviderDep,
 ) -> DecisionResponse:
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.reject(order_id, principal.user_id, motivo=body.motivo)
     except OrderNotFound as exc:
@@ -615,11 +616,8 @@ async def reject_order(
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
 
-    assert result.notice is not None  # a rejection always tells the customer
-    alerts = TenantAlerts(session, principal.tenant_id)
-    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-        result.order, result.notice, motivo=body.motivo
-    )
+    assert result.prepared is not None  # a rejection always tells the customer
+    notice = await notifier.deliver(result.prepared)
     await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
@@ -640,7 +638,9 @@ async def set_order_status(
     """Discarding an order with a payment proof needs `motivo`, voids the proof and
     tells the customer; if it was confirmed, the order owes a refund."""
     assert body.estado in OPERATOR_STATES
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.set_status(order_id, principal.user_id, body.estado, motivo=body.motivo)
     except OrderNotFound as exc:
@@ -656,11 +656,8 @@ async def set_order_status(
         ) from exc
 
     notice: CustomerNotice | None = None
-    if result.notice is not None:
-        alerts = TenantAlerts(session, principal.tenant_id)
-        notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-            result.order, result.notice, motivo=body.motivo
-        )
+    if result.prepared is not None:
+        notice = await notifier.deliver(result.prepared)
         await send_emails(email, alerts.pending_emails)
     return StatusResponse(
         estado=result.order.estado,

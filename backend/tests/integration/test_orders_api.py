@@ -30,6 +30,7 @@ from app.models.conversation_state import ConversationStageEvent, FunnelCode
 from app.models.orders import Order, PaymentProof
 from app.models.tenant import CUSTOMER_UNREACHED
 from app.models.whatsapp import WhatsAppNumber
+from app.orders.review import OrderReviewService
 from app.orders.service import OrderService
 from app.process.recompute import recompute_stage
 from app.process.state import StateRepo
@@ -45,6 +46,8 @@ from app.providers.whatsapp.base import (
 from app.repositories.channel import ContactRepository
 from app.repositories.notification import TenantNotificationRepository
 from app.repositories.orders import PaymentProofRepository
+from app.services.channel import stranded_replies
+from app.services.order_notices import CustomerNotifier
 from tests.integration.test_team import (
     AUTH,
     PASSWORD,
@@ -529,6 +532,31 @@ class TestDetail:
         )
 
         assert response.status_code == 404
+
+
+class TestTheNoticeIsPartOfTheDecision:
+    """Finding E-4 (outbox): the decision and its `queued` notice are one commit."""
+
+    async def test_a_crash_after_the_commit_leaves_the_notice_for_the_sweep(
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+    ) -> None:
+        account, headers = await _owner(api, mail)
+        order, _ = seed_order(db, account["tenant_id"])
+        notifier = CustomerNotifier(db, order.tenant_id, provider=whatsapp)
+
+        # The decision commits; the process "dies" before delivering.
+        result = OrderReviewService(db, order.tenant_id, notifier=notifier).confirm(
+            order.id, uuid.UUID(account["user_id"])
+        )
+
+        assert result.order.estado == "confirmado"
+        assert whatsapp.sent == []
+        stranded = stranded_replies(
+            db, now=datetime.now(UTC) + timedelta(minutes=10), older_than_seconds=60
+        )
+        assert [m.conversation_id for m in stranded if m.author == "system"] == [
+            order.conversation_id
+        ]
 
 
 class TestConfirm:
