@@ -234,6 +234,16 @@ class TestPlanIntelligenceLevels:
         assert plans
         assert all("economico" in plan.allowed_intelligence for plan in plans)
 
+    def test_paid_plans_allow_every_level_and_the_trial_only_the_economic_one(
+        self, db: Session
+    ) -> None:
+        """Milestone B, decision 4: levels are not locked by plan (migration 0027)."""
+        levels = {plan.id: plan.allowed_intelligence for plan in db.query(Plan).all()}
+
+        assert levels.pop("trial") == ["economico"]
+        assert levels
+        assert all(allowed == ["economico", "medio", "mejor"] for allowed in levels.values())
+
     @pytest.mark.parametrize("levels", [[], ["inventado"], ["economico", "inventado"]])
     def test_an_empty_or_unknown_list_is_rejected(self, db: Session, levels: list[str]) -> None:
         with pytest.raises(IntegrityError), db.begin_nested():

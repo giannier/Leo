@@ -17,7 +17,7 @@ aquí antes de implementar; el plan y las tasks ya las asumen.
 **Decisión:** Entran en versión mínima:
 - **Circuit breaker:** si el proveedor LLM falla 3 veces en 60 s para un tenant, se responde `unsupported_fallback`, se avisa al tenant y no se llama al modelo por 2 minutos.
 - **Memoria:** ventana de los últimos 20 mensajes más los hechos de la conversación. No hay resúmenes ni memoria a largo plazo.
-- **model_policies:** el "nivel de inteligencia" (económico, medio, mejor) se mapea a modelos en `settings` y el plan limita qué niveles se pueden elegir.
+- **model_policies:** el "nivel de inteligencia" (económico, medio, mejor) se mapea a modelos en `settings` y el plan limita qué niveles se pueden elegir. **Revisado por Giannier (Milestone B, decisión 4):** no se bloquean niveles por plan: todos los planes de pago pueden usar los tres y cada nivel descuenta créditos según su costo real; la prueba gratis solo usa `economico`.
 **Impacto en implementación:** TASK-445. Si el tenant usa su propio LLM (`tenant_llm_settings`), el nivel no aplica y la UI lo indica.
 **Registrado por:** Claude — por ratificar
 

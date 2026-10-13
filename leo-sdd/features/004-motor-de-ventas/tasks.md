@@ -298,7 +298,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Input: `contracts/api.md §1–§2`, C-05
   - Output: behavior (con límite por plan), templates, process (opciones validadas contra el schema de la plantilla), stages (editar y restaurar, `hay_texto_nuevo`), prompt-preview; caché por tenant invalidada al guardar
   - Depends on: TASK-404, TASK-414
-  - Verification: un nivel fuera del plan da 403; restaurar devuelve el texto por defecto; tras guardar, el siguiente mensaje del simulador usa el cambio
+  - Verification: un nivel fuera del plan da 403 (hoy solo la prueba gratis, que solo permite `economico`: Milestone B, decisión 4); restaurar devuelve el texto por defecto; tras guardar, el siguiente mensaje del simulador usa el cambio
   - Parallel: true
 
 - [ ] TASK-436: API de multimedia
@@ -324,7 +324,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 - [ ] TASK-439: Frontend — Comportamiento
   - Input: `contracts/api.md §1` (behavior)
-  - Output: selectores visuales de ritmo, detalle (con ejemplo de respuesta para cada uno), seguimiento, nivel de inteligencia (bloqueado según plan, con "Mejorar plan"), pausa de derivación, mensajes de sistema editables y estado del asistente
+  - Output: selectores visuales de ritmo, detalle (con ejemplo de respuesta para cada uno), seguimiento, nivel de inteligencia (los planes de pago eligen cualquiera, mostrando cuántos créditos gasta cada nivel; en la prueba gratis solo `economico`, con "Mejorar plan"), pausa de derivación, mensajes de sistema editables y estado del asistente
   - Depends on: TASK-435
   - Verification: Playwright; `tsc` y `eslint` limpios
   - Parallel: true
@@ -373,7 +373,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 - [ ] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
   - Input: C-02
-  - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas
+  - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas. **Milestone B, decisión 4:** los planes de pago permiten los tres niveles (migración 0027) y **cada nivel descuenta créditos según su costo real** (un mensaje `mejor` gasta más que uno `economico`; la tabla de costo por nivel va en settings y la cobra la 009); la prueba gratis solo usa `economico`
   - Depends on: TASK-421, TASK-431
   - Verification: tests del breaker con proveedor que falla; un nivel no permitido cae al permitido más alto; la ventana se respeta
   - Parallel: true
