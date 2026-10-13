@@ -477,6 +477,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/orders/{order_id}/notes/{imagen_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A signed link to an image kept on the order (10 minutes)
+         * @description An image the model did not take for a receipt (finding D-4). Private, like a proof.
+         */
+        get: operations["note_image_api_v1_tenant_orders__order_id__notes__imagen_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/orders/{order_id}/confirm": {
         parameters: {
             query?: never;
@@ -1891,6 +1911,10 @@ export interface components {
             texto: string;
             /** Origen */
             origen: string;
+            /** Evento */
+            evento?: string | null;
+            /** Imagen Id */
+            imagen_id?: string | null;
         };
         /** OrderSummary */
         OrderSummary: {
@@ -3571,6 +3595,56 @@ export interface operations {
             path: {
                 order_id: string;
                 proof_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProofImage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    note_image_api_v1_tenant_orders__order_id__notes__imagen_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                imagen_id: string;
             };
             cookie?: never;
         };

@@ -65,9 +65,6 @@ _LOCKED = (
     "El pedido ya está en revisión del negocio y no se puede cambiar. Explícaselo al cliente; "
     'si quiere otra cosa, déjalo anotado con accion="solicitar_cambio" y su pedido en "nota".'
 )
-# How long a note may be, and how many an order keeps.
-_MAX_NOTE_CHARS = 300
-_MAX_NOTES = 20
 
 
 # --------------------------------------------------------------------- views
@@ -438,12 +435,10 @@ def _solicitar_cambio(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
             order,
             "El pedido no está en revisión: haz el cambio con las otras acciones.",
         )
-    note = " ".join(str(arguments.get("nota") or "").split())[:_MAX_NOTE_CHARS]
+    note = " ".join(str(arguments.get("nota") or "").split())
     if not note:
         return ToolResult.error("nota está vacía: escribe qué quiere cambiar el cliente.")
-    entry = {"en": turn.service.now.isoformat(), "texto": note, "origen": "cliente"}
-    order.notas = [*(order.notas or []), entry][-_MAX_NOTES:]
-    turn.context.session.flush()
+    turn.service.add_note(order, note, origen="cliente")
     return turn.result(
         "hecho",
         order,

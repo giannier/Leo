@@ -76,6 +76,11 @@ OBS_EARLY_DATE = "fecha_anterior_al_pedido"
 
 DEFAULT_TIMEZONE = "America/Lima"
 
+# The event an unrecognised image leaves on the order (finding D-4).
+UNRECOGNISED_NOTE = (
+    "El cliente envió una imagen que no parece un comprobante. Revísala por si es un pago."
+)
+
 # What the model is told when the receipt is kept but the order is not complete.
 _MISSING_LABELS = {
     "selecciones": "completar los temas del paquete",
@@ -202,6 +207,7 @@ class ProofPipeline:
         else:
             reading = await read_proof(self._llm, image.data, image.mime_type)
         if reading.legible and not reading.es_comprobante:
+            self._keep_unrecognised(order, image)
             return ProofOutcome(
                 "no_comprobante",
                 "la imagen NO es un comprobante de pago; pídele la foto del comprobante",
@@ -246,6 +252,24 @@ class ProofPipeline:
                 order,
             )
         return ProofOutcome("registrado", _describe(order, proof, reading), proof, order)
+
+    def _keep_unrecognised(self, order: Order, image: ReceivedImage) -> None:
+        """An image the model did not take for a receipt is kept, with an event on
+        the order, so a real receipt the model misread is not lost (finding D-4).
+        It is not a proof: no row in `payment_proofs`, no observation, no notice."""
+        try:
+            key = self._store(image)
+        except StorageError:
+            logger.exception("an unrecognised image could not be stored")
+            return
+        self._orders.add_note(
+            order,
+            UNRECOGNISED_NOTE,
+            origen="sistema",
+            evento="imagen_no_reconocida",
+            imagen_id=str(uuid.uuid4()),
+            imagen_key=key,
+        )
 
     def submit_waiting(self, conversation: Conversation) -> Order | None:
         """Send the order to the operator if a proof waits on it and it is complete now.

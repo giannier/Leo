@@ -472,16 +472,20 @@ class TestAReceiptForAnIncompleteOrder:
 
 
 class TestWhatIsNotAReceipt:
-    async def test_a_photo_that_is_not_a_receipt_creates_nothing_and_the_model_knows(
+    async def test_a_photo_that_is_not_a_receipt_is_no_proof_but_is_kept_on_the_order(
         self, db: Session, world: World
     ) -> None:
+        """Finding D-4: the model may be wrong about a blurry real receipt."""
         llm = vision({"es_comprobante": False})
 
         result = await world.send_photo(llm)
 
         assert world.stored_proofs() == []
-        assert world.storage.objects == {}
         db.refresh(world.order)
+        [note] = world.order.notas
+        assert (note["origen"], note["evento"]) == ("sistema", "imagen_no_reconocida")
+        assert world.storage.get(note["imagen_key"]) == PHOTO.data
+        assert note["imagen_key"].startswith(f"tenants/{world.tenant.id}/proofs/")
         assert world.order.estado == "borrador"
         assert result.stage_after is Stage.COBRO
         assert "la imagen NO es un comprobante" in the_prompt(llm)
