@@ -441,6 +441,55 @@ class TestAddingAndChangingLines:
         assert "revisión" in (result.decir or "")
         assert result.data["pedido"]["estado"] == "por_confirmar"
 
+    async def test_a_change_asked_during_review_is_noted_for_the_operator(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """Milestone B, decision 8: explained to the customer, left on the order."""
+        context = make_context(db, tenant, conversation)
+        await act(context, accion="agregar", producto_id=str(catalogue["excel"].id))
+        order = active_order(db, tenant, conversation)
+        assert order is not None
+        order.estado = "por_confirmar"
+        db.flush()
+
+        result = await act(
+            context, accion="solicitar_cambio", nota="  Quiere  cambiar Excel por Word  "
+        )
+
+        assert result.status == "hecho"
+        assert "no se puede cambiar ahora" in (result.decir or "")
+        db.refresh(order)
+        [note] = order.notas
+        assert (note["texto"], note["origen"]) == ("Quiere cambiar Excel por Word", "cliente")
+        # The order itself did not change.
+        assert order.estado == "por_confirmar"
+        assert [line["nombre"] for line in result.data["pedido"]["items"]] == ["Excel"]
+
+    async def test_a_change_request_needs_an_order_under_review_and_a_note(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        context = make_context(db, tenant, conversation)
+        await act(context, accion="agregar", producto_id=str(catalogue["excel"].id))
+
+        draft = await act(context, accion="solicitar_cambio", nota="otra cosa")
+        order = active_order(db, tenant, conversation)
+        assert order is not None
+        order.estado = "por_confirmar"
+        db.flush()
+        empty = await act(context, accion="solicitar_cambio", nota="   ")
+
+        assert draft.status == "no_disponible"
+        assert empty.status == "error"
+        assert order.notas == []
+
     async def test_after_a_confirmed_order_adding_starts_a_new_one(
         self,
         db: Session,

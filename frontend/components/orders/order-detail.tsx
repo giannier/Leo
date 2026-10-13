@@ -319,6 +319,17 @@ export function OrderNotes({ order }: { order: OrderDetail }) {
           </span>
         </Alert>
       ) : null}
+      {order.notas.length > 0 ? (
+        <Alert tone="warning" title="El cliente pidió cambios mientras revisabas">
+          <ul data-testid="order-notes" className="space-y-1">
+            {order.notas.map((note) => (
+              <li key={note.en}>
+                <span className="text-ink-faint">{formatDateTime(note.en)}:</span> {note.texto}
+              </li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
       {order.cliente_posible_duplicado ? (
         <Alert tone="warning" title="Este cliente podría estar registrado dos veces">
           <span data-testid="duplicate-contact">

@@ -156,6 +156,12 @@ class HistoryEntry(BaseModel):
     usuario_id: uuid.UUID | None = None
 
 
+class OrderNote(BaseModel):
+    en: datetime
+    texto: str
+    origen: str
+
+
 class OrderDetail(BaseModel):
     id: uuid.UUID
     numero: int
@@ -177,6 +183,8 @@ class OrderDetail(BaseModel):
     devolucion_pendiente: bool
     # The customer may have two contacts (Milestone B, decision 12).
     cliente_posible_duplicado: bool
+    # What the customer asked while the order was under review (decision 8).
+    notas: list[OrderNote]
     siguiente_paso: str | None
     es_sandbox: bool
     conversation_id: uuid.UUID
@@ -476,6 +484,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         rechazo_vigente=order.rechazo_vigente,
         devolucion_pendiente=order.devolucion_pendiente,
         cliente_posible_duplicado=contact is not None and contact.posible_duplicado_de is not None,
+        notas=[OrderNote.model_validate(note) for note in order.notas or []],
         siguiente_paso=order.siguiente_paso,
         es_sandbox=order.is_sandbox,
         conversation_id=order.conversation_id,

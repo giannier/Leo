@@ -1820,6 +1820,8 @@ export interface components {
             devolucion_pendiente: boolean;
             /** Cliente Posible Duplicado */
             cliente_posible_duplicado: boolean;
+            /** Notas */
+            notas: components["schemas"]["OrderNote"][];
             /** Siguiente Paso */
             siguiente_paso: string | null;
             /** Es Sandbox */
@@ -1877,6 +1879,18 @@ export interface components {
              * Format: date-time
              */
             creado: string;
+        };
+        /** OrderNote */
+        OrderNote: {
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+            /** Texto */
+            texto: string;
+            /** Origen */
+            origen: string;
         };
         /** OrderSummary */
         OrderSummary: {

@@ -141,6 +141,9 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     devolucion_pendiente: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    # What the customer asked while the order waited for the business, for the
+    # operator: `[{en, texto, origen}]`, newest last (Milestone B, decision 8).
+    notas: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, server_default="[]")
     # Written by the operator on confirming; goes into the notice to the customer.
     siguiente_paso: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
