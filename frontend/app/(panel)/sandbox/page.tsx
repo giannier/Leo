@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertIcon, BookIcon, ChatIcon, SparkIcon, SpinnerIcon } from "@/components/icons";
 import { Alert, Button, Skeleton, cx } from "@/components/ui";
+import { WhatsAppText } from "@/components/whatsapp-text";
 import {
   api,
   type Saliente,
@@ -501,7 +502,11 @@ function Outbound({
 }) {
   switch (saliente.tipo) {
     case "texto":
-      return <div className={BUBBLE}>{saliente.texto}</div>;
+      return (
+        <div className={BUBBLE}>
+          <WhatsAppText text={saliente.texto} />
+        </div>
+      );
 
     case "imagen":
       return (
@@ -518,7 +523,11 @@ function Outbound({
               Imagen: {saliente.titulo ?? saliente.clave} (el archivo ya no está disponible)
             </div>
           )}
-          {saliente.caption ? <figcaption className={BUBBLE}>{saliente.caption}</figcaption> : null}
+          {saliente.caption ? (
+            <figcaption className={BUBBLE}>
+              <WhatsAppText text={saliente.caption} />
+            </figcaption>
+          ) : null}
         </figure>
       );
 
@@ -542,7 +551,9 @@ function Outbound({
     case "botones":
       return (
         <div className="space-y-1.5" data-testid="saliente-botones">
-          <div className={BUBBLE}>{saliente.body}</div>
+          <div className={BUBBLE}>
+            <WhatsAppText text={saliente.body} />
+          </div>
           <div className="flex flex-col gap-1.5">
             {(saliente.botones ?? []).map((button: { id: string; title: string }) => (
               <button
@@ -578,7 +589,9 @@ function ListMessage({
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-1.5" data-testid="saliente-lista">
-      <div className={BUBBLE}>{saliente.body}</div>
+      <div className={BUBBLE}>
+        <WhatsAppText text={saliente.body} />
+      </div>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

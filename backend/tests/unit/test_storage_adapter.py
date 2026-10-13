@@ -17,7 +17,7 @@ import io
 from collections.abc import Iterator
 
 import pytest
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, EndpointConnectionError
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
 
@@ -111,10 +111,34 @@ class TestWriting:
         assert provider.put(KEY, b"data", content_type="application/pdf") == KEY
 
     def test_a_failed_write_names_the_key(self, provider: S3StorageProvider, stub: Stubber) -> None:
-        stub.add_client_error("put_object", service_error_code="NoSuchBucket")
+        stub.add_client_error("put_object", service_error_code="AccessDenied")
 
         with pytest.raises(StorageError, match=KEY):
             provider.put(KEY, b"data", content_type="application/pdf")
+
+    def test_a_missing_bucket_is_created_and_the_write_retried(
+        self, provider: S3StorageProvider, stub: Stubber
+    ) -> None:
+        """A fresh MinIO has no bucket; the first upload used to 500 the request."""
+        params = {"Bucket": BUCKET, "Key": KEY, "Body": b"data", "ContentType": "image/png"}
+        stub.add_client_error("put_object", service_error_code="NoSuchBucket")
+        stub.add_client_error("head_bucket", service_error_code="404")
+        stub.add_response("create_bucket", {}, {"Bucket": BUCKET})
+        stub.add_response("put_object", {}, params)
+
+        assert provider.put(KEY, b"data", content_type="image/png") == KEY
+        stub.assert_no_pending_responses()
+
+    def test_an_unreachable_store_on_read_is_a_storage_error(
+        self, provider: S3StorageProvider, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def unreachable(**_: object) -> None:
+            raise EndpointConnectionError(endpoint_url="http://storage.invalid:9000")
+
+        monkeypatch.setattr(provider._client, "get_object", unreachable)  # noqa: SLF001
+
+        with pytest.raises(StorageError):
+            provider.get(KEY)
 
 
 class TestExistenceAndDeletion:
