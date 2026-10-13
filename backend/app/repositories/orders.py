@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Collection, Sequence
+from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.models.channel import Contact
 from app.models.orders import (
     ORDERS_SEQUENCE,
     Order,
@@ -75,6 +78,110 @@ class OrderRepository(BaseRepository[Order]):
             ORDERS_SEQUENCE
         )
         return self.add(numero=numero, **values)
+
+    def get_for_update(self, order_id: uuid.UUID) -> Order | None:
+        """The order, locked until the transaction ends.
+
+        The operator's confirm and reject read the state and then change it; two
+        clicks (or two operators) at once must queue here, so the second one sees the
+        first one's result and gets a 409 instead of confirming twice.
+        """
+        statement = self._scoped().where(Order.id == order_id).with_for_update()
+        return self._session.execute(statement).scalar_one_or_none()
+
+    def search(
+        self,
+        *,
+        estados: Collection[str] = (),
+        since: datetime | None = None,
+        until: datetime | None = None,
+        q: str | None = None,
+        sandbox: bool = False,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[tuple[Order, Contact]], int]:
+        """Orders for the list page, newest first, with their customer, and the total.
+
+        `q` matches the order number, the customer's name (the one they gave or the
+        one WhatsApp shows) or part of their phone. Sandbox orders are hidden unless
+        asked for (C-19).
+        """
+        criteria = self._list_criteria(estados, since, until, q, sandbox)
+        base = (
+            select(Order, Contact)
+            .join(
+                Contact, and_(Contact.id == Order.contact_id, Contact.tenant_id == self._tenant_id)
+            )
+            .where(Order.tenant_id == self._tenant_id, *criteria)
+        )
+        total = self._session.execute(
+            select(func.count())
+            .select_from(Order)
+            .join(
+                Contact, and_(Contact.id == Order.contact_id, Contact.tenant_id == self._tenant_id)
+            )
+            .where(Order.tenant_id == self._tenant_id, *criteria)
+        ).scalar_one()
+        rows = self._session.execute(
+            base.order_by(Order.created_at.desc(), Order.numero.desc()).limit(limit).offset(offset)
+        ).all()
+        return [(order, contact) for order, contact in rows], total
+
+    def totals_by_state(self, *, since: datetime, until: datetime | None = None) -> dict[str, int]:
+        """How many real orders were created in the period, by state."""
+        statement = (
+            select(Order.estado, func.count())
+            .where(Order.tenant_id == self._tenant_id, Order.is_sandbox.is_(False))
+            .where(Order.created_at >= since)
+            .group_by(Order.estado)
+        )
+        if until is not None:
+            statement = statement.where(Order.created_at < until)
+        return {state: int(count) for state, count in self._session.execute(statement).all()}
+
+    def sales_made(self, *, since: datetime, until: datetime | None = None) -> tuple[int, Decimal]:
+        """`(count, total)` of the real orders that reached `confirmado` or beyond in the period."""
+        statement = select(func.count(), func.coalesce(func.sum(Order.total), 0)).where(
+            Order.tenant_id == self._tenant_id,
+            Order.is_sandbox.is_(False),
+            Order.estado.in_(("confirmado", "en_curso", "completado")),
+            Order.confirmed_at >= since,
+        )
+        if until is not None:
+            statement = statement.where(Order.confirmed_at < until)
+        count, total = self._session.execute(statement).one()
+        return int(count), Decimal(total)
+
+    def _list_criteria(
+        self,
+        estados: Collection[str],
+        since: datetime | None,
+        until: datetime | None,
+        q: str | None,
+        sandbox: bool,
+    ) -> list[ColumnElement[bool]]:
+        criteria: list[ColumnElement[bool]] = []
+        if not sandbox:
+            criteria.append(Order.is_sandbox.is_(False))
+        if estados:
+            criteria.append(Order.estado.in_(list(estados)))
+        if since is not None:
+            criteria.append(Order.created_at >= since)
+        if until is not None:
+            criteria.append(Order.created_at < until)
+        text_q = (q or "").strip()
+        if text_q:
+            escaped = text_q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            matches: list[ColumnElement[bool]] = [
+                Contact.custom_data["nombres"].astext.ilike(pattern, escape="\\"),
+                Contact.profile_name.ilike(pattern, escape="\\"),
+                Contact.phone_e164.ilike(pattern, escape="\\"),
+            ]
+            if text_q.lstrip("#").isdigit():
+                matches.append(Order.numero == int(text_q.lstrip("#")))
+            criteria.append(or_(*matches))
+        return criteria
 
     def by_numero(self, numero: int) -> Order | None:
         statement = self._scoped().where(Order.numero == numero)
@@ -146,6 +253,20 @@ class PaymentProofRepository(BaseRepository[PaymentProof]):
             .order_by(PaymentProof.created_at.desc())
         )
         return self._session.execute(statement).scalars().all()
+
+    def for_orders(self, order_ids: Collection[uuid.UUID]) -> dict[uuid.UUID, list[PaymentProof]]:
+        """The proofs of several orders in one query, newest first, grouped by order."""
+        grouped: dict[uuid.UUID, list[PaymentProof]] = {order_id: [] for order_id in order_ids}
+        if not grouped:
+            return grouped
+        statement = (
+            self._scoped()
+            .where(PaymentProof.order_id.in_(list(grouped)))
+            .order_by(PaymentProof.created_at.desc())
+        )
+        for proof in self._session.execute(statement).scalars():
+            grouped[proof.order_id].append(proof)
+        return grouped
 
     def latest_for_order(self, order_id: uuid.UUID) -> PaymentProof | None:
         statement = (

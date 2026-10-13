@@ -253,7 +253,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - el modelo recibe el resultado en el ESTADO.
   - Parallel: false
 
-- [ ] TASK-430: API de pedidos y avisos al cliente
+- [x] TASK-430: API de pedidos y avisos al cliente
   - Input: `contracts/api.md §5`, C-09
   - Output: router con lista, resumen, detalle, imagen firmada, confirmar, rechazar (`rechazo_vigente` y motivo; contra entrega vuelve a COBRO) y status; aviso por WhatsApp después del commit con los mensajes de sistema (sandbox: queda como saliente sandbox); comprobación de ventana de 24 h; `audit_logs`; recálculo de etapa con su evento
   - Depends on: TASK-429
