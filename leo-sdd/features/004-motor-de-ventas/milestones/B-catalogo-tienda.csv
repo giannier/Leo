@@ -1,0 +1,4 @@
+nombre,descripcion,precio,stock,categoria,modo_venta,es_digital,paquete,permite_libres,destacado
+Polo básico,Polo de algodón pima en varias tallas,35.00,50,Ropa,precio_fijo,no,,,si
+Gorra urbana,Gorra ajustable de algodón,25.00,40,Accesorios,precio_fijo,no,,,no
+Mochila ejecutiva,Mochila para laptop de 15 pulgadas,120.00,15,Accesorios,precio_fijo,no,,,no
