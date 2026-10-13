@@ -26,6 +26,7 @@ import {
   HomeIcon,
   LogOutIcon,
   PhoneIcon,
+  ReceiptIcon,
   SparkIcon,
   UsersIcon,
 } from "@/components/icons";
@@ -46,10 +47,12 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: "/", label: "Inicio", icon: HomeIcon, primary: true },
+  // Every role: confirming a payment is exactly the work an operator is here for.
+  { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
   { href: "/onboarding", label: "Configuración", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
   { href: "/sandbox", label: "Modo prueba", icon: ChatIcon, primary: true },
   { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION, primary: true },
-  { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
   { href: "/knowledge", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
   { href: "/team", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },
 ];

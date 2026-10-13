@@ -398,6 +398,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the orders
+         * @description Newest first, with the customer's phone masked. Simulator orders are hidden unless asked.
+         */
+        get: operations["list_orders_api_v1_tenant_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversions, value and what is waiting, for a period
+         * @description `conversiones` are the orders that reached `confirmado` or beyond in the period.
+         *
+         *     The simulator's orders never count (C-19).
+         */
+        get: operations["orders_summary_api_v1_tenant_orders_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One order with its items, customer data, receipts and history */
+        get: operations["get_order_api_v1_tenant_orders__order_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/proofs/{proof_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A signed link to the receipt photo (10 minutes)
+         * @description The photo is private: only members of the tenant get a link, and it expires.
+         */
+        get: operations["proof_image_api_v1_tenant_orders__order_id__proofs__proof_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept the payment (or the cash-on-delivery order)
+         * @description Order, receipt, audit and stage in one transaction; the customer is told after.
+         */
+        post: operations["confirm_order_api_v1_tenant_orders__order_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send the order back with a reason */
+        post: operations["reject_order_api_v1_tenant_orders__order_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a confirmed order along, or discard it */
+        post: operations["set_order_status_api_v1_tenant_orders__order_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-admin/connection-requests": {
         parameters: {
             query?: never;
@@ -1175,6 +1308,11 @@ export interface components {
             /** Activation Ready */
             activation_ready: boolean;
         };
+        /** ConfirmRequest */
+        ConfirmRequest: {
+            /** Siguiente Paso */
+            siguiente_paso?: string | null;
+        };
         /** ConnectionRequestAdminResponse */
         ConnectionRequestAdminResponse: {
             /**
@@ -1283,6 +1421,13 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** CustomerBrief */
+        CustomerBrief: {
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+        };
         /**
          * DeadLetterResponse
          * @description One abandoned webhook, flattened for an operator to scan.
@@ -1360,6 +1505,16 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** DecisionResponse */
+        DecisionResponse: {
+            /** Estado */
+            estado: string;
+            /**
+             * Aviso Cliente
+             * @enum {string}
+             */
+            aviso_cliente: "enviado" | "ventana_cerrada" | "no_enviado";
+        };
         /**
          * ErrorResponse
          * @description The documented failure body, so it appears in the OpenAPI schema.
@@ -1398,6 +1553,20 @@ export interface components {
             status: string;
             /** Service */
             service: string;
+        };
+        /** HistoryEntry */
+        HistoryEntry: {
+            /** Evento */
+            evento: string;
+            /** Estado */
+            estado: string | null;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+            /** Usuario Id */
+            usuario_id?: string | null;
         };
         /** HistoryResponse */
         HistoryResponse: {
@@ -1504,6 +1673,23 @@ export interface components {
             /** Files Limit */
             files_limit: number;
         };
+        /** LineOut */
+        LineOut: {
+            /** Producto Id */
+            producto_id: string | null;
+            /** Nombre */
+            nombre: string;
+            /** Cantidad */
+            cantidad: number;
+            /** Precio Unitario */
+            precio_unitario: string;
+            /** Subtotal */
+            subtotal: string;
+            /** Selecciones */
+            selecciones: string[];
+            /** Faltan Selecciones */
+            faltan_selecciones: number;
+        };
         /**
          * LoginRequest
          * @description Payload of `POST /auth/login`.
@@ -1571,6 +1757,122 @@ export interface components {
              */
             created_at: string;
             saliente?: components["schemas"]["Saliente"] | null;
+        };
+        /** OrderDetail */
+        OrderDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            /** Estado */
+            estado: string;
+            /** Modalidad Pago */
+            modalidad_pago: string;
+            /** Moneda */
+            moneda: string;
+            /** Items */
+            items: components["schemas"]["LineOut"][];
+            /** Subtotal */
+            subtotal: string;
+            /** Descuento */
+            descuento: string;
+            /** Envio */
+            envio: string;
+            /** Total */
+            total: string;
+            /** Promocion */
+            promocion: {
+                [key: string]: unknown;
+            } | null;
+            /** Tipo Entrega */
+            tipo_entrega: string | null;
+            /** Zona Envio */
+            zona_envio: string | null;
+            /** Datos Cliente */
+            datos_cliente: {
+                [key: string]: unknown;
+            };
+            /** Comprobantes */
+            comprobantes: components["schemas"]["ProofOut"][];
+            /** Motivo Rechazo */
+            motivo_rechazo: string | null;
+            /** Rechazo Vigente */
+            rechazo_vigente: boolean;
+            /** Siguiente Paso */
+            siguiente_paso: string | null;
+            /** Es Sandbox */
+            es_sandbox: boolean;
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Ventana Abierta */
+            ventana_abierta: boolean;
+            /**
+             * Creado
+             * Format: date-time
+             */
+            creado: string;
+            /** Historial */
+            historial: components["schemas"]["HistoryEntry"][];
+        };
+        /** OrderList */
+        OrderList: {
+            /** Items */
+            items: components["schemas"]["OrderListItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+        };
+        /** OrderListItem */
+        OrderListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Numero */
+            numero: number;
+            /** Estado */
+            estado: string;
+            cliente: components["schemas"]["CustomerBrief"];
+            /** Total */
+            total: string;
+            /** Moneda */
+            moneda: string;
+            /** Items Resumen */
+            items_resumen: string;
+            /** Tiene Comprobante */
+            tiene_comprobante: boolean;
+            /** Observaciones */
+            observaciones: string[];
+            /**
+             * Creado
+             * Format: date-time
+             */
+            creado: string;
+        };
+        /** OrderSummary */
+        OrderSummary: {
+            /** Conversiones */
+            conversiones: number;
+            /** Valor Total */
+            valor_total: string;
+            /** Ticket Promedio */
+            ticket_promedio: string;
+            /** Moneda */
+            moneda: string;
+            /** Por Estado */
+            por_estado: {
+                [key: string]: number;
+            };
+            /** Pendientes Revision */
+            pendientes_revision: number;
         };
         /** PaymentMethodPatch */
         PaymentMethodPatch: {
@@ -1642,6 +1944,16 @@ export interface components {
             category?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Modo Venta */
+            modo_venta?: ("precio_fijo" | "cotizacion") | null;
+            /** Es Digital */
+            es_digital?: boolean | null;
+            /** Bundle Size */
+            bundle_size?: number | null;
+            /** Bundle Permite Libres */
+            bundle_permite_libres?: boolean | null;
+            /** Destacado */
+            destacado?: boolean | null;
         };
         /** ProductRequest */
         ProductRequest: {
@@ -1660,6 +1972,29 @@ export interface components {
              * @default true
              */
             is_active: boolean;
+            /**
+             * Modo Venta
+             * @default precio_fijo
+             * @enum {string}
+             */
+            modo_venta: "precio_fijo" | "cotizacion";
+            /**
+             * Es Digital
+             * @default false
+             */
+            es_digital: boolean;
+            /** Bundle Size */
+            bundle_size?: number | null;
+            /**
+             * Bundle Permite Libres
+             * @default false
+             */
+            bundle_permite_libres: boolean;
+            /**
+             * Destacado
+             * @default false
+             */
+            destacado: boolean;
         };
         /** ProductResponse */
         ProductResponse: {
@@ -1680,6 +2015,67 @@ export interface components {
             category: string | null;
             /** Is Active */
             is_active: boolean;
+            /**
+             * Modo Venta
+             * @enum {string}
+             */
+            modo_venta: "precio_fijo" | "cotizacion";
+            /** Es Digital */
+            es_digital: boolean;
+            /** Bundle Size */
+            bundle_size: number | null;
+            /** Bundle Permite Libres */
+            bundle_permite_libres: boolean;
+            /** Destacado */
+            destacado: boolean;
+        };
+        /** ProofImage */
+        ProofImage: {
+            /** Url */
+            url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * ProofOut
+         * @description A receipt as the panel shows it: no storage key, no URL (those are separate).
+         */
+        ProofOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Estado */
+            estado: string;
+            /** Monto */
+            monto: string | null;
+            /** Moneda */
+            moneda: string | null;
+            /** Fecha Operacion */
+            fecha_operacion: string | null;
+            /** Codigo Operacion */
+            codigo_operacion: string | null;
+            /** Entidad */
+            entidad: string | null;
+            /** Destinatario */
+            destinatario: string | null;
+            /** Confianza */
+            confianza: string | null;
+            /** Observaciones */
+            observaciones: string[];
+            /** Motivo Rechazo */
+            motivo_rechazo: string | null;
+            /**
+             * Creado
+             * Format: date-time
+             */
+            creado: string;
+            /** Revisado */
+            revisado: string | null;
         };
         /**
          * RefreshRequest
@@ -1734,6 +2130,11 @@ export interface components {
             /** Verification Email Sent */
             verification_email_sent: boolean;
         };
+        /** RejectRequest */
+        RejectRequest: {
+            /** Motivo */
+            motivo: string;
+        };
         /** ReplyResponse */
         ReplyResponse: {
             /**
@@ -1749,50 +2150,6 @@ export interface components {
             /** Email */
             email: string;
         };
-        /** SeatsResponse */
-        SeatsResponse: {
-            /** Used */
-            used: number;
-            /** Limit */
-            limit: number;
-        };
-        /** SendMessageResponse */
-        SendMessageResponse: {
-            /**
-             * Message Id
-             * Format: uuid
-             */
-            message_id: string;
-            /** Salientes */
-            salientes: components["schemas"]["Saliente"][];
-            reply?: components["schemas"]["ReplyResponse"] | null;
-            trace?: components["schemas"]["TraceResponse"] | null;
-            debug?: components["schemas"]["DebugResponse"] | null;
-        };
-        /**
-         * SessionResponse
-         * @description `200` body of both `POST /auth/login` and `POST /auth/refresh`.
-         *
-         *     Refresh returns the same shape as login, not just the new access token.
-         *     It costs nothing - the data is already loaded to build the token - and it
-         *     is what lets the panel restore a session on a page reload: one call, and
-         *     it knows who is signed in and which businesses they can switch to.
-         */
-        SessionResponse: {
-            /** Access Token */
-            access_token: string;
-            /**
-             * Token Type
-             * @default bearer
-             * @constant
-             */
-            token_type: "bearer";
-            /** Expires In */
-            expires_in: number;
-            user: components["schemas"]["UserSummary"];
-            /** Memberships */
-            memberships: components["schemas"]["MembershipSummary"][];
-            /** Active Tenant Id */
         /** Row */
         Row: {
             /** Id */
@@ -1845,6 +2202,50 @@ export interface components {
             /** Filas */
             filas?: components["schemas"]["Row"][] | null;
         };
+        /** SeatsResponse */
+        SeatsResponse: {
+            /** Used */
+            used: number;
+            /** Limit */
+            limit: number;
+        };
+        /** SendMessageResponse */
+        SendMessageResponse: {
+            /**
+             * Message Id
+             * Format: uuid
+             */
+            message_id: string;
+            /** Salientes */
+            salientes: components["schemas"]["Saliente"][];
+            reply?: components["schemas"]["ReplyResponse"] | null;
+            trace?: components["schemas"]["TraceResponse"] | null;
+            debug?: components["schemas"]["DebugResponse"] | null;
+        };
+        /**
+         * SessionResponse
+         * @description `200` body of both `POST /auth/login` and `POST /auth/refresh`.
+         *
+         *     Refresh returns the same shape as login, not just the new access token.
+         *     It costs nothing - the data is already loaded to build the token - and it
+         *     is what lets the panel restore a session on a page reload: one call, and
+         *     it knows who is signed in and which businesses they can switch to.
+         */
+        SessionResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             * @constant
+             */
+            token_type: "bearer";
+            /** Expires In */
+            expires_in: number;
+            user: components["schemas"]["UserSummary"];
+            /** Memberships */
+            memberships: components["schemas"]["MembershipSummary"][];
+            /** Active Tenant Id */
             active_tenant_id: string | null;
         };
         /** StartConversationResponse */
@@ -1854,6 +2255,19 @@ export interface components {
              * Format: uuid
              */
             conversation_id: string;
+        };
+        /** StatusRequest */
+        StatusRequest: {
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "en_curso" | "completado" | "descartado";
+        };
+        /** StatusResponse */
+        StatusResponse: {
+            /** Estado */
+            estado: string;
         };
         /** TeamResponse */
         TeamResponse: {
@@ -1948,6 +2362,10 @@ export interface components {
             latency_ms: number;
             /** Degraded */
             degraded: boolean;
+            /** Catalog Guard */
+            catalog_guard?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** TransitionPayload */
         TransitionPayload: {
@@ -1994,10 +2412,6 @@ export interface components {
             ai_messages_limit: number;
             /** Percent Used */
             percent_used: number;
-            /** Catalog Guard */
-            catalog_guard?: {
-                [key: string]: unknown;
-            } | null;
             /** Messages In */
             messages_in: number;
             /** Messages Out */
@@ -2956,6 +3370,377 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_orders_api_v1_tenant_orders_get: {
+        parameters: {
+            query?: {
+                estado?: string[] | null;
+                desde?: string | null;
+                hasta?: string | null;
+                q?: string | null;
+                sandbox?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    orders_summary_api_v1_tenant_orders_summary_get: {
+        parameters: {
+            query?: {
+                periodo?: "hoy" | "7d" | "30d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderSummary"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_order_api_v1_tenant_orders__order_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    proof_image_api_v1_tenant_orders__order_id__proofs__proof_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+                proof_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProofImage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    confirm_order_api_v1_tenant_orders__order_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `invalid_transition` or `already_reviewed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reject_order_api_v1_tenant_orders__order_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `invalid_transition` or `already_reviewed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_order_status_api_v1_tenant_orders__order_id__status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the order does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `invalid_transition` or `already_reviewed` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4057,6 +4842,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                after?: string | null;
             };
             header?: never;
             path: {
@@ -4103,11 +4889,12 @@ export interface operations {
                 };
             };
         };
-                after?: string | null;
     };
     send_message_api_v1_tenant_sandbox_conversations__conversation_id__messages_post: {
         parameters: {
-            query?: never;
+            query?: {
+                debug?: boolean;
+            };
             header?: never;
             path: {
                 conversation_id: string;
@@ -4189,54 +4976,6 @@ export interface operations {
             };
         };
     };
-    get_tenant_api_v1_tenant_get: {
-        parameters: {
-            query?: {
-                debug?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TenantResponse"];
-                };
-            };
-            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    get_usage_api_v1_tenant_usage_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
     reset_conversation_api_v1_tenant_sandbox_conversations__conversation_id__reset_post: {
         parameters: {
             query?: never;
@@ -4284,6 +5023,52 @@ export interface operations {
             };
         };
     };
+    get_tenant_api_v1_tenant_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_usage_api_v1_tenant_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

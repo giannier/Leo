@@ -54,7 +54,8 @@ export function onSessionEnded(handler: (() => void) | null): void {
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
+  /** An array repeats the key (`estado=a&estado=b`), which is how FastAPI reads a list. */
+  query?: Record<string, string | number | boolean | readonly string[] | undefined>;
   /** Set for the calls that must not attempt a refresh on 401. */
   skipRefresh?: boolean;
   signal?: AbortSignal;
@@ -64,7 +65,11 @@ function buildUrl(path: string, query?: RequestOptions["query"]): string {
   const url = new URL(`${BASE_URL}${PREFIX}${path}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          url.searchParams.append(key, item);
+        }
+      } else if (value !== undefined) {
         url.searchParams.set(key, String(value));
       }
     }
@@ -225,7 +230,12 @@ export type AgentConfigPatch = JsonBody<Ops["/api/v1/tenant/agent-config"]["put"
 
 export type ProductPage = Ok<Ops["/api/v1/tenant/products"]["get"]>;
 export type Product = ProductPage["items"][number];
-export type ProductBody = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
+type ProductCreate = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
+/** Fields the server fills in when omitted (TASK-406); the generated type lists
+ * them as required because the schema is read from the response side. */
+type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado";
+export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
+  Partial<Pick<ProductCreate, ProductServerDefaults>>;
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
@@ -279,6 +289,33 @@ export type PaymentMethod = Ok<Ops["/api/v1/tenant/payment-methods"]["get"]>[num
 export type PaymentMethodBody = JsonBody<
   Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
 >;
+
+export type OrderPage = Ok<Ops["/api/v1/tenant/orders"]["get"]>;
+export type OrderListItem = OrderPage["items"][number];
+export type OrderSummary = Ok<Ops["/api/v1/tenant/orders/summary"]["get"]>;
+export type OrderDetail = Ok<Ops["/api/v1/tenant/orders/{order_id}"]["get"]>;
+export type OrderLine = OrderDetail["items"][number];
+export type PaymentProof = OrderDetail["comprobantes"][number];
+export type OrderHistoryEntry = OrderDetail["historial"][number];
+export type ProofImage = Ok<
+  Ops["/api/v1/tenant/orders/{order_id}/proofs/{proof_id}/image"]["get"]
+>;
+export type OrderDecision = Ok<Ops["/api/v1/tenant/orders/{order_id}/confirm"]["post"]>;
+/** What the customer was told: sent, window closed (no WhatsApp), or not sent. */
+export type CustomerNotice = OrderDecision["aviso_cliente"];
+/** The states an operator can move a confirmed order to. */
+export type OperatorState = JsonBody<
+  Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]["requestBody"]
+>["estado"];
+export type OrderListQuery = {
+  estado?: readonly string[];
+  desde?: string;
+  hasta?: string;
+  q?: string;
+  sandbox?: boolean;
+  page?: number;
+  page_size?: number;
+};
 
 export const api = {
   auth: {
@@ -459,5 +496,27 @@ export const api = {
     update: (id: string, body: Partial<PaymentMethodBody>) =>
       request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PATCH", body }),
     remove: (id: string) => request<void>(`/tenant/payment-methods/${id}`, { method: "DELETE" }),
+  },
+  orders: {
+    list: (query: OrderListQuery, signal?: AbortSignal) =>
+      request<OrderPage>("/tenant/orders", { query, signal }),
+    summary: (periodo: "hoy" | "7d" | "30d", signal?: AbortSignal) =>
+      request<OrderSummary>("/tenant/orders/summary", { query: { periodo }, signal }),
+    get: (id: string) => request<OrderDetail>(`/tenant/orders/${id}`),
+    /** A signed link that lives ten minutes; ask again rather than keep it. */
+    proofImage: (id: string, proofId: string) =>
+      request<ProofImage>(`/tenant/orders/${id}/proofs/${proofId}/image`),
+    confirm: (id: string, siguientePaso?: string) =>
+      request<OrderDecision>(`/tenant/orders/${id}/confirm`, {
+        method: "POST",
+        body: siguientePaso ? { siguiente_paso: siguientePaso } : {},
+      }),
+    reject: (id: string, motivo: string) =>
+      request<OrderDecision>(`/tenant/orders/${id}/reject`, { method: "POST", body: { motivo } }),
+    setStatus: (id: string, estado: OperatorState) =>
+      request<{ estado: string }>(`/tenant/orders/${id}/status`, {
+        method: "POST",
+        body: { estado },
+      }),
   },
 };
