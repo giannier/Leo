@@ -210,8 +210,10 @@ class TestTypedOutbounds:
         assert (first["tipo"], first["clave"], first["url"]) == ("documento", "malla", None)
 
     async def test_an_image_is_accepted_and_the_model_is_told_one_arrived(
-        self, api: AsyncClient, mail: Any, llm: MockLLMProvider, db: Session
+        self, api: AsyncClient, mail: Any, llm: MockLLMProvider, db: Session, app: Any
     ) -> None:
+        storage = MockStorageProvider()
+        app.dependency_overrides[get_storage_provider] = lambda: storage
         headers, conversation_id, _ = await _certificaciones_conversation(api, mail, db)
         llm.queue(ChatResult(content="Recibí tu imagen, ¿en qué te ayudo?"))
 
@@ -223,6 +225,8 @@ class TestTypedOutbounds:
 
         assert response.status_code == 200, response.text
         assert "[El cliente envió una imagen]" in llm.chat_calls[0].messages[0].content
+        # The photo is kept in private storage for the turn that expects a receipt.
+        assert len(storage.objects) == 1
 
     @pytest.mark.parametrize(
         ("name", "data", "mime"),

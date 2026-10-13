@@ -242,7 +242,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: `omitido` la segunda vez para el mismo pedido; se permite un reenvío después de un rechazo; un pedido nuevo después de CERRADO vuelve a recibir los métodos; el embudo pasa a CUENTAS_ENVIADAS
   - Parallel: true
 
-- [ ] TASK-429: ProofPipeline y visión
+- [x] TASK-429: ProofPipeline y visión
   - Input: C-08, `plan.md` (comprobantes)
   - Output: `orders/vision.py` (salida estructurada, timeout de 8 s) y `orders/proofs.py`: guarda la imagen en MinIO privado, crea el `payment_proof`, calcula las observaciones (monto distinto, código repetido sin contar sandbox, baja confianza, sin datos), pasa el pedido a `por_confirmar` y avisa al operador. Se integra en el paso 4 del pipeline usando `stage_previa`, incluso con la conversación derivada
   - Depends on: TASK-425, TASK-421

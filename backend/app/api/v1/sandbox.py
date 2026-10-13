@@ -36,6 +36,7 @@ from app.api.deps import (
 )
 from app.api.errors import ApiError, error_responses
 from app.models.conversation import Message
+from app.orders.proofs import ReceivedImage
 from app.process.state import facts_snapshot
 from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
@@ -303,8 +304,10 @@ def _debug(result: TurnResult) -> DebugResponse:
     )
 
 
-async def _read_request(request: Request) -> tuple[str, InteractiveReply | None, bool]:
-    """The customer's message from either shape of body: (text, tap, is_image)."""
+async def _read_request(
+    request: Request,
+) -> tuple[str, InteractiveReply | None, ReceivedImage | None]:
+    """The customer's message from either shape of body: (text, tap, image)."""
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("multipart/form-data"):
         form = await request.form()
@@ -323,7 +326,7 @@ async def _read_request(request: Request) -> tuple[str, InteractiveReply | None,
         text = (
             caption.strip() if isinstance(caption, str) and caption.strip() else IMAGE_PLACEHOLDER
         )
-        return text[:4096], None, True
+        return text[:4096], None, ReceivedImage(data=data, mime_type=upload.content_type)
 
     try:
         payload = SendMessageRequest.model_validate(await request.json())
@@ -333,9 +336,9 @@ async def _read_request(request: Request) -> tuple[str, InteractiveReply | None,
         return (
             payload.title or "",
             InteractiveReply(id=payload.interactive_id, title=payload.title or ""),
-            False,
+            None,
         )
-    return payload.content or "", None, False
+    return payload.content or "", None, None
 
 
 # --------------------------------------------------------------- endpoints
@@ -419,10 +422,10 @@ async def send_message(
             headers={"Retry-After": str(decision.retry_after_seconds)},
         )
 
-    text, tap, is_image = await _read_request(request)
-    service = SandboxService(session, principal.tenant_id, llm=llm)
+    text, tap, image = await _read_request(request)
+    service = SandboxService(session, principal.tenant_id, llm=llm, storage=storage)
     try:
-        turn = await service.send(conversation_id, content=text, interactive=tap, image=is_image)
+        turn = await service.send(conversation_id, content=text, interactive=tap, image=image)
     except ConversationNotFound as exc:
         raise _not_found() from exc
 

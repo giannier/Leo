@@ -2,6 +2,8 @@
 
 from app.providers.whatsapp.base import (
     Button,
+    DownloadedMedia,
+    InboundMedia,
     InboundMessage,
     InteractiveReply,
     InvalidCredentials,
@@ -27,6 +29,8 @@ from app.providers.whatsapp.ycloud import YCloudProvider
 
 __all__ = [
     "Button",
+    "DownloadedMedia",
+    "InboundMedia",
     "InboundMessage",
     "InteractiveReply",
     "InvalidCredentials",

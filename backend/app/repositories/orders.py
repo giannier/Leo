@@ -12,6 +12,7 @@ import uuid
 from collections.abc import Collection, Sequence
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.orders import (
@@ -154,3 +155,25 @@ class PaymentProofRepository(BaseRepository[PaymentProof]):
             .limit(1)
         )
         return self._session.execute(statement).scalar_one_or_none()
+
+    def code_seen(self, codigo: str, *, sandbox: bool, exclude_id: uuid.UUID | None = None) -> bool:
+        """Whether another proof of this tenant carries the same operation code.
+
+        Compared case-insensitively, and only among orders of the same kind: a
+        simulator proof never counts against a real one (C-19), while the simulator
+        can still show the flag against its own earlier proofs.
+        """
+        statement = (
+            select(PaymentProof.id)
+            .join(Order, Order.id == PaymentProof.order_id)
+            .where(
+                PaymentProof.tenant_id == self._tenant_id,
+                Order.tenant_id == self._tenant_id,
+                Order.is_sandbox.is_(sandbox),
+                func.lower(PaymentProof.codigo_operacion) == codigo.lower(),
+            )
+            .limit(1)
+        )
+        if exclude_id is not None:
+            statement = statement.where(PaymentProof.id != exclude_id)
+        return self._session.execute(statement).first() is not None

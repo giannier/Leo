@@ -28,6 +28,7 @@ import pytest
 
 from app.providers.whatsapp import (
     Button,
+    InboundMedia,
     InboundMessage,
     InteractiveReply,
     InvalidCredentials,
@@ -289,6 +290,36 @@ class TestReadingAnInboundMessage:
         assert isinstance(parsed, InboundMessage)
         assert parsed.msg_type == "image"
         assert parsed.text is None
+
+    def test_an_image_keeps_the_reference_to_its_file(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_image.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.media == InboundMedia(
+            media_id="1642901234567890",
+            link="https://api.ycloud.com/v2/whatsapp/media/download/1642901234567890",
+            mime_type="image/jpeg",
+            caption="Este es el que quiero",
+        )
+
+    def test_the_camel_case_mime_type_is_accepted_too(self) -> None:
+        payload = load("ycloud/inbound_image.json")
+        image = payload["whatsappInboundMessage"]["image"]
+        image["mimeType"] = image.pop("mime_type")
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.media is not None and parsed.media.mime_type == "image/jpeg"
+
+    def test_an_image_object_without_id_or_link_is_no_media(self) -> None:
+        payload = load("ycloud/inbound_image.json")
+        payload["whatsappInboundMessage"]["image"] = {"caption": "sin archivo"}
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.msg_type == "image" and parsed.media is None
 
     def test_a_type_this_version_cannot_read_becomes_unsupported(self) -> None:
         """C-001: stored, answered with the tenant's fallback, and counted as
@@ -711,3 +742,52 @@ class TestReadingInteractiveReferralAndBsuid:
         del payload["whatsappInboundMessage"]["fromUserId"]
 
         assert YCloudProvider().parse_event(payload) is None
+
+
+class TestDownloadingACustomersFile:
+    LINK = "https://api.ycloud.com/v2/whatsapp/media/download/1642901234567890"
+
+    async def test_it_fetches_the_file_with_the_tenants_key(self) -> None:
+        provider, seen = _provider(
+            httpx.Response(200, content=b"jpegbytes", headers={"content-type": "image/jpeg"})
+        )
+
+        media = await provider.download_media(_credentials(), link=self.LINK, max_bytes=1000)
+
+        assert media.data == b"jpegbytes" and media.mime_type == "image/jpeg"
+        assert str(seen[0].url) == self.LINK
+        assert seen[0].headers["x-api-key"] == "yc_live_abcdef123456"
+
+    @pytest.mark.parametrize(
+        "link",
+        [
+            "https://evil.example/v2/whatsapp/media/download/1",
+            "http://api.ycloud.com/v2/whatsapp/media/download/1",
+            "not a url",
+        ],
+    )
+    async def test_it_never_sends_the_key_to_another_host(self, link: str) -> None:
+        provider, seen = _provider(httpx.Response(200, content=b"x"))
+
+        with pytest.raises(WhatsAppError):
+            await provider.download_media(_credentials(), link=link, max_bytes=1000)
+
+        assert seen == []
+
+    async def test_a_file_over_the_limit_is_refused(self) -> None:
+        provider, _ = _provider(httpx.Response(200, content=b"x" * 50))
+
+        with pytest.raises(WhatsAppError, match="larger"):
+            await provider.download_media(_credentials(), link=self.LINK, max_bytes=10)
+
+    async def test_a_rejected_key_is_not_retryable(self) -> None:
+        provider, _ = _provider(httpx.Response(401, content=b"nope"))
+
+        with pytest.raises(WhatsAppAuthError):
+            await provider.download_media(_credentials(), link=self.LINK, max_bytes=10)
+
+    async def test_a_gateway_failure_is_retryable(self) -> None:
+        provider, _ = _provider(httpx.Response(503, content=b"down"))
+
+        with pytest.raises(WhatsAppTransientError):
+            await provider.download_media(_credentials(), link=self.LINK, max_bytes=10)

@@ -184,6 +184,28 @@ class Referral:
 
 
 @dataclass(frozen=True)
+class InboundMedia:
+    """The file a customer sent with a message (an image, for now).
+
+    `link` is where the provider keeps the file; fetching it needs the tenant's
+    credential, so it goes through `WhatsAppProvider.download_media`, never a bare GET.
+    """
+
+    media_id: str | None = None
+    link: str | None = None
+    mime_type: str | None = None
+    caption: str | None = None
+
+
+@dataclass(frozen=True)
+class DownloadedMedia:
+    """A customer's file, fetched."""
+
+    data: bytes
+    mime_type: str
+
+
+@dataclass(frozen=True)
 class SendResult:
     """What the provider said when it accepted a message.
 
@@ -220,6 +242,8 @@ class InboundMessage:
     interactive: InteractiveReply | None = None
     # Present on the first message after a Click-to-WhatsApp ad.
     referral: Referral | None = None
+    # The image of an `image` message, when the provider sent a reference to it.
+    media: InboundMedia | None = None
 
 
 @dataclass(frozen=True)
@@ -325,6 +349,20 @@ class WhatsAppProvider(Protocol):
         filename: str,
     ) -> UploadedMedia:
         """Store a file with the provider so it can be sent by id."""
+        ...
+
+    async def download_media(
+        self,
+        credentials: NumberCredentials,
+        *,
+        link: str,
+        max_bytes: int,
+    ) -> DownloadedMedia:
+        """Fetch a file the customer sent, or raise a `WhatsAppError`.
+
+        Refuses a link that does not belong to the provider (the credential must
+        never be sent anywhere else) and a file larger than `max_bytes`.
+        """
         ...
 
     def verify_signature(self, *, raw_body: bytes, header: str | None, secret: str) -> bool:

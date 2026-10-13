@@ -14,8 +14,9 @@
     "sendTime": "2026-08-04T14:35:01.000Z",
     "type": "image",
     "image": {
+      "link": "https://api.ycloud.com/v2/whatsapp/media/download/1642901234567890",
       "id": "1642901234567890",
-      "mimeType": "image/jpeg",
+      "mime_type": "image/jpeg",
       "sha256": "b1946ac92492d2347c6235b4d2611184",
       "caption": "Este es el que quiero"
     }

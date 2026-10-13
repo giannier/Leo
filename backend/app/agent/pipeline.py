@@ -31,12 +31,16 @@ gate.
 (C-19). The pipeline only decides whether the text is stored `queued` (to be sent by
 `ReplySender`, which retries and honours the 24-hour window) or just stored.
 
-Step 4 does not yet read payment proofs (`ProofPipeline`, TASK-429): an image reaches
-the model as one line of context, "[El cliente envió una imagen]".
+Step 4 reads payment proofs (`ProofPipeline`, TASK-429): an image that arrives while
+the stage (as if nobody had taken the conversation) is COBRO, or VERIFICACION with a
+rejected payment, is read, stored and recorded before the model is called, handover
+or not. Any other image reaches the model as one line of context, "[El cliente envió
+una imagen]".
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import uuid
 from collections.abc import Callable, Mapping
@@ -56,6 +60,7 @@ from app.agent.tools.registry import ToolContext
 from app.models.conversation import Conversation, Message
 from app.models.conversation_state import FunnelCode
 from app.models.tenant import Tenant
+from app.orders.proofs import ImageReader, InboundImage, ProofOutcome, ProofPipeline
 from app.process.engine import compute_stage, funnel_for
 from app.process.facts import EntradaAnuncio, Facts, FactsLoader
 from app.process.interactive import InteractiveReply, apply_interactive
@@ -74,8 +79,12 @@ logger = logging.getLogger(__name__)
 GateReason = Literal["paused", "opted_out", "handover"]
 Outcome = Literal["answered", "gated", "unsupported"]
 
-# Why a stage was saved. `comprobante` arrives with the proof pipeline (TASK-429).
+# Why a stage was saved: an ordinary turn, or a payment proof that arrived in it.
 REASON_TURN = "turno"
+REASON_PROOF = "comprobante"
+
+# What the model is told when a receipt photo could not be opened.
+IMAGE_UNREADABLE_LINE = "no se pudo abrir la imagen; pídele que la envíe de nuevo"
 
 
 @dataclass(frozen=True)
@@ -88,13 +97,15 @@ class InboundTurn:
     interactive: tuple[InteractiveReply, ...] = ()
     # The ad the customer came from, when the first message carried one.
     referral: Referral | None = None
-    # An image arrived. Reading it is TASK-429.
+    # An image arrived.
     image: bool = False
+    # The image messages of the burst, to fetch if a receipt is expected.
+    images: tuple[InboundImage, ...] = ()
 
     @property
     def readable(self) -> bool:
         """Whether there is anything the assistant can answer."""
-        return bool(self.text.strip()) or self.image or bool(self.interactive)
+        return bool(self.text.strip()) or self.image or bool(self.images) or bool(self.interactive)
 
     def for_the_model(self) -> str:
         """The user message the model gets: the text, or the image line."""
@@ -140,6 +151,8 @@ class TurnPipeline:
         queue_text: bool = False,
         model_tier_applies: bool = True,
         process_config: ProcessConfigService | None = None,
+        proofs: ProofPipeline | None = None,
+        images: ImageReader | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._session = session
@@ -152,6 +165,8 @@ class TurnPipeline:
         # A tenant that brings its own model has no intelligence level (C-02).
         self._tier_applies = model_tier_applies
         self._process = process_config or ProcessConfigService(session)
+        self._proofs = proofs
+        self._images = images
         self._clock = clock
         self._states = StateRepo(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
@@ -173,15 +188,19 @@ class TurnPipeline:
         stage_before = Stage(state.stage_key)
         funnel_before = FunnelCode(state.funnel_code)
 
-        # 3. the stage if nobody had taken the conversation (the proof pipeline
-        # of TASK-429 decides on it whether an image must be read during a pause)
+        # 3. the stage if nobody had taken the conversation (it decides whether an
+        # image is read as a payment proof, also during a pause)
         stage_previa = compute_stage(template, config.options, facts, now, ignorar_derivacion=True)
 
         # 4-5. inbound
         patch, turn = self._read_inbound(inbound, facts, config, now)
+        proof_made = False
+        if inbound.images and self._expects_proof(stage_previa, facts):
+            turn, proof_made = await self._read_proofs(conversation, inbound.images, turn)
         version = state.version
         if patch:
             version = self._save(conversation_id, stage_before, funnel_before, patch, version)
+        if patch or proof_made:
             facts = loader.load(conversation, now=now)
 
         # 6. stage
@@ -189,7 +208,13 @@ class TurnPipeline:
         funnel = funnel_for(template, stage, facts)
         if (stage, funnel) != (stage_before, funnel_before):
             version = self._save(
-                conversation_id, stage, funnel, None, version, snapshot=facts_snapshot(facts)
+                conversation_id,
+                stage,
+                funnel,
+                None,
+                version,
+                snapshot=facts_snapshot(facts),
+                reason=REASON_PROOF if proof_made else REASON_TURN,
             )
 
         def result(outcome: Outcome, **extra: Any) -> TurnResult:
@@ -346,6 +371,42 @@ class TurnPipeline:
         )
         return patch, turn
 
+    @staticmethod
+    def _expects_proof(stage_previa: Stage, facts: Facts) -> bool:
+        """Whether an image now is probably a payment receipt (RF-022): the customer
+        is being asked to pay, or to pay again after a rejection."""
+        return stage_previa is Stage.COBRO or (
+            stage_previa is Stage.VERIFICACION and facts.pago_estado == "rechazado"
+        )
+
+    async def _read_proofs(
+        self, conversation: Conversation, images: tuple[InboundImage, ...], turn: TurnContext
+    ) -> tuple[TurnContext, bool]:
+        """Step 4, images: run each through the proof pipeline.
+
+        Returns the turn context with what the model should know (a receipt came in,
+        or the photo is not one) and whether a proof was recorded. With nothing to
+        read them with, the image stays what it was: a line of context.
+        """
+        if self._proofs is None or self._images is None:
+            return turn, False
+        lines: list[str] = []
+        recorded = False
+        for image in images:
+            received = await self._images.read(image)
+            if received is None:
+                lines.append(IMAGE_UNREADABLE_LINE)
+                continue
+            outcome: ProofOutcome = await self._proofs.handle(
+                conversation, received, message_id=image.message_id
+            )
+            recorded = recorded or outcome.kind == "registrado"
+            if outcome.context:
+                lines.append(outcome.context)
+        if not lines:
+            return turn, recorded
+        return dataclasses.replace(turn, comprobante="; ".join(lines)), recorded
+
     def _gate(self, conversation: Conversation, facts: Facts, now: datetime) -> GateReason | None:
         """Step 7: the reasons the assistant stays quiet.
 
@@ -378,6 +439,7 @@ class TurnPipeline:
         version: int,
         *,
         snapshot: Mapping[str, Any] | None = None,
+        reason: str = REASON_TURN,
     ) -> int:
         """Save and return the new version; once more on a collision that got away.
 
@@ -392,7 +454,7 @@ class TurnPipeline:
                     stage=stage,
                     funnel=funnel,
                     facts_patch=patch,
-                    reason=REASON_TURN,
+                    reason=reason,
                     expected_version=version,
                     snapshot=snapshot,
                 )
