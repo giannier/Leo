@@ -50,6 +50,7 @@ from app.services.channel import (
     lock_key,
     stranded_replies,
 )
+from app.services.tenant_alerts import TenantAlerts
 from app.services.turn_outbound import live_outbound_factory
 
 logger = logging.getLogger(__name__)
@@ -360,12 +361,14 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
         with session_factory() as session:
             llm_settings = session.get(TenantLLMSettings, tenant)
             llm = provider_for_tenant(llm_settings)
+            alerts = TenantAlerts(session, tenant)
             responder = ConversationResponder(
                 session,
                 tenant,
                 llm=llm,
                 storage=ctx.get("storage"),
                 whatsapp=ctx["whatsapp"],
+                notices=alerts,
                 outbound_for=live_outbound_factory(
                     session,
                     tenant,
@@ -377,7 +380,9 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 model_tier_applies=llm_settings is None or llm_settings.mode == "platform",
             )
             answers = await responder.respond_turn(conversation)
-            warnings = tuple(responder.pending_emails)
+            # The quota warnings and the notices to the business: both are emails about
+            # what this turn did, sent only once it is committed.
+            warnings = (*responder.pending_emails, *alerts.pending_emails)
             # Committed before the send. The reply exists as `queued` from
             # here on, so a worker killed mid-send leaves a record of what the
             # business meant to say - and `send_queued_replies` can pick it up

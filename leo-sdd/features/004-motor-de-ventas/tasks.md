@@ -264,7 +264,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - una doble confirmación da 409.
   - Parallel: false
 
-- [ ] TASK-431: Notificaciones al tenant
+- [x] TASK-431: Notificaciones al tenant
   - Input: `contracts/api.md §10`
   - Output: tipos nuevos en `tenant_notifications` y correos con el proveedor existente (`console` en desarrollo), con límite para `llm_caido`
   - Depends on: TASK-430

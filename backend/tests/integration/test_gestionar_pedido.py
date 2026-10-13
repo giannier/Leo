@@ -26,14 +26,16 @@ from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order
 from app.models.sales_config import Promotion
-from app.models.tenant import Tenant
+from app.models.tenant import CASH_ORDER, Tenant
 from app.process.engine import compute_stage
 from app.process.facts import Facts, FactsConfig, FactsLoader
 from app.process.templates import TEMPLATES
 from app.process.templates.base import ProcessOptions, Stage
 from app.providers.llm import MockLLMProvider
+from app.repositories.notification import TenantNotificationRepository
 from app.repositories.orders import OrderRepository
 from app.repositories.sales_config import BusinessInfoRepository
+from app.services.tenant_alerts import TenantAlerts
 
 D = Decimal
 SHOP = TEMPLATES["productos"]
@@ -918,6 +920,36 @@ class TestConfirming:
         order = active_order(db, tenant, conversation)
         assert order is not None
         assert order.datos_cliente == {"nombres": "Ana", "telefono": "+51987000333"}
+
+    async def test_the_business_is_told_about_a_cash_order_but_not_about_a_simulated_one(
+        self,
+        db: Session,
+        tenant: Tenant,
+        contact: Contact,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """TASK-431: `pedido_contra_entrega` for a real order; nothing in the simulator."""
+        alerts = TenantAlerts(db, tenant.id)
+        real = self.cash_context(db, tenant, conversation, sandbox=False, notices=alerts)
+        await act(real, accion="agregar", producto_id=str(catalogue["siaf"].id))
+
+        await act(real, accion="confirmar")
+
+        [notice] = TenantNotificationRepository(db, tenant.id).recent(CASH_ORDER)
+        order = active_order(db, tenant, conversation)
+        assert order is not None
+        assert notice.payload["order_id"] == str(order.id)
+        assert notice.payload["numero"] == order.numero
+
+        simulated = Conversation(tenant_id=tenant.id, channel="sandbox", contact_id=contact.id)
+        db.add(simulated)
+        db.flush()
+        quiet = TenantAlerts(db, tenant.id)
+        fake = self.cash_context(db, tenant, simulated, sandbox=True, notices=quiet)
+        await act(fake, accion="agregar", producto_id=str(catalogue["siaf"].id))
+        await act(fake, accion="confirmar")
+        assert len(TenantNotificationRepository(db, tenant.id).recent(CASH_ORDER)) == 1
 
     async def test_a_prepaid_order_cannot_be_confirmed_by_the_assistant(
         self,

@@ -60,6 +60,7 @@ from app.agent.tools.registry import ToolContext
 from app.models.conversation import Conversation, Message
 from app.models.conversation_state import FunnelCode
 from app.models.tenant import Tenant
+from app.orders.notices import OrderNotices
 from app.orders.proofs import ImageReader, InboundImage, ProofOutcome, ProofPipeline
 from app.process.engine import compute_stage, funnel_for
 from app.process.facts import EntradaAnuncio, Facts, FactsLoader
@@ -153,6 +154,7 @@ class TurnPipeline:
         process_config: ProcessConfigService | None = None,
         proofs: ProofPipeline | None = None,
         images: ImageReader | None = None,
+        notices: OrderNotices | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._session = session
@@ -167,6 +169,8 @@ class TurnPipeline:
         self._process = process_config or ProcessConfigService(session)
         self._proofs = proofs
         self._images = images
+        # Where the business is told what waits for a person (TASK-431).
+        self._notices = notices
         self._clock = clock
         self._states = StateRepo(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
@@ -255,6 +259,7 @@ class TurnPipeline:
             sandbox=self._sandbox,
             turn=turn,
             facts=facts,
+            notices=None if self._sandbox else self._notices,
         )
         prompt = build_stage_prompt(
             config, facts, stage, now=now, turn=turn, tool_specs=registry.specs()

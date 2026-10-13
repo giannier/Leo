@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.budget import TurnBudget
 from app.agent.outbound import TurnOutbound
+from app.orders.notices import OrderNotices
 from app.process.facts import Facts
 from app.process.templates.base import GLOBAL_TOOLS, EffectiveOptions, Stage, Template
 from app.process.turn import TurnContext
@@ -149,6 +150,9 @@ class ToolContext:
     # of a package). The catalogue guard accepts them in the reply, or it would
     # mistake "Excel avanzado" for an invented product.
     extra_names: list[str] = field(default_factory=list)
+    # Where the business is told that something waits for a person (a cash-on-delivery
+    # order, TASK-431). None in the simulator and wherever nobody is to be told.
+    notices: OrderNotices | None = None
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult]]

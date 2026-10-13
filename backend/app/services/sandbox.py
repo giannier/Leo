@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
-from app.orders.proofs import InboundImage, ProofNotices, ProofPipeline, ReceivedImage
+from app.orders.proofs import InboundImage, ProofPipeline, ReceivedImage
 from app.process.inbound import interactive_of, stored_image_of
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageProvider
@@ -87,7 +87,6 @@ class SandboxService:
         *,
         llm: LLMProvider,
         storage: StorageProvider | None = None,
-        notices: ProofNotices | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
@@ -95,7 +94,6 @@ class SandboxService:
         # Where the customer's photo is kept so the turn can read it as a payment
         # receipt; without it an image is only a line of context.
         self._storage = storage
-        self._notices = notices
         self._conversations = ConversationRepository(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
 
@@ -202,7 +200,6 @@ class SandboxService:
                 self._tenant_id,
                 llm=self._llm,
                 storage=self._storage,
-                notices=self._notices,
             ),
             images=InboundImageReader(self._session, self._tenant_id, storage=self._storage),
         )

@@ -22,7 +22,13 @@ from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, StringConstraints
 from sqlalchemy.orm import Session
 
-from app.api.deps import MemberDep, SessionDep, WhatsAppProviderDep, get_storage_provider
+from app.api.deps import (
+    EmailProviderDep,
+    MemberDep,
+    SessionDep,
+    WhatsAppProviderDep,
+    get_storage_provider,
+)
 from app.api.errors import ApiError, error_responses
 from app.core.config import get_settings
 from app.models.channel import Contact
@@ -41,6 +47,7 @@ from app.repositories.business import BusinessProfileRepository
 from app.repositories.channel import ContactRepository, session_window_is_open
 from app.repositories.orders import OrderItemRepository, OrderRepository, PaymentProofRepository
 from app.services.order_notices import CustomerNotice, CustomerNotifier
+from app.services.tenant_alerts import TenantAlerts, send_emails
 
 router = APIRouter(prefix="/tenant/orders", tags=["orders"])
 
@@ -472,6 +479,7 @@ async def confirm_order(
     principal: MemberDep,
     session: SessionDep,
     provider: WhatsAppProviderDep,
+    email: EmailProviderDep,
     body: ConfirmRequest | None = None,
 ) -> DecisionResponse:
     """Order, receipt, audit and stage in one transaction; the customer is told after."""
@@ -486,9 +494,11 @@ async def confirm_order(
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
 
-    notice = await _notifier(session, principal.tenant_id, provider).notify(
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
         result.order, "pago_confirmado", siguiente_paso=result.order.siguiente_paso
     )
+    await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
 
@@ -503,6 +513,7 @@ async def reject_order(
     principal: MemberDep,
     session: SessionDep,
     provider: WhatsAppProviderDep,
+    email: EmailProviderDep,
 ) -> DecisionResponse:
     review = OrderReviewService(session, principal.tenant_id)
     try:
@@ -515,9 +526,11 @@ async def reject_order(
         raise _conflict("invalid_transition", exc) from exc
 
     assert result.notice is not None  # a rejection always tells the customer
-    notice = await _notifier(session, principal.tenant_id, provider).notify(
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
         result.order, result.notice, motivo=body.motivo
     )
+    await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
 
@@ -541,11 +554,12 @@ def set_order_status(
 
 
 def _notifier(
-    session: Session, tenant_id: uuid.UUID, provider: WhatsAppProvider
+    session: Session, tenant_id: uuid.UUID, provider: WhatsAppProvider, alerts: TenantAlerts
 ) -> CustomerNotifier:
     return CustomerNotifier(
         session,
         tenant_id,
         provider=provider,
         max_attempts=get_settings().channel_send_max_attempts,
+        notices=alerts,
     )
