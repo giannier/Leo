@@ -76,6 +76,10 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 
 ## 6. Pendientes y decisiones abiertas
 
+- **Cobro de la plataforma apagado** (`BILLING_ENFORCED=false`, 2026-10-13): prueba que no vence, cupo
+  sin aplicar, sin límites de asientos ni de conocimiento, un teléfono puede abrir varios negocios. Se
+  enciende antes de vender (deploy, TASK-026 de la 001).
+
 1. **Milestone TASK-209 (Giannier):** probar de punta a punta con su número real. Requiere configurar `YCLOUD_WEBHOOK_SECRET` y apuntar el webhook a `/webhooks/ycloud`. Es lo único que mide el p95 <10s.
 2. **TASK-026:** deploy a producción (compose prod, Caddy, backups con restore probado, Sentry/Uptime Kuma, runbook). Milestone: Giannier ejecuta el restore.
 3. **Milestones 1–5 de 001:** no hay registro en el repo de que se confirmaron. No verificado.

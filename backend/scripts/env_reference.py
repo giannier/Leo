@@ -32,6 +32,7 @@ SECRETS = frozenset(
 GROUPS: list[tuple[str, list[str]]] = [
     ("General", ["app_name", "environment", "debug", "api_v1_prefix", "log_level"]),
     ("Database / Redis", ["database_url", "redis_url"]),
+    ("Platform billing", ["billing_enforced"]),
     (
         "Auth",
         [

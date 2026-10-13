@@ -2368,6 +2368,8 @@ export interface components {
             /** Plan */
             plan: string;
             trial: components["schemas"]["TrialStatus"] | null;
+            /** Cobro Activo */
+            cobro_activo: boolean;
         };
         /** TenantSummaryResponse */
         TenantSummaryResponse: {
@@ -2467,6 +2469,8 @@ export interface components {
              * Format: date-time
              */
             period_start: string;
+            /** Cobro Activo */
+            cobro_activo: boolean;
         };
         /**
          * UserSummary

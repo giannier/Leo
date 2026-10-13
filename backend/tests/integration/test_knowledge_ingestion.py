@@ -668,6 +668,19 @@ class TestPlanLimits:
         assert response.json()["fields"]["files_used"] == "1"
         assert response.json()["fields"]["files_limit"] == "1"
 
+    async def test_with_billing_off_the_budgets_are_shown_not_enforced(
+        self, knowledge: AsyncClient, db: Session, plan: Plan, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`BILLING_ENFORCED=false` (the default while Giannier tests with his
+        own businesses): a source past both budgets is accepted."""
+        monkeypatch.setattr(get_settings(), "billing_enforced", False)
+        plan.max_knowledge_files = 1
+        plan.max_rag_chars = 50
+        db.flush()
+
+        assert (await _post_text(knowledge, content="uno")).status_code == 202
+        assert (await _post_text(knowledge, content="x" * 200)).status_code == 202
+
     async def test_a_pdf_is_refused_when_no_character_budget_remains(
         self, knowledge: AsyncClient, db: Session, plan: Plan
     ) -> None:

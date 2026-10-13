@@ -38,6 +38,7 @@ from app.repositories.knowledge import (
 from app.repositories.tenant import TenantRepository
 from app.services.chunking import chunk_text
 from app.services.knowledge import PDF_TYPE, KnowledgeError, KnowledgeService
+from app.services.trial import billing_enforced
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +259,8 @@ def _reserve_characters(
         return f"The plan's knowledge limits could not be read: {exc}"
 
     used_by_others = sources.total_chars(exclude_source_id=source_id)
-    if used_by_others + char_count > chars_limit:
+    # Billing off: the budget is shown, not enforced.
+    if billing_enforced() and used_by_others + char_count > chars_limit:
         session.rollback()
         return (
             f"This document holds {char_count} characters and the plan allows "

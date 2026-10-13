@@ -26,6 +26,7 @@ from app.repositories.payment import PaymentMethodRepository
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
 from app.services.activation import build_checklist
+from app.services.trial import billing_enforced
 
 router = APIRouter(prefix="/tenant", tags=["tenant"])
 
@@ -53,6 +54,9 @@ class TenantResponse(BaseModel):
     status: str
     plan: str
     trial: TrialStatus | None
+    # False while the platform does not charge (`BILLING_ENFORCED` off): the
+    # trial never ends and the limits are not enforced.
+    cobro_activo: bool
 
 
 class UsageResponse(BaseModel):
@@ -64,6 +68,8 @@ class UsageResponse(BaseModel):
     messages_in: int
     messages_out: int
     period_start: datetime
+    # False while the platform does not charge: the limit is shown, not enforced.
+    cobro_activo: bool
 
 
 class ChecklistItemResponse(BaseModel):
@@ -133,6 +139,7 @@ async def get_tenant(principal: MemberDep, session: SessionDep) -> TenantRespons
         status=tenant.status,
         plan=tenant.plan_id,
         trial=trial,
+        cobro_activo=billing_enforced(),
     )
 
 
@@ -166,6 +173,7 @@ async def get_usage(principal: MemberDep, session: SessionDep) -> UsageResponse:
     return UsageResponse(
         ai_messages_used=tenant.ai_messages_used,
         ai_messages_limit=limit,
+        cobro_activo=billing_enforced(),
         # Capped at 100: an admin lowering a plan's limit must not produce a
         # progress bar past the end of its own track.
         percent_used=min(100, round(100 * tenant.ai_messages_used / limit)) if limit else 0,

@@ -214,6 +214,7 @@
   - **Output:** `docker-compose.prod.yml` (Caddy con HTTPS, backend, workers, frontend, Postgres, Redis, MinIO), backups diarios cifrados + script de restore probado, Sentry y Uptime Kuma conectados, GitHub Actions de deploy, runbook de operación (conexión YCloud, restore, extender trial)
   - **Depends on:** TASK-025
   - **Verification:** smoke test en producción del flujo registro→sandbox; restore de backup ejecutado una vez con éxito
+  - **Nota (2026-10-13):** el cobro de la plataforma está apagado (`BILLING_ENFORCED=false`) mientras Giannier prueba con sus negocios. El runbook debe decir que se enciende con `BILLING_ENFORCED=true` solo cuando Leo empiece a vender, con su confirmación.
 
 ---
 

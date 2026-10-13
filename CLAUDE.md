@@ -38,6 +38,16 @@ según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-
   contrato usa `buscar_productos` y `ver_producto`. Ratificado por Giannier (Milestone B, decisión 6;
   `leo-sdd/features/004-motor-de-ventas/plan.md`, "Decisiones Posteriores").
 
+## Cobro de la plataforma: apagado por ahora
+- `BILLING_ENFORCED=false` (por defecto) mientras Giannier prueba Leo con sus propios negocios: la prueba
+  no vence ni pausa, el cupo de mensajes se cuenta pero no se aplica, no hay límite de asientos ni de
+  conocimiento, y un mismo teléfono puede abrir varios negocios. El panel muestra "Modo pruebas".
+- Todo lo de cobro se sigue **desarrollando y probando** (los tests corren con el interruptor encendido),
+  pero cualquier límite o cobro nuevo debe respetar `billing_enforced()` (`services/trial.py`). Se
+  enciende el día que Leo empiece a vender.
+- No confundir con los comprobantes de pago de los clientes de cada negocio (motor de ventas): eso es
+  funcionalidad del producto y está activo.
+
 ## Dónde se corren las pruebas
 - `make test` (y `make isolation`, `make lint`, `make evals`) **no se corre en el host de Windows**: todo
   corre dentro del contenedor (`docker compose`, `make up`) o en WSL2. Si una task pide "tests en verde",

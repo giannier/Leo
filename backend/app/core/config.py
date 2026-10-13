@@ -91,6 +91,15 @@ class Settings(BaseSettings):
     # Redis (cache + ARQ job queue)
     redis_url: str = "redis://localhost:6379/0"
 
+    # --- Platform billing --------------------------------------------------
+    # Whether the platform charges its tenants: the trial that expires and
+    # pauses the agent, the message quota and its warnings, the seat and
+    # knowledge limits of the plan, one trial per phone. Built and tested, but
+    # off by default while Giannier tests the product with his own businesses
+    # (Milestone B of the 004). Usage is still metered either way. Turn it on
+    # (`BILLING_ENFORCED=true`) the day Leo starts selling.
+    billing_enforced: bool = False
+
     # --- LLM providers ----------------------------------------------------
     # Which profile the platform itself uses. Tenants may override the *chat*
     # side with their own paid credentials; see `providers/llm/factory.py`.
