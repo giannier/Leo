@@ -159,7 +159,11 @@ class HistoryEntry(BaseModel):
 class OrderNote(BaseModel):
     en: datetime
     texto: str
+    # `cliente` (a change asked during review) or `sistema` (an unrecognised image).
     origen: str
+    evento: str | None = None
+    # Set when the note carries an image: ask `/notes/{imagen_id}/image` for a link.
+    imagen_id: str | None = None
 
 
 class OrderDetail(BaseModel):
@@ -291,6 +295,11 @@ def proof_out(proof: PaymentProof) -> ProofOut:
 
 
 # ------------------------------------------------------------------- helpers
+
+
+def _note_out(note: dict[str, Any]) -> OrderNote:
+    """A note as the panel sees it: never the storage key."""
+    return OrderNote.model_validate({k: v for k, v in note.items() if k != "imagen_key"})
 
 
 def _not_found() -> ApiError:
@@ -455,6 +464,11 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
             for proof in proofs
         ],
         *[
+            HistoryEntry(evento=str(note["evento"]), estado=None, en=note["en"])
+            for note in order.notas or []
+            if note.get("evento")
+        ],
+        *[
             HistoryEntry(
                 evento=entry.action,
                 estado=str(entry.detail.get("a")) if entry.detail.get("a") else None,
@@ -484,7 +498,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         rechazo_vigente=order.rechazo_vigente,
         devolucion_pendiente=order.devolucion_pendiente,
         cliente_posible_duplicado=contact is not None and contact.posible_duplicado_de is not None,
-        notas=[OrderNote.model_validate(note) for note in order.notas or []],
+        notas=[_note_out(note) for note in order.notas or []],
         siguiente_paso=order.siguiente_paso,
         es_sandbox=order.is_sandbox,
         conversation_id=order.conversation_id,
@@ -515,6 +529,32 @@ def proof_image(
         raise _not_found()
     return ProofImage(
         url=storage.presigned_url(proof.storage_key, expires_in=IMAGE_LINK_SECONDS),
+        expires_at=datetime.now(UTC) + timedelta(seconds=IMAGE_LINK_SECONDS),
+    )
+
+
+@router.get(
+    "/{order_id}/notes/{imagen_id}/image",
+    summary="A signed link to an image kept on the order (10 minutes)",
+    responses=error_responses(NOT_FOUND, *AUTH_RESPONSES),
+)
+def note_image(
+    order_id: uuid.UUID,
+    imagen_id: str,
+    principal: MemberDep,
+    session: SessionDep,
+    storage: StorageDep,
+) -> ProofImage:
+    """An image the model did not take for a receipt (finding D-4). Private, like a proof."""
+    order = OrderRepository(session, principal.tenant_id).get(order_id)
+    note = next(
+        (n for n in (order.notas if order else []) or [] if n.get("imagen_id") == imagen_id),
+        None,
+    )
+    if note is None or not note.get("imagen_key"):
+        raise _not_found()
+    return ProofImage(
+        url=storage.presigned_url(str(note["imagen_key"]), expires_in=IMAGE_LINK_SECONDS),
         expires_at=datetime.now(UTC) + timedelta(seconds=IMAGE_LINK_SECONDS),
     )
 

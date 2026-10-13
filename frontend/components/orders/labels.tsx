@@ -168,4 +168,5 @@ export const HISTORY_LABELS: Record<string, string> = {
   "order.confirmed": "Pedido confirmado",
   "order.rejected": "Pedido rechazado",
   "order.status_changed": "Cambio de estado",
+  imagen_no_reconocida: "Imagen no reconocida como comprobante",
 };

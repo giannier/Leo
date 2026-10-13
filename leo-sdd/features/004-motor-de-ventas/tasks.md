@@ -578,7 +578,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: test que corta entre el commit y el envío: la fila existe y el worker la manda
   - Parallel: true
 
-- [ ] TASK-454: Imagen no reconocida, guardada y visible (hallazgo D-4)
+- [x] TASK-454: Imagen no reconocida, guardada y visible (hallazgo D-4)
   - Input: revisión, D-4
   - Output: si el modelo dice que no es comprobante, la imagen se guarda igual y el pedido muestra el
     evento "imagen no reconocida" (sin crear comprobante)

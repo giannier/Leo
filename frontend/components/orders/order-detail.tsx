@@ -4,6 +4,7 @@
 
 import { AlertIcon } from "@/components/icons";
 import { Alert, Button, Card, Skeleton, cx } from "@/components/ui";
+import { api } from "@/lib/api/client";
 import type { OrderDetail, PaymentProof } from "@/lib/api/client";
 
 import {
@@ -301,9 +302,22 @@ export function HistoryCard({ order }: { order: OrderDetail }) {
 
 /* ---------------------------------------------------------------- warnings */
 
+/** Opens a kept image in a new tab; the link is signed and lives ten minutes. */
+async function openNoteImage(orderId: string, imageId: string) {
+  const tab = window.open("", "_blank");
+  try {
+    const { url } = await api.orders.noteImage(orderId, imageId);
+    if (tab) tab.location.href = url;
+  } catch {
+    tab?.close();
+  }
+}
+
 /** What the operator must know before deciding. */
 export function OrderNotes({ order }: { order: OrderDetail }) {
   const awaiting = order.estado === "por_confirmar";
+  const customerNotes = order.notas.filter((note) => note.origen === "cliente");
+  const imageNotes = order.notas.filter((note) => note.imagen_id);
   return (
     <div className="space-y-3">
       {awaiting && !order.ventana_abierta ? (
@@ -319,15 +333,36 @@ export function OrderNotes({ order }: { order: OrderDetail }) {
           </span>
         </Alert>
       ) : null}
-      {order.notas.length > 0 ? (
+      {customerNotes.length > 0 ? (
         <Alert tone="warning" title="El cliente pidió cambios mientras revisabas">
           <ul data-testid="order-notes" className="space-y-1">
-            {order.notas.map((note) => (
+            {customerNotes.map((note) => (
               <li key={note.en}>
                 <span className="text-ink-faint">{formatDateTime(note.en)}:</span> {note.texto}
               </li>
             ))}
           </ul>
+        </Alert>
+      ) : null}
+      {imageNotes.length > 0 ? (
+        <Alert tone="info" title="Imágenes que no parecían un comprobante">
+          <ul data-testid="unrecognised-images" className="space-y-1">
+            {imageNotes.map((note) => (
+              <li key={note.en} className="flex flex-wrap items-center gap-2">
+                <span className="text-ink-faint">{formatDateTime(note.en)}</span>
+                <button
+                  type="button"
+                  className="cursor-pointer font-medium text-accent hover:underline"
+                  onClick={() => void openNoteImage(order.id, note.imagen_id ?? "")}
+                >
+                  Ver imagen
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-ink-faint">
+            El sistema no la tomó como pago. Revísala por si era un comprobante borroso.
+          </p>
         </Alert>
       ) : null}
       {order.cliente_posible_duplicado ? (

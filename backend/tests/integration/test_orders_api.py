@@ -427,6 +427,32 @@ class TestListAndSummary:
 
 
 class TestDetail:
+    async def test_an_unrecognised_image_shows_as_an_event_with_a_private_link(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        """Finding D-4: the operator sees it; the storage key never leaves the API."""
+        account, headers = await _owner(api, mail)
+        order, _ = seed_order(db, account["tenant_id"], submit=False)
+        OrderService(db, order.tenant_id).add_note(
+            order,
+            "El cliente envió una imagen que no parece un comprobante.",
+            origen="sistema",
+            evento="imagen_no_reconocida",
+            imagen_id="img-1",
+            imagen_key=f"tenants/{order.tenant_id}/proofs/x.jpg",
+        )
+        db.commit()
+
+        detail = (await api.get(f"{ORDERS}/{order.id}", headers=headers)).json()
+        link = await api.get(f"{ORDERS}/{order.id}/notes/img-1/image", headers=headers)
+        missing = await api.get(f"{ORDERS}/{order.id}/notes/otra/image", headers=headers)
+
+        [note] = detail["notas"]
+        assert note["imagen_id"] == "img-1" and "imagen_key" not in note
+        assert "imagen_no_reconocida" in [entry["evento"] for entry in detail["historial"]]
+        assert link.status_code == 200 and link.json()["url"]
+        assert missing.status_code == 404
+
     async def test_a_customer_with_two_contacts_is_marked(
         self, api: AsyncClient, mail: Any, db: Session
     ) -> None:
