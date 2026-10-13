@@ -23,6 +23,7 @@ from app.models.conversation import Conversation
 from app.models.orders import Order
 from app.process.state import StateRepo
 from app.providers.llm import ChatResult, MockLLMProvider
+from app.providers.storage.base import StorageError
 from app.providers.storage.mock import MockStorageProvider
 from app.repositories.conversation import MessageRepository
 from app.repositories.media import MediaAssetRepository
@@ -227,6 +228,29 @@ class TestTypedOutbounds:
         assert "[El cliente envió una imagen]" in llm.chat_calls[0].messages[0].content
         # The photo is kept in private storage for the turn that expects a receipt.
         assert len(storage.objects) == 1
+
+    async def test_a_storage_failure_does_not_take_the_turn_down(
+        self, api: AsyncClient, mail: Any, llm: MockLLMProvider, db: Session, app: Any
+    ) -> None:
+        """Giannier's first test: a fresh MinIO without its bucket answered the
+        image with a 500, which the panel reads as "No pudimos contactar"."""
+
+        class Broken(MockStorageProvider):
+            def put(self, key: str, data: bytes, *, content_type: str) -> str:
+                raise StorageError("no bucket")
+
+        app.dependency_overrides[get_storage_provider] = lambda: Broken()
+        headers, conversation_id, _ = await _certificaciones_conversation(api, mail, db)
+        llm.queue(ChatResult(content="Recibí tu imagen."))
+
+        response = await api.post(
+            _messages_url(conversation_id),
+            headers=headers,
+            files={"image": ("voucher.png", b"\x89PNG\r\n\x1a\n" + b"0" * 64, "image/png")},
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["reply"]["content"] == "Recibí tu imagen."
 
     @pytest.mark.parametrize(
         ("name", "data", "mime"),

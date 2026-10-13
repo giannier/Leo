@@ -25,6 +25,7 @@ throttles abuse without ever telling a legitimate customer they have run out.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
 
@@ -36,7 +37,7 @@ from app.models.conversation import Conversation, Message
 from app.orders.proofs import InboundImage, ProofPipeline, ReceivedImage
 from app.process.inbound import interactive_of, stored_image_of
 from app.providers.llm.base import LLMProvider
-from app.providers.storage.base import StorageProvider
+from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
@@ -44,6 +45,8 @@ from app.repositories.sandbox_reset import SandboxResetRepository
 from app.services.activation import build_checklist
 from app.services.inbound_media import InboundImageReader
 from app.services.turn_outbound import SandboxOutbound
+
+logger = logging.getLogger(__name__)
 
 SANDBOX_CHANNEL = "sandbox"
 
@@ -252,7 +255,14 @@ class SandboxService:
         if image is not None and self._storage is not None:
             extension = {"image/png": "png", "image/webp": "webp"}.get(image.mime_type, "jpg")
             key = f"tenants/{self._tenant_id}/sandbox/{uuid.uuid4()}.{extension}"
-            self._storage.put(key, image.data, content_type=image.mime_type)
+            try:
+                self._storage.put(key, image.data, content_type=image.mime_type)
+            except StorageError:
+                # The turn goes on: the agent hears "[El cliente envió una
+                # imagen]" instead of reading it. A storage outage must not
+                # turn the simulator into "no connection".
+                logger.exception("a simulator image could not be stored")
+                return None
             return {"image": {"storage_key": key, "mime_type": image.mime_type}}
         return None
 
