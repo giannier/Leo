@@ -80,7 +80,7 @@ Siempre disponibles (globales): `consultar_conocimiento`, `enviar_recurso`, `der
 | PEDIDO | gestionar_pedido, buscar_productos, ver_producto, mostrar_opciones | ídem | ídem |
 | DATOS | gestionar_pedido | ídem | ídem |
 | COBRO | enviar_metodos_pago, gestionar_pedido | ídem | ídem |
-| VERIFICACION | por verificar: — · rechazado: enviar_metodos_pago, gestionar_pedido | ídem | ídem |
+| VERIFICACION | por verificar: gestionar_pedido (solo `ver` y `solicitar_cambio`) · rechazado: enviar_metodos_pago, gestionar_pedido | ídem | ídem |
 | CERRADO | buscar_productos, ver_producto, gestionar_pedido | ídem | ídem |
 | ASESORIA | buscar_productos, ver_producto, mostrar_opciones, elegir_camino | ídem | ídem |
 | DERIVADO | (no hay turno de modelo) | | |
@@ -286,6 +286,8 @@ Si el ESTADO trae el motivo de un rechazo anterior del negocio, tenlo en cuenta 
 - Si el pago está por verificar: dile que su comprobante (o su pedido) está en revisión y que le avisamos
   apenas se confirme. No pidas el comprobante de nuevo, no reenvíes los métodos de pago y no digas que está
   confirmado.
+- Si quiere cambiar el pedido mientras está en revisión: explícale que ahora no se puede modificar y deja
+  anotado lo que pide con gestionar_pedido(accion="solicitar_cambio", nota=...). El negocio lo verá al revisar.
 - Si el pago fue rechazado: el ESTADO trae el motivo. Explícaselo con amabilidad y ayúdalo a corregirlo:
   nueva foto, nuevo pago (puedes reenviar los métodos de pago una vez), o un cambio en el pedido o en sus
   datos con gestionar_pedido o registrar_datos_cliente. Si no se resuelve, usa derivar_a_humano.

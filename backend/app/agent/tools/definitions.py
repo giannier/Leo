@@ -62,7 +62,11 @@ ORDER_ACTIONS = (
     "vaciar",
     "aplicar_promocion",
     "confirmar",
+    "solicitar_cambio",
 )
+# While the business reviews the payment the order cannot change: the model can
+# only show it, or leave the customer's request on it (Milestone B, decision 8).
+UNDER_REVIEW_ACTIONS = ("ver", "solicitar_cambio")
 HANDOVER_REASONS = ("pide_humano", "queja", "sin_respuesta", "asesoria", "cotizacion", "otro")
 DELIVERY_TYPES = ("delivery", "recojo")
 
@@ -163,8 +167,18 @@ def _may_confirm(scope: ToolScope) -> bool:
     return scope.stage is Stage.COBRO and scope.facts.modalidad_pago == "contra_entrega"
 
 
+def _under_review(scope: ToolScope) -> bool:
+    return scope.stage is Stage.VERIFICACION and scope.facts.pago_estado != "rechazado"
+
+
 def _order_actions(scope: ToolScope) -> list[str]:
-    return [a for a in ORDER_ACTIONS if a != "confirmar" or _may_confirm(scope)]
+    if _under_review(scope):
+        return list(UNDER_REVIEW_ACTIONS)
+    return [
+        a
+        for a in ORDER_ACTIONS
+        if a != "solicitar_cambio" and (a != "confirmar" or _may_confirm(scope))
+    ]
 
 
 def _order_schema(scope: ToolScope) -> dict[str, Any]:
@@ -175,12 +189,20 @@ def _order_schema(scope: ToolScope) -> dict[str, Any]:
             "cantidad": {"type": "integer", "minimum": 1},
             "seleccion": _text("Tema o elemento que el cliente elige para su paquete."),
             "promocion_id": _text("La promoción de cierre que se ofrece."),
+            "nota": _text("Qué quiere cambiar el cliente, en sus palabras (solicitar_cambio)."),
         },
         ["accion"],
     )
 
 
 def _order_guard(scope: ToolScope, arguments: dict[str, Any]) -> ToolResult | None:
+    if _under_review(scope) and arguments.get("accion") not in UNDER_REVIEW_ACTIONS:
+        return ToolResult.no_disponible(
+            decir=(
+                "El pedido está en revisión del negocio y no se puede cambiar. Si el cliente "
+                'quiere otra cosa, usa accion="solicitar_cambio" con su pedido en "nota".'
+            )
+        )
     if arguments.get("accion") == "confirmar" and not _may_confirm(scope):
         return ToolResult.no_disponible(
             decir=(

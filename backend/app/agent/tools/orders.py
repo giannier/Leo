@@ -62,9 +62,12 @@ _MAX_SELECTIONS_PER_CALL = 10
 
 _NO_ORDER = "Todavía no hay un pedido. Para empezar, agrega un producto."
 _LOCKED = (
-    "El pedido ya está en revisión del negocio y no se puede cambiar. No ofrezcas modificarlo; "
-    "si el cliente quiere otra cosa, una persona del negocio le ayudará."
+    "El pedido ya está en revisión del negocio y no se puede cambiar. Explícaselo al cliente; "
+    'si quiere otra cosa, déjalo anotado con accion="solicitar_cambio" y su pedido en "nota".'
 )
+# How long a note may be, and how many an order keeps.
+_MAX_NOTE_CHARS = 300
+_MAX_NOTES = 20
 
 
 # --------------------------------------------------------------------- views
@@ -246,7 +249,7 @@ async def gestionar_pedido(context: ToolContext, arguments: dict[str, Any]) -> T
     if handler is None:
         return ToolResult.error(
             "accion no es válida: usa agregar, quitar, cantidad, elegir, ver, vaciar, "
-            "aplicar_promocion o confirmar."
+            "aplicar_promocion, confirmar o solicitar_cambio."
         )
     try:
         return handler(turn, arguments)
@@ -426,6 +429,29 @@ def _refusal_says(refusal: SelectionRefused) -> str:
     return f"No se pudo registrar la elección: {refusal}."
 
 
+def _solicitar_cambio(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
+    """Leave the customer's change on an order the business is reviewing (decision 8)."""
+    order = turn.active()
+    if order is None or order.estado != "por_confirmar":
+        return turn.result(
+            "no_disponible",
+            order,
+            "El pedido no está en revisión: haz el cambio con las otras acciones.",
+        )
+    note = " ".join(str(arguments.get("nota") or "").split())[:_MAX_NOTE_CHARS]
+    if not note:
+        return ToolResult.error("nota está vacía: escribe qué quiere cambiar el cliente.")
+    entry = {"en": turn.service.now.isoformat(), "texto": note, "origen": "cliente"}
+    order.notas = [*(order.notas or []), entry][-_MAX_NOTES:]
+    turn.context.session.flush()
+    return turn.result(
+        "hecho",
+        order,
+        "Quedó anotado para el negocio. Explícale al cliente que su pedido está en revisión y no "
+        "se puede cambiar ahora; el negocio verá lo que pidió al revisarlo. No prometas el cambio.",
+    )
+
+
 def _ver(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     order = turn.active()
     if order is None:
@@ -588,6 +614,7 @@ _ACTIONS = {
     "vaciar": _vaciar,
     "aplicar_promocion": _aplicar_promocion,
     "confirmar": _confirmar,
+    "solicitar_cambio": _solicitar_cambio,
 }
 
 __all__ = ["gestionar_pedido", "offers_of", "order_text", "order_view"]

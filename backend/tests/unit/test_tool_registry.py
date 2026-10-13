@@ -193,7 +193,7 @@ _EXPECTED_OWN_TOOLS: dict[Stage, set[str]] = {
     Stage.PEDIDO: {"gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"},
     Stage.DATOS: {"gestionar_pedido"},
     Stage.COBRO: {"enviar_metodos_pago", "gestionar_pedido"},
-    Stage.VERIFICACION: set(),
+    Stage.VERIFICACION: {"gestionar_pedido"},
     Stage.CERRADO: {"buscar_productos", "ver_producto", "gestionar_pedido"},
     Stage.ASESORIA: {"buscar_productos", "ver_producto", "mostrar_opciones", "elegir_camino"},
 }
@@ -235,12 +235,21 @@ class TestEachStageExposesOnlyItsOwnTools:
         assert len(registry) == 0
         assert registry.specs() == ()
 
-    def test_a_payment_under_review_offers_only_the_globals(self) -> None:
+    def test_a_payment_under_review_can_only_show_the_order_or_note_a_change(self) -> None:
+        """Milestone B, decision 8."""
         facts = Facts(pago_estado="por_verificar")
 
         registry = registry_for_stage(SHOP, Stage.VERIFICACION, facts, SHOP_OPTIONS)
 
-        assert _names(registry) == set(GLOBAL_TOOLS)
+        assert _names(registry) == {"gestionar_pedido", *GLOBAL_TOOLS}
+        [spec] = [s for s in registry.specs() if s.name == "gestionar_pedido"]
+        assert spec.parameters["properties"]["accion"]["enum"] == ["ver", "solicitar_cambio"]
+
+    def test_solicitar_cambio_is_offered_only_under_review(self) -> None:
+        registry = registry_for_stage(SHOP, Stage.PEDIDO, Facts(), SHOP_OPTIONS)
+
+        [spec] = [s for s in registry.specs() if s.name == "gestionar_pedido"]
+        assert "solicitar_cambio" not in spec.parameters["properties"]["accion"]["enum"]
 
     def test_a_rejected_payment_may_resend_the_methods_and_change_the_order(self) -> None:
         facts = Facts(pago_estado="rechazado")

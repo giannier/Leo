@@ -45,7 +45,7 @@ COMMON_TOOLS = {
     Stage.PEDIDO: ("gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"),
     Stage.DATOS: ("gestionar_pedido",),
     Stage.COBRO: ("enviar_metodos_pago", "gestionar_pedido"),
-    Stage.VERIFICACION: (),
+    Stage.VERIFICACION: ("gestionar_pedido",),
     Stage.CERRADO: ("buscar_productos", "ver_producto", "gestionar_pedido"),
     Stage.ASESORIA: (*SEARCH, "elegir_camino"),
     Stage.DERIVADO: (),
@@ -172,7 +172,7 @@ class TestEveryStage:
     def test_only_verificacion_changes_its_tools_when_rejected(self, template: Template) -> None:
         for stage, spec in template.stages.items():
             if stage is Stage.VERIFICACION:
-                assert spec.tools_for() == ()
+                assert spec.tools_for() == ("gestionar_pedido",)
                 assert spec.tools_for(rejected=True) == ("enviar_metodos_pago", "gestionar_pedido")
             else:
                 assert spec.tools_if_rejected is None
