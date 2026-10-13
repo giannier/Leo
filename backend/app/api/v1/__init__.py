@@ -8,6 +8,7 @@ from app.api.v1 import (
     connection,
     health,
     knowledge,
+    orders,
     platform_admin,
     products,
     sandbox,
@@ -22,6 +23,7 @@ router.include_router(agent.router)
 router.include_router(auth.router)
 router.include_router(connection.router)
 router.include_router(knowledge.router)
+router.include_router(orders.router)
 router.include_router(platform_admin.router)
 router.include_router(team.router)
 router.include_router(products.router)
