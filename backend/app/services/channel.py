@@ -34,9 +34,11 @@ from app.models.channel import SESSION_WINDOW_HOURS, Contact
 from app.models.conversation import Conversation, Message
 from app.models.tenant import QUOTA_80, QUOTA_WARNING_RATIO, Tenant
 from app.models.whatsapp import WhatsAppNumber
-from app.process.inbound import interactive_of, payload_of, referral_of
+from app.orders.proofs import InboundImage, ProofNotices, ProofPipeline
+from app.process.inbound import interactive_of, media_of, payload_of, referral_of, stored_image_of
 from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
+from app.providers.storage.base import StorageProvider
 from app.providers.whatsapp.base import (
     InboundMessage,
     NumberCredentials,
@@ -57,6 +59,7 @@ from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
 from app.services.activation import owner_of
 from app.services.connection import read_credentials
 from app.services.emails import build_quality_alert_email, build_quota_warning_email
+from app.services.inbound_media import InboundImageReader
 from app.services.trial import (
     MeteringResult,
     claim_notification,
@@ -430,6 +433,9 @@ class ConversationResponder:
         llm: LLMProvider,
         outbound_for: OutboundFactory | None = None,
         model_tier_applies: bool = True,
+        storage: StorageProvider | None = None,
+        whatsapp: WhatsAppProvider | None = None,
+        notices: ProofNotices | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
@@ -438,6 +444,11 @@ class ConversationResponder:
         # it the tools answer `no_disponible` and the turn is text only.
         self._outbound_for = outbound_for
         self._tier_applies = model_tier_applies
+        # What reading a payment receipt needs: private storage for the photo and
+        # the provider to fetch it from. Without storage an image is only context.
+        self._storage = storage
+        self._whatsapp = whatsapp
+        self._notices = notices
         self._messages = MessageRepository(session, tenant_id)
         # Warnings this turn produced, sent by the caller after the commit.
         # Same reason as `ChannelEventProcessor`: mailing somebody about a
@@ -490,6 +501,16 @@ class ConversationResponder:
             outbound=self._outbound_for(conversation_id) if self._outbound_for else None,
             queue_text=True,
             model_tier_applies=self._tier_applies,
+            proofs=ProofPipeline(
+                self._session,
+                self._tenant_id,
+                llm=self._llm,
+                storage=self._storage,
+                notices=self._notices,
+            ),
+            images=InboundImageReader(
+                self._session, self._tenant_id, storage=self._storage, provider=self._whatsapp
+            ),
         )
         result = await pipeline.run(conversation_id, self._read_burst(burst))
 
@@ -555,6 +576,15 @@ class ConversationResponder:
             interactive=taps,
             referral=referral,
             image=any(message.msg_type == "image" for message in burst),
+            images=tuple(
+                InboundImage(
+                    message_id=message.id,
+                    media=media_of(message.payload),
+                    stored=stored_image_of(message.payload),
+                )
+                for message in burst
+                if message.msg_type == "image"
+            ),
         )
 
     def _react_to_the_meter(self, tenant: Tenant, metered: MeteringResult) -> None:

@@ -127,3 +127,38 @@ class LLMProvider(Protocol):
         support the distinction ignore it.
         """
         ...
+
+
+@dataclass(frozen=True)
+class VisionReading:
+    """What a model made of one image, as the JSON object the caller's schema asked for."""
+
+    data: dict[str, Any]
+    model: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    latency_ms: int = 0
+
+
+@runtime_checkable
+class VisionProvider(Protocol):
+    """A provider that can read an image into structured data (Feature 004, C-08).
+
+    A separate port from `LLMProvider` on purpose: the chat port is protected, and
+    not every model behind it can see. The caller asks `isinstance(llm,
+    VisionProvider)` and, when the answer is no, records the image without reading
+    it. The image travels as bytes; how a vendor wants it encoded (a data URL, a
+    file id) stops inside the adapter.
+    """
+
+    async def read_image(
+        self,
+        image: bytes,
+        mime_type: str,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+    ) -> VisionReading:
+        """Read `image` into an object that follows `schema`, or raise `LLMError`."""
+        ...

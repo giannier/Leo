@@ -33,13 +33,16 @@ from sqlalchemy.orm import Session
 from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
-from app.process.inbound import interactive_of
+from app.orders.proofs import InboundImage, ProofNotices, ProofPipeline, ReceivedImage
+from app.process.inbound import interactive_of, stored_image_of
 from app.providers.llm.base import LLMProvider
+from app.providers.storage.base import StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.sandbox_reset import SandboxResetRepository
 from app.services.activation import build_checklist
+from app.services.inbound_media import InboundImageReader
 from app.services.turn_outbound import SandboxOutbound
 
 SANDBOX_CHANNEL = "sandbox"
@@ -83,10 +86,16 @@ class SandboxService:
         tenant_id: uuid.UUID,
         *,
         llm: LLMProvider,
+        storage: StorageProvider | None = None,
+        notices: ProofNotices | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
         self._llm = llm
+        # Where the customer's photo is kept so the turn can read it as a payment
+        # receipt; without it an image is only a line of context.
+        self._storage = storage
+        self._notices = notices
         self._conversations = ConversationRepository(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
 
@@ -153,7 +162,7 @@ class SandboxService:
         *,
         content: str,
         interactive: InteractiveReply | None = None,
-        image: bool = False,
+        image: ReceivedImage | None = None,
     ) -> SandboxTurn:
         """Record the customer's message, answer it, record the answer.
 
@@ -169,24 +178,15 @@ class SandboxService:
         if conversation is None:
             raise ConversationNotFound(str(conversation_id))
         self._ensure_contact(conversation)
+        payload = self._payload(interactive, image)
 
         customer_message = self._messages.append(
             conversation_id=conversation_id,
             direction="inbound",
             author="customer",
             content=content,
-            msg_type="image" if image else "text",
-            payload=(
-                {
-                    "interactive": {
-                        "id": interactive.id,
-                        "title": interactive.title,
-                        "description": interactive.description,
-                    }
-                }
-                if interactive is not None
-                else None
-            ),
+            msg_type="image" if image is not None else "text",
+            payload=payload,
         )
         self._session.commit()
 
@@ -197,14 +197,28 @@ class SandboxService:
             outbound=SandboxOutbound(self._session, self._tenant_id, conversation_id),
             sandbox=True,
             queue_text=False,
+            proofs=ProofPipeline(
+                self._session,
+                self._tenant_id,
+                llm=self._llm,
+                storage=self._storage,
+                notices=self._notices,
+            ),
+            images=InboundImageReader(self._session, self._tenant_id, storage=self._storage),
         )
         tap = interactive_of(customer_message.payload)
+        stored = stored_image_of(customer_message.payload)
         result = await pipeline.run(
             conversation_id,
             InboundTurn(
-                text="" if image else content,
+                text="" if image is not None else content,
                 interactive=(tap,) if tap is not None else (),
-                image=image,
+                image=image is not None,
+                images=(
+                    (InboundImage(message_id=customer_message.id, stored=stored),)
+                    if stored is not None
+                    else ()
+                ),
             ),
         )
 
@@ -221,6 +235,29 @@ class SandboxService:
             outbound=result.messages,
             result=result,
         )
+
+    def _payload(
+        self, interactive: InteractiveReply | None, image: ReceivedImage | None
+    ) -> dict[str, object] | None:
+        """What the customer's row remembers: the tapped option, or where the photo is.
+
+        The photo goes to private storage the way a real one would sit with the
+        provider: the turn fetches it from there when it expects a receipt.
+        """
+        if interactive is not None:
+            return {
+                "interactive": {
+                    "id": interactive.id,
+                    "title": interactive.title,
+                    "description": interactive.description,
+                }
+            }
+        if image is not None and self._storage is not None:
+            extension = {"image/png": "png", "image/webp": "webp"}.get(image.mime_type, "jpg")
+            key = f"tenants/{self._tenant_id}/sandbox/{uuid.uuid4()}.{extension}"
+            self._storage.put(key, image.data, content_type=image.mime_type)
+            return {"image": {"storage_key": key, "mime_type": image.mime_type}}
+        return None
 
     # ------------------------------------------------------------ the contact
 

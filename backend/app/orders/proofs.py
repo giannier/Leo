@@ -1,0 +1,252 @@
+"""The proof pipeline: a photo in, a payment proof recorded (Feature 004, TASK-429, C-08).
+
+In Capacita v21 the model read the receipt and called a "register payment" tool; if
+it forgot, the payment was lost. Here the system does it, *before* the model is
+called (step 4 of the turn pipeline), so a receipt cannot be forgotten, and it also
+runs while a conversation is handed to a person:
+
+1. Vision reads the image (`vision.py`, 8 s at most, never raises).
+2. If it is a receipt - or could not be read at all, which is not the same as
+   "not a receipt" - the image goes to private storage, a `payment_proof` is
+   created `por_verificar` and the order moves to `por_confirmar`.
+3. What looks off is flagged, never rejected: a different amount, an operation code
+   seen before, low confidence, nothing readable. The operator decides (RF-023).
+4. The operator is told, and the model gets one line for "ESTE TURNO".
+
+An image that vision says is *not* a receipt is not stored at all: it is a stranger's
+photo, not a payment record.
+
+Cash-on-delivery orders have no proof (C-07): an image there is just an image.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Literal, Protocol
+
+from sqlalchemy.orm import Session
+
+from app.agent.tools.shared import CURRENCY_SYMBOLS, money
+from app.models.channel import Contact
+from app.models.conversation import Conversation
+from app.models.orders import Order, PaymentProof
+from app.orders.service import OrderError, OrderService
+from app.orders.vision import ProofReading, read_proof
+from app.providers.llm.base import LLMProvider
+from app.providers.storage.base import StorageError, StorageProvider
+from app.providers.whatsapp.base import InboundMedia
+from app.repositories.channel import ContactRepository
+from app.repositories.orders import PaymentProofRepository
+
+logger = logging.getLogger(__name__)
+
+# Below this the reading is flagged `baja_confianza`. A number nobody set in the
+# docs: a conservative start, one constant to move once real receipts show where
+# the model is wrong.
+LOW_CONFIDENCE = Decimal("0.70")
+
+OBS_AMOUNT = "monto_distinto"
+OBS_CODE = "codigo_repetido"
+OBS_CONFIDENCE = "baja_confianza"
+OBS_NO_DATA = "sin_datos"
+
+_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+Kind = Literal["registrado", "no_comprobante", "ignorado"]
+
+
+class ProofNotices(Protocol):
+    """Tells the business a receipt arrived (TASK-431 implements it)."""
+
+    def new_proof(self, order: Order, proof: PaymentProof) -> None: ...
+
+
+@dataclass(frozen=True)
+class ReceivedImage:
+    """A photo the customer sent, in memory."""
+
+    data: bytes
+    mime_type: str
+
+
+@dataclass(frozen=True)
+class InboundImage:
+    """An image message of the burst, as the pipeline knows it before fetching it.
+
+    Either already in private storage (`stored` = key and type: the simulator) or
+    still with the provider (`media`: the real channel).
+    """
+
+    message_id: uuid.UUID
+    media: InboundMedia | None = None
+    stored: tuple[str, str] | None = None
+
+
+class ImageReader(Protocol):
+    """Fetches the bytes of an inbound image; None if they cannot be had."""
+
+    async def read(self, image: InboundImage) -> ReceivedImage | None: ...
+
+
+@dataclass(frozen=True)
+class ProofOutcome:
+    """What the pipeline did with one image."""
+
+    kind: Kind
+    # The line for "ESTE TURNO"; None when the image was ignored.
+    context: str | None = None
+    proof: PaymentProof | None = None
+    order: Order | None = None
+
+
+class ProofPipeline:
+    """Turns a receipt photo into a payment proof on the active order."""
+
+    def __init__(
+        self,
+        session: Session,
+        tenant_id: uuid.UUID,
+        *,
+        llm: LLMProvider,
+        storage: StorageProvider | None,
+        notices: ProofNotices | None = None,
+    ) -> None:
+        self._session = session
+        self._tenant_id = tenant_id
+        self._llm = llm
+        self._storage = storage
+        self._notices = notices
+        self._orders = OrderService(session, tenant_id)
+        self._proofs = PaymentProofRepository(session, tenant_id)
+
+    async def handle(
+        self,
+        conversation: Conversation,
+        image: ReceivedImage,
+        *,
+        message_id: uuid.UUID | None = None,
+    ) -> ProofOutcome:
+        """Record one image as a payment proof if it is one."""
+        order = self._orders.active_for(conversation.id)
+        if order is None or order.estado != "borrador" or order.modalidad_pago != "previo":
+            # No order to pay, one already waiting, or cash on delivery: a receipt
+            # has nothing to attach to.
+            return ProofOutcome("ignorado")
+        if self._storage is None:
+            logger.warning("a receipt cannot be stored: no object storage is configured")
+            return ProofOutcome("ignorado")
+
+        reading = await read_proof(self._llm, image.data, image.mime_type)
+        if reading.legible and not reading.es_comprobante:
+            return ProofOutcome(
+                "no_comprobante",
+                "la imagen NO es un comprobante de pago; pídele la foto del comprobante",
+                order=order,
+            )
+
+        try:
+            key = self._store(image)
+        except StorageError:
+            logger.exception("a receipt could not be stored")
+            return ProofOutcome(
+                "ignorado",
+                "no se pudo guardar la imagen; pídele que la envíe de nuevo",
+                order=order,
+            )
+
+        proof = self._proofs.add(
+            order_id=order.id,
+            conversation_id=conversation.id,
+            message_id=message_id,
+            storage_key=key,
+            estado="por_verificar",
+            monto=reading.monto,
+            moneda=reading.moneda,
+            fecha_operacion=reading.fecha,
+            codigo_operacion=reading.codigo,
+            entidad=reading.entidad,
+            destinatario=reading.destinatario,
+            confianza=reading.confianza,
+            observaciones=[],
+            extraccion=_extraction(reading),
+        )
+        proof.observaciones = self.observations(order, proof, reading)
+        self._submit(order, conversation)
+        self._session.flush()
+
+        if self._notices is not None and not order.is_sandbox:
+            self._notices.new_proof(order, proof)
+        return ProofOutcome("registrado", _describe(order, proof, reading), proof, order)
+
+    # ---------------------------------------------------------------- helpers
+
+    def observations(self, order: Order, proof: PaymentProof, reading: ProofReading) -> list[str]:
+        """What looks off about a proof. Flags for the operator, never a verdict."""
+        flags: list[str] = []
+        if not reading.has_data:
+            flags.append(OBS_NO_DATA)
+        if reading.monto is not None and (
+            reading.monto != order.total
+            or (reading.moneda is not None and reading.moneda != order.moneda)
+        ):
+            flags.append(OBS_AMOUNT)
+        if reading.codigo is not None and self._proofs.code_seen(
+            reading.codigo, sandbox=order.is_sandbox, exclude_id=proof.id
+        ):
+            flags.append(OBS_CODE)
+        if reading.confianza is not None and reading.confianza < LOW_CONFIDENCE:
+            flags.append(OBS_CONFIDENCE)
+        return flags
+
+    def _store(self, image: ReceivedImage) -> str:
+        extension = _EXTENSIONS.get(image.mime_type, "bin")
+        key = f"tenants/{self._tenant_id}/proofs/{uuid.uuid4()}.{extension}"
+        assert self._storage is not None  # checked by the caller
+        return self._storage.put(key, image.data, content_type=image.mime_type)
+
+    def _submit(self, order: Order, conversation: Conversation) -> None:
+        """The order waits for the operator. If it cannot (it is not complete), the
+        proof stays on it and the operator sees both."""
+        contact: Contact | None = None
+        if conversation.contact_id is not None:
+            contact = ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
+        if contact is None:
+            logger.warning("a receipt arrived on a conversation without a contact")
+            return
+        try:
+            self._orders.submit(order, contact)
+        except OrderError:
+            logger.warning(
+                "a receipt arrived but its order cannot be submitted",
+                extra={"tenant_id": str(self._tenant_id), "state": order.estado},
+            )
+
+
+def _extraction(reading: ProofReading) -> dict[str, object]:
+    """The raw reading for `payment_proofs.extraccion`: no image, nothing derived."""
+    if not reading.legible:
+        return {"legible": False, "motivo": reading.reason}
+    return {"legible": True, "modelo": reading.model, "lectura": reading.raw}
+
+
+def _describe(order: Order, proof: PaymentProof, reading: ProofReading) -> str:
+    """The line the model reads: what came in, never a confirmation."""
+    if not reading.legible:
+        return (
+            "comprobante recibido pero no se pudo leer; queda en revisión del negocio "
+            "(no digas que está confirmado)"
+        )
+    symbol = CURRENCY_SYMBOLS.get(proof.moneda or order.moneda, proof.moneda or order.moneda)
+    parts = [money(proof.monto, symbol)] if proof.monto is not None else []
+    if proof.entidad:
+        parts.append(proof.entidad)
+    if proof.codigo_operacion:
+        parts.append(f"op. {proof.codigo_operacion}")
+    detail = ", ".join(parts) or "sin datos legibles"
+    return (
+        f"comprobante recibido: {detail}; queda en revisión del negocio "
+        "(no digas que está confirmado)"
+    )

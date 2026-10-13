@@ -7,10 +7,12 @@ on the prompt that was actually built.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import struct
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from app.models.knowledge import EMBEDDING_DIMENSIONS
 from app.providers.llm.base import (
@@ -19,6 +21,7 @@ from app.providers.llm.base import (
     InputType,
     LLMError,
     ToolSpec,
+    VisionReading,
 )
 
 
@@ -28,6 +31,15 @@ class RecordedChat:
     tools: tuple[ToolSpec, ...]
     temperature: float
     max_tokens: int
+
+
+@dataclass
+class RecordedImage:
+    image: bytes
+    mime_type: str
+    instruction: str
+    schema: dict[str, Any]
+    timeout_seconds: float
 
 
 @dataclass
@@ -52,6 +64,11 @@ class MockLLMProvider:
         self._embedding_model = embedding_model
         self._dimensions = dimensions
         self.chat_calls: list[RecordedChat] = []
+        # What `read_image` answers, in order: an object, or an exception to raise.
+        # `vision_delay` makes the call slow, to exercise a timeout.
+        self.vision_responses: list[dict[str, Any] | Exception] = []
+        self.vision_delay = 0.0
+        self.vision_calls: list[RecordedImage] = []
         self.embed_calls: list[RecordedEmbed] = []
 
     @property
@@ -80,6 +97,28 @@ class MockLLMProvider:
                 "expected model turn - an agent loop calls chat() repeatedly."
             )
         return self._responses.pop(0)
+
+    async def read_image(
+        self,
+        image: bytes,
+        mime_type: str,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+    ) -> VisionReading:
+        """The scripted vision answer (`VisionProvider`); never reaches a real model."""
+        self.vision_calls.append(
+            RecordedImage(image, mime_type, instruction, schema, timeout_seconds)
+        )
+        if self.vision_delay:
+            await asyncio.sleep(self.vision_delay)
+        if not self.vision_responses:
+            raise LLMError("MockLLMProvider has no queued vision response.")
+        answer = self.vision_responses.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return VisionReading(data=answer, model="mock-vision")
 
     async def embed(
         self, texts: Sequence[str], *, input_type: InputType = "passage"

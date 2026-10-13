@@ -364,6 +364,8 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 session,
                 tenant,
                 llm=llm,
+                storage=ctx.get("storage"),
+                whatsapp=ctx["whatsapp"],
                 outbound_for=live_outbound_factory(
                     session,
                     tenant,

@@ -42,7 +42,7 @@ import hmac
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -56,6 +56,8 @@ from app.providers.whatsapp.base import (
     MAX_ROW_DESCRIPTION,
     MAX_ROW_TITLE,
     Button,
+    DownloadedMedia,
+    InboundMedia,
     InboundMessage,
     InteractiveReply,
     InvalidCredentials,
@@ -83,6 +85,9 @@ MEDIA_UPLOAD_PATH = "/whatsapp/media/{phone}/upload"
 
 # Uploading a file is slower than posting a few hundred bytes of JSON.
 UPLOAD_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
+
+# Downloading a customer's photo.
+DOWNLOAD_TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 
 # YCloud (through Meta) keeps an uploaded file for 30 days.
 MEDIA_LIFETIME = timedelta(days=30)
@@ -302,6 +307,47 @@ class YCloudProvider:
             raise WhatsAppError("YCloud accepted the upload but returned no media id")
         return UploadedMedia(media_id=str(media_id), expires_at=datetime.now(UTC) + MEDIA_LIFETIME)
 
+    async def download_media(
+        self,
+        credentials: NumberCredentials,
+        *,
+        link: str,
+        max_bytes: int,
+    ) -> DownloadedMedia:
+        """Fetch a customer's file from YCloud (`image.link` of an inbound message).
+
+        The docs: the link "can be directly accessed in a few minutes for
+        convenience, but you should always include an `X-API-Key` header to download
+        this file within 30 days". Because the key is sent, the link is only
+        followed if it points at YCloud: a webhook is signed, but a credential is
+        not something to hand to whatever host a payload names.
+        """
+        self.validate(credentials)
+        if not _same_origin(link, self._base_url):
+            raise WhatsAppError("refusing to download media from a host that is not YCloud")
+        headers = {"X-API-Key": credentials.values["api_key"], "Accept": "*/*"}
+        chunks: list[bytes] = []
+        size = 0
+        try:
+            async with (
+                httpx.AsyncClient(timeout=DOWNLOAD_TIMEOUT, transport=self._transport) as client,
+                client.stream("GET", link, headers=headers) as response,
+            ):
+                if response.status_code >= 400:
+                    await response.aread()
+                self._raise_for_status(response)
+                mime = response.headers.get("content-type", "").split(";")[0].strip()
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise WhatsAppError(f"the file is larger than {max_bytes} bytes")
+                    chunks.append(chunk)
+        except httpx.TimeoutException as exc:
+            raise WhatsAppTransientError("YCloud timed out sending a file") from exc
+        except httpx.HTTPError as exc:
+            raise WhatsAppTransientError(f"could not reach YCloud: {exc}") from exc
+        return DownloadedMedia(data=b"".join(chunks), mime_type=mime)
+
     async def _send(
         self,
         credentials: NumberCredentials,
@@ -472,6 +518,7 @@ class YCloudProvider:
             text=text,
             interactive=interactive,
             referral=_parse_referral(message.get("referral")),
+            media=_parse_image(message) if msg_type == "image" else None,
             # `sendTime` is what the webhook examples carry and `timestamp`
             # is what the schema calls it. Both are accepted rather than
             # betting the 24-hour window on which one turns up.
@@ -539,6 +586,36 @@ def _parse_interactive(message: dict[str, Any]) -> InteractiveReply | None:
         title=str(reply.get("title") or ""),
         description=str(reply.get("description") or "") or None,
     )
+
+
+def _parse_image(message: dict[str, Any]) -> InboundMedia | None:
+    """The `image` object of an inbound image: `{id, link, mime_type, sha256, caption}`.
+
+    The documented keys are snake_case; `mimeType` is accepted too (the first
+    fixtures of this repository wrote it so).
+    """
+    image = _as_dict(message.get("image"))
+    if not image:
+        return None
+    media_id = str(image.get("id") or "") or None
+    link = str(image.get("link") or "") or None
+    if not (media_id or link):
+        return None
+    return InboundMedia(
+        media_id=media_id,
+        link=link,
+        mime_type=str(image.get("mime_type") or image.get("mimeType") or "") or None,
+        caption=str(image.get("caption") or "") or None,
+    )
+
+
+def _same_origin(link: str, base_url: str) -> bool:
+    """Whether `link` is served by the same host (and scheme) as the API."""
+    try:
+        target, base = urlsplit(link), urlsplit(base_url)
+    except ValueError:
+        return False
+    return bool(base.hostname) and (target.scheme, target.hostname) == (base.scheme, base.hostname)
 
 
 def _parse_referral(value: object) -> Referral | None:

@@ -13,6 +13,7 @@ this leaves the application (Constitution: third-party access lives in
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 from collections.abc import Sequence
@@ -29,6 +30,7 @@ from app.providers.llm.base import (
     LLMRateLimitError,
     ToolCall,
     ToolSpec,
+    VisionReading,
 )
 
 # 30 seconds, not 60. This bounds how long a WhatsApp customer stares at a
@@ -52,6 +54,7 @@ class OpenAICompatibleProvider:
         embedding_dimensions: int | None = None,
         send_embedding_input_type: bool = True,
         max_tokens_field: str = "max_tokens",
+        vision_model: str | None = None,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
@@ -73,6 +76,9 @@ class OpenAICompatibleProvider:
         # kind of vendor difference as `send_embedding_input_type`, so it
         # is carried the same way rather than branched on a provider name.
         self._max_tokens_field = max_tokens_field
+        # The model that reads images. It is the chat model unless told otherwise:
+        # which model suits which intelligence level is TASK-445's decision.
+        self._vision_model = vision_model or chat_model
         self._timeout = timeout
         # The seam that makes everything below testable without a network.
         # `None` is httpx's own default, so production behaviour is untouched;
@@ -121,15 +127,16 @@ class OpenAICompatibleProvider:
                 f"HTTP {response.status_code} from {self._base_url}: {response.text[:200]}"
             )
 
-    async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post(
+        self, path: str, payload: dict[str, Any], *, limit: httpx.Timeout | None = None
+    ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
+        limit = limit or self._timeout
         try:
-            async with httpx.AsyncClient(
-                timeout=self._timeout, transport=self._transport
-            ) as client:
+            async with httpx.AsyncClient(timeout=limit, transport=self._transport) as client:
                 response = await client.post(url, headers=self._headers(), json=payload)
         except httpx.TimeoutException as exc:
-            raise LLMError(f"{self._base_url} timed out after {self._timeout.read}s") from exc
+            raise LLMError(f"{self._base_url} timed out after {limit.read}s") from exc
         except httpx.HTTPError as exc:
             raise LLMError(f"could not reach {self._base_url}: {exc}") from exc
 
@@ -246,6 +253,73 @@ class OpenAICompatibleProvider:
             output_tokens=int(usage.get("completion_tokens") or 0),
             latency_ms=latency_ms,
             finish_reason=choice.get("finish_reason") or "",
+        )
+
+    # ---------------------------------------------------------------- vision
+
+    async def read_image(
+        self,
+        image: bytes,
+        mime_type: str,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+    ) -> VisionReading:
+        """Read an image into the object `schema` describes (`VisionProvider`).
+
+        The image goes inline as a base64 data URL, so nothing has to be reachable
+        from the provider's side, and the answer is constrained by a JSON schema so
+        an amount is a field, not a sentence to parse.
+        """
+        encoded = base64.b64encode(image).decode("ascii")
+        payload: dict[str, Any] = {
+            "model": self._vision_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": instruction},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
+                        },
+                    ],
+                }
+            ],
+            "temperature": 0,
+            self._max_tokens_field: 400,
+            "stream": False,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "reading", "strict": True, "schema": schema},
+            },
+        }
+        started = time.perf_counter()
+        body = await self._post(
+            "/chat/completions",
+            payload,
+            limit=httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 5.0)),
+        )
+        latency_ms = int((time.perf_counter() - started) * 1000)
+
+        choices = body.get("choices") or []
+        if not choices:
+            raise LLMError("provider returned no choices")
+        content = (choices[0].get("message") or {}).get("content") or ""
+        try:
+            data = json.loads(content)
+        except (ValueError, TypeError) as exc:
+            raise LLMError("the vision answer was not JSON") from exc
+        if not isinstance(data, dict):
+            raise LLMError("the vision answer was not a JSON object")
+        usage = body.get("usage") or {}
+        return VisionReading(
+            data=data,
+            model=body.get("model") or self._vision_model,
+            input_tokens=int(usage.get("prompt_tokens") or 0),
+            output_tokens=int(usage.get("completion_tokens") or 0),
+            latency_ms=latency_ms,
         )
 
     # ------------------------------------------------------------- embeddings

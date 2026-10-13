@@ -23,10 +23,17 @@ import math
 import re
 import time
 from collections.abc import Sequence
-from typing import Literal
+from typing import Any, Literal
 
 from app.models.knowledge import EMBEDDING_DIMENSIONS
-from app.providers.llm.base import ChatMessage, ChatResult, LLMConfigurationError, ToolSpec
+from app.providers.llm.base import (
+    ChatMessage,
+    ChatResult,
+    LLMConfigurationError,
+    LLMError,
+    ToolSpec,
+    VisionReading,
+)
 
 CHAT_MODEL = "offline-deterministic"
 EMBEDDING_MODEL = "offline-hashing"
@@ -96,6 +103,22 @@ class OfflineLLMProvider:
             output_tokens=len(content) // 4,
             latency_ms=int((time.perf_counter() - started) * 1000),
         )
+
+    async def read_image(
+        self,
+        image: bytes,
+        mime_type: str,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+    ) -> VisionReading:
+        """Refuses: a hash cannot read a receipt, and a made-up amount is worse than none.
+
+        The caller treats this like any provider that cannot see: the proof is
+        recorded without data and the operator reads the image.
+        """
+        raise LLMError("the offline provider cannot read images")
 
     async def embed(
         self,
