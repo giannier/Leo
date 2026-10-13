@@ -351,6 +351,27 @@ class TestDelivery:
         assert "solo ofrece recojo" in (result.texto or "")
         assert result.data["faltan"] == []
 
+    async def test_a_business_that_only_delivers_sets_the_type_by_itself(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """Milestone B, decision 11: the same as pickup, the other way round."""
+        set_deliveries(db, tenant, recojo_en_tienda=False, zonas=[])
+        ctx = context(db, tenant, conversation, required=["nombres"])
+        order = await order_with(ctx, catalogue["physical"])
+        assert order.tipo_entrega is None
+
+        result = await save(ctx, nombres="Ana")
+
+        assert order.tipo_entrega == "delivery"
+        assert result.data["tipo_entrega"] == "delivery"
+        assert "solo hace delivery" in (result.texto or "")
+        # The type is never asked; the address still is.
+        assert result.data["faltan"] == ["direccion"]
+
     async def test_a_business_that_only_picks_up_refuses_delivery(
         self,
         db: Session,

@@ -288,6 +288,22 @@ def _requires_delivery(snapshot: ConversationSnapshot, entregas: Entregas | None
     return any(not line.es_digital for line in snapshot.lines)
 
 
+def only_delivery_type(entregas: Entregas | None) -> Literal["recojo", "delivery"] | None:
+    """The delivery type when the business offers just one, else None.
+
+    A shop that only delivers, or only lets people pick up, never asks the
+    customer to choose (`plantillas.md` section 1; delivery added by Giannier,
+    Milestone B, decision 11).
+    """
+    if entregas is None:
+        return None
+    if entregas.recojo_en_tienda and not entregas.hace_delivery:
+        return "recojo"
+    if entregas.hace_delivery and not entregas.recojo_en_tienda:
+        return "delivery"
+    return None
+
+
 def missing_customer_data(
     contact: Contact | None,
     datos_requeridos: Sequence[str],
@@ -302,7 +318,7 @@ def missing_customer_data(
     The fields the template requires that the customer has not given, then - only
     when the order needs delivery (C-22) - the delivery choice: the type, the
     address for a delivery, the zone when the business has zones. A business that
-    only offers pickup does not make the customer choose. Shared by the facts
+    only offers pickup, or only delivers, does not make the customer choose. Shared by the facts
     (`datos_faltantes`) and by `registrar_datos_cliente`, which answers `faltan`
     with fresh data, so the two can never disagree.
     """
@@ -310,8 +326,7 @@ def missing_customer_data(
     if not requiere_entrega or entregas is None:
         return missing
 
-    only_pickup = entregas.recojo_en_tienda and not entregas.hace_delivery
-    tipo = tipo_entrega or ("recojo" if only_pickup else None)
+    tipo = tipo_entrega or only_delivery_type(entregas)
     if tipo is None:
         missing.append("tipo_entrega")
     elif tipo == "delivery":

@@ -491,6 +491,13 @@ class TestDelivery:
         assert facts.requiere_entrega is True
         assert facts.datos_faltantes == []
 
+    def test_a_delivery_only_business_fixes_the_type_by_itself(self) -> None:
+        """Milestone B, decision 11: the type is not asked; the address is."""
+        facts = self._facts(_entregas(hace_delivery=True, recojo_en_tienda=False, zonas=[]))
+
+        assert facts.requiere_entrega is True
+        assert facts.datos_faltantes == ["direccion"]
+
     def test_the_address_is_not_asked_twice_when_the_template_already_requires_it(self) -> None:
         options = TEMPLATES["productos"].resolve(
             TEMPLATES["productos"].validate_options({"datos_requeridos": ["nombres", "direccion"]})
