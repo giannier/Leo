@@ -271,7 +271,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de que cada evento crea su notificación y su correo
   - Parallel: true
 
-- [ ] TASK-432: Frontend — Pedidos
+- [x] TASK-432: Frontend — Pedidos
   - Input: `contracts/api.md §5`, referencia visual: página "Pedidos" de Ventor (tarjetas de resumen, filtros por estado, tabla y detalle)
   - Output: página `/pedidos` con resumen por periodo, filtros, búsqueda y tabla; detalle con ítems, datos del cliente, imagen del comprobante, datos leídos, observaciones resaltadas y botones Confirmar (con "siguiente paso") y Rechazar (con motivo); aviso si la ventana está cerrada
   - Depends on: TASK-430

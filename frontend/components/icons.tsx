@@ -97,6 +97,14 @@ export const BoxIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const ReceiptIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z" />
+    <path d="M9 8h6" />
+    <path d="M9 12h6" />
+  </Svg>
+);
+
 export const BookIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2Z" />

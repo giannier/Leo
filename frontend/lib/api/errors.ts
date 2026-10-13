@@ -77,6 +77,10 @@ const MESSAGES: Record<string, string> = {
   phone_already_connected: "Ese número ya está conectado. Escríbenos si es tuyo.",
   open_request_exists: "Ya hay una solicitud abierta para ese número.",
 
+  // Orders
+  invalid_transition: "Ese pedido ya no puede pasar a ese estado. Actualiza la página.",
+  already_reviewed: "Otra persona ya revisó este pedido. Actualiza la página.",
+
   // Generic
   validation_error: "Revisa los datos marcados.",
   rate_limited: "Demasiados intentos. Espera un momento.",
