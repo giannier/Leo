@@ -218,8 +218,11 @@ class TestWhichLinesAPromotionWorksOn:
 
         assert totals([line(category=None)], [promo]).descuento == D("0.00")
 
-    def test_the_minimum_amount_counts_only_the_lines_in_scope(self) -> None:
-        """A coupon on courses with a S/ 150 minimum asks for S/ 150 of courses."""
+    def test_the_minimum_amount_counts_the_whole_order(self) -> None:
+        """A coupon on courses with a S/ 150 minimum is met by S/ 150 of anything.
+
+        The discount still only falls on the courses (Milestone B, decision 7).
+        """
         promo = rule(
             aplica_a="productos",
             product_ids=frozenset({COURSE}),
@@ -227,10 +230,21 @@ class TestWhichLinesAPromotionWorksOn:
             valor=D("10"),
         )
 
-        assert totals([line("100.00"), line("500.00", product=OTHER)], [promo]).descuento == 0
-        assert totals([line("160.00"), line("500.00", product=OTHER)], [promo]).descuento == D(
-            "16.00"
+        assert totals([line("100.00"), line("500.00", product=OTHER)], [promo]).descuento == D(
+            "10.00"
         )
+        assert totals([line("100.00"), line("40.00", product=OTHER)], [promo]).descuento == 0
+
+    def test_the_minimum_amount_needs_a_line_in_scope(self) -> None:
+        """A big order with no course in it gets nothing from the course coupon."""
+        promo = rule(
+            aplica_a="productos",
+            product_ids=frozenset({COURSE}),
+            monto_minimo=D("150"),
+            valor=D("10"),
+        )
+
+        assert totals([line("500.00", product=OTHER)], [promo]).descuento == 0
 
     def test_a_free_item_does_not_get_a_discount(self) -> None:
         assert totals([line("0.00")], [rule()]).descuento == D("0.00")
