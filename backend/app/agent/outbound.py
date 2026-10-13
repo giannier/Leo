@@ -25,6 +25,10 @@ class OutboundFailed(RuntimeError):
 
 
 class TurnOutbound(Protocol):
+    async def send_text(self, body: str) -> None:
+        """Send one plain text message (the payment methods)."""
+        ...
+
     async def send_media(self, asset: MediaAsset) -> None:
         """Send a library file, with the caption the tenant gave it."""
         ...
