@@ -223,7 +223,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     - los precios nunca vienen del modelo.
   - Parallel: false
 
-- [ ] TASK-427: Tool `registrar_datos_cliente`
+- [x] TASK-427: Tool `registrar_datos_cliente`
   - Input: `data-model.md §0020` (validación por campo), opción `datos_requeridos`, sección Entregas (C-22)
   - Output: herramienta global; guardado parcial en `custom_data` (incluido `nombres` en cualquier etapa); `tipo_entrega`, `direccion`, `referencia` y `zona_envio` cuando el pedido requiere entrega, con recálculo del envío; apaga `rechazo_vigente`; devuelve `faltan` e `invalidos`
   - Depends on: TASK-426, TASK-408, TASK-403

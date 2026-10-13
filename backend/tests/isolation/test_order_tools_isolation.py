@@ -19,6 +19,7 @@ from app.models.business import Product
 from app.models.conversation import Conversation
 from app.models.sales_config import Promotion
 from app.orders.service import OrderService
+from app.process.templates import TEMPLATES
 from app.providers.llm import MockLLMProvider
 from tests.isolation.conftest import TenantFixture
 
@@ -129,3 +130,38 @@ class TestAnotherTenantsIds:
         assert result.status == "error"
         unknown = await _act(context, accion="elegir", seleccion="Product B")
         assert unknown.status == "no_disponible"
+
+
+@pytest.mark.usefixtures("with_contacts")
+class TestCustomerDataStaysInsideTheTenant:
+    async def test_data_go_to_the_contact_of_this_tenant_only(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        from app.agent.tools.customer import registrar_datos_cliente
+        from app.models.channel import Contact
+
+        options = TEMPLATES["productos"].resolve()
+        result = await registrar_datos_cliente(
+            _context(db, tenant_a, options=options), {"nombres": "Ana"}
+        )
+
+        assert result.status == "hecho"
+        contact_a = db.get(Contact, tenant_a.contact_id)
+        contact_b = db.get(Contact, tenant_b.contact_id)
+        assert contact_a is not None and contact_b is not None
+        assert contact_a.custom_data == {"nombres": "Ana"}
+        assert contact_b.custom_data == {}
+
+    async def test_a_foreign_conversation_saves_nothing(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        from app.agent.tools.customer import registrar_datos_cliente
+        from app.models.channel import Contact
+
+        context = _context(db, tenant_a, conversation_id=tenant_b.conversation_id)
+
+        result = await registrar_datos_cliente(context, {"nombres": "Intruso"})
+
+        assert result.status == "error"
+        contact_b = db.get(Contact, tenant_b.contact_id)
+        assert contact_b is not None and contact_b.custom_data == {}
