@@ -350,6 +350,11 @@ sigue sin herramientas).
 cuentas e2e (TASK-455), fixtures reales de YCloud (TASK-456). E-3 queda en el backlog. Las cuentas de cobro
 del perfil del negocio entran en TASK-434 (Fase C).
 
+**Evals (2026-10-13, `make evals`, perfil `openai`, commit `32e6787`):** 2 de 2 en verde en 43 s. Los 6
+casos dorados pasan y el prompt saboteado hace fallar la suite (los evals tienen dientes). Alcance: corren
+sobre `AgentCore` con el prompt de la 003 y `MAX_TOOL_ROUNDS = 3`; **no** cubren el pipeline por etapas,
+la línea nueva de VERIFICACION ni la instrucción de visión. Eso lo mide TASK-447 ("flujos de venta").
+
 **Por confirmar con Giannier:** a qué decisión del reporte original corresponden la **14** ("Aceptado") y
 la **22** ("Anotado como tarea de la 007"); el reporte numerado no quedó en el repo.
 
