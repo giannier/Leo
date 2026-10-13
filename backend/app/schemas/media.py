@@ -27,6 +27,7 @@ MEDIA_LIMITS: dict[str, MediaLimit] = {
     "imagen": MediaLimit(frozenset({"image/jpeg", "image/png"}), 5 * MB),
     "video": MediaLimit(frozenset({"video/mp4"}), 16 * MB),
     # The spec fixes the size only; these are the audio formats WhatsApp accepts.
+    # List and limit ratified by Giannier (Milestone B, decision 5).
     "audio": MediaLimit(
         frozenset({"audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"}), 16 * MB
     ),

@@ -196,13 +196,15 @@ Pedido completo: ítems con selecciones, totales, promoción, entrega (`tipo_ent
 ### POST /api/v1/orders/{id}/confirm — operador
 `{ "siguiente_paso": "Te enviamos tus certificados en 48 h" }` (opcional) → 200
 ```json
-{ "estado": "confirmado", "aviso_cliente": "enviado" }   // o "ventana_cerrada" (C-09)
+{ "estado": "confirmado", "aviso_cliente": "enviado" }   // o "ventana_cerrada" (C-09) o "no_enviado"
 ```
 Efectos en una transacción:
 1. El último comprobante (si hay; en contra entrega no hay) pasa a `aprobado` y el pedido a `confirmado`.
 2. Se registra en `audit_logs`.
 3. Se recalcula la etapa (CERRADO / GANADO) y se crea el evento con `reason=operador:confirmar`.
 4. Después del commit se encola el aviso por WhatsApp.
+
+`aviso_cliente`: `enviado`; `ventana_cerrada` (ventana de 24 h cerrada: no se llama al proveedor); `no_enviado` (falló el proveedor o no hay número conectado; la decisión queda guardada y el negocio recibe el aviso `ventana_cerrada` con motivo `envio_fallido`). `no_enviado` se agregó en el Milestone B (decisión 15). Lo mismo vale para `reject` y para `status` al anular.
 
 ### POST /api/v1/orders/{id}/reject — operador
 `{ "motivo": "El monto no coincide con el total" }` (obligatorio, de 5 a 300 caracteres) → 200

@@ -206,7 +206,7 @@ Con Claude Code y una persona revisando, son 49 tasks (4 son milestones tuyos):
 
 ### 2026-10-12 — `consultar_catalogo` frente a `buscar_productos` y `ver_producto` (TASK-417)
 
-**Estado: pendiente de ratificar por Giannier.** Se implementó para no bloquear la Fase A; si no te convence, se revierte cambiando `LEGACY_ALIASES` y `build_default_registry`.
+**Estado: ratificado por Giannier (Milestone B, decisión 6).** El alias está en el glosario del `CLAUDE.md`.
 
 **Problema.** `TOOL_NAMES` (`contracts/api.md §7`) nombra `buscar_productos` y `ver_producto`; el agente de hoy tiene una sola tool, `consultar_catalogo`, que mencionan 19 pruebas de `test_agent_core`, `test_prompt_builder`, `test_sandbox`, `test_agent_isolation`, los evals y el texto del prompt viejo (`conciliacion.md §3.4`). Renombrar sin más rompe todo eso antes de que exista el pipeline que lo reemplaza.
 

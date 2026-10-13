@@ -57,7 +57,8 @@ CREATE TABLE notification_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE messages ADD COLUMN payload JSONB;  -- eventos de sistema
+-- messages.payload YA EXISTE (004, migración 0021): la 007 la reutiliza y no la vuelve a crear
+-- (Giannier, Milestone B de la 004, decisión 2). Solo agrega el tipo 'event' al CHECK de msg_type.
 CREATE INDEX idx_messages_search ON messages
   USING GIN (to_tsvector('spanish', content));
 ```
@@ -98,3 +99,8 @@ Commits: `feat(inbox): ... [TASK-7XX]`
 - [ ] **TASK-708: E2E multi-operador + endurecimiento.** Depends: todo. Milestone humano: Giannier y un ayudante simulan operación real 30 min con tráfico del número de prueba.
 
 Dependencias: 701 → (702,703,704,706) → 705/707 → 708.
+
+## Heredado de la 004 (Milestone B)
+- `messages.payload` (migración 0021) ya existe: se reutiliza para los eventos del hilo.
+- `contacts.posible_duplicado_de` (migración 0024): el inbox muestra la marca de "posible cliente
+  duplicado" (un BSUID y un teléfono de dos contactos distintos; no se fusionan).

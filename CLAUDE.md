@@ -6,8 +6,10 @@
 1. Lee `leo-sdd/constitution.md`. Es ley. Sus "Restricciones para la IA" no admiten excepciones.
 2. Lee el spec, plan y tasks de la feature en curso (`leo-sdd/features/NNN-*/`).
 3. Trabaja **una task por sesión**, en el orden y con las dependencias de `tasks.md`.
-4. Si una decisión no está en los docs, NO la inventes: propónla, espera aprobación de
-   Giannier, y documenta la decisión en el plan de la feature antes de implementarla.
+4. Si una decisión no está en los docs y afecta dinero, datos personales, contratos públicos o el costo
+   del LLM, NO la inventes: propónla, espera aprobación de Giannier, y documenta la decisión en el plan
+   de la feature antes de implementarla. El resto se decide con la lectura conservadora (ver
+   "Reglas que no están en la spec").
 
 ## Orden de desarrollo del MVP
 001-onboarding → 002-canal-whatsapp → 003-agent-core → 004-tools →
@@ -30,6 +32,17 @@ según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-
 - Dinero siempre con Decimal. Jamás float.
 - Commits: Conventional Commits + `[TASK-XXX]`. Un commit por task como mínimo.
 
+## Glosario
+- `consultar_catalogo`: nombre viejo de la tool de catálogo (agente previo a la 004). En el registry por
+  etapa es solo un **alias** de `buscar_productos` (no aparece en las tools que ve el modelo); el
+  contrato usa `buscar_productos` y `ver_producto`. Ratificado por Giannier (Milestone B, decisión 6;
+  `leo-sdd/features/004-motor-de-ventas/plan.md`, "Decisiones Posteriores").
+
+## Dónde se corren las pruebas
+- `make test` (y `make isolation`, `make lint`, `make evals`) **no se corre en el host de Windows**: todo
+  corre dentro del contenedor (`docker compose`, `make up`) o en WSL2. Si una task pide "tests en verde",
+  se miden ahí.
+
 ## Definition of Done de una task
 - Código + tests de la task en verde localmente (`make test`), lint y mypy limpios.
 - Cobertura del módulo dentro del estándar (80% críticos / 70% resto).
@@ -40,6 +53,14 @@ según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-
 ## Milestones de revisión humana
 No avances más allá de un milestone marcado en `tasks.md` sin confirmación explícita de
 Giannier. Los milestones existen porque él prueba a mano con datos y números reales.
+
+### Reglas que no están en la spec (desde el Milestone B)
+- Si una regla no está en la spec, decide con la **lectura conservadora**, regístrala en
+  `clarifications.md` de la feature y sigue.
+- Detente a preguntar solo por lo que afecte **dinero, datos personales, contratos públicos o el costo
+  del LLM**.
+- En el reporte de cada milestone separa las decisiones en tres grupos: **bloqueantes**, **para
+  ratificar** e **informativas**.
 
 ## Estructura esperada del repo
 ```
