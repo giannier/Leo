@@ -17,9 +17,10 @@ Rules, in the order they apply:
    the offer has not expired (`promos_ofrecidas[id] > now`). An unoffered one and
    an expired one are worth nothing, however good they are.
 3. **A promotion's scope** (everything, some products, some categories) decides
-   which lines it works on. `monto_minimo` is compared with the subtotal of *those
-   lines*: a "20 % off the courses" coupon with a minimum of S/ 100 asks for S/ 100
-   of courses, not S/ 100 of anything (decision to ratify, `conciliacion.md` 8.19).
+   which lines it works on, and so what it takes off. `monto_minimo` is compared
+   with the subtotal of the *whole order*, which is what a customer understands by
+   "minimum purchase": a "20 % off the courses" coupon with a minimum of S/ 100 is
+   met by S/ 100 of anything (Giannier, Milestone B, decision 7).
 4. **Quantity promotions work line by line.** "Take 3, pay 2" counts the units of
    one product; mixing two products never completes a group. It is the reading
    that can never cost the business more than the owner meant.
@@ -193,12 +194,15 @@ def _covers(rule: Rule, line: Line) -> bool:
     return True
 
 
-def _saving_on(rule: Rule, lines: Sequence[Line]) -> Decimal:
-    """What `rule` takes off `lines` (already limited to its scope)."""
+def _saving_on(rule: Rule, lines: Sequence[Line], order_subtotal: Decimal) -> Decimal:
+    """What `rule` takes off `lines` (already limited to its scope).
+
+    `order_subtotal` is the whole order's, only used for the minimum amount.
+    """
     eligible = sum((line.subtotal for line in lines), ZERO)
     if not lines or eligible <= 0:
         return ZERO
-    if rule.monto_minimo is not None and eligible < rule.monto_minimo:
+    if rule.monto_minimo is not None and order_subtotal < rule.monto_minimo:
         return ZERO
 
     saving = ZERO
@@ -222,7 +226,8 @@ def _saving_on(rule: Rule, lines: Sequence[Line]) -> Decimal:
 
 def saving(rule: Rule, lines: Sequence[Line]) -> Decimal:
     """What `rule` is worth on `lines`: zero when it does not qualify."""
-    return _saving_on(rule, [line for line in lines if _covers(rule, line)])
+    order_subtotal = sum((line.subtotal for line in lines), ZERO)
+    return _saving_on(rule, [line for line in lines if _covers(rule, line)], order_subtotal)
 
 
 def applies_to_order(rule: Rule, lines: Sequence[Line], now: datetime) -> bool:
