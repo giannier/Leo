@@ -52,10 +52,13 @@ from app.repositories.product import ProductRepository
 
 logger = logging.getLogger(__name__)
 
-# How many times the model may call tools before it has to answer. Two is
-# enough for the real pattern - look up the product, then look up the delivery
-# policy - and bounds a loop that would otherwise bill per iteration.
-MAX_TOOL_ROUNDS = 2
+# How many times the model may call tools before it has to answer. Search and
+# add to the order spend two rounds, so with two the customer-data tool never
+# fit in the same turn (Milestone B). Three costs one more model call on the
+# turns that need it and bounds a loop that would otherwise bill per iteration.
+# Every tool call in the trace carries its `ronda`, and the turn logs how many
+# rounds it used, so the cost of this number can be read from real traffic.
+MAX_TOOL_ROUNDS = 3
 
 # Conversation *messages* - not exchanges - replayed into the prompt. At ten
 # the agent lost track inside a single order: a customer who said "para recoger
@@ -222,6 +225,8 @@ class AgentReply:
     # that is the right answer, and the pipeline must not replace it with the
     # apology `content` carries.
     silent: bool = False
+    # Tool rounds the model used before answering (0 when it answered straight away).
+    tool_rounds: int = 0
 
 
 @dataclass(frozen=True)
@@ -304,6 +309,7 @@ class AgentCore:
         input_tokens = 0
         output_tokens = 0
         result: ChatResult | None = None
+        rounds_used = 0
 
         for round_index in range(self._max_rounds + 1):
             # The last round offers no tools, which is what forces an answer.
@@ -338,6 +344,7 @@ class AgentCore:
             # leaves the `tool` results below answering nothing, which OpenAI
             # rejects outright.
             messages.append(ChatMessage("assistant", result.content, tool_calls=result.tool_calls))
+            rounds_used += 1
             for call in result.tool_calls:
                 output, sources, cached = await self._run_tool(context, call, tool_cache)
                 # A served-from-cache call is still recorded: a model asking
@@ -350,6 +357,7 @@ class AgentCore:
                         "ok": not output.startswith("ERROR:"),
                         "status": _status_of(output),
                         "cached": cached,
+                        "ronda": rounds_used,
                     }
                 )
                 rag_sources.extend(sources)
@@ -370,6 +378,14 @@ class AgentCore:
             output_tokens += guarded.output_tokens
             unusable = guarded.blocked
 
+        logger.info(
+            "agent turn tool rounds",
+            extra={
+                "tenant_id": str(self._tenant_id),
+                "tool_rounds": rounds_used,
+                "max_tool_rounds": self._max_rounds,
+            },
+        )
         return AgentReply(
             content=content,
             model=result.model if result else self._llm.chat_model,
@@ -381,6 +397,7 @@ class AgentCore:
             degraded=result is None or unusable,
             catalog_guard=guard_note,
             silent=silent,
+            tool_rounds=rounds_used,
         )
 
     async def _enforce_catalogue_names(
