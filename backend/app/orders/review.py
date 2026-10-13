@@ -22,17 +22,28 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from app.models.orders import Order, PaymentProof
-from app.orders.service import SALE_MADE, InvalidTransition, OrderError, OrderService
+from app.orders.service import (
+    SALE_MADE,
+    TRANSITIONS,
+    InvalidTransition,
+    OrderError,
+    OrderService,
+)
 from app.process.recompute import REASON_CONFIRM, REASON_REJECT, REASON_STATUS, recompute_stage
 from app.repositories.audit import AuditLogRepository
 from app.repositories.conversation import ConversationRepository
 from app.repositories.orders import OrderRepository, PaymentProofRepository
 
 # The system message that tells the customer (`DEFAULT_SYSTEM_MESSAGES`), if any.
-NoticeKind = Literal["pago_confirmado", "pago_rechazado", "pedido_rechazado"]
+NoticeKind = Literal["pago_confirmado", "pago_rechazado", "pedido_rechazado", "pedido_anulado"]
 
 # What `POST .../status` may set: the operator moves a confirmed order along or drops it.
 OPERATOR_STATES = ("en_curso", "completado", "descartado")
+
+# The proofs that still stand for a payment; discarding the order voids them.
+LIVE_PROOF_STATES = frozenset({"por_verificar", "aprobado"})
+# Discarding from these states means the business had accepted the money.
+REFUND_STATES = frozenset({"confirmado", "en_curso"})
 
 ACTION_CONFIRMED = "order.confirmed"
 ACTION_REJECTED = "order.rejected"
@@ -45,6 +56,10 @@ class OrderNotFound(OrderError):
 
 class AlreadyReviewed(OrderError):
     """The payment was already confirmed or rejected."""
+
+
+class ReasonRequired(OrderError):
+    """Discarding an order the customer paid for needs a reason: the customer is told."""
 
 
 @dataclass(frozen=True)
@@ -123,15 +138,49 @@ class OrderReviewService:
 
     # ---------------------------------------------------------------- status
 
-    def set_status(self, order_id: uuid.UUID, user_id: uuid.UUID, estado: str) -> ReviewResult:
-        """Move a confirmed order along, or discard it. No notice to the customer."""
+    def set_status(
+        self,
+        order_id: uuid.UUID,
+        user_id: uuid.UUID,
+        estado: str,
+        *,
+        motivo: str | None = None,
+    ) -> ReviewResult:
+        """Move a confirmed order along, or discard it.
+
+        Moving along tells the customer nothing. Discarding an order with a live
+        payment proof (waiting or approved) is different: the customer paid, so it
+        takes a reason, the proofs are voided (`anulado`) and the customer is told.
+        If the business had already confirmed it, a refund is owed and the order is
+        marked `devolucion_pendiente` for the operator (Milestone B, E-2).
+        """
         order = self._lock(order_id)
         before = order.estado
+        if estado not in TRANSITIONS[before]:
+            # A move the matrix forbids is a conflict, whether or not it has a reason.
+            raise InvalidTransition(before, estado)
+        live = (
+            [p for p in self._proofs.for_order(order.id) if p.estado in LIVE_PROOF_STATES]
+            if estado == "descartado"
+            else []
+        )
+        reason = (motivo or "").strip() or None
+        if live and reason is None:
+            raise ReasonRequired("discarding an order with a payment proof needs a reason")
         self._service.transition(order, estado)
-        self._audit(user_id, ACTION_STATUS, order, before, estado, None)
+        for proof in live:
+            proof.estado = "anulado"
+            proof.motivo_rechazo = reason
+            proof.reviewed_by = user_id
+            proof.reviewed_at = self.now
+        if live and before in REFUND_STATES:
+            order.devolucion_pendiente = True
+        self._audit(
+            user_id, ACTION_STATUS, order, before, estado, live[0] if live else None, reason
+        )
         self._restage(order, REASON_STATUS)
         self._session.commit()
-        return ReviewResult(order)
+        return ReviewResult(order, "pedido_anulado" if live else None, live[0] if live else None)
 
     # --------------------------------------------------------------- helpers
 

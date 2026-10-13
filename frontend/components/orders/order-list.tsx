@@ -242,10 +242,16 @@ export function OrderTable({
 
 /** A receipt that arrived, and what looks off about it. */
 function Flags({ order }: { order: OrderListItem }) {
-  if (!order.tiene_comprobante) return null;
+  if (!order.tiene_comprobante && !order.devolucion_pendiente) return null;
   return (
     <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-      <span className="text-ink-faint">Con comprobante</span>
+      {order.devolucion_pendiente ? (
+        <span data-testid="refund-flag" className="inline-flex items-center gap-1 font-semibold text-danger">
+          <AlertIcon className="size-3.5" />
+          Devolución pendiente
+        </span>
+      ) : null}
+      {order.tiene_comprobante ? <span className="text-ink-faint">Con comprobante</span> : null}
       {order.observaciones.map((code) => (
         <span key={code} className="inline-flex items-center gap-1 font-medium text-warning">
           <AlertIcon className="size-3.5" />

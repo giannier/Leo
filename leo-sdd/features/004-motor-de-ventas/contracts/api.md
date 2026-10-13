@@ -82,7 +82,7 @@ El `PATCH` del método de pago acepta `media_asset_id` (QR o imagen de cuentas) 
   "seguimiento": { "activo": true, "horas": 4, "max_intentos": 2 },
   "nivel_inteligencia": "economico", "niveles_permitidos": ["economico", "medio"],
   "derivacion_pausa_horas": 6, "activo": true,
-  "mensajes_sistema": { "pago_confirmado": "…", "pago_rechazado": "…", "pedido_rechazado": "…", "derivacion": "…" }
+  "mensajes_sistema": { "pago_confirmado": "…", "pago_rechazado": "…", "pedido_rechazado": "…", "pedido_anulado": "…", "derivacion": "…" }
 }
 ```
 `niveles_permitidos` es solo lectura (sale del plan). Si se pide un nivel fuera del plan, responde 403 `plan_limit`. `reglas_adicionales` se guarda en `agent_configs.restrictions` (máximo 2 000 caracteres).
@@ -213,7 +213,11 @@ Efectos en una transacción:
 En contra entrega no hay comprobante: el pedido vuelve a `borrador` con `motivo_rechazo` y `rechazo_vigente = false`, `pago_estado` queda `null` y la etapa vuelve a COBRO con el motivo en el ESTADO. El aviso usa el mensaje `pedido_rechazado`.
 
 ### POST /api/v1/orders/{id}/status — operador
-`{ "estado": "en_curso" | "completado" | "descartado" }` → 200, o 409 `invalid_transition`. Recalcula la etapa (evento `operador:estado` si cambia).
+`{ "estado": "en_curso" | "completado" | "descartado", "motivo"?: "…" }` → 200, o 409 `invalid_transition`. Recalcula la etapa (evento `operador:estado` si cambia).
+```json
+{ "estado": "descartado", "aviso_cliente": "enviado", "devolucion_pendiente": true }
+```
+**Descartar un pedido con comprobante vigente** (`por_verificar` o `aprobado`; Milestone B, hallazgo E-2): el cliente ya pagó, así que `motivo` (5–300) es obligatorio (sin él, 400 `validation_error`), el comprobante pasa a `anulado` y se avisa al cliente con el mensaje `pedido_anulado` (`aviso_cliente` como en confirmar). Si el pedido estaba `confirmado` o `en_curso`, queda `devolucion_pendiente = true`, visible en la lista y el detalle. Sin comprobante (contra entrega) o al mover a `en_curso`/`completado` no hay aviso: `aviso_cliente` es `null`.
 
 ---
 

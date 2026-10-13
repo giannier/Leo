@@ -171,6 +171,7 @@ const PROOF_STATE: Record<string, string> = {
   por_verificar: "Por verificar",
   aprobado: "Aprobado",
   rechazado: "Rechazado",
+  anulado: "Anulado",
 };
 
 function Proof({
@@ -309,6 +310,13 @@ export function OrderNotes({ order }: { order: OrderDetail }) {
         <Alert tone="warning" title="La ventana de 24 h con este cliente está cerrada">
           Puedes confirmar o rechazar igual, pero el aviso no saldrá por WhatsApp: escríbele tú por otro
           medio.
+        </Alert>
+      ) : null}
+      {order.devolucion_pendiente ? (
+        <Alert tone="danger" title="Devolución pendiente">
+          <span data-testid="refund-pending">
+            Este pedido se descartó después de confirmar el pago. Devuélvele el dinero al cliente.
+          </span>
         </Alert>
       ) : null}
       {order.es_sandbox ? (

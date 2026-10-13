@@ -310,6 +310,10 @@ DEFAULT_SYSTEM_MESSAGES: Mapping[str, str] = MappingProxyType(
             "{nombre_cliente}, revisamos tu pedido #{numero} y hay un detalle: {motivo}. "
             "¿Lo ajustamos?"
         ),
+        "pedido_anulado": (
+            "{nombre_cliente}, tu pedido #{numero} fue anulado: {motivo}. Si ya realizaste "
+            "el pago, nos comunicaremos contigo para la devolución."
+        ),
         "derivacion": "Te comunico con una persona del equipo. Te responderá en breve 🙌",
     }
 )
