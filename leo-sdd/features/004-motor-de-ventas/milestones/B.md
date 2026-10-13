@@ -30,6 +30,11 @@ Este milestone demuestra el ciclo completo de una venta: el cliente arma el pedi
 
 ## 2. Preparar los tenants
 
+> **Atajo (2026-10-13):** `make seed-milestone-b` hace todo lo de esta sección de una vez y se puede
+> correr dos veces sin duplicar nada: crea **Tienda Demo** con su dueño (`tienda.demo@leo.test` /
+> `tienda-demo-2026`), sus 3 productos, entregas, el 2×1 y Yape, y le agrega Yape a **Escuela Capacita** si
+> existe. Los pasos de abajo quedan como referencia de lo que hace.
+
 ### 2.1 Capacita: lo que falta
 
 Falta solo un **método de pago**. Si ya lo cargaste en el paso 5 del onboarding, omite el `INSERT` (devolverá `INSERT 0 0`):
@@ -368,6 +373,9 @@ del perfil del negocio entran en TASK-434 (Fase C).
 casos dorados pasan y el prompt saboteado hace fallar la suite (los evals tienen dientes). Alcance: corren
 sobre `AgentCore` con el prompt de la 003 y `MAX_TOOL_ROUNDS = 3`; **no** cubren el pipeline por etapas,
 la línea nueva de VERIFICACION ni la instrucción de visión. Eso lo mide TASK-447 ("flujos de venta").
+
+**Evals (2026-10-13, después de TASK-450 a 455):** 2 de 2 en verde con OpenAI (38 s); suite completa
+3228 en verde.
 
 **Por confirmar con Giannier:** a qué decisión del reporte original corresponden la **14** ("Aceptado") y
 la **22** ("Anotado como tarea de la 007"); el reporte numerado no quedó en el repo.

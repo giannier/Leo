@@ -52,6 +52,7 @@ GROUPS: list[tuple[str, list[str]]] = [
         "LLM providers",
         [
             "llm_profile",
+            "vision_enabled",
             "openai_api_key",
             "openai_base_url",
             "openai_chat_model",

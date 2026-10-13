@@ -150,10 +150,8 @@ class RegisterRequest(BaseModel):
     # connection request (Clarification 005, TASK-008). Supplying it here
     # takes the trial lock straight away.
     phone_e164: PhoneE164 | None = None
-    # Accepted and validated, but not persisted: no table in data-model.md
-    # has a country column. The wizard collects locale settings
-    # (`business_profiles.currency` / `timezone`) in TASK-010. Kept in the
-    # contract so the frontend does not have to change when it gains a home.
+    # Stored on the tenant (`tenants.pais`, TASK-450): it decides the prefix of
+    # a customer's phone typed without one.
     country: CountryCode = "PE"
 
 
@@ -410,6 +408,7 @@ async def register(
             password=payload.password,
             business_name=payload.business_name,
             phone_e164=payload.phone_e164,
+            country=payload.country,
         )
     except EmailAlreadyRegisteredError as exc:
         raise ApiError(

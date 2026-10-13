@@ -113,6 +113,11 @@ class Settings(BaseSettings):
     # column - a schema migration and a full reindex, to keep a provider that
     # is not the one this platform actually runs on.
     llm_profile: LLMProfile = "openai"
+    # Whether payment receipts may be sent to the platform model for reading
+    # (hallazgo P-1 of the Milestone B review). Off: every receipt is stored
+    # without data and the operator reads the photo. Only a profile whose vision
+    # model was approved for personal data should run with it on.
+    vision_enabled: bool = True
 
     # OpenAI - paid.
     openai_api_key: str | None = None

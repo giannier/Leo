@@ -31,6 +31,7 @@ from typing import Any
 
 from app.agent.tools.registry import ToolContext, ToolResult
 from app.models.orders import Order
+from app.models.tenant import Tenant
 from app.orders.customer_data import ORDER_FIELDS, InvalidField, validate_field
 from app.orders.service import InvalidDelivery, OrderService
 from app.process.facts import missing_customer_data, only_delivery_type
@@ -76,6 +77,8 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
     allowed = _allowed(context, service, order)
 
     invalid: dict[str, str] = {}
+    tenant = context.session.get(Tenant, context.tenant_id)
+    pais = tenant.pais if tenant is not None else "PE"
     contact_values: dict[str, str] = {}
     delivery: dict[str, str] = {}
     for field, raw in arguments.items():
@@ -93,7 +96,7 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
             delivery[field] = str(raw).strip()
         else:
             try:
-                contact_values[field] = validate_field(field, raw)
+                contact_values[field] = validate_field(field, raw, pais=pais)
             except InvalidField as exc:
                 invalid[field] = str(exc)
 
