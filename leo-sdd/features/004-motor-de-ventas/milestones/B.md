@@ -312,15 +312,15 @@ Anota debajo cualquier falla con el escenario, el turno y una captura del debug 
 
 Todas están **pendientes de ratificar por Giannier** (detalle en `conciliacion.md §8.19 a §8.26`). Si alguna no te convence, dilo al aprobar.
 
-1. **Imagen del comprobante en desarrollo.** El enlace firmado usa el endpoint interno de MinIO (`minio:9000`). Hace falta un `S3_PUBLIC_ENDPOINT` (o equivalente) para firmar con un host alcanzable por el navegador; hoy se resuelve con `hosts`. En producción depende de cómo se publique el almacenamiento. *Hallazgo de TASK-432.*
+1. **Imagen del comprobante en desarrollo.** El enlace firmado usa el endpoint interno de MinIO (`minio:9000`). Hace falta un `S3_PUBLIC_ENDPOINT` (o equivalente) para firmar con un host alcanzable por el navegador; hoy se resuelve con `hosts`. En producción depende de cómo se publique el almacenamiento. *Hallazgo de TASK-432.* **Resuelto:** se añadió `S3_PUBLIC_ENDPOINT` para firmar los enlaces del navegador (commit `d70cc35`).
 2. **`aviso_cliente: no_enviado`.** El contrato solo conoce `enviado` y `ventana_cerrada`; se añadió `no_enviado` para cuando falla el proveedor o no hay número. La pantalla lo muestra como "No pudimos enviar el aviso; avísale tú". §8.25.
 3. **"Por revisar" sigue el periodo.** Un pedido por confirmar de hace 8 días no cuenta en "Hoy" (la lista, en cambio, no se limita por periodo). ¿Debe ser "pendientes de siempre"? §8.25.
 4. **Quién puede decidir.** Cualquier miembro activo (también `operator`) confirma o rechaza; no hay un permiso aparte para pagos. §8.25.
 5. **Correos solo al dueño** (no a `tenant_admin`); `llm_caido` máximo uno por hora. §8.26. Y la **migración 0022** amplió `tenant_notifications` en vez de crear otra tabla. §8.26.
 6. **Visión.** Modelo de chat del perfil (no hay un modelo de visión aparte); umbral de "lectura poco segura" de `0.70` y timeout de 8 s son constantes mías; qué modelo corresponde a cada nivel llega con TASK-445. §8.24.
-7. **Pricing (§8.19):** el monto mínimo cuenta sobre las líneas a las que aplica la promoción; N×M por línea; el envío gratis se evalúa después del descuento; delivery sin zona vale 0 hasta elegirla.
+7. **Pricing (§8.19):** el monto mínimo cuenta sobre todo el pedido (decidido por Giannier; antes: solo las líneas a las que aplica la promoción); N×M por línea; el envío gratis se evalúa después del descuento; delivery sin zona vale 0 hasta elegirla.
 8. **Un pedido `por_confirmar` no se puede modificar** ni abrir otro mientras el negocio revisa (`OrderLocked`). §8.20.
-9. **`MAX_TOOL_ROUNDS = 2`:** buscar y agregar gastan las dos vueltas; registrar datos en cadena no cabe. Subirlo cambia costo y latencia. §8.21.
+9. **`MAX_TOOL_ROUNDS = 2`:** buscar y agregar gastan las dos vueltas; registrar datos en cadena no cabe. Subirlo cambia costo y latencia. §8.21. **Resuelto:** subió a `MAX_TOOL_ROUNDS = 3`; cada llamada en la traza lleva su `ronda` para medir el costo con tráfico real (commit `01591b5`).
 10. **Datos personales:** el DNI que escribe el cliente queda en `messages.content` y vuelve al modelo en el historial; solo se enmascara en trazas y debug. Un teléfono de 9 dígitos que empieza en 9 se toma como móvil peruano (`+51`). §8.22.
 11. **Decisiones de pantalla (TASK-432):** ruta `/pedidos` y `/pedidos/{id}`; la lista oculta los pedidos de prueba por defecto; "Pedidos" ocupa un lugar de la barra inferior del teléfono y "Mi número" pasa a estar solo en el menú lateral; el campo de búsqueda y los filtros se aplican tras una pausa de 300 ms.
 12. **Escenario 6 de Capacita:** `tasks.md` pide 4 y 5 en este milestone; se dejó como extra (3.3). Confirma si debe ser obligatorio aquí o en la aceptación (TASK-449).
