@@ -301,6 +301,9 @@ class TurnPipeline:
             after["seguimiento"] = None
         if after:
             version = self._save(conversation_id, stage, funnel, after, version)
+        # A receipt that waited for the order to be complete goes to the operator
+        # as soon as this turn's tools completed it (finding E-1).
+        submitted = self._submit_waiting_proof(conversation)
         facts_after = loader.load(conversation, now=now)
         stage_after = compute_stage(template, config.options, facts_after, now)
         funnel_after = funnel_for(template, stage_after, facts_after)
@@ -312,6 +315,7 @@ class TurnPipeline:
                 None,
                 version,
                 snapshot=facts_snapshot(facts_after),
+                reason=REASON_PROOF if submitted else REASON_TURN,
             )
 
         # 14. trace
@@ -411,6 +415,12 @@ class TurnPipeline:
         if not lines:
             return turn, recorded
         return dataclasses.replace(turn, comprobante="; ".join(lines)), recorded
+
+    def _submit_waiting_proof(self, conversation: Conversation) -> bool:
+        """Step 13: send a waiting receipt's order to the operator if it is complete."""
+        if self._proofs is None:
+            return False
+        return self._proofs.submit_waiting(conversation) is not None
 
     def _gate(self, conversation: Conversation, facts: Facts, now: datetime) -> GateReason | None:
         """Step 7: the reasons the assistant stays quiet.

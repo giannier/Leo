@@ -45,8 +45,18 @@ PAYMENT_MODES = ("previo", "contra_entrega")
 DELIVERY_TYPES = ("delivery", "recojo")
 PROOF_STATES = ("por_verificar", "aprobado", "rechazado")
 # What a proof can be flagged for. Observations are never an automatic rejection
-# (C-08): they tell the operator where to look.
-PROOF_OBSERVATIONS = ("monto_distinto", "codigo_repetido", "baja_confianza", "sin_datos")
+# (C-08): they tell the operator where to look. An empty list means every check
+# ran and passed (Milestone B, D-1).
+PROOF_OBSERVATIONS = (
+    "monto_distinto",
+    "monto_negativo",
+    "codigo_repetido",
+    "baja_confianza",
+    "sin_datos",
+    "destinatario_distinto",
+    "destinatario_no_verificado",
+    "fecha_anterior_al_pedido",
+)
 
 # The row of `tenant_sequences` that numbers a tenant's orders.
 ORDERS_SEQUENCE = "orders"

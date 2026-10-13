@@ -7,11 +7,19 @@ runs while a conversation is handed to a person:
 
 1. Vision reads the image (`vision.py`, 8 s at most, never raises).
 2. If it is a receipt - or could not be read at all, which is not the same as
-   "not a receipt" - the image goes to private storage, a `payment_proof` is
-   created `por_verificar` and the order moves to `por_confirmar`.
-3. What looks off is flagged, never rejected: a different amount, an operation code
-   seen before, low confidence, nothing readable. The operator decides (RF-023).
-4. The operator is told, and the model gets one line for "ESTE TURNO".
+   "not a receipt" - the image goes to private storage and a `payment_proof` is
+   created `por_verificar` on the order.
+3. What looks off is flagged, never rejected: a different or negative amount, an
+   operation code seen before, low confidence, nothing readable, a recipient that
+   is not the business's (or that nobody could check), an operation dated before
+   the order. The operator decides (RF-023). An empty list of observations means
+   every check ran and passed, nothing less.
+4. If the order is complete - lines, package selections, the customer's data -
+   it moves to `por_confirmar`, the operator is told and the model says it is in
+   review. If not, nobody is told yet: the proof waits on the order, the model asks
+   for what is missing, and `submit_waiting` sends it once the order is complete
+   (Milestone B, finding E-1). A second photo while a proof waits is not another
+   proof and not another notice.
 
 An image that vision says is *not* a receipt is not stored at all: it is a stranger's
 photo, not a payment record.
@@ -22,19 +30,27 @@ Cash-on-delivery orders have no proof (C-07): an image there is just an image.
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from typing import Literal, Protocol
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy.orm import Session
 
 from app.agent.tools.shared import CURRENCY_SYMBOLS, money
+from app.models.business import BusinessProfile
 from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order, PaymentProof
 from app.orders.service import OrderError, OrderService
 from app.orders.vision import ProofReading, read_proof
+from app.process.facts import missing_customer_data
+from app.process.service import ProcessConfigService
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InboundMedia
@@ -49,9 +65,22 @@ logger = logging.getLogger(__name__)
 LOW_CONFIDENCE = Decimal("0.70")
 
 OBS_AMOUNT = "monto_distinto"
+OBS_NEGATIVE = "monto_negativo"
 OBS_CODE = "codigo_repetido"
 OBS_CONFIDENCE = "baja_confianza"
 OBS_NO_DATA = "sin_datos"
+OBS_RECIPIENT = "destinatario_distinto"
+OBS_RECIPIENT_UNCHECKED = "destinatario_no_verificado"
+OBS_EARLY_DATE = "fecha_anterior_al_pedido"
+
+DEFAULT_TIMEZONE = "America/Lima"
+
+# What the model is told when the receipt is kept but the order is not complete.
+_MISSING_LABELS = {
+    "selecciones": "completar los temas del paquete",
+    "pedido": "agregar al menos un producto al pedido",
+    "contacto": "identificar al cliente",
+}
 
 _EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 
@@ -113,12 +142,19 @@ class ProofPipeline:
         llm: LLMProvider,
         storage: StorageProvider | None,
         notices: ProofNotices | None = None,
+        payees: Sequence[str] = (),
+        process_config: ProcessConfigService | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
         self._llm = llm
         self._storage = storage
         self._notices = notices
+        # The names the business collects under (its Yape/Plin, bank account
+        # holders). None configured: no recipient can be checked, and every proof
+        # says so. The business profile gains these accounts in Phase C.
+        self._payees = tuple(name for name in payees if _name_tokens(name))
+        self._process = process_config or ProcessConfigService(session)
         self._orders = OrderService(session, tenant_id)
         self._proofs = PaymentProofRepository(session, tenant_id)
 
@@ -138,6 +174,18 @@ class ProofPipeline:
         if self._storage is None:
             logger.warning("a receipt cannot be stored: no object storage is configured")
             return ProofOutcome("ignorado")
+
+        contact = self._contact(conversation)
+        waiting = self.waiting_proof(order)
+        if waiting is not None:
+            # The receipt is already on the order; it waits for the order to be
+            # complete. Another photo is neither another proof nor another notice.
+            return ProofOutcome(
+                "ignorado",
+                _waiting_line(self.missing(order, contact)),
+                proof=waiting,
+                order=order,
+            )
 
         reading = await read_proof(self._llm, image.data, image.mime_type)
         if reading.legible and not reading.es_comprobante:
@@ -174,20 +222,82 @@ class ProofPipeline:
             extraccion=_extraction(reading),
         )
         proof.observaciones = self.observations(order, proof, reading)
-        self._submit(order, conversation)
         self._session.flush()
 
-        if self._notices is not None and not order.is_sandbox:
-            self._notices.new_proof(order, proof)
+        missing = self.missing(order, contact)
+        if missing or contact is None or not self._submit(order, contact, proof):
+            return ProofOutcome(
+                "registrado",
+                _incomplete_line(order, proof, reading, missing or ["pedido"]),
+                proof,
+                order,
+            )
         return ProofOutcome("registrado", _describe(order, proof, reading), proof, order)
+
+    def submit_waiting(self, conversation: Conversation) -> Order | None:
+        """Send the order to the operator if a proof waits on it and it is complete now.
+
+        Called after the model's turn: the customer may have just given the data
+        that were missing. Returns the order when it moved to `por_confirmar`.
+        """
+        order = self._orders.active_for(conversation.id)
+        if order is None or order.estado != "borrador" or order.modalidad_pago != "previo":
+            return None
+        proof = self.waiting_proof(order)
+        if proof is None:
+            return None
+        contact = self._contact(conversation)
+        if contact is None or self.missing(order, contact):
+            return None
+        if not self._submit(order, contact, proof):
+            return None
+        self._session.flush()
+        return order
+
+    def waiting_proof(self, order: Order) -> PaymentProof | None:
+        """The proof that waits on a draft order for it to be complete, if any."""
+        latest = self._proofs.latest_for_order(order.id)
+        if latest is None or latest.estado != "por_verificar":
+            return None
+        return latest
+
+    def missing(self, order: Order, contact: Contact | None) -> list[str]:
+        """What keeps the order from going to the operator, in the words the
+        facts use (`datos_faltantes`) plus `pedido`, `selecciones` and `contacto`."""
+        if contact is None:
+            return ["contacto"]
+        if not self._orders.lines(order):
+            return ["pedido"]
+        missing: list[str] = []
+        if self._orders.missing_selections(order):
+            missing.append("selecciones")
+        options = self._process.effective(self._tenant_id).options
+        missing.extend(
+            missing_customer_data(
+                contact,
+                options.datos_requeridos,
+                self._orders.entregas(),
+                requiere_entrega=self._orders.requires_delivery(order),
+                tipo_entrega=order.tipo_entrega,
+                zona_envio=order.zona_envio,
+            )
+        )
+        return missing
 
     # ---------------------------------------------------------------- helpers
 
     def observations(self, order: Order, proof: PaymentProof, reading: ProofReading) -> list[str]:
-        """What looks off about a proof. Flags for the operator, never a verdict."""
+        """What looks off about a proof. Flags for the operator, never a verdict.
+
+        An empty list must mean "every check ran and passed": a check that could
+        not run (no accounts to compare the recipient with) is a flag too.
+        """
         flags: list[str] = []
         if not reading.has_data:
             flags.append(OBS_NO_DATA)
+        if reading.monto is not None and reading.monto < 0:
+            # A reversal or a refund: never a payment, whatever its size.
+            flags.append(OBS_NEGATIVE)
         if reading.monto is not None and (
             reading.monto != order.total
             or (reading.moneda is not None and reading.moneda != order.moneda)
@@ -199,23 +309,43 @@ class ProofPipeline:
             flags.append(OBS_CODE)
         if reading.confianza is not None and reading.confianza < LOW_CONFIDENCE:
             flags.append(OBS_CONFIDENCE)
+        recipient = self._recipient_flag(reading.destinatario)
+        if recipient is not None:
+            flags.append(recipient)
+        if reading.fecha is not None and reading.fecha < self._order_day(order):
+            flags.append(OBS_EARLY_DATE)
         return flags
 
-    def _store(self, image: ReceivedImage) -> str:
-        extension = _EXTENSIONS.get(image.mime_type, "bin")
-        key = f"tenants/{self._tenant_id}/proofs/{uuid.uuid4()}.{extension}"
-        assert self._storage is not None  # checked by the caller
-        return self._storage.put(key, image.data, content_type=image.mime_type)
+    def _recipient_flag(self, destinatario: str | None) -> str | None:
+        """`destinatario_distinto`, `destinatario_no_verificado` or None (it matched)."""
+        if not self._payees or destinatario is None or not _name_tokens(destinatario):
+            return OBS_RECIPIENT_UNCHECKED
+        if any(_same_person(destinatario, payee) for payee in self._payees):
+            return None
+        return OBS_RECIPIENT
 
-    def _submit(self, order: Order, conversation: Conversation) -> None:
-        """The order waits for the operator. If it cannot (it is not complete), the
-        proof stays on it and the operator sees both."""
-        contact: Contact | None = None
-        if conversation.contact_id is not None:
-            contact = ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
-        if contact is None:
+    def _order_day(self, order: Order) -> date:
+        """The day the order was created, in the business's time zone.
+
+        A receipt shows its local date; comparing it with a UTC day would flag a
+        payment made at 8 pm in Lima on the day the order was created.
+        """
+        profile = self._session.get(BusinessProfile, self._tenant_id)
+        try:
+            zone = ZoneInfo(profile.timezone if profile is not None else DEFAULT_TIMEZONE)
+        except (ZoneInfoNotFoundError, ValueError):
+            zone = ZoneInfo(DEFAULT_TIMEZONE)
+        return order.created_at.astimezone(zone).date()
+
+    def _contact(self, conversation: Conversation) -> Contact | None:
+        if conversation.contact_id is None:
             logger.warning("a receipt arrived on a conversation without a contact")
-            return
+            return None
+        return ContactRepository(self._session, self._tenant_id).get(conversation.contact_id)
+
+    def _submit(self, order: Order, contact: Contact, proof: PaymentProof) -> bool:
+        """The order waits for the operator, and the operator is told. False if the
+        order rules refuse it: the proof stays on the draft and nobody is told."""
         try:
             self._orders.submit(order, contact)
         except OrderError:
@@ -223,6 +353,16 @@ class ProofPipeline:
                 "a receipt arrived but its order cannot be submitted",
                 extra={"tenant_id": str(self._tenant_id), "state": order.estado},
             )
+            return False
+        if self._notices is not None and not order.is_sandbox:
+            self._notices.new_proof(order, proof)
+        return True
+
+    def _store(self, image: ReceivedImage) -> str:
+        extension = _EXTENSIONS.get(image.mime_type, "bin")
+        key = f"tenants/{self._tenant_id}/proofs/{uuid.uuid4()}.{extension}"
+        assert self._storage is not None  # checked by the caller
+        return self._storage.put(key, image.data, content_type=image.mime_type)
 
 
 def _extraction(reading: ProofReading) -> dict[str, object]:
@@ -250,3 +390,51 @@ def _describe(order: Order, proof: PaymentProof, reading: ProofReading) -> str:
         f"comprobante recibido: {detail}; queda en revisión del negocio "
         "(no digas que está confirmado)"
     )
+
+
+def _incomplete_line(
+    order: Order, proof: PaymentProof, reading: ProofReading, missing: Sequence[str]
+) -> str:
+    """The model's line when the receipt is kept but the order cannot go yet."""
+    received = _describe(order, proof, reading).split(";", 1)[0]
+    return (
+        f"{received}; quedó guardado en el pedido, pero antes de pasarlo a revisión "
+        f"falta: {_missing_text(missing)}. Pídeselo al cliente; no digas que está en "
+        "revisión ni que está confirmado"
+    )
+
+
+def _waiting_line(missing: Sequence[str]) -> str:
+    """The model's line for a photo that arrives while a proof already waits."""
+    if not missing:
+        return "ya tenemos su comprobante en el pedido; no hace falta que lo envíe de nuevo"
+    return (
+        "ya tenemos su comprobante en el pedido (no hace falta otro); para pasarlo a "
+        f"revisión falta: {_missing_text(missing)}. Pídeselo al cliente"
+    )
+
+
+def _missing_text(missing: Sequence[str]) -> str:
+    return ", ".join(_MISSING_LABELS.get(item, item) for item in missing)
+
+
+_WORD_BREAK = re.compile(r"[\s.,;]+")
+_NOT_A_LETTER = re.compile(r"[^a-z0-9]+")
+
+
+def _name_tokens(name: str) -> set[str]:
+    """The words of a name that can be compared: no accents, no case, no masked or
+    short parts (`Juan P. Pér*` -> {"juan"})."""
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    words = (_NOT_A_LETTER.sub("", word) for word in _WORD_BREAK.split(plain) if "*" not in word)
+    return {word for word in words if len(word) >= 3}
+
+
+def _same_person(read: str, payee: str) -> bool:
+    """Whether the recipient read on the receipt is the business's account holder.
+
+    Wallets show the name shortened or masked ("Juan P. Pér*"), so every complete
+    word read must be part of the holder's name; at least one word must be read.
+    """
+    read_tokens = _name_tokens(read)
+    return bool(read_tokens) and read_tokens <= _name_tokens(payee)

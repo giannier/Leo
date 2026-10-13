@@ -41,7 +41,8 @@ INSTRUCTION = (
     "operation (YYYY-MM-DD), the operation code, the bank or wallet, and the name of "
     "who received the money. Use null for anything you cannot read; never guess. "
     "'confianza' is how sure you are that the amounts and the code were read "
-    "correctly, from 0 to 1. Write numbers as plain text with a dot, no symbols."
+    "correctly, from 0 to 1. Write numbers as plain text with a dot, no symbols; "
+    "keep the minus sign of a negative amount (a reversal or a refund)."
 )
 
 _NULLABLE_TEXT = {"type": ["string", "null"]}
@@ -175,24 +176,56 @@ def _text(value: object) -> str | None:
 
 
 def _amount(value: object) -> Decimal | None:
-    """`"S/ 1,250.50"` or `"1250.5"` -> Decimal('1250.50'); None if unreadable."""
+    """`"S/ 1,250.50"`, `"1.250,50"` or `"1250.5"` -> Decimal; None if unreadable.
+
+    Negative amounts (a reversal, a refund) come back negative so the pipeline can
+    flag them: they must never pass for a payment of the same size.
+    """
     text = _text(value)
     if text is None:
         return None
-    kept = "".join(char for char in text if char.isdigit() or char in ".,")
-    if not kept:
+    first_digit = next((i for i, char in enumerate(text) if char.isdigit()), None)
+    if first_digit is None:
         return None
-    # A comma followed by exactly two digits at the end is a decimal comma.
-    if "," in kept and "." not in kept and len(kept) - kept.rfind(",") == 3:
-        kept = kept.replace(",", ".")
-    kept = kept.replace(",", "")
+    negative = any(char in "-\u2212" for char in text[:first_digit])
+    kept = "".join(char for char in text if char.isdigit() or char in ".,")
+    normalised = _decimal_point(kept)
+    if normalised is None:
+        return None
     try:
-        amount = Decimal(kept).quantize(Decimal("0.01"))
+        amount = Decimal(normalised).quantize(Decimal("0.01"))
     except InvalidOperation:
         return None
-    if amount < 0 or amount > _MAX_AMOUNT:
+    if amount > _MAX_AMOUNT:
         return None
-    return amount
+    return -amount if negative and amount else amount
+
+
+def _decimal_point(kept: str) -> str | None:
+    """Digits and separators with a single `.` as the decimal point, or None.
+
+    Leo sells outside Peru, so both `1,250.00` and `1.250,00` occur. With both
+    separators the last one is the decimal point. With one kind only: repeated, it
+    groups thousands (`1.250.000`); once, it is a thousands separator when exactly
+    three digits follow (`1.250`, `1,250`) and the decimal point otherwise (`120,5`).
+    """
+    last = max(kept.rfind("."), kept.rfind(","))
+    if last < 0:
+        return kept
+    decimal_sep: str | None
+    if "." in kept and "," in kept:
+        decimal_sep = kept[last]
+    else:
+        sep = kept[last]
+        decimals = len(kept) - last - 1
+        decimal_sep = sep if kept.count(sep) == 1 and decimals != 3 else None
+    if decimal_sep is None:
+        return kept.replace(".", "").replace(",", "")
+    whole, fraction = kept[:last], kept[last + 1 :]
+    whole = whole.replace(".", "").replace(",", "")
+    if not whole and not fraction:
+        return None
+    return f"{whole or '0'}.{fraction or '0'}"
 
 
 def _currency(value: object) -> str | None:

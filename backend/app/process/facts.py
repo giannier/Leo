@@ -177,6 +177,9 @@ class Facts(_Model):
     metodos_pago_enviados: bool = False
     motivo_rechazo: str | None = None
     comprobante: Comprobante | None = None
+    # A receipt arrived but the order was not complete: it waits on the draft and
+    # goes to the operator once the order is complete (finding E-1).
+    comprobante_en_espera: bool = False
     promos_cierre: list[PromoCierre] = Field(default_factory=list)
 
     def derivado_activo(self, now: datetime) -> bool:
@@ -458,6 +461,12 @@ def build_facts(snapshot: ConversationSnapshot, config: FactsConfig, now: dateti
             Comprobante(observaciones=list(snapshot.last_proof.observaciones))
             if snapshot.last_proof is not None
             else None
+        ),
+        comprobante_en_espera=(
+            order is not None
+            and order.estado == "borrador"
+            and snapshot.last_proof is not None
+            and snapshot.last_proof.estado == "por_verificar"
         ),
         promos_cierre=_closing_promotions(
             config.promotions, stored.get("promos_ofrecidas", {}), now, _pricing_lines(snapshot)
