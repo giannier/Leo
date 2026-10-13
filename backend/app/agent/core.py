@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.catalog_guard import CatalogueGuard, build_catalogue_guard
 from app.agent.formatter import to_whatsapp_markup
+from app.agent.privacy import mask_arguments
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
@@ -643,10 +644,13 @@ def _summarise(arguments: dict[str, object], limit: int = 120) -> str:
 
     Summarised rather than stored whole: arguments can carry a customer's
     entire message, and a trace is not the place to accumulate a second copy
-    of the conversation.
+    of the conversation. And masked first: the customer's DNI, e-mail, phone and
+    address (`registrar_datos_cliente`) must not live in `agent_traces`, which the
+    panel shows and which outlasts the conversation (C-20). Masking comes before
+    cutting, so a long value cannot leave its tail behind.
     """
     try:
-        rendered = json.dumps(arguments, ensure_ascii=False)
+        rendered = json.dumps(mask_arguments(arguments), ensure_ascii=False)
     except (TypeError, ValueError):  # pragma: no cover - defensive
         rendered = str(arguments)
     return rendered[:limit]
