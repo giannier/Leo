@@ -175,6 +175,8 @@ class OrderDetail(BaseModel):
     motivo_rechazo: str | None
     rechazo_vigente: bool
     devolucion_pendiente: bool
+    # The customer may have two contacts (Milestone B, decision 12).
+    cliente_posible_duplicado: bool
     siguiente_paso: str | None
     es_sandbox: bool
     conversation_id: uuid.UUID
@@ -473,6 +475,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         motivo_rechazo=order.motivo_rechazo,
         rechazo_vigente=order.rechazo_vigente,
         devolucion_pendiente=order.devolucion_pendiente,
+        cliente_posible_duplicado=contact is not None and contact.posible_duplicado_de is not None,
         siguiente_paso=order.siguiente_paso,
         es_sandbox=order.is_sandbox,
         conversation_id=order.conversation_id,

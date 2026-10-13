@@ -319,6 +319,14 @@ export function OrderNotes({ order }: { order: OrderDetail }) {
           </span>
         </Alert>
       ) : null}
+      {order.cliente_posible_duplicado ? (
+        <Alert tone="warning" title="Este cliente podría estar registrado dos veces">
+          <span data-testid="duplicate-contact">
+            Escribió con un identificador de WhatsApp y un teléfono que pertenecen a dos contactos
+            distintos. No los unimos: revisa sus pedidos anteriores antes de decidir.
+          </span>
+        </Alert>
+      ) : null}
       {order.es_sandbox ? (
         <Alert tone="info">Pedido del modo prueba: no es una venta real.</Alert>
       ) : null}

@@ -87,6 +87,13 @@ class Contact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # have none, and never trusted as an identity - only as a display label.
     profile_name: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Another contact of the same tenant that is probably the same person: a
+    # message brought this one's BSUID with the other's phone. They are not
+    # merged; the operator sees the mark (Milestone B, decision 12).
+    posible_duplicado_de: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Set when this person asked not to be contacted. Auditable by being a
     # timestamp rather than a boolean: "when did they opt out" is a question
     # that gets asked, and a flag cannot answer it.
