@@ -159,7 +159,11 @@ class HistoryEntry(BaseModel):
 class OrderNote(BaseModel):
     en: datetime
     texto: str
+    # `cliente` (a change asked during review) or `sistema` (an unrecognised image).
     origen: str
+    evento: str | None = None
+    # Set when the note carries an image: ask `/notes/{imagen_id}/image` for a link.
+    imagen_id: str | None = None
 
 
 class OrderDetail(BaseModel):
@@ -291,6 +295,11 @@ def proof_out(proof: PaymentProof) -> ProofOut:
 
 
 # ------------------------------------------------------------------- helpers
+
+
+def _note_out(note: dict[str, Any]) -> OrderNote:
+    """A note as the panel sees it: never the storage key."""
+    return OrderNote.model_validate({k: v for k, v in note.items() if k != "imagen_key"})
 
 
 def _not_found() -> ApiError:
@@ -455,6 +464,11 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
             for proof in proofs
         ],
         *[
+            HistoryEntry(evento=str(note["evento"]), estado=None, en=note["en"])
+            for note in order.notas or []
+            if note.get("evento")
+        ],
+        *[
             HistoryEntry(
                 evento=entry.action,
                 estado=str(entry.detail.get("a")) if entry.detail.get("a") else None,
@@ -484,7 +498,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         rechazo_vigente=order.rechazo_vigente,
         devolucion_pendiente=order.devolucion_pendiente,
         cliente_posible_duplicado=contact is not None and contact.posible_duplicado_de is not None,
-        notas=[OrderNote.model_validate(note) for note in order.notas or []],
+        notas=[_note_out(note) for note in order.notas or []],
         siguiente_paso=order.siguiente_paso,
         es_sandbox=order.is_sandbox,
         conversation_id=order.conversation_id,
@@ -519,6 +533,32 @@ def proof_image(
     )
 
 
+@router.get(
+    "/{order_id}/notes/{imagen_id}/image",
+    summary="A signed link to an image kept on the order (10 minutes)",
+    responses=error_responses(NOT_FOUND, *AUTH_RESPONSES),
+)
+def note_image(
+    order_id: uuid.UUID,
+    imagen_id: str,
+    principal: MemberDep,
+    session: SessionDep,
+    storage: StorageDep,
+) -> ProofImage:
+    """An image the model did not take for a receipt (finding D-4). Private, like a proof."""
+    order = OrderRepository(session, principal.tenant_id).get(order_id)
+    note = next(
+        (n for n in (order.notas if order else []) or [] if n.get("imagen_id") == imagen_id),
+        None,
+    )
+    if note is None or not note.get("imagen_key"):
+        raise _not_found()
+    return ProofImage(
+        url=storage.presigned_url(str(note["imagen_key"]), expires_in=IMAGE_LINK_SECONDS),
+        expires_at=datetime.now(UTC) + timedelta(seconds=IMAGE_LINK_SECONDS),
+    )
+
+
 @router.post(
     "/{order_id}/confirm",
     summary="Accept the payment (or the cash-on-delivery order)",
@@ -534,7 +574,9 @@ async def confirm_order(
 ) -> DecisionResponse:
     """Order, receipt, audit and stage in one transaction; the customer is told after."""
     next_step = body.siguiente_paso if body else None
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.confirm(order_id, principal.user_id, siguiente_paso=next_step)
     except OrderNotFound as exc:
@@ -544,10 +586,7 @@ async def confirm_order(
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
 
-    alerts = TenantAlerts(session, principal.tenant_id)
-    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-        result.order, "pago_confirmado", siguiente_paso=result.order.siguiente_paso
-    )
+    notice = await notifier.deliver(result.prepared)
     await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
@@ -565,7 +604,9 @@ async def reject_order(
     provider: WhatsAppProviderDep,
     email: EmailProviderDep,
 ) -> DecisionResponse:
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.reject(order_id, principal.user_id, motivo=body.motivo)
     except OrderNotFound as exc:
@@ -575,11 +616,8 @@ async def reject_order(
     except InvalidTransition as exc:
         raise _conflict("invalid_transition", exc) from exc
 
-    assert result.notice is not None  # a rejection always tells the customer
-    alerts = TenantAlerts(session, principal.tenant_id)
-    notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-        result.order, result.notice, motivo=body.motivo
-    )
+    assert result.prepared is not None  # a rejection always tells the customer
+    notice = await notifier.deliver(result.prepared)
     await send_emails(email, alerts.pending_emails)
     return DecisionResponse(estado=result.order.estado, aviso_cliente=notice)
 
@@ -600,7 +638,9 @@ async def set_order_status(
     """Discarding an order with a payment proof needs `motivo`, voids the proof and
     tells the customer; if it was confirmed, the order owes a refund."""
     assert body.estado in OPERATOR_STATES
-    review = OrderReviewService(session, principal.tenant_id)
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
     try:
         result = review.set_status(order_id, principal.user_id, body.estado, motivo=body.motivo)
     except OrderNotFound as exc:
@@ -616,11 +656,8 @@ async def set_order_status(
         ) from exc
 
     notice: CustomerNotice | None = None
-    if result.notice is not None:
-        alerts = TenantAlerts(session, principal.tenant_id)
-        notice = await _notifier(session, principal.tenant_id, provider, alerts).notify(
-            result.order, result.notice, motivo=body.motivo
-        )
+    if result.prepared is not None:
+        notice = await notifier.deliver(result.prepared)
         await send_emails(email, alerts.pending_emails)
     return StatusResponse(
         estado=result.order.estado,

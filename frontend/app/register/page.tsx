@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Alert, AuthShell, Button, Field } from "@/components/ui";
+import { Alert, AuthShell, Button, Field, Select } from "@/components/ui";
 import { api } from "@/lib/api/client";
 import { ApiError, humanMessage } from "@/lib/api/errors";
 
@@ -15,6 +15,19 @@ const PHONE = /^\+[1-9]\d{7,14}$/;
 
 type Errors = Partial<Record<"full_name" | "email" | "password" | "business_name" | "phone_e164", string>>;
 
+/** The business's country: the prefix of a phone a customer types without one. */
+const COUNTRIES = [
+  { value: "PE", label: "Perú" },
+  { value: "CO", label: "Colombia" },
+  { value: "MX", label: "México" },
+  { value: "CL", label: "Chile" },
+  { value: "EC", label: "Ecuador" },
+  { value: "BO", label: "Bolivia" },
+  { value: "AR", label: "Argentina" },
+  { value: "US", label: "Estados Unidos" },
+  { value: "ES", label: "España" },
+] as const;
+
 export default function RegisterPage() {
   const [form, setForm] = useState({
     full_name: "",
@@ -22,6 +35,7 @@ export default function RegisterPage() {
     email: "",
     phone_e164: "+51",
     password: "",
+    country: "PE",
   });
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -73,7 +87,7 @@ export default function RegisterPage() {
         email: form.email.trim(),
         password: form.password,
         phone_e164: phone && phone !== "+51" ? phone : null,
-        country: "PE",
+        country: form.country,
       });
       setDone(form.email.trim());
     } catch (caught) {
@@ -155,6 +169,14 @@ export default function RegisterPage() {
           value={form.email}
           error={errors.email}
           onChange={(e) => set("email", e.target.value)}
+        />
+
+        <Select
+          label="País del negocio"
+          name="country"
+          options={COUNTRIES}
+          value={form.country}
+          onChange={(e) => set("country", e.target.value)}
         />
 
         <Field

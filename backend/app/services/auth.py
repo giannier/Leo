@@ -124,6 +124,7 @@ class AuthService:
         password: str,
         business_name: str,
         phone_e164: str | None = None,
+        country: str = "PE",
     ) -> RegistrationResult:
         """Create the user, the trial tenant and the ownership."""
         now = datetime.now(UTC)
@@ -146,6 +147,7 @@ class AuthService:
             name=business_name,
             plan_id=TRIAL_PLAN_ID,
             trial_ends_at=trial_ends_at,
+            pais=country.upper(),
         )
         TenantUserRepository(self._session, tenant.id).add_member(user_id=user.id, role=OWNER_ROLE)
 

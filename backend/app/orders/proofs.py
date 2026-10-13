@@ -43,12 +43,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.orm import Session
 
 from app.agent.tools.shared import CURRENCY_SYMBOLS, money
+from app.core.config import get_settings
 from app.models.business import BusinessProfile
 from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order, PaymentProof
 from app.orders.service import OrderError, OrderService
-from app.orders.vision import ProofReading, read_proof
+from app.orders.vision import ProofReading, read_proof, unreadable
 from app.process.facts import missing_customer_data
 from app.process.service import ProcessConfigService
 from app.providers.llm.base import LLMProvider
@@ -74,6 +75,11 @@ OBS_RECIPIENT_UNCHECKED = "destinatario_no_verificado"
 OBS_EARLY_DATE = "fecha_anterior_al_pedido"
 
 DEFAULT_TIMEZONE = "America/Lima"
+
+# The event an unrecognised image leaves on the order (finding D-4).
+UNRECOGNISED_NOTE = (
+    "El cliente envió una imagen que no parece un comprobante. Revísala por si es un pago."
+)
 
 # What the model is told when the receipt is kept but the order is not complete.
 _MISSING_LABELS = {
@@ -164,8 +170,15 @@ class ProofPipeline:
         image: ReceivedImage,
         *,
         message_id: uuid.UUID | None = None,
+        read: bool = True,
     ) -> ProofOutcome:
-        """Record one image as a payment proof if it is one."""
+        """Record one image as a payment proof if it is one.
+
+        `read=False` (the conversation is paused, handed to a person or the
+        customer opted out: hallazgo P-1) stores the image for the operator
+        without sending it to any model. So does a platform whose vision is not
+        approved (`VISION_ENABLED=false`).
+        """
         order = self._orders.active_for(conversation.id)
         if order is None or order.estado != "borrador" or order.modalidad_pago != "previo":
             # No order to pay, one already waiting, or cash on delivery: a receipt
@@ -187,8 +200,14 @@ class ProofPipeline:
                 order=order,
             )
 
-        reading = await read_proof(self._llm, image.data, image.mime_type)
+        if not read:
+            reading = unreadable("revision_humana")
+        elif not get_settings().vision_enabled:
+            reading = unreadable("vision_no_aprobada")
+        else:
+            reading = await read_proof(self._llm, image.data, image.mime_type)
         if reading.legible and not reading.es_comprobante:
+            self._keep_unrecognised(order, image)
             return ProofOutcome(
                 "no_comprobante",
                 "la imagen NO es un comprobante de pago; pídele la foto del comprobante",
@@ -233,6 +252,24 @@ class ProofPipeline:
                 order,
             )
         return ProofOutcome("registrado", _describe(order, proof, reading), proof, order)
+
+    def _keep_unrecognised(self, order: Order, image: ReceivedImage) -> None:
+        """An image the model did not take for a receipt is kept, with an event on
+        the order, so a real receipt the model misread is not lost (finding D-4).
+        It is not a proof: no row in `payment_proofs`, no observation, no notice."""
+        try:
+            key = self._store(image)
+        except StorageError:
+            logger.exception("an unrecognised image could not be stored")
+            return
+        self._orders.add_note(
+            order,
+            UNRECOGNISED_NOTE,
+            origen="sistema",
+            evento="imagen_no_reconocida",
+            imagen_id=str(uuid.uuid4()),
+            imagen_key=key,
+        )
 
     def submit_waiting(self, conversation: Conversation) -> Order | None:
         """Send the order to the operator if a proof waits on it and it is complete now.

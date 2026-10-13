@@ -72,7 +72,9 @@ class TenantRepository:
         """
         return self._session.get(Tenant, tenant_id, with_for_update=True)
 
-    def create_trial(self, *, name: str, plan_id: str, trial_ends_at: datetime) -> Tenant:
+    def create_trial(
+        self, *, name: str, plan_id: str, trial_ends_at: datetime, pais: str = "PE"
+    ) -> Tenant:
         """Open a tenant on a trial plan.
 
         `trial_ends_at` is passed in rather than computed here: the trial
@@ -84,6 +86,7 @@ class TenantRepository:
             status=TRIAL_STATUS,
             plan_id=plan_id,
             trial_ends_at=trial_ends_at,
+            pais=pais,
         )
         self._session.add(tenant)
         self._session.flush()

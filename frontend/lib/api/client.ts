@@ -505,6 +505,9 @@ export const api = {
       request<OrderSummary>("/tenant/orders/summary", { query: { periodo }, signal }),
     get: (id: string) => request<OrderDetail>(`/tenant/orders/${id}`),
     /** A signed link that lives ten minutes; ask again rather than keep it. */
+    /** An image the model did not take for a receipt, kept on the order (D-4). */
+    noteImage: (id: string, imageId: string) =>
+      request<ProofImage>(`/tenant/orders/${id}/notes/${imageId}/image`),
     proofImage: (id: string, proofId: string) =>
       request<ProofImage>(`/tenant/orders/${id}/proofs/${proofId}/image`),
     confirm: (id: string, siguientePaso?: string) =>

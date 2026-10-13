@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import IMAGE_UNREADABLE_LINE, InboundTurn, TurnPipeline
+from app.core.config import get_settings
 from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
@@ -106,6 +107,8 @@ class World:
                     tenant_id=self.tenant.id, business_name="Tienda", industry="retail"
                 ),
                 AgentConfig(tenant_id=self.tenant.id, agent_name="Leo"),
+                # Off by default: a real-channel tenant with the agent off is
+                # "paused" for the gate, and its receipts are not read (P-1).
             ]
         )
         self.product = Product(
@@ -125,6 +128,14 @@ class World:
         self.notices = FakeNotices()
         self.sandbox = sandbox
         self.new_chat(sandbox=sandbox)
+
+    def answering(self) -> World:
+        """Switch the agent on, so the real channel is not gated as paused."""
+        config = self.db.get(AgentConfig, self.tenant.id)
+        assert config is not None
+        config.is_active = True
+        self.db.flush()
+        return self
 
     def new_chat(self, *, sandbox: bool) -> Conversation:
         """Another conversation of the same customer, with an order at COBRO."""
@@ -291,7 +302,7 @@ class TestWhatLooksOff:
     async def test_a_repeated_code_is_flagged_among_real_orders_of_the_same_tenant(
         self, db: Session
     ) -> None:
-        mine = World(db, sandbox=False)
+        mine = World(db, sandbox=False).answering()
         await mine.send_photo(vision(receipt(codigo="OP-DUP")))
         assert mine.stored_proofs()[0].observaciones == []
 
@@ -300,7 +311,7 @@ class TestWhatLooksOff:
         assert mine.stored_proofs()[0].observaciones == ["codigo_repetido"]
 
         # Another tenant's code is nobody's business.
-        other = World(db, sandbox=False)
+        other = World(db, sandbox=False).answering()
         await other.send_photo(vision(receipt(codigo="OP-DUP")))
         assert other.stored_proofs()[0].observaciones == []
 
@@ -309,7 +320,7 @@ class TestWhatLooksOff:
         await shop.send_photo(vision(receipt(codigo="OP-S")))
         assert shop.stored_proofs()[0].observaciones == []
 
-        shop.new_chat(sandbox=False)
+        shop.answering().new_chat(sandbox=False)
         await shop.send_photo(vision(receipt(codigo="OP-S")))
         assert shop.stored_proofs()[0].observaciones == []
 
@@ -461,16 +472,20 @@ class TestAReceiptForAnIncompleteOrder:
 
 
 class TestWhatIsNotAReceipt:
-    async def test_a_photo_that_is_not_a_receipt_creates_nothing_and_the_model_knows(
+    async def test_a_photo_that_is_not_a_receipt_is_no_proof_but_is_kept_on_the_order(
         self, db: Session, world: World
     ) -> None:
+        """Finding D-4: the model may be wrong about a blurry real receipt."""
         llm = vision({"es_comprobante": False})
 
         result = await world.send_photo(llm)
 
         assert world.stored_proofs() == []
-        assert world.storage.objects == {}
         db.refresh(world.order)
+        [note] = world.order.notas
+        assert (note["origen"], note["evento"]) == ("sistema", "imagen_no_reconocida")
+        assert world.storage.get(note["imagen_key"]) == PHOTO.data
+        assert note["imagen_key"].startswith(f"tenants/{world.tenant.id}/proofs/")
         assert world.order.estado == "borrador"
         assert result.stage_after is Stage.COBRO
         assert "la imagen NO es un comprobante" in the_prompt(llm)
@@ -562,7 +577,11 @@ class TestDuringAHandover:
 
         assert result.outcome == "gated" and result.gate == "handover"
         assert llm.chat_calls == []
-        assert len(world.stored_proofs()) == 1
+        [proof] = world.stored_proofs()
+        # P-1: stored for the person who has the conversation, never sent to a model.
+        assert len(llm.vision_responses) == 1  # the scripted reading was not consumed
+        assert proof.extraccion == {"legible": False, "motivo": "revision_humana"}
+        assert "sin_datos" in proof.observaciones
         assert result.stage_after is Stage.VERIFICACION
         db.refresh(world.order)
         assert world.order.estado == "por_confirmar"
@@ -579,6 +598,19 @@ class TestDuringAHandover:
         assert llm.chat_calls == []
         [proof] = real.stored_proofs()
         assert real.notices.proofs == [proof.id]
+        assert len(llm.vision_responses) == 1  # paused: no model saw the receipt
+
+    async def test_a_platform_without_approved_vision_never_sends_the_receipt(
+        self, world: World, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(get_settings(), "vision_enabled", False)
+        llm = vision(receipt())
+
+        await world.send_photo(llm)
+
+        [proof] = world.stored_proofs()
+        assert len(llm.vision_responses) == 1
+        assert proof.extraccion == {"legible": False, "motivo": "vision_no_aprobada"}
 
     async def test_the_simulator_tells_nobody(self, world: World) -> None:
         await world.send_photo(vision(receipt()))

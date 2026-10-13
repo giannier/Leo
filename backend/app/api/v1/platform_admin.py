@@ -327,11 +327,15 @@ async def list_tenants(
     search: Annotated[str | None, Query(max_length=120)] = None,
     tenant_status: Annotated[TenantStatus | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    incluir_prueba: bool = False,
 ) -> list[TenantSummaryResponse]:
+    """The businesses the end-to-end suite created are hidden unless `incluir_prueba`."""
     service = PlatformAdminService(session, actor=admin)
     return [
         TenantSummaryResponse.model_validate(row, from_attributes=True)
-        for row in service.list_tenants(search=search, status=tenant_status, limit=limit)
+        for row in service.list_tenants(
+            search=search, status=tenant_status, limit=limit, include_test=incluir_prueba
+        )
     ]
 
 

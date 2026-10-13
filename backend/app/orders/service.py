@@ -62,6 +62,9 @@ TRANSITIONS: Mapping[str, frozenset[str]] = {
 SALE_MADE = frozenset({"confirmado", "en_curso", "completado"})
 
 MAX_QUANTITY = 999
+# `orders.notas`: how long one note may be and how many an order keeps.
+MAX_NOTE_CHARS = 300
+MAX_NOTES = 20
 MAX_SELECTION_CHARS = 80
 # How many catalogue names an error offers the model when a choice is not valid.
 SUGGESTIONS = 10
@@ -203,6 +206,18 @@ class OrderService:
 
     def entregas(self) -> Entregas | None:
         return load_entregas(self._session, self._tenant_id)
+
+    def add_note(self, order: Order, texto: str, *, origen: str, **extra: str) -> dict[str, str]:
+        """Append a note for the operator (`orders.notas`), newest last, at most 20.
+
+        `origen` is `cliente` (a change asked while the order was under review,
+        decision 8) or `sistema` (an image that was not a receipt, P-1/D-4).
+        """
+        entry = {"en": self.now.isoformat(), "texto": texto[:MAX_NOTE_CHARS], "origen": origen}
+        entry.update(extra)
+        order.notas = [*(order.notas or []), entry][-MAX_NOTES:]
+        self._session.flush()
+        return entry
 
     def requires_delivery(self, order: Order) -> bool:
         """Whether the order needs delivery data: something physical in it and a

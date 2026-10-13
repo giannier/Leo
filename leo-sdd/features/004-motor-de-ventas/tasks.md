@@ -297,6 +297,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 - [ ] TASK-459: 🧑 Prueba con un número real de WhatsApp por túnel (antes de la Fase 1)
   - Input: sugerencia aceptada por Giannier (2026-10-13); TASK-209 de la 002 (milestone humano pendiente);
     TASK-456 (fixtures reales)
+  - **Preparado (2026-10-13):** la guía `milestones/numero-real.md` ya está escrita; falta ejecutarla.
   - Output: `milestones/numero-real.md`, guía paso a paso para correr Leo en la PC de Giannier (WSL2 o
     contenedor) con un túnel HTTPS (Cloudflare Tunnel o ngrok, herramienta de su PC, no dependencia del
     repo) apuntado a `POST /webhooks/ycloud`, con `YCLOUD_WEBHOOK_SECRET` y el número conectado desde el
@@ -546,7 +547,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el deploy a producción**
 (TASK-026 de la 001). Cada una lleva su test y su verificación.
 
-- [ ] TASK-450: País del negocio y prefijo telefónico (decisión 10)
+- [x] TASK-450: País del negocio y prefijo telefónico (decisión 10)
+  - **Hecho (2026-10-13):** `tenants.pais` (migración 0028; en el tenant y no en el perfil porque existe
+    desde el registro), selector de país en el registro, `+51` solo para negocios de Perú (fuera de Perú se
+    pide el número completo). Editarlo desde el panel queda en TASK-438.
   - Input: decisión 10 (prefijo según el país del negocio, Perú por defecto); hoy el tenant no tiene país
   - Output: `business_profiles.pais` (ISO 3166, por defecto `PE`, migración) en el wizard y en Información
     del negocio; `orders/customer_data.py` toma el prefijo del país (9 dígitos que empiezan en 9 → `+51`
@@ -554,7 +558,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: un negocio de otro país no convierte "987654321" a `+51`; Perú sigue igual
   - Parallel: true
 
-- [ ] TASK-451: El DNI o RUC registrado no vuelve al modelo (decisión 18)
+- [x] TASK-451: El DNI o RUC registrado no vuelve al modelo (decisión 18)
   - Input: decisión 18; `conciliacion.md §8.22`
   - Output: cuando un DNI o RUC ya se guardó con `registrar_datos_cliente`, el historial que va al LLM lo
     reemplaza por `[DNI registrado]` / `[RUC registrado]` (al armar el historial, no al guardar el
@@ -563,7 +567,7 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
     registrarse; los evals no bajan
   - Parallel: true
 
-- [ ] TASK-452: Visión después de los gates y nunca con el perfil gratuito (hallazgo P-1)
+- [x] TASK-452: Visión después de los gates y nunca con el perfil gratuito (hallazgo P-1)
   - Input: revisión de TASK-429 a 431, P-1 (Ley 29733, minimización)
   - Output: si la conversación está pausada, derivada o con opt-out, la imagen se guarda para el humano
     sin llamar al modelo (comprobante `sin_datos`, revisión humana); un perfil sin visión aprobada
@@ -571,21 +575,21 @@ Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el
   - Verification: tests de cada gate y del perfil gratuito: ninguna llamada a `read_image`
   - Parallel: true
 
-- [ ] TASK-453: Outbox transaccional del aviso al cliente (hallazgo E-4)
+- [x] TASK-453: Outbox transaccional del aviso al cliente (hallazgo E-4)
   - Input: revisión, E-4
   - Output: la fila del aviso (`queued`) se escribe en la misma transacción que confirmar, rechazar o
     anular; el worker la envía. Si el proceso muere después del commit, el aviso igual sale
   - Verification: test que corta entre el commit y el envío: la fila existe y el worker la manda
   - Parallel: true
 
-- [ ] TASK-454: Imagen no reconocida, guardada y visible (hallazgo D-4)
+- [x] TASK-454: Imagen no reconocida, guardada y visible (hallazgo D-4)
   - Input: revisión, D-4
   - Output: si el modelo dice que no es comprobante, la imagen se guarda igual y el pedido muestra el
     evento "imagen no reconocida" (sin crear comprobante)
   - Verification: test del pipeline y del historial del pedido
   - Parallel: true
 
-- [ ] TASK-455: Cuentas de prueba de Playwright
+- [x] TASK-455: Cuentas de prueba de Playwright
   - Input: pendiente del Milestone B
   - Output: las cuentas que crean los e2e se borran al terminar o quedan marcadas como de prueba (no
     cuentan en el panel de plataforma)
