@@ -311,6 +311,14 @@ derivar salvo que pida hablar con alguien, y si muestra interés en otro camino,
 mostrar_opciones(tipo="caminos") o regístralo con elegir_camino.
 ```
 
+### DERIVADO [base]
+```text
+Esta conversación está pausada para que la atienda una persona del negocio.
+No respondas al cliente.
+```
+Mientras la conversación está pausada el motor no arma un turno de modelo (§2). El texto existe para que
+toda etapa tenga uno y una llamada por error degrade con seguridad (Giannier, Milestone B, decisión 20).
+
 ### ASESORIA [certificaciones]
 ```text
 Quiere un programa completo.

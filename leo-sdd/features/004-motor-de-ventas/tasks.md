@@ -287,12 +287,22 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 ## Fase C · Configuración
 
+> **Antes de empezar la Fase C (Giannier, Milestone B):** Giannier entrega un brief nuevo de
+> configuración en capas y aprendizaje. No se empieza ninguna task de esta fase sin leerlo. El primer
+> paso es mapear TASK-434 a TASK-442 contra las capas "plantilla del rubro" y "perfil del negocio" y
+> proponerle los ajustes.
+
 - [ ] TASK-434: API de información del negocio, FAQ y promociones
   - Input: `contracts/api.md §1`
   - Output: routers; las FAQ se indexan como `knowledge_source` de tipo `faq`; borrar una FAQ borra su fuente
   - Depends on: TASK-403
   - Verification: tests de API y aislamiento; `consultar_conocimiento` encuentra una FAQ recién creada
   - Parallel: true (desde que termina la Fase A)
+  - **Agregado en el Milestone B (hallazgo D-1):** las cuentas de cobro del negocio (Yape/Plin, banco,
+    titular) son un campo del perfil del negocio. Con ellas `ProofPipeline(payees=...)` compara el
+    destinatario de cada comprobante de verdad (`destinatario_distinto`); hoy, sin cuentas, todo
+    comprobante sale `destinatario_no_verificado`. La gestión de categorías (renombrar, ordenar,
+    apagar; tabla de la decisión 13) entra en el panel de catálogo de esta fase.
 
 - [ ] TASK-435: API de comportamiento y proceso
   - Input: `contracts/api.md §1–§2`, C-05
@@ -411,6 +421,69 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Depends on: TASK-446, TASK-447, TASK-448
   - Verification: Giannier aprueba los 3 negocios y hace el merge
   - Parallel: false
+
+## Antes de producción (salidas del Milestone B)
+
+Giannier las pidió como tareas: no entran en el Milestone B, pero **bloquean el deploy a producción**
+(TASK-026 de la 001). Cada una lleva su test y su verificación.
+
+- [ ] TASK-450: País del negocio y prefijo telefónico (decisión 10)
+  - Input: decisión 10 (prefijo según el país del negocio, Perú por defecto); hoy el tenant no tiene país
+  - Output: `business_profiles.pais` (ISO 3166, por defecto `PE`, migración) en el wizard y en Información
+    del negocio; `orders/customer_data.py` toma el prefijo del país (9 dígitos que empiezan en 9 → `+51`
+    solo si el país es `PE`); la máscara de la lista de pedidos usa el mismo país
+  - Verification: un negocio de otro país no convierte "987654321" a `+51`; Perú sigue igual
+  - Parallel: true
+
+- [ ] TASK-451: El DNI o RUC registrado no vuelve al modelo (decisión 18)
+  - Input: decisión 18; `conciliacion.md §8.22`
+  - Output: cuando un DNI o RUC ya se guardó con `registrar_datos_cliente`, el historial que va al LLM lo
+    reemplaza por `[DNI registrado]` / `[RUC registrado]` (al armar el historial, no al guardar el
+    mensaje: el operador sigue viendo el original)
+  - Verification: test con el pipeline: el valor no aparece en ninguna llamada al modelo después de
+    registrarse; los evals no bajan
+  - Parallel: true
+
+- [ ] TASK-452: Visión después de los gates y nunca con el perfil gratuito (hallazgo P-1)
+  - Input: revisión de TASK-429 a 431, P-1 (Ley 29733, minimización)
+  - Output: si la conversación está pausada, derivada o con opt-out, la imagen se guarda para el humano
+    sin llamar al modelo (comprobante `sin_datos`, revisión humana); un perfil sin visión aprobada
+    (`vision_aprobada` en settings; el gratuito nunca) tampoco la llama
+  - Verification: tests de cada gate y del perfil gratuito: ninguna llamada a `read_image`
+  - Parallel: true
+
+- [ ] TASK-453: Outbox transaccional del aviso al cliente (hallazgo E-4)
+  - Input: revisión, E-4
+  - Output: la fila del aviso (`queued`) se escribe en la misma transacción que confirmar, rechazar o
+    anular; el worker la envía. Si el proceso muere después del commit, el aviso igual sale
+  - Verification: test que corta entre el commit y el envío: la fila existe y el worker la manda
+  - Parallel: true
+
+- [ ] TASK-454: Imagen no reconocida, guardada y visible (hallazgo D-4)
+  - Input: revisión, D-4
+  - Output: si el modelo dice que no es comprobante, la imagen se guarda igual y el pedido muestra el
+    evento "imagen no reconocida" (sin crear comprobante)
+  - Verification: test del pipeline y del historial del pedido
+  - Parallel: true
+
+- [ ] TASK-455: Cuentas de prueba de Playwright
+  - Input: pendiente del Milestone B
+  - Output: las cuentas que crean los e2e se borran al terminar o quedan marcadas como de prueba (no
+    cuentan en el panel de plataforma)
+  - Verification: correr `npx playwright test` dos veces no deja cuentas sueltas sin marca
+  - Parallel: true
+
+- [ ] TASK-456: Fixtures reales de YCloud
+  - Input: pendiente del Milestone B; depende de un número real conectado (TASK-209 de la 002)
+  - Output: capturar webhooks reales (texto, imagen, botón, lista, **referral**) y reemplazar los fixtures
+    escritos a mano en `backend/tests/fixtures/`
+  - Verification: la suite pasa con los fixtures reales
+  - Parallel: true
+
+### Backlog
+
+- E-3 (revisión de TASK-429): la segunda imagen que llega mientras un comprobante espera se guarda en
+  el pedido aunque no se lea. Hoy se ignora (no crea fila ni aviso, decisión E-1).
 
 ---
 

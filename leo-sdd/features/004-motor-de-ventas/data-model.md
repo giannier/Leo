@@ -448,3 +448,21 @@ ALTER TABLE agent_traces
 
 `contacts.custom_data` guarda los datos de `datos_requeridos` (`{"dni": "…", "correo": "…"}`). Se valida
 por campo: DNI de 8 dígitos, RUC de 11, correo y teléfono E.164. En trazas y logs se enmascara (C-20).
+
+## 0021 – 0027 — Agregadas al implementar (Fases A y B, Milestone B)
+
+No estaban en este documento; cada una se justifica en `conciliacion.md` y en su migración.
+
+| Migración | Cambio | Origen |
+|---|---|---|
+| 0021 | `messages.payload jsonb` y los tipos `interactive` y `video` | TASK-422 (la 007 la reutiliza, decisión 2) |
+| 0022 | `tenant_notifications` con `id`, `payload` y los tipos que se repiten | TASK-431 (decisión 3) |
+| 0023 | `payment_proofs.estado` suma `anulado`; `orders.devolucion_pendiente boolean` | Revisión E-2 |
+| 0024 | `contacts.posible_duplicado_de uuid` (FK a `contacts`, `SET NULL`) | Decisión 12 |
+| 0025 | `orders.notas jsonb` (`[{en, texto, origen}]`) | Decisión 8 |
+| 0026 | `product_categories (tenant_id, nombre, orden, activa)` y `products.category_id`, con backfill | Decisión 13 |
+| 0027 | Datos: los planes de pago permiten `economico, medio, mejor`; `trial` solo `economico` | Decisión 4 |
+
+`payment_proofs.observaciones` admite además `monto_negativo`, `destinatario_distinto`,
+`destinatario_no_verificado` y `fecha_anterior_al_pedido` (revisión D-1 y D-2). Una lista vacía significa
+que todas las comprobaciones corrieron y pasaron.
