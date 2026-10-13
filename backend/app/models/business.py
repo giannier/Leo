@@ -180,6 +180,34 @@ class AgentConfig(Base):
     )
 
 
+class ProductCategory(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A category of the catalogue: its name, its place in a list, on or off.
+
+    Milestone B, decision 13. `products.category` keeps the display text and
+    `products.category_id` points here; `ProductRepository` links them on every
+    write. The option list (`mostrar_opciones`, tipo categorias) shows the active
+    ones that have live products, by `orden` and then by name.
+    """
+
+    __tablename__ = "product_categories"
+    __table_args__ = (
+        CheckConstraint("char_length(btrim(nombre)) BETWEEN 1 AND 80", name="nombre_length"),
+        Index(
+            "uq_product_categories_tenant_id_nombre",
+            "tenant_id",
+            text("lower(nombre)"),
+            unique=True,
+        ),
+    )
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    nombre: Mapped[str] = mapped_column(Text, nullable=False)
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    activa: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+
+
 class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """A catalog item the agent can quote. Soft-deleted."""
 
@@ -205,6 +233,13 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # NULL means this product does not track stock at all.
     stock: Mapped[int | None] = mapped_column(Integer, nullable=True)
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The row of `product_categories` that `category` names (migration 0026).
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("product_categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     # Object storage keys, not URLs: the bucket may be private.
     image_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_key: Mapped[str | None] = mapped_column(Text, nullable=True)
