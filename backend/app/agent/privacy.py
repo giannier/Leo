@@ -18,6 +18,7 @@ just enough to be recognisable to the person who owns it:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -60,3 +61,24 @@ def _mask_any(field: str, value: Any) -> Any:
     if isinstance(value, list | tuple):
         return [_mask_any(field, item) for item in value]
     return mask_value(field, value)
+
+
+# What replaces a registered document in the history the model reads (decision 18).
+REGISTERED_LABELS = {"dni": "[DNI registrado]", "ruc": "[RUC registrado]"}
+
+
+def redact_registered(text: str, registered: Mapping[str, Any]) -> str:
+    """Replace the DNI or RUC the customer already registered with a label.
+
+    Milestone B, decision 18: once `registrar_datos_cliente` stored the number,
+    the history that goes back to the model says `[DNI registrado]` instead. The
+    message itself is untouched (the operator still sees it). The number is found
+    however the customer typed it: `12345678`, `12 345 678` or `12-345-678`.
+    """
+    for field, label in REGISTERED_LABELS.items():
+        digits = "".join(char for char in str(registered.get(field) or "") if char.isdigit())
+        if not digits:
+            continue
+        pattern = r"(?<!\d)" + r"[\s.-]?".join(digits) + r"(?!\d)"
+        text = re.sub(pattern, label, text)
+    return text
