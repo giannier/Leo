@@ -9,7 +9,7 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 | 001 Onboarding | Parcial (25/26 tasks) | TASK-001..025 marcadas `[x]`; TASK-026 (deploy Contabo) sin hacer. No existe `docker-compose.prod.yml` ni Caddy/Sentry/backups en `deploy/` |
 | 002 Canal WhatsApp | Hecho salvo milestone humano | TASK-201..208 `[x]`; 209 `[~]`: test de caos hecho, falta la prueba real con número propio |
 | 003 Agent-core | Parcial | `tasks.md` 301..308 sin marcar, pero existe motor v0 (`agent/core.py`), prompt builder, trazas, `catalog_guard`. No hay circuit breaker, memoria ni `model_policies` (no verificado en detalle) |
-| 004 Tools | Parcial | Solo 2 tools: catálogo y conocimiento (`agent/tools/catalog.py`). No hay tools de acción |
+| 004 Motor de ventas | En curso | Milestones A y B aprobados (B el 2026-10-14). Sigue TASK-459 (número real por túnel) y luego la Fase C = Fase 1 de la 017 |
 | 005 Catalog / 008 Inbox | Absorbidas | Catálogo CRUD+CSV/XLSX en 001 (TASK-011); inbox absorbido por 007 |
 | 006 Conocimiento avanzado | No iniciado | Solo RAG v0 (PDF con texto, sin OCR ni URL) |
 | 007 Inbox | No iniciado | No hay endpoints de conversaciones fuera del sandbox |
