@@ -53,3 +53,24 @@ class PdfTextExtractor(Protocol):
         an empty or whitespace-only string.
         """
         ...
+
+
+@runtime_checkable
+class PdfPages(Protocol):
+    """Page-level access, for OCR of scanned pages (Feature 006, TASK-602).
+
+    A separate port so an extractor that only knows text (the mock) keeps
+    working: the worker asks `isinstance(extractor, PdfPages)` and falls back to
+    `extract_text` when the answer is no.
+    """
+
+    def page_texts(self, data: bytes) -> list[str]:
+        """The text layer of every page, in order; `""` for a page without one.
+
+        Raises `InvalidPdfError` if the file cannot be opened.
+        """
+        ...
+
+    def page_pdf(self, data: bytes, index: int) -> bytes:
+        """Page `index` (0-based) as a PDF of its own, to hand to a vision model."""
+        ...

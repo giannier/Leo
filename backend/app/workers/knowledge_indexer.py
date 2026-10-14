@@ -26,8 +26,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.models.knowledge import KnowledgeSource
-from app.providers.llm.base import LLMError, LLMProvider
-from app.providers.pdf.base import PdfError, PdfTextExtractor
+from app.providers.llm.base import DocumentReader, LLMError, LLMProvider
+from app.providers.pdf.base import PdfError, PdfPages, PdfTextExtractor
 from app.providers.storage.base import StorageError, StorageProvider
 from app.repositories.knowledge import (
     STATUS_FAILED,
@@ -38,6 +38,7 @@ from app.repositories.knowledge import (
 from app.repositories.tenant import TenantRepository
 from app.services.chunking import chunk_text, dedupe
 from app.services.knowledge import PDF_TYPE, KnowledgeError, KnowledgeService
+from app.services.ocr import pages_to_read, read_scanned_pages
 from app.services.trial import billing_enforced
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,27 @@ class _ExtractionFailure:
     """No usable text, and the sentence explaining that to the tenant."""
 
     reason: str
+    report: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class _Extracted:
+    """The text to index, and what the panel should know about how it was read."""
+
+    text: str
+    report: dict[str, Any] | None = None
+
+
+# A scanned PDF (Feature 006, TASK-602).
+PAGE_SEPARATOR = "\n\n"
+SCANNED_WITHOUT_OCR = (
+    "Este PDF es escaneado (las páginas son imágenes) y ahora no se puede leer con el modelo. "
+    "Sube un PDF con texto o pega el contenido como texto."
+)
+SCANNED_ILLEGIBLE = (
+    "No pudimos leer ninguna página de este PDF escaneado. Prueba con una copia más nítida "
+    "o pega el contenido como texto."
+)
 
 
 async def index_source(
@@ -118,11 +140,15 @@ async def index_source(
     session.commit()
 
     try:
-        extracted = _extract(source, storage=storage, pdf_extractor=pdf_extractor)
+        extracted = await _extract(
+            source, storage=storage, pdf_extractor=pdf_extractor, llm=llm, settings=settings
+        )
+        source.report = extracted.report
+        session.flush()
         if isinstance(extracted, _ExtractionFailure):
             return _fail(session, sources, source_id, extracted.reason)
         return await _index_extracted_text(
-            session, tenant_id, source_id, extracted, llm=llm, settings=settings
+            session, tenant_id, source_id, extracted.text, llm=llm, settings=settings
         )
     except Exception:
         # The source has already been moved to `indexing`. Letting anything
@@ -136,16 +162,18 @@ async def index_source(
         return _fail(session, sources, source_id, UNEXPECTED_MESSAGE)
 
 
-def _extract(
+async def _extract(
     source: KnowledgeSource,
     *,
     storage: StorageProvider,
     pdf_extractor: PdfTextExtractor,
-) -> str | _ExtractionFailure:
+    llm: LLMProvider,
+    settings: Settings,
+) -> _Extracted | _ExtractionFailure:
     """Get the source's text, or the reason there is none."""
     if source.type != PDF_TYPE:
         content = (source.content or "").strip()
-        return content if content else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+        return _Extracted(content) if content else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
 
     if not source.file_key:
         return _ExtractionFailure("The uploaded file is missing from storage.")
@@ -156,6 +184,9 @@ def _extract(
         logger.exception("could not read a knowledge PDF from storage")
         return _ExtractionFailure(f"The uploaded file could not be read from storage: {exc}")
 
+    if isinstance(pdf_extractor, PdfPages):
+        return await _extract_pages(data, pages=pdf_extractor, llm=llm, settings=settings)
+
     try:
         text = pdf_extractor.extract_text(data)
     except PdfError as exc:
@@ -164,7 +195,35 @@ def _extract(
         return _ExtractionFailure(str(exc))
 
     stripped = text.strip()
-    return stripped if stripped else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+    return _Extracted(stripped) if stripped else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+
+
+async def _extract_pages(
+    data: bytes, *, pages: PdfPages, llm: LLMProvider, settings: Settings
+) -> _Extracted | _ExtractionFailure:
+    """Page by page: the text layer where there is one, the vision model where there is not."""
+    try:
+        texts = pages.page_texts(data)
+    except PdfError as exc:
+        return _ExtractionFailure(str(exc))
+
+    scanned = pages_to_read(texts, settings)
+    report: dict[str, Any] | None = None
+    if scanned:
+        if isinstance(llm, DocumentReader) and settings.vision_enabled:
+            outcome = await read_scanned_pages(
+                data, texts, pages=pages, reader=llm, settings=settings
+            )
+            texts, report = outcome.texts, outcome.report()
+            if not any(text.strip() for text in texts):
+                return _ExtractionFailure(SCANNED_ILLEGIBLE, report)
+        else:
+            report = {"ocr": {"paginas": len(texts), "sin_leer": [i + 1 for i in scanned]}}
+
+    text = PAGE_SEPARATOR.join(t.strip() for t in texts if t.strip())
+    if not text:
+        return _ExtractionFailure(SCANNED_WITHOUT_OCR, report)
+    return _Extracted(text, report)
 
 
 async def _index_extracted_text(
