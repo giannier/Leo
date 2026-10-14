@@ -81,11 +81,28 @@ const MESSAGES: Record<string, string> = {
   invalid_transition: "Ese pedido ya no puede pasar a ese estado. Actualiza la página.",
   already_reviewed: "Otra persona ya revisó este pedido. Actualiza la página.",
 
+  // Inbox (Feature 007)
+  already_taken: "Otra persona ya tomó esta conversación.",
+  not_holder: "Esta conversación la tiene otra persona.",
+  outside_24h_window:
+    "El cliente no escribe hace más de 24 horas: podrás responder cuando vuelva a escribir.",
+  closed: "La conversación está cerrada. Reábrela para escribir.",
+  another_open: "El cliente ya tiene otra conversación abierta.",
+
+  // Knowledge (Feature 006)
+  source_busy: "Esta fuente se está procesando. Intenta de nuevo en unos segundos.",
+  rag_limit_exceeded: "Llegaste al límite de conocimiento de tu plan. Elimina una fuente para agregar otra.",
+  pdf_too_large: "El PDF pesa más de 10 MB.",
+  invalid_pdf: "Ese archivo no es un PDF que podamos abrir.",
+  indexing_unavailable: "No pudimos procesarlo ahora. Intenta de nuevo en un momento.",
+
   // Generic
   validation_error: "Revisa los datos marcados.",
   rate_limited: "Demasiados intentos. Espera un momento.",
   internal_error: "Algo falló de nuestro lado. Intenta de nuevo.",
 };
+
+const SERVER_WORDED = new Set(["invalid_url"]);
 
 /**
  * What to show the user. Falls back to something honest rather than to the
@@ -94,6 +111,8 @@ const MESSAGES: Record<string, string> = {
  */
 export function humanMessage(error: unknown): string {
   if (error instanceof ApiError) {
+    // These the server words in Spanish for the person, with what to correct.
+    if (SERVER_WORDED.has(error.code) && error.message) return error.message;
     return MESSAGES[error.code] ?? "No pudimos completar la acción. Intenta de nuevo.";
   }
   if (error instanceof NetworkError) {

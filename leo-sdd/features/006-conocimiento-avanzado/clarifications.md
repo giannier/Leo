@@ -69,3 +69,23 @@ eso es costo del LLM. Se mide con el recall@5 (TASK-604) antes de proponer otro 
 - **Verificación:** las reglas del lector y del recorrido se prueban sin red (transporte simulado). La
   prueba con la web real de un cliente de Zentek360 es el milestone humano de la TASK-604: desde el entorno
   de desarrollo no hay salida a webs públicas.
+
+## C-107: Prioridad y citas (C-003, HU-05)
+- La búsqueda trae 12 candidatos, deja una copia de cada fragmento repetido (la de la fuente con más
+  prioridad), se queda con los 4 más cercanos y los **ordena por prioridad** (la distancia desempata). La
+  tool le dice al modelo: "de la fuente más confiable a la menos; si dos fragmentos se contradicen, vale el
+  primero", y cada fragmento va con el nombre de su fuente entre corchetes. El texto que recibe el modelo
+  cambió, así que se corrieron los evals (resultado en el milestone).
+- Prioridad configurable por fuente en el panel (alta 100, media 90, baja 50); por defecto lo que el negocio
+  escribió es 100, sus PDF 90 y su web 50.
+- Las fuentes usadas quedan en la traza (`rag_sources[].fuentes`) y se ven en la depuración del simulador y
+  en cada respuesta del asistente en la bandeja: "Respondió usando: Política de envíos".
+
+## C-108: Recall@5 (HU-04, C-004)
+- Set dorado en `backend/evals/knowledge_recall.py`: dos negocios demo (panadería e instituto), 12 documentos
+  con catálogos largos como distractores y 31 preguntas escritas como las escriben los clientes. Corre con
+  `make evals` contra el modelo real de embeddings.
+- Exige recall@5 de 0,8 o más por negocio y, como cada negocio queda en unos 10 fragmentos (el top 5 es
+  la mitad del corpus), también recall@1 de 0,7 o más.
+- **Limitación conocida:** el corpus es chico. Al conectar los negocios del piloto, conviene sumar sus
+  documentos reales y las preguntas reales de sus clientes al set.

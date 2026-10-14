@@ -339,8 +339,8 @@ function AddFile({ onAdded }: { onAdded: () => Promise<void> }) {
       <div>
         <p className="text-sm font-medium text-ink">Subir un PDF</p>
         <p className="mt-0.5 text-xs text-ink-faint">
-          Catálogos, manuales, políticas. Hasta 10 MB. Tiene que ser un PDF con texto: si es la
-          foto de un papel escaneado, no podemos leerlo.
+          Catálogos, manuales, políticas. Hasta 10 MB. Si es un papel escaneado, lo leemos página
+          por página (hasta 30 páginas).
         </p>
       </div>
 

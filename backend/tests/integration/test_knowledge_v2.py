@@ -402,3 +402,54 @@ class TestTheBusinessWebsite:
         refused = await knowledge.post(f"{KNOWLEDGE}/web", json={"url": "tienda.pe"})
 
         assert refused.status_code == 403
+
+
+class TestRetrievalWithSources:
+    """Feature 006, C-003 and HU-05: one copy per passage, trusted sources first, cited."""
+
+    async def test_a_passage_in_two_sources_is_shown_once_from_the_trusted_one(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        from app.services.knowledge import retrieve
+
+        await _indexed(knowledge, db, tenant, llm, storage, content=POLICY, kind="faq")
+        web = await _indexed(knowledge, db, tenant, llm, storage, content=f"  {POLICY.upper()} ")
+        await knowledge.patch(f"{KNOWLEDGE}/{web}", json={"priority": 50, "title": "Mi web"})
+        vector = (await llm.embed([POLICY]))[0]
+
+        passages = retrieve(db, tenant, vector, k=4)
+
+        assert [p.title for p in passages] == ["Envíos"]
+        assert passages[0].priority == 100
+
+    async def test_when_sources_disagree_the_trusted_one_comes_first(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        from app.agent.tools.catalog import consultar_conocimiento
+        from app.agent.tools.registry import ToolContext
+
+        web_text = "El envío a Lima cuesta 15 soles."
+        faq = await _indexed(knowledge, db, tenant, llm, storage, content=POLICY, kind="faq")
+        web = await _indexed(knowledge, db, tenant, llm, storage, content=web_text)
+        await knowledge.patch(f"{KNOWLEDGE}/{faq}", json={"title": "Preguntas frecuentes"})
+        await knowledge.patch(f"{KNOWLEDGE}/{web}", json={"priority": 50, "title": "Mi web"})
+
+        # The question is the web's own words: the web passage is the nearest.
+        result = await consultar_conocimiento(
+            ToolContext(session=db, tenant_id=tenant, llm=llm), {"consulta": web_text}
+        )
+
+        text = result.render()
+        assert text.index("[Preguntas frecuentes]") < text.index("[Mi web]")
+        assert "vale el primero" in text
+        assert result.data["fuentes"] == ["Preguntas frecuentes", "Mi web"]

@@ -1034,7 +1034,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One knowledge source, with its text */
+        get: operations["get_knowledge_source_api_v1_tenant_knowledge__source_id__get"];
         put?: never;
         post?: never;
         /**
@@ -1049,6 +1050,70 @@ export interface paths {
          *     first, so an operator is refused before the lookup either way.
          */
         delete: operations["delete_knowledge_source_api_v1_tenant_knowledge__source_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a source's title, priority or text (new text is re-indexed)
+         * @description The old text keeps answering until the new one is indexed (006, HU-03).
+         */
+        patch: operations["update_knowledge_source_api_v1_tenant_knowledge__source_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the business's website into the knowledge base
+         * @description Up to 20 pages of the same site, read by the worker (006, HU-02).
+         */
+        post: operations["create_web_source_api_v1_tenant_knowledge_web_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/{source_id}/resync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Process a source again: re-read the website, retry a failed document
+         * @description Manual only (006 C-002): nothing re-reads a website on its own.
+         */
+        post: operations["resync_knowledge_source_api_v1_tenant_knowledge__source_id__resync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/{source_id}/chunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The passages the agent can retrieve from one source
+         * @description A debugging view for whoever configures the agent (006 plan).
+         */
+        get: operations["knowledge_source_chunks_api_v1_tenant_knowledge__source_id__chunks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2254,6 +2319,11 @@ export interface components {
             /** Activation Ready */
             activation_ready: boolean;
         };
+        /** ChunkList */
+        ChunkList: {
+            /** Chunks */
+            chunks: string[];
+        };
         /** ConfirmRequest */
         ConfirmRequest: {
             /** Siguiente Paso */
@@ -2801,6 +2871,44 @@ export interface components {
             sources: components["schemas"]["KnowledgeSourceResponse"][];
             usage: components["schemas"]["KnowledgeUsageResponse"];
         };
+        /** KnowledgeSourceDetail */
+        KnowledgeSourceDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Char Count */
+            char_count: number;
+            /** Error Msg */
+            error_msg?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Priority
+             * @default 100
+             */
+            priority: number;
+            /** Source Url */
+            source_url?: string | null;
+            /** Crawled At */
+            crawled_at?: string | null;
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
+            /** Content */
+            content?: string | null;
+        };
         /** KnowledgeSourceResponse */
         KnowledgeSourceResponse: {
             /**
@@ -2823,6 +2931,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Priority
+             * @default 100
+             */
+            priority: number;
+            /** Source Url */
+            source_url?: string | null;
+            /** Crawled At */
+            crawled_at?: string | null;
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * KnowledgeUsageResponse
@@ -3024,6 +3145,8 @@ export interface components {
              * @default false
              */
             imagen: boolean;
+            /** Fuentes */
+            fuentes?: string[];
         };
         /** MessageResponse */
         MessageResponse: {
@@ -4226,6 +4349,15 @@ export interface components {
             /** Puede Revisar */
             puede_revisar?: boolean | null;
         };
+        /** UpdateSourceRequest */
+        UpdateSourceRequest: {
+            /** Title */
+            title?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Priority */
+            priority?: number | null;
+        };
         /**
          * UsageResponse
          * @description Live consumption, for the banner that watches a busy afternoon.
@@ -4344,6 +4476,13 @@ export interface components {
             evals_vigentes: boolean;
             /** Publicada En */
             publicada_en: string | null;
+        };
+        /** WebSourceRequest */
+        WebSourceRequest: {
+            /** Url */
+            url: string;
+            /** Title */
+            title?: string | null;
         };
         /** WhatsAppNumberResponse */
         WhatsAppNumberResponse: {
@@ -7683,6 +7822,55 @@ export interface operations {
             };
         };
     };
+    get_knowledge_source_api_v1_tenant_knowledge__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_knowledge_source_api_v1_tenant_knowledge__source_id__delete: {
         parameters: {
             query?: never;
@@ -7700,6 +7888,280 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_knowledge_source_api_v1_tenant_knowledge__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceResponse"];
+                };
+            };
+            /** @description `validation_error` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `source_busy`: it is being indexed right now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_web_source_api_v1_tenant_knowledge_web_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateSourceResponse"];
+                };
+            };
+            /** @description `invalid_url` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` or `plan_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resync_knowledge_source_api_v1_tenant_knowledge__source_id__resync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `source_busy` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    knowledge_source_chunks_api_v1_tenant_knowledge__source_id__chunks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkList"];
+                };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */
             401: {

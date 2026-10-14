@@ -45,6 +45,7 @@ from app.repositories.knowledge import (
 )
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
+from app.services.chunking import content_hash
 from app.services.trial import billing_enforced
 from app.services.web_crawl import normalise_start
 
@@ -119,6 +120,18 @@ class KnowledgeHit:
     chunk_id: uuid.UUID
     source_id: uuid.UUID
     content: str
+
+
+@dataclass(frozen=True)
+class Passage:
+    """A retrieved chunk with the source it comes from (Feature 006)."""
+
+    content: str
+    source_id: uuid.UUID
+    title: str
+    source_type: str
+    priority: int
+    distance: float
 
 
 class KnowledgeError(Exception):
@@ -563,3 +576,39 @@ async def search_knowledge(
         KnowledgeHit(chunk_id=chunk.id, source_id=chunk.source_id, content=chunk.content)
         for chunk in chunks
     ]
+
+
+def retrieve(
+    session: Session, tenant_id: uuid.UUID, vector: Sequence[float], *, k: int
+) -> list[Passage]:
+    """The `k` passages closest to a question, one copy each, most trusted source first.
+
+    Feature 006: the same paragraph in two sources (the FAQ and the website) is
+    shown once, from the higher-priority source (C-101). The `k` closest are then
+    ordered by the source's priority, so when two passages disagree the one the
+    business trusts more comes first and the tool says that the first one wins
+    (C-003). Distance breaks ties.
+    """
+    if k <= 0:
+        return []
+    rows = KnowledgeChunkRepository(session, tenant_id).search_with_sources(vector, limit=k * 3)
+    best: dict[str, Passage] = {}
+    order: list[str] = []
+    for chunk, source, distance in rows:
+        digest = chunk.content_hash or content_hash(chunk.content)
+        passage = Passage(
+            content=chunk.content,
+            source_id=source.id,
+            title=source.title,
+            source_type=source.type,
+            priority=source.priority,
+            distance=distance,
+        )
+        kept = best.get(digest)
+        if kept is None:
+            best[digest] = passage
+            order.append(digest)
+        elif passage.priority > kept.priority:
+            best[digest] = passage
+    closest = [best[digest] for digest in order][:k]
+    return sorted(closest, key=lambda p: (-p.priority, p.distance))

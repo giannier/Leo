@@ -217,6 +217,19 @@ class TestTheCrawler:
         result = await crawl(fetcher, "https://tienda.pe/", max_pages=20)
 
         assert result.pages == [] and result.skipped[0]["motivo"] == "robots.txt"
+        assert result.error is not None and "robots.txt" in result.error
+
+    async def test_an_unreachable_site_says_so(self) -> None:
+        fetcher = MockWebFetcher({"https://tienda.pe/robots.txt": (-1, "", "no existe el dominio")})
+
+        result = await crawl(fetcher, "https://tienda.pe/", max_pages=20)
+
+        assert result.error == "No pudimos abrir tu web: no existe el dominio. Revisa la dirección."
+
+    async def test_a_start_page_that_answers_404_says_so(self) -> None:
+        result = await crawl(MockWebFetcher({}), "https://tienda.pe/", max_pages=20)
+
+        assert result.error == "No pudimos leer tu web: respondió 404."
 
     async def test_a_javascript_site_reads_as_empty(self) -> None:
         fetcher = MockWebFetcher(

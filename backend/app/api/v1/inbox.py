@@ -45,7 +45,7 @@ from app.process.inbound import stored_image_of
 from app.process.service import ProcessConfigService
 from app.process.state import StateRepo
 from app.providers.storage.base import StorageProvider
-from app.repositories.conversation import MessageRepository
+from app.repositories.conversation import AgentTraceRepository, MessageRepository
 from app.services import inbox as service
 from app.services.channel import NoConnectedNumber, ReplySender, SessionWindowClosed
 from app.services.inbox_queries import Filter, count_waiting, list_conversations
@@ -140,6 +140,8 @@ class MessageOut(BaseModel):
     descartado: bool = False
     opciones: list[str] = Field(default_factory=list)
     imagen: bool = False
+    # The knowledge sources the assistant's reply leaned on (Feature 006, HU-05).
+    fuentes: list[str] = Field(default_factory=list)
 
 
 class ThreadPage(BaseModel):
@@ -239,7 +241,7 @@ def _holder(session: SessionDep, conversation: Conversation) -> Holder | None:
     return Holder(id=conversation.takeover_user_id, nombre=user.full_name if user else None)
 
 
-def _message(message: Message) -> MessageOut:
+def _message(message: Message, sources: list[str] | None = None) -> MessageOut:
     payload: dict[str, Any] = message.payload or {}
     options = [str(b.get("title", "")) for b in payload.get("botones") or [] if isinstance(b, dict)]
     for section in payload.get("secciones") or payload.get("filas") or []:
@@ -259,6 +261,7 @@ def _message(message: Message) -> MessageOut:
         descartado=payload.get("descartado") is not None,
         opciones=options,
         imagen=stored_image_of(payload) is not None,
+        fuentes=sources or [],
     )
 
 
@@ -397,7 +400,10 @@ def conversation_thread(
         inbox.mark_read(conversation)
         session.commit()
         _changed(principal.tenant_id, conversation.id)
-    return ThreadPage(items=[_message(m) for m in page], anteriores=earlier)
+    sources = AgentTraceRepository(session, principal.tenant_id).sources_by_message(
+        [m.id for m in page if m.author == "agent"]
+    )
+    return ThreadPage(items=[_message(m, sources.get(m.id)) for m in page], anteriores=earlier)
 
 
 @router.get(

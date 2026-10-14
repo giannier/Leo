@@ -853,10 +853,13 @@ function Trace({ trace }: { trace: SandboxTrace }) {
           ) : (
             <ul className="mt-1 space-y-1">
               {sources.map((source, index) => (
-                <li key={index} className="text-ink-soft">
-                  {String(source.title ?? source.source_id ?? "fuente")}
-                  {typeof source.score === "number" ? (
-                    <span className="tabular ml-2 text-ink-faint">{source.score.toFixed(2)}</span>
+                <li key={index} className="text-ink-soft" data-testid="trace-source">
+                  {/* Feature 006: the documents the answer leaned on, by name. */}
+                  {Array.isArray(source.fuentes) && source.fuentes.length
+                    ? `Respondió usando: ${source.fuentes.join(", ")}`
+                    : String(source.title ?? source.source_id ?? "fuente")}
+                  {typeof source.consulta === "string" ? (
+                    <span className="ml-2 text-ink-faint">(buscó: {source.consulta})</span>
                   ) : null}
                 </li>
               ))}
