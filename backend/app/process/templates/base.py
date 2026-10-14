@@ -99,7 +99,8 @@ _TOOLS_BY_STAGE: Mapping[Stage, tuple[str, ...]] = MappingProxyType(
         Stage.DERIVADO: (),
     }
 )
-_VERIFICATION_TOOLS_IF_REJECTED = ("enviar_metodos_pago", "gestionar_pedido")
+# With the search: to add something the model needs its producto_id (Milestone B run).
+_VERIFICATION_TOOLS_IF_REJECTED = ("enviar_metodos_pago", "gestionar_pedido", "buscar_productos")
 
 # ------------------------------------------------------------------- funnel
 
@@ -215,7 +216,9 @@ VERIFICACION_BASE = """\
   anotado lo que pide con gestionar_pedido(accion="solicitar_cambio", nota=...). El negocio lo verá al revisar.
 - Si el pago fue rechazado: el ESTADO trae el motivo. Explícaselo con amabilidad y ayúdalo a corregirlo:
   nueva foto, nuevo pago (puedes reenviar los métodos de pago una vez), o un cambio en el pedido o en sus
-  datos con gestionar_pedido o registrar_datos_cliente. Si no se resuelve, usa derivar_a_humano.
+  datos con gestionar_pedido o registrar_datos_cliente. Con el pago rechazado el pedido sí se puede
+  cambiar: hazlo en el mismo turno (búscalo con buscar_productos y usa agregar, quitar o cambiar_cantidad;
+  nunca solicitar_cambio), sin preguntarle si quiere que lo hagas. Si no se resuelve, usa derivar_a_humano.
 - Dudas generales (tiempos, entrega): respóndelas con consultar_conocimiento. No vuelvas a vender."""
 
 CERRADO_BASE = """\

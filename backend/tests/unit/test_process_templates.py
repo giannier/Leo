@@ -173,7 +173,11 @@ class TestEveryStage:
         for stage, spec in template.stages.items():
             if stage is Stage.VERIFICACION:
                 assert spec.tools_for() == ("gestionar_pedido",)
-                assert spec.tools_for(rejected=True) == ("enviar_metodos_pago", "gestionar_pedido")
+                assert spec.tools_for(rejected=True) == (
+                    "enviar_metodos_pago",
+                    "gestionar_pedido",
+                    "buscar_productos",
+                )
             else:
                 assert spec.tools_if_rejected is None
                 assert spec.tools_for(rejected=True) == spec.tools

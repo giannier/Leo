@@ -187,7 +187,10 @@ def _order_schema(scope: ToolScope) -> dict[str, Any]:
             "accion": {"type": "string", "enum": _order_actions(scope)},
             "producto_id": _text("El producto_id del producto."),
             "cantidad": {"type": "integer", "minimum": 1},
-            "seleccion": _text("Tema o elemento que el cliente elige para su paquete."),
+            "seleccion": _text(
+                "Temas o elementos que el cliente elige para su paquete, todos los que dijo en "
+                "una sola llamada, separados por comas (con agregar o con elegir)."
+            ),
             "promocion_id": _text("La promoción de cierre que se ofrece."),
             "nota": _text("Qué quiere cambiar el cliente, en sus palabras (solicitar_cambio)."),
         },
@@ -245,6 +248,11 @@ def _path_keys(scope: ToolScope) -> list[str]:
 
 def _path_schema(scope: ToolScope) -> dict[str, Any]:
     return _object({"camino": {"type": "string", "enum": _path_keys(scope)}}, ["camino"])
+
+
+def _pays_up_front(scope: ToolScope) -> bool:
+    """Cash on delivery sends no accounts: the order is confirmed, then paid on delivery."""
+    return scope.facts.modalidad_pago != "contra_entrega"
 
 
 def _has_paths(scope: ToolScope) -> bool:
@@ -327,6 +335,7 @@ def _definitions() -> list[ToolDefinition]:
             parameters=_methods_schema,
             handler=enviar_metodos_pago,
             effect=True,
+            available=_pays_up_front,
         ),
         ToolDefinition(
             name="elegir_camino",

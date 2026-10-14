@@ -728,6 +728,15 @@ def test_advisory_handover_is_stated_in_the_words_the_stage_text_checks() -> Non
             Facts(motivo_rechazo="falta la dirección"),
             "- Pago: — (el negocio rechazó antes: falta la dirección)",
         ),
+        (
+            Facts(modalidad_pago="contra_entrega"),
+            "- Pago: contra entrega: resume el pedido y pídele que lo confirme; no hay métodos "
+            "de pago que enviar",
+        ),
+        (
+            Facts(modalidad_pago="contra_entrega", motivo_rechazo="falta la dirección"),
+            "que enviar (el negocio rechazó antes: falta la dirección)",
+        ),
     ],
 )
 def test_the_payment_line(facts: Facts, line: str) -> None:
