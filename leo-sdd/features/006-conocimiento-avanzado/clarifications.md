@@ -47,3 +47,25 @@ eso es costo del LLM. Se mide con el recall@5 (TASK-604) antes de proponer otro 
   embeddings).
 - Sin modelo que lea documentos (perfil offline o `VISION_ENABLED=false`), un escaneado falla con un
   mensaje claro, como antes.
+
+## C-106: Lectura de la web del negocio (HU-02)
+- Desde la dirección que escribe el dueño se recorre en anchura **el mismo sitio** (el dominio con o sin
+  `www.`), solo páginas HTML, hasta 20, una a la vez. Se respeta `robots.txt` con el agente `LeoBot`: si no
+  existe (4xx) se lee todo, y **si no se puede leer (5xx o error de red) no se lee nada**. Una página con
+  `noindex` se omite.
+- Se quitan scripts, estilos, menús de navegación, botones y formularios. Una línea que se repite en la
+  mitad o más de las páginas (pie, menú), con al menos 3 páginas, se guarda una sola vez. Cada página entra
+  como una sección con su título y su dirección.
+- Solo HTML estático (C-001): una web armada con JavaScript se lee vacía y la fuente falla diciendo que se
+  pegue el texto o se suba un PDF.
+- Prioridad por defecto 50, debajo de lo que el negocio escribió (100) y de sus PDF (90) (C-003).
+- El texto leído queda en la fuente (para mostrarlo y regenerar chunks) y cuenta contra los caracteres del
+  plan como cualquier fuente. Volver a leerla es solo manual (C-002).
+- **Seguridad (SSRF).** La dirección la escribe un cliente, así que el lector solo llega a direcciones
+  públicas: resuelve el dominio y rechaza loopback, redes privadas, link-local (incluido el metadata de la
+  nube), reservadas y multicast, **en cada redirección** (máximo 5). Solo http y https en sus puertos por
+  defecto, 10 s por pedido y 2 MB por página. El user agent dice quién lee y para qué. Riesgo residual
+  conocido: un dominio que cambie de dirección entre la verificación y la conexión (DNS rebinding).
+- **Verificación:** las reglas del lector y del recorrido se prueban sin red (transporte simulado). La
+  prueba con la web real de un cliente de Zentek360 es el milestone humano de la TASK-604: desde el entorno
+  de desarrollo no hay salida a webs públicas.

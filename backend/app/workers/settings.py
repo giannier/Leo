@@ -27,6 +27,7 @@ from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
 from app.workers.catalog_evals import run_catalog_evals
 from app.workers.catalog_indexer import index_catalog_knowledge
@@ -81,6 +82,10 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["session_factory"] = get_session_factory()
     ctx["storage"] = build_storage_provider()
     ctx["pdf_extractor"] = PypdfTextExtractor()
+    ctx["web_fetcher"] = HttpxWebFetcher(
+        timeout_seconds=settings.knowledge_web_timeout_seconds,
+        max_bytes=settings.knowledge_web_max_page_bytes,
+    )
     # Embeddings are always platform-funded, never the tenant's own key -
     # see `app/models/llm_settings.py` for why that is not configurable.
     ctx["llm"] = platform_provider(settings)
@@ -103,6 +108,7 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("llm", None)
     ctx.pop("storage", None)
     ctx.pop("pdf_extractor", None)
+    ctx.pop("web_fetcher", None)
     ctx.pop("email", None)
     ctx.pop("whatsapp", None)
 

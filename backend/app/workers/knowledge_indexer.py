@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ from app.models.knowledge import KnowledgeSource
 from app.providers.llm.base import DocumentReader, LLMError, LLMProvider
 from app.providers.pdf.base import PdfError, PdfPages, PdfTextExtractor
 from app.providers.storage.base import StorageError, StorageProvider
+from app.providers.web.base import WebFetcher
 from app.repositories.knowledge import (
     STATUS_FAILED,
     STATUS_INDEXED,
@@ -37,9 +39,10 @@ from app.repositories.knowledge import (
 )
 from app.repositories.tenant import TenantRepository
 from app.services.chunking import chunk_text, dedupe
-from app.services.knowledge import PDF_TYPE, KnowledgeError, KnowledgeService
+from app.services.knowledge import PDF_TYPE, WEB_TYPE, KnowledgeError, KnowledgeService
 from app.services.ocr import pages_to_read, read_scanned_pages
 from app.services.trial import billing_enforced
+from app.services.web_crawl import EMPTY_SITE, crawl
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +112,7 @@ async def index_source(
     storage: StorageProvider,
     pdf_extractor: PdfTextExtractor,
     settings: Settings | None = None,
+    web_fetcher: WebFetcher | None = None,
 ) -> IndexingOutcome:
     """Extract, chunk, embed and store one knowledge source.
 
@@ -141,7 +145,12 @@ async def index_source(
 
     try:
         extracted = await _extract(
-            source, storage=storage, pdf_extractor=pdf_extractor, llm=llm, settings=settings
+            source,
+            storage=storage,
+            pdf_extractor=pdf_extractor,
+            llm=llm,
+            settings=settings,
+            web_fetcher=web_fetcher,
         )
         source.report = extracted.report
         session.flush()
@@ -169,8 +178,12 @@ async def _extract(
     pdf_extractor: PdfTextExtractor,
     llm: LLMProvider,
     settings: Settings,
+    web_fetcher: WebFetcher | None = None,
 ) -> _Extracted | _ExtractionFailure:
     """Get the source's text, or the reason there is none."""
+    if source.type == WEB_TYPE:
+        return await _extract_site(source, web_fetcher, settings)
+
     if source.type != PDF_TYPE:
         content = (source.content or "").strip()
         return _Extracted(content) if content else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
@@ -196,6 +209,25 @@ async def _extract(
 
     stripped = text.strip()
     return _Extracted(stripped) if stripped else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+
+
+async def _extract_site(
+    source: KnowledgeSource, fetcher: WebFetcher | None, settings: Settings
+) -> _Extracted | _ExtractionFailure:
+    """Crawl the business's website (Feature 006, HU-02); the text is kept on the source."""
+    if fetcher is None or not source.source_url:
+        return _ExtractionFailure("No se pudo leer la web: el lector no está disponible.")
+    result = await crawl(fetcher, source.source_url, max_pages=settings.knowledge_web_max_pages)
+    report = result.report()
+    if result.error:
+        return _ExtractionFailure(result.error, report)
+    text = result.text().strip()
+    if not text:
+        return _ExtractionFailure(EMPTY_SITE, report)
+    # Kept so the panel can show what was read, and the chunks can be regenerated.
+    source.content = text
+    source.crawled_at = datetime.now(UTC)
+    return _Extracted(text, report)
 
 
 async def _extract_pages(
@@ -398,5 +430,6 @@ async def index_knowledge_source(ctx: dict[str, Any], tenant_id: str, source_id:
             storage=ctx["storage"],
             pdf_extractor=ctx["pdf_extractor"],
             settings=ctx.get("settings"),
+            web_fetcher=ctx.get("web_fetcher"),
         )
     return outcome.status

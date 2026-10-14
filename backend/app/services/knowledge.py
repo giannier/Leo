@@ -28,6 +28,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
@@ -45,6 +46,7 @@ from app.repositories.knowledge import (
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
 from app.services.trial import billing_enforced
+from app.services.web_crawl import normalise_start
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +359,27 @@ class KnowledgeService:
         if source is None or source.deleted_at is not None:
             raise SourceNotFoundError(str(source_id))
         return [chunk.content for chunk in self._chunks.list_for_source(source_id)]
+
+    async def ingest_web(self, *, url: str, title: str | None = None) -> IngestResult:
+        """Accept the business's website for reading (Feature 006, HU-02).
+
+        Like a PDF, its size is unknown until the worker has read it: the file
+        count and "some budget left" are enforced here, the characters there.
+        """
+        start = normalise_start(url)
+        self._reserve(chars=0)
+        source = self._sources.add(
+            type=WEB_TYPE,
+            title=_clean_title(title or (urlsplit(start).hostname or start)),
+            source_url=start,
+            char_count=0,
+            status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[WEB_TYPE],
+        )
+        source_id = source.id
+        self._session.commit()
+        await self._enqueue(source_id)
+        return IngestResult(id=source_id, status=STATUS_PENDING)
 
     # ------------------------------------------------------------- deletion
 

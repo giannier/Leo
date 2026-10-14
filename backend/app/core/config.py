@@ -292,6 +292,12 @@ class Settings(BaseSettings):
     knowledge_ocr_timeout_seconds: float = 90.0
     knowledge_ocr_max_tokens: int = 2500
 
+    # Reading the business's website (Feature 006, TASK-603): pages per crawl,
+    # seconds per request and bytes per page.
+    knowledge_web_max_pages: int = 20
+    knowledge_web_timeout_seconds: float = 10.0
+    knowledge_web_max_page_bytes: int = 2_000_000
+
     # CORS
     # `NoDecode` turns off pydantic-settings' JSON decoding for this field.
     # Without it the environment source parses the value before any

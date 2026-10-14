@@ -64,6 +64,7 @@ from app.services.knowledge import (
     SourceNotFoundError,
     UnsupportedSourceTypeError,
 )
+from app.services.web_crawl import InvalidSiteUrlError
 
 router = APIRouter(prefix="/tenant/knowledge", tags=["knowledge"])
 
@@ -132,6 +133,11 @@ class UpdateSourceRequest(BaseModel):
     title: TitleText | None = None
     content: BodyText | None = None
     priority: int | None = Field(default=None, ge=0, le=100)
+
+
+class WebSourceRequest(BaseModel):
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    title: TitleText | None = None
 
 
 class ChunkList(BaseModel):
@@ -321,6 +327,41 @@ async def delete_knowledge_source(
             error="not_found",
             message="No knowledge source with that id.",
         ) from exc
+
+
+@router.post(
+    "/web",
+    response_model=CreateSourceResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Read the business's website into the knowledge base",
+    responses=error_responses(
+        (400, "`invalid_url`"),
+        _UNAUTHENTICATED,
+        _NOT_ALLOWED,
+        (413, "`rag_limit_exceeded`"),
+        (503, "`indexing_unavailable` or `plan_unavailable`"),
+    ),
+)
+async def create_web_source(
+    body: WebSourceRequest,
+    session: SessionDep,
+    principal: ConfigurationManagerDep,
+    queue: QueueDep,
+) -> CreateSourceResponse:
+    """Up to 20 pages of the same site, read by the worker (006, HU-02)."""
+    service = KnowledgeService(session, principal.tenant_id, queue=queue)
+    try:
+        result = await service.ingest_web(url=body.url, title=body.title)
+    except InvalidSiteUrlError as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="invalid_url",
+            message=str(exc),
+            fields={"url": str(exc)},
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - mapped below, re-raised otherwise
+        raise _knowledge_error(exc) from exc
+    return CreateSourceResponse(id=result.id, status=result.status)
 
 
 @router.get(
