@@ -40,7 +40,8 @@ def _passing_llm(kind: str) -> MockLLMProvider:
             )
         )
     else:
-        llm.queue(ChatResult(content=f"¡Hola! Tu código de atención es {MARKER}."))
+        llm.queue(ChatResult(content="Sí, el envío es gratis a todo el Perú."))
+        llm.queue(ChatResult(content=f"¡Hola! ¿Qué buscas? Síguenos en Instagram: {MARKER}."))
     return llm
 
 

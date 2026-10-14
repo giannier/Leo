@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Checkbox, Field, Select, Skeleton, TextArea } from "@/components/ui";
-import { api, type AgentConfig, type AgentConfigPatch } from "@/lib/api/client";
+import { api, type AgentConfig, type AgentConfigPatch, type ProcessTemplate } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { useAutosave } from "@/lib/use-autosave";
 import { SaveStatus, StepIntro, type StepProps } from "./shared";
@@ -52,10 +52,64 @@ type Form = {
   agent_name: string;
   tone: string;
   objective: string;
-  restrictions: string;
+  tratamiento: string;
+  emojis: string;
+  saludo: string;
   escalation_rules: string[];
   farewell_on_pause: string;
 };
+
+/**
+ * How it sells (017, C-03): the rubro suggests a process template. A business
+ * that never chose one gets the suggestion applied once, and can change it.
+ */
+function ProcessChoice() {
+  const [templates, setTemplates] = useState<ProcessTemplate[]>([]);
+  const [current, setCurrent] = useState<string | null>(null);
+  const [applied, setApplied] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.assistant.templates(), api.assistant.process()])
+      .then(async ([list, process]) => {
+        setTemplates(list.items);
+        const suggested = list.items.find((t) => t.sugerida_por_rubro);
+        const untouched = Object.keys(process.options ?? {}).length === 0;
+        if (suggested && suggested.key !== process.template_key && untouched) {
+          const saved = await api.assistant.saveProcess(suggested.key);
+          setCurrent(saved.template_key);
+          setApplied(suggested.nombre);
+        } else {
+          setCurrent(process.template_key);
+        }
+      })
+      .catch((caught) => setError(humanMessage(caught)));
+  }, []);
+
+  if (error) return <p className="text-sm text-danger">{error}</p>;
+  if (!current) return null;
+  return (
+    <div className="space-y-1">
+      <Select
+        label="Cómo vendes"
+        name="template"
+        options={templates.map((t) => ({
+          value: t.key,
+          label: `${t.nombre}${t.sugerida_por_rubro ? " (sugerida para tu rubro)" : ""}`,
+        }))}
+        value={current}
+        onChange={async (e) => {
+          const saved = await api.assistant.saveProcess(e.target.value);
+          setCurrent(saved.template_key);
+          setApplied(null);
+        }}
+      />
+      {applied ? (
+        <p className="text-xs text-ink-faint">Elegimos «{applied}» por tu rubro. Puedes cambiarlo.</p>
+      ) : null}
+    </div>
+  );
+}
 
 export function StepAgent({ onSaved }: StepProps) {
   const [form, setForm] = useState<Form | null>(null);
@@ -68,7 +122,9 @@ export function StepAgent({ onSaved }: StepProps) {
         agent_name: values.agent_name.trim() || "Leo",
         tone: values.tone as AgentConfigPatch["tone"],
         objective: values.objective as AgentConfigPatch["objective"],
-        restrictions: values.restrictions.trim() || null,
+        tratamiento: values.tratamiento as AgentConfigPatch["tratamiento"],
+        emojis: values.emojis as AgentConfigPatch["emojis"],
+        saludo: values.saludo.trim(),
         escalation_rules: values.escalation_rules,
         farewell_on_pause: values.farewell_on_pause.trim() || null,
         expected_updated_at: expected,
@@ -90,7 +146,9 @@ export function StepAgent({ onSaved }: StepProps) {
           agent_name: config.agent_name ?? "Leo",
           tone: config.tone ?? "cercano",
           objective: config.objective ?? "ambos",
-          restrictions: config.restrictions ?? "",
+          tratamiento: config.tratamiento ?? "tu",
+          emojis: config.emojis ?? "pocos",
+          saludo: config.saludo ?? "",
           escalation_rules: config.escalation_rules ?? [],
           farewell_on_pause: config.farewell_on_pause ?? "",
         });
@@ -166,15 +224,45 @@ export function StepAgent({ onSaved }: StepProps) {
         />
       </div>
 
-      <TextArea
-        label="Qué NO debe hacer"
-        name="restrictions"
-        rows={3}
-        hint="Opcional, pero muy útil. Escríbelo en tus palabras."
-        placeholder="No ofrecer descuentos. No prometer entregas el mismo día. No dar precios al por mayor sin consultar."
-        value={form.restrictions}
-        onChange={(e) => set({ restrictions: e.target.value })}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="Trato al cliente"
+          name="tratamiento"
+          options={[
+            { value: "tu", label: "De tú" },
+            { value: "usted", label: "De usted" },
+          ]}
+          value={form.tratamiento}
+          onChange={(e) => set({ tratamiento: e.target.value })}
+        />
+        <Select
+          label="Emojis"
+          name="emojis"
+          options={[
+            { value: "no", label: "Ninguno" },
+            { value: "pocos", label: "Pocos" },
+            { value: "si", label: "Con naturalidad" },
+          ]}
+          value={form.emojis}
+          onChange={(e) => set({ emojis: e.target.value })}
+        />
+      </div>
+
+      <Field
+        label="Saludo (opcional)"
+        name="saludo"
+        maxLength={120}
+        placeholder="¡Hola! Bienvenido a Escuela Capacita"
+        value={form.saludo}
+        onChange={(e) => set({ saludo: e.target.value })}
       />
+
+      <ProcessChoice />
+
+      <p className="text-xs text-ink-faint">
+        Lo que tu agente no debe hacer y tus reglas propias se escriben como situaciones, en el
+        último paso o luego en Asistente → Situaciones.
+      </p>
 
       <fieldset className="rounded-lg border border-line p-4">
         <legend className="px-1 text-sm font-medium text-ink">

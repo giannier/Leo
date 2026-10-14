@@ -150,7 +150,10 @@ function Members({
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(membershipId: string, body: { role?: string; status?: string }) {
+  async function change(
+    membershipId: string,
+    body: { role?: string; status?: string; puede_revisar?: boolean },
+  ) {
     setBusy(membershipId);
     setFailure(null);
     try {
@@ -212,6 +215,18 @@ function Members({
               {canManage && !isOwnerRow ? (
                 <div className="flex shrink-0 items-center gap-2">
                   {!disabled ? (
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs text-ink-soft">
+                      <input
+                        type="checkbox"
+                        className="size-5 accent-accent"
+                        checked={member.puede_revisar}
+                        disabled={busy === member.id}
+                        onChange={(e) => void change(member.id, { puede_revisar: e.target.checked })}
+                      />
+                      Revisor
+                    </label>
+                  ) : null}
+                  {!disabled ? (
                     <select
                       aria-label={`Rol de ${member.full_name}`}
                       value={member.role}
@@ -246,6 +261,12 @@ function Members({
 
       {canManage ? (
         <p className="mt-4 text-xs text-ink-faint">
+          Un revisor ve las novedades de tu rubro y puede apagar o encender reglas del asistente,
+          aunque no configure lo demás. Quien creó la cuenta siempre lo es.
+        </p>
+      ) : null}
+      {canManage ? (
+        <p className="mt-2 text-xs text-ink-faint">
           Al desactivar a alguien, sus sesiones se cierran de inmediato: si tiene el panel
           abierto, deja de funcionar en el acto.
         </p>

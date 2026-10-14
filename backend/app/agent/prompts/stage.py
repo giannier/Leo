@@ -332,8 +332,22 @@ def _situations_block(situations: Sequence[SelectedSituation]) -> str:
     """The situations of this message, each cut to its share of the budget, then the priority."""
     if not situations:
         return _PRIORITY
-    head = "SITUACIONES DEL NEGOCIO (aplican a este mensaje)"
-    fixed = estimate_tokens(head) + estimate_tokens(_PRIORITY) + 4
+    # Measured with the platform model (TASK-469): with a softer heading an
+    # unconditional "siempre" was dropped whenever the customer also asked something.
+    head = (
+        "SITUACIONES DEL NEGOCIO: aplican a este mensaje. Cúmplelas TODAS en tu respuesta, "
+        "además de responder lo que preguntó."
+    )
+    # The "siempre" ones are repeated in one closing line: without it the model
+    # dropped them in 2 of 12 turns, with it in none (TASK-469 measurement).
+    always = [s for s in situations if s.siempre]
+    reminder = (
+        "Antes de enviar, revisa que cumpliste: "
+        + "; ".join(_clip(s.que_hace, 160) for s in always)
+        if always
+        else ""
+    )
+    fixed = estimate_tokens(head) + estimate_tokens(_PRIORITY) + estimate_tokens(reminder) + 6
     share = max(40, (SECTION_CAPS["situaciones"] - fixed) // len(situations))
     lines = [head]
     for situation in situations:
@@ -345,6 +359,8 @@ def _situations_block(situations: Sequence[SelectedSituation]) -> str:
         if chars < _SITUATION_FIELD_CHARS:
             logger.warning("a situation was cut to fit the prompt budget")
         lines.append(text)
+    if reminder:
+        lines.append(reminder)
     lines.append(_PRIORITY)
     return "\n".join(lines)
 

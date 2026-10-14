@@ -21,7 +21,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { AlertIcon, ClockIcon, LogOutIcon, UsersIcon } from "@/components/icons";
+import { AlertIcon, ClockIcon, LogOutIcon, UsersIcon, BookIcon } from "@/components/icons";
 import { Skeleton, cx } from "@/components/ui";
 import { useSession } from "@/lib/session";
 
@@ -30,6 +30,7 @@ const NAV = [
   { href: "/admin/tenants", label: "Negocios", icon: UsersIcon },
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
+  { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

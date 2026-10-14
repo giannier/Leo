@@ -56,8 +56,11 @@ test.describe("Registro, verificación y entrada", () => {
 
     // The trial banner is the thing that must never be missing: it is how a
     // customer learns their trial is ending before the agent goes quiet.
-    await expect(page.getByText(/días de prueba|día de prueba|termina hoy/)).toBeVisible();
-    await expect(page.getByText(/de 250 mensajes usados/)).toBeVisible();
+    // "Modo pruebas" while BILLING_ENFORCED is off (the default for now).
+    await expect(
+      page.getByText(/días de prueba|día de prueba|termina hoy|Modo pruebas/).first(),
+    ).toBeVisible();
+    await expect(page.getByText(/respuestas del agente por WhatsApp/)).toBeVisible();
 
     // --- the session survives a reload ----------------------------------
     // The access token is deliberately held in memory only, so this proves

@@ -453,7 +453,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests con un tenant vacío, uno parcial y uno completo
   - Parallel: false
 
-- [ ] TASK-438: Frontend — Información del negocio y perfil
+- [x] TASK-438: Frontend — Información del negocio y perfil
+  - **Hecho (2026-10-14):** `/asistente/informacion` (métodos de pago con titular y QR, entregas, locales y
+    horarios, FAQ, promociones, política de descuentos, tipos de cliente, devoluciones, contacto).
+    Playwright: una zona guardada aparece en la vista previa del prompt.
   - Input: los 8 bloques de RF-001; RF-010 de la 017
   - Output: tarjetas por bloque (métodos de pago con titular y QR, locales y horarios, entregas, tipos de
     cliente, FAQ, promociones, devoluciones, contacto, política de descuentos), sin texto libre
@@ -462,7 +465,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: completar entregas y verlo reflejado en una respuesta del simulador
   - Parallel: true
 
-- [ ] TASK-439: Frontend — Comportamiento y estilo
+- [x] TASK-439: Frontend — Comportamiento y estilo
+  - **Hecho (2026-10-14):** `/asistente/comportamiento`; casilla «Revisor» en Equipo. Arreglo de paso: el
+    cliente usaba `PATCH` para miembros del equipo y métodos de pago y el backend solo tiene `PUT` (405).
   - Input: `contracts/api.md §1` (behavior)
   - Output: ritmo, detalle (con ejemplo), seguimiento, tratamiento, emojis, saludo, nivel de inteligencia
     (sin bloqueo mientras `BILLING_ENFORCED` esté apagado), pausa de derivación, mensajes de sistema y
@@ -471,7 +476,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright; `tsc` y `eslint` limpios
   - Parallel: true
 
-- [ ] TASK-440: Frontend — Proceso de venta y rubro
+- [x] TASK-440: Frontend — Proceso de venta y rubro
+  - **Hecho (2026-10-14):** `/asistente/proceso` (plantilla con la sugerida del rubro, etapas con
+    interruptores, rubro con novedades, FAQ, objeciones y situaciones sugeridas, vista previa del prompt).
+    Playwright: apagar una regla la saca de la vista previa.
   - Input: `contracts/api.md §2`, C-01 y C-04 de la 017
   - Output: selector de plantilla (con la sugerida por el rubro); opciones generadas desde el schema;
     etapas en línea de tiempo con su columna del embudo y **sus reglas con interruptor** (sin editor de
@@ -481,7 +489,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: apagar una regla y verla desaparecer de la vista previa del prompt
   - Parallel: true
 
-- [ ] TASK-467: Frontend — Situaciones
+- [x] TASK-467: Frontend — Situaciones
+  - **Hecho (2026-10-14):** `/asistente/situaciones`; el simulador acepta `?probar=<id>` y su panel de
+    depuración muestra situaciones y reglas apagadas. Playwright: crear, probar en borrador, activar.
   - Input: RF-006 y RF-009 de la 017
   - Output: lista de tarjetas con filtros por estado y origen; formulario (cuándo aplica, qué hace,
     archivos, derivar, ejemplo, etapas, siempre); "Probar en el simulador"; activar y desactivar
@@ -489,7 +499,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: crear una situación, probarla en borrador, activarla
   - Parallel: true
 
-- [ ] TASK-468: Wizard — estilo y situaciones sugeridas (toca la 001)
+- [x] TASK-468: Wizard — estilo y situaciones sugeridas (toca la 001)
+  - **Hecho (2026-10-14):** el paso del agente pide trato, emojis y saludo (ya no «qué NO debe hacer») y
+    aplica una vez la plantilla que sugiere el rubro; el resumen ofrece hasta 5 situaciones sugeridas.
+    Playwright: el wizard termina con una situación sugerida activa.
   - Input: C-02 y C-03 de la 017
   - Output: paso 2 con tratamiento, emojis y saludo en lugar de "restricciones"; el rubro sugiere la
     plantilla; paso final con 3 a 5 situaciones sugeridas del rubro para activar o completar.
@@ -498,7 +511,11 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: un negocio nuevo termina el wizard con situaciones activas
   - Parallel: true
 
-- [ ] TASK-441: Frontend — Multimedia, checklist y depuración
+- [x] TASK-441: Frontend — Multimedia, checklist y depuración
+  - **Hecho (2026-10-14):** `/asistente/multimedia` (arrastrar, clave sugerida desde el título, reemplazar);
+    widget del asistente en Inicio; `/asistente` con progreso. El Playwright de subir imagen necesita
+    MinIO (`make up`); aquí no se pudo correr. Arreglo de paso: el operador de plataforma no tenía el
+    enlace «Panel de operación» en el teléfono.
   - Input: `contracts/api.md §3`, overview
   - Output: biblioteca con subida (arrastrar), clave sugerida desde el título, "cuándo usarlo", vínculo a
     producto, promoción o situación; widget de activación en el inicio del panel; interruptor de
@@ -507,7 +524,11 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: subir una imagen, pedirla en el simulador y verla llegar
   - Parallel: true
 
-- [ ] TASK-469: Evals de cierre de la Fase 1
+- [x] TASK-469: Evals de cierre de la Fase 1
+  - **Hecho (2026-10-14):** evals del agente 2/2 y del catálogo 9/9 (dos veces) con `gpt-5.4-mini`
+    (`scripts/run_catalog_evals.py`). La primera corrida encontró que el modelo dejaba de lado una
+    situación «siempre» cuando el cliente preguntaba otra cosa: se reforzó el encabezado de SITUACIONES y
+    una línea final las repite (medido: 10/12 → 12/12).
   - Input: C-01 de la 017
   - Output: evals del agente y de catálogo con OpenAI; resultado adjunto en `milestones/C.md`
   - Depends on: TASK-464, TASK-466
