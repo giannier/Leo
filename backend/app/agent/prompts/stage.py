@@ -122,7 +122,10 @@ _DETAIL_TEXT: Mapping[str, str] = {
 }
 _TREATMENT_TEXT: Mapping[str, str] = {
     "tu": "Trata al cliente de tú.",
-    "usted": "Trata al cliente de usted.",
+    "usted": (
+        "Trata al cliente de usted en TODA la respuesta (usted, le, su, quiere, tiene), "
+        "nunca de tú, aunque los ejemplos de abajo estén en tú."
+    ),
 }
 _EMOJI_TEXT: Mapping[str, str] = {
     "no": "No uses emojis.",

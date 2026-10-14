@@ -432,7 +432,8 @@ def test_the_style_says_how_to_address_the_customer() -> None:
     full = build_stage_prompt(make_config(full=True), Facts(), Stage.INICIO, now=NOW).text
 
     assert "Trata al cliente de tú." in plain
-    assert "Trata al cliente de usted." in full
+    assert "Trata al cliente de usted en TODA la respuesta" in full
+    assert "nunca de tú" in full
     assert "«¡Bienvenido a Escuela Capacita!»" in full
 
 

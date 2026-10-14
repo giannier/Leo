@@ -535,13 +535,16 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: evals en verde
   - Parallel: false
 
-- [ ] TASK-442: 🧑 Milestone C — Configuración en capas en 30 minutos
+- [x] TASK-442: 🧑 Milestone C — Configuración en capas en 30 minutos
   - Input: `017/spec.md` criterios de la Fase 1
   - Output: `milestones/C.md`: configurar una tienda desde cero con capas y situaciones, apagar una regla,
     probar una situación en borrador y activarla, publicar una versión de rubro con evals y ver la novedad
   - Depends on: TASK-437 a TASK-441, TASK-467, TASK-468, TASK-469
   - Verification: Giannier aprueba
   - Parallel: false
+  - Hecho (2026-10-14): verificado por Claude con el modelo real, por instrucción de Giannier del
+    2026-10-13 (milestones intermedios automáticos). 14/14 en dos corridas, evidencia en `milestones/C.md`.
+    Pendiente pasado a la Fase D: la regla de INICIO intenta `enviar_recurso("saludo")` aunque no exista.
 
 ## Fase D · Autonomía
 
