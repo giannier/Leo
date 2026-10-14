@@ -410,8 +410,8 @@ def test_the_layers_go_from_the_least_to_the_most_specific() -> None:
 
     order = [
         text.index("PROCESO: INSTRUCCIONES DE LA ETAPA"),
-        text.index("RUBRO"),
-        text.index("NEGOCIO"),
+        text.index("\nRUBRO"),
+        text.index("\nNEGOCIO"),
         text.index("SITUACIONES DEL NEGOCIO"),
         text.index("PRIORIDAD:"),
     ]

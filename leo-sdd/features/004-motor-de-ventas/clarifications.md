@@ -218,3 +218,27 @@ solo sale del canal real (en el simulador no). Al vencer o al reactivar no se en
 ## Clarificaciones Pendientes
 - [ ] ¿Aviso al operador por WhatsApp además del correo? Decisión provisional: no en esta versión (va con la 007).
 - [ ] ¿Horario permitido de seguimiento configurable por tenant? Decisión provisional: fijo de 08:00 a 21:00 por ahora.
+
+## C-24: Lo que encontraron los evals de flujos de venta (TASK-447, 2026-10-14)
+**Situación:** Las 24 conversaciones guionadas (8 por plantilla) empezaron en 12/24 con el modelo real.
+Una parte eran guiones poco realistas (el cliente nunca decía "sí, agrégalo"); el resto, fallas del agente.
+**Decisión (lectura conservadora, para ratificar):**
+- **CALIFICAR no retiene respuestas por el nombre.** Plantillas de proceso **v2** (migración 0033) con la
+  regla `CALIFICAR.aun_no_sabes_su_nombre` reescrita: sigue pidiendo el nombre, pero si el cliente ya dijo
+  qué busca, registra el camino y responde. Mismo `rule_key`, así que un negocio que la apagó la sigue
+  teniendo apagada. Los negocios ven la novedad.
+- **Regla de plataforma 2:** precios y promociones salen "de tus herramientas **o del bloque NEGOCIO**".
+  Antes el modelo ignoraba las promociones vigentes del prompt y decía que no había.
+- **`consultar_conocimiento` vacío** ya no empuja a derivar: primero revisa NEGOCIO y `buscar_productos`; solo
+  deriva si el cliente lo pide o lo acepta.
+- **`buscar_productos`** se describe como el catálogo completo (productos, servicios o certificados): con
+  servicios el modelo no lo usaba.
+- **Texto repetido:** si el modelo escribe de nuevo el cuerpo de los botones o la lista del mismo turno, esa
+  burbuja no se envía (el cliente la leía dos veces; también se vio en el Milestone C).
+- **Zona de envío que falta:** la herramienta le pasa al modelo las zonas válidas para que las ofrezca.
+- **No se cambió:** los datos de entrega dichos antes de tener pedido siguen sin guardarse en el pedido (el
+  esquema solo ofrece esos campos cuando el pedido los necesita, para cuidar el tope de tokens); en DATOS el
+  modelo los toma del historial o los vuelve a pedir.
+**Resultado:** 24/24 en dos corridas seguidas, `make evals` y evals de catálogo en verde. Evidencia:
+`milestones/evals-flujos-de-venta.md`.
+**Registrado por:** Claude — por ratificar

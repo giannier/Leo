@@ -172,7 +172,7 @@ Es tu primer mensaje en esta conversación.
 
 CALIFICAR_BASE = """\
 Necesitas saber qué busca el cliente para llevarlo por el camino correcto.
-- Si aún no sabes su nombre, pídelo y te detienes.
+- Si aún no sabes su nombre, pídelo. Si en ese mismo mensaje ya dijo qué busca o hizo una pregunta, primero registra el camino con elegir_camino y responde su pregunta: nunca condiciones una respuesta a que te dé su nombre.
 - Con el nombre, llama a mostrar_opciones(tipo="caminos") con este texto, personalizado con su nombre:
   "{pregunta_calificacion}"
 - Si responde ESCRIBIENDO en vez de tocar un botón, llama a elegir_camino con la opción que corresponda:

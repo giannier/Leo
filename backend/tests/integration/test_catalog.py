@@ -43,6 +43,9 @@ class TestTheSplit:
         ]
 
 
+LATEST_PROCESS_VERSION = 2
+
+
 class TestVersionOne:
     @pytest.mark.parametrize("key", sorted(TEMPLATES))
     def test_the_prompt_text_from_the_database_is_today_s_text(self, db: Session, key: str) -> None:
@@ -52,7 +55,8 @@ class TestVersionOne:
         code = {s.value: TEMPLATES[key].stage(s).instrucciones for s in Stage}
         texts = stage_texts_from(rules, code, list(code))
 
-        assert rules.process_version == 1
+        # The newest published version (v2 since migration 0033) is today's code text.
+        assert rules.process_version == LATEST_PROCESS_VERSION
         assert texts == code
 
     def test_six_rubros_with_content_and_a_suggested_template(self, db: Session) -> None:
@@ -77,7 +81,7 @@ class TestVersionOne:
 
         config = ProcessConfigService(db, cache=ProcessConfigCache())._load(uuid4())
 
-        assert config.process_version == 1
+        assert config.process_version == LATEST_PROCESS_VERSION
 
 
 class TestPublishedIsFrozen:
