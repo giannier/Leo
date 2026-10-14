@@ -614,7 +614,9 @@ def _categories(session: SessionDep, tenant_id: uuid.UUID) -> list[CategoryRespo
             select(Product.category_id, func.count())
             .where(Product.tenant_id == tenant_id, Product.deleted_at.is_(None))
             .group_by(Product.category_id)
-        ).tuples()
+        )
+        .tuples()
+        .all()
     )
     rows = session.execute(
         select(ProductCategory)
