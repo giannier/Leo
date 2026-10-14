@@ -10,6 +10,7 @@
 | `derivacion`            | the assistant handed a conversation to a person| yes              |
 | `ventana_cerrada`       | the customer could not be told                 | no               |
 | `llm_caido`             | the model failed several times in a row        | yes, once an hour|
+| `derivacion_sin_atender` | a handover nobody took in N minutes (007)    | yes              |
 
 The notice is written in the caller's transaction; the email is *not* sent here. It is
 queued in `pending_emails` and the caller sends it after the commit, as every other
@@ -36,6 +37,7 @@ from app.models.tenant import (
     HANDOFF,
     LLM_DOWN,
     NEW_RECEIPT,
+    UNATTENDED,
     Tenant,
 )
 from app.orders.notices import NotReached
@@ -47,6 +49,7 @@ from app.services.emails import (
     build_handoff_email,
     build_llm_down_email,
     build_new_receipt_email,
+    build_unattended_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -167,6 +170,25 @@ class TenantAlerts:
                 motivo=motivo,
                 resumen=resumen,
                 panel_url=self._panel(""),
+            )
+        )
+
+    def unattended(
+        self, conversation_id: uuid.UUID, *, motivo: str, resumen: str | None, minutes: int
+    ) -> None:
+        """A handover nobody took within the business's minutes (Feature 007, HU-03)."""
+        self._notices.record(
+            UNATTENDED,
+            {"conversation_id": str(conversation_id), "motivo": motivo, "minutos": minutes},
+        )
+        self._email(
+            lambda to, name: build_unattended_email(
+                to=to,
+                tenant_name=name,
+                motivo=motivo,
+                resumen=resumen,
+                minutes=minutes,
+                panel_url=self._panel(f"bandeja?c={conversation_id}"),
             )
         )
 

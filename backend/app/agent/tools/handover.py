@@ -65,6 +65,7 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
         "motivo": motivo,
         "resumen": resumen,
         "hasta": hasta.isoformat(),
+        "desde": now.isoformat(),
     }
     if motivo == "asesoria":
         context.facts_patch["asesoria_derivada_en"] = now.isoformat()

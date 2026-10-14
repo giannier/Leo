@@ -571,6 +571,7 @@ NEW_RECEIPT_SUBJECT = "Nuevo comprobante por revisar"
 CASH_ORDER_SUBJECT = "Nuevo pedido contra entrega por confirmar"
 HANDOFF_SUBJECT = "Un cliente necesita que lo atiendas"
 LLM_DOWN_SUBJECT = "Tu agente tuvo un problema y no esta respondiendo"
+UNATTENDED_SUBJECT = "Un cliente sigue esperando que lo atiendas"
 
 
 def _alert_email(
@@ -665,4 +666,30 @@ def build_llm_down_email(*, to: str, tenant_name: str, panel_url: str) -> EmailM
         ],
         panel_url=panel_url,
         link_label="Abrir el panel",
+    )
+
+
+def build_unattended_email(
+    *,
+    to: str,
+    tenant_name: str,
+    motivo: str,
+    resumen: str | None,
+    minutes: int,
+    panel_url: str,
+) -> EmailMessage:
+    """A handover nobody took in the business's minutes (Feature 007, HU-03)."""
+    lines = [
+        f"Hace {minutes} minutos el asistente de {tenant_name} paso una conversacion a una "
+        f"persona y nadie la ha tomado. Motivo: {motivo}.",
+    ]
+    if resumen:
+        lines.append(f"Resumen: {resumen}")
+    lines.append("Tomala desde la bandeja para responderle.")
+    return _alert_email(
+        to=to,
+        subject=UNATTENDED_SUBJECT,
+        lines=lines,
+        panel_url=panel_url,
+        link_label="Abrir la bandeja",
     )

@@ -42,6 +42,12 @@ from app.workers.followups import (
     run_followups,
 )
 from app.workers.handoff import EXPIRE_JOB, expire_handoff_pauses
+from app.workers.inbox import (
+    AUTO_RETURN_JOB,
+    UNATTENDED_JOB,
+    auto_return_takeovers,
+    email_unattended_handovers,
+)
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
 from app.workers.situations import embed_situations
@@ -139,6 +145,48 @@ class WorkerSettings:
         cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
         # gives the bot back within five minutes of its `hasta`.
+        # Feature 007: idle takeovers back to the agent, unattended handovers emailed.
+        cron(
+            auto_return_takeovers,
+            name=f"cron:{AUTO_RETURN_JOB}",
+            minute={3, 8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58},
+        ),
+        cron(
+            email_unattended_handovers,
+            name=f"cron:{UNATTENDED_JOB}",
+            minute={
+                0,
+                2,
+                4,
+                6,
+                8,
+                10,
+                12,
+                14,
+                16,
+                18,
+                20,
+                22,
+                24,
+                26,
+                28,
+                30,
+                32,
+                34,
+                36,
+                38,
+                40,
+                42,
+                44,
+                46,
+                48,
+                50,
+                52,
+                54,
+                56,
+                58,
+            },
+        ),
         # C-13: every 15 minutes, off the quarter hours.
         cron(run_followups, name=f"cron:{FOLLOW_UP_JOB}", minute={4, 19, 34, 49}),
         # 08:10 UTC is 03:10 in Lima (`contracts/api.md` section 9).
