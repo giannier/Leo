@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, func, select, update
+from sqlalchemy.orm import aliased
 
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.repositories.base import BaseRepository, TenantScopeError
@@ -162,12 +163,18 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
         The tenant filter is applied before ordering, so another tenant's
         chunk can never win the ranking - the reason this must live in a
         repository rather than in an ad-hoc query at the call site.
+
+        "Before" has to be enforced, not hoped for. Given `ORDER BY distance
+        LIMIT n`, Postgres picks the HNSW index once the table is big enough,
+        and pgvector 0.6 then filters by tenant *after* the index returned its
+        ~40 nearest rows across every tenant: a business whose chunks are not
+        among them gets fewer results or none. The tenant's rows are therefore
+        selected in a `MATERIALIZED` CTE (through the `tenant_id` index) and
+        ranked exactly; a tenant holds thousands of chunks at most.
         """
-        statement = (
-            self._scoped()
-            .order_by(KnowledgeChunk.embedding.cosine_distance(embedding))
-            .limit(limit)
-        )
+        own = self._scoped().cte("own_chunks").prefix_with("MATERIALIZED")
+        chunk = aliased(KnowledgeChunk, own)
+        statement = select(chunk).order_by(chunk.embedding.cosine_distance(embedding)).limit(limit)
         return self._session.execute(statement).scalars().all()
 
     def list_for_source(self, source_id: uuid.UUID) -> Sequence[KnowledgeChunk]:
