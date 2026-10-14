@@ -28,11 +28,12 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.agent.circuit import CircuitBreaker
+from app.agent.model_policy import chat_provider_for
 from app.core.locks import LockStore, acquire_lock, claim_once
 from app.core.queue import ArqJobQueue, JobQueue
 from app.models.llm_settings import TenantLLMSettings
 from app.providers.email.base import EmailMessage, EmailProvider
-from app.providers.llm.factory import provider_for_tenant
 from app.providers.whatsapp.base import (
     InboundMessage,
     QualityUpdate,
@@ -360,7 +361,8 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
         session_factory = ctx["session_factory"]
         with session_factory() as session:
             llm_settings = session.get(TenantLLMSettings, tenant)
-            llm = provider_for_tenant(llm_settings)
+            # The level's model (TASK-445); the tenant's own model if it has one.
+            llm, _level = chat_provider_for(session, tenant, settings)
             alerts = TenantAlerts(session, tenant)
             responder = ConversationResponder(
                 session,
@@ -369,6 +371,7 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 storage=ctx.get("storage"),
                 whatsapp=ctx["whatsapp"],
                 notices=alerts,
+                breaker=CircuitBreaker(store, tenant, on_open=alerts.llm_down),
                 outbound_for=live_outbound_factory(
                     session,
                     tenant,

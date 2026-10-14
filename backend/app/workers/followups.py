@@ -13,9 +13,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.agent.model_policy import chat_provider_for
 from app.core.locks import acquire_lock
-from app.models.llm_settings import TenantLLMSettings
-from app.providers.llm.factory import provider_for_tenant
 from app.services.channel import NoConnectedNumber, ReplySender, lock_key
 from app.services.followups import FollowUps, discard_stale_drafts, due_candidates
 
@@ -42,7 +41,7 @@ async def run_followups(ctx: dict[str, Any]) -> dict[str, int]:
                 outcomes["ocupado"] = outcomes.get("ocupado", 0) + 1
                 continue
             try:
-                llm = provider_for_tenant(session.get(TenantLLMSettings, tenant_id))
+                llm, _level = chat_provider_for(session, tenant_id, settings)
                 result = await FollowUps(session, tenant_id, llm=llm).run(conversation_id)
                 session.commit()
                 if result.message is not None:

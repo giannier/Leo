@@ -572,12 +572,19 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     seguimiento, lo más reciente. El seguimiento cuenta como respuesta del agente (`record_ai_message`).
     Tests: `test_followup_rules.py` (29), `test_followups.py` (9); probado con el modelo real.
 
-- [ ] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
+- [x] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
   - Input: C-02
   - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas. **Milestone B, decisión 4:** los planes de pago permiten los tres niveles (migración 0027) y **cada nivel descuenta créditos según su costo real** (un mensaje `mejor` gasta más que uno `economico`; la tabla de costo por nivel va en settings y la cobra la 009); la prueba gratis solo usa `economico`. **Mientras `BILLING_ENFORCED` esté apagado** (Giannier prueba con sus negocios), ningún nivel se bloquea por plan
   - Depends on: TASK-421, TASK-431
   - Verification: tests del breaker con proveedor que falla; un nivel no permitido cae al permitido más alto; la ventana se respeta
   - Parallel: true
+  - Hecho (2026-10-14): `agent/circuit.py`, `agent/model_policy.py`, `HISTORY_TURNS = 20`. Con el circuito
+    abierto el pipeline responde `llm_down` **después** de los gates (una conversación derivada o pausada no
+    recibe el texto de respaldo) y ese turno no cuenta en el cupo. Settings nuevos: `LLM_MODEL_<NIVEL>` (sin
+    valor = el modelo del perfil) y `LLM_CREDITS_<NIVEL>` (1 por defecto; los cobra la 009). **Para ratificar
+    (costo del LLM):** qué modelo va en `medio` y `mejor` y cuántos créditos cuesta cada uno. Hoy los tres
+    niveles corren el mismo modelo, así que elegir nivel no cambia el costo.
+    Tests: `test_model_policy.py`, `test_circuit_and_levels.py`.
 
 ## Fase E · Cierre
 
