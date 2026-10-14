@@ -89,6 +89,36 @@ class TestVectorSearchIsScoped:
         assert tenant_b.chunk_id not in returned
         assert returned == {tenant_a.chunk_id}
 
+    def test_the_vector_index_cannot_starve_a_tenant(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        """B has 60 chunks nearer the query than A's only one, and the planner is
+        pushed onto the HNSW index. An index scan that filters by tenant *after*
+        taking its ~40 nearest rows returns nothing for A; the search must still
+        find A's chunk (pgvector 0.6 has no iterative scan)."""
+        from sqlalchemy import text
+
+        from app.models.knowledge import KnowledgeChunk
+
+        db.add_all(
+            KnowledgeChunk(
+                tenant_id=tenant_b.tenant_id,
+                source_id=db.get(KnowledgeChunk, tenant_b.chunk_id).source_id,  # type: ignore[union-attr]
+                content=f"B {index}",
+                embedding=[-1.0] * (EMBEDDING_DIM - 1) + [float(index) / 100],
+            )
+            for index in range(60)
+        )
+        db.flush()
+        db.execute(text("SET LOCAL enable_seqscan = off"))
+        db.execute(text("SET LOCAL enable_sort = off"))
+
+        results = KnowledgeChunkRepository(db, tenant_a.tenant_id).search(
+            [-1.0] * EMBEDDING_DIM, limit=5
+        )
+
+        assert [chunk.id for chunk in results] == [tenant_a.chunk_id]
+
 
 class TestWritesCannotCrossTenants:
     def test_update_of_a_foreign_row_is_a_no_op(
