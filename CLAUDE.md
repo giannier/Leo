@@ -22,6 +22,15 @@ Milestone B de la 004 → prueba con número real por túnel (TASK-459) → Fase
 holding → 017 Fases 2 a 4. Dónde quedan 006, 009 y 010 está pendiente de confirmar (ver
 `017/clarifications.md` C-05).
 
+### Cambio de secuencia (Giannier, 2026-10-14)
+"Sigue con la Fase C, termina de construir todo el proyecto y al final conecto el número": la prueba con
+número real (TASK-459) pasa **al final**, antes del despliegue. Orden: Fase C (= 017 Fase 1) → Fases D y
+E de la 004 → 007 → 006 → 009 → 010 → TASK-459 (número real) → VPS → piloto → 017 Fases 2 a 4.
+Los milestones humanos intermedios (C, D, E y los de 007, 006, 009 y 010) los verifica Claude con pruebas
+automáticas contra el modelo real y Playwright, deja la evidencia en `milestones/` y sigue; Giannier los
+prueba a mano al conectar el número. Las decisiones de dinero, datos personales, contratos públicos y costo
+del LLM se siguen consultando.
+
 ## Fase 2 (post-MVP) — solo tras cerrar el MVP y con ratificación de Giannier por feature
 011-campanas → 012-crm-leads → 013-analytics-csat → (014-citas o 016-pedidos-delivery,
 según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-mvp/README.md`.

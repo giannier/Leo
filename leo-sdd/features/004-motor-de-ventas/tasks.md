@@ -292,8 +292,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 > Cuatro capas: plantilla de proceso → rubro → perfil del negocio → situaciones; gana la más específica.
 > El negocio **apaga** reglas de plantilla y rubro, no las edita; sus reglas propias son **situaciones**.
 > Diseño en `017/plan.md`; decisiones en `017/clarifications.md`.
-> **No se empieza hasta que Giannier apruebe el Milestone B (TASK-433)**, y la primera task es la prueba
-> con número real por túnel (TASK-459).
+> Empieza tras el Milestone B (TASK-433, aprobado el 2026-10-14). TASK-459 (número real) pasa al final
+> del MVP por decisión de Giannier (017 C-13).
 
 - [ ] TASK-459: 🧑 Prueba con un número real de WhatsApp por túnel (antes de la Fase 1)
   - Input: sugerencia aceptada por Giannier (2026-10-13); TASK-209 de la 002 (milestone humano pendiente);
@@ -311,14 +311,18 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     TASK-209 de la 002 queda cerrada
   - Parallel: false
 
-- [ ] TASK-460: Catálogo versionado de plantillas y rubros
+- [x] TASK-460: Catálogo versionado de plantillas y rubros
+  - **Hecho (2026-10-14):** migración 0030; `models/catalog.py`, `repositories/catalog.py`,
+    `process/rule_split.py`; 118 reglas de proceso v1 y seis rubros v1 publicados; el texto de etapa sale
+    de la BD (respaldo: el código); triggers que congelan lo publicado; `process_stage_overrides` eliminada.
+    **Para que Giannier revise:** el contenido de los rubros en `backend/alembic/data/rubros_v1.json`.
   - Input: `017/plan.md` (modelo de datos), C-01, C-03, C-04 de la 017
   - Output: migraciones de `catalog_versions`, `catalog_rules`, `catalog_faqs`, `catalog_objections`,
     `catalog_suggested_situations` y `rubros`; migración de datos que parte los textos de etapa de
     `process/templates/*` en reglas con `rule_key` estable (proceso v1 publicada); rubros v1 de los seis
     rubros (reglas, 5 FAQ, 5 objeciones, 3 a 5 situaciones sugeridas, plantilla sugerida) para que
     Giannier los revise; se elimina `process_stage_overrides`
-  - Depends on: TASK-459
+  - Depends on: TASK-433 (TASK-459 movida al final, 017 C-13)
   - Verification: el prompt de cada etapa armado desde la BD es idéntico al de hoy (snapshots); una
     versión publicada no se puede modificar
   - Parallel: false

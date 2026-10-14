@@ -1,7 +1,6 @@
-"""Sales behaviour, stage overrides and plan levels (Feature 004, TASK-404).
+"""Sales behaviour and plan levels (Feature 004, TASK-404).
 
-Two tenants configure the same template and the same stage key, so any lookup
-that forgets the tenant returns the other business's instructions. The agent
+Stage overrides were removed by the 017 (C-01): stages are no longer edited. The agent
 configuration is a different risk: the new columns must have defaults for
 tenants that existed before the migration and must be enforced by the database
 for writers that skip the API.
@@ -17,119 +16,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.plan import Plan
-from app.repositories.base import TenantScopeError
 from app.repositories.business import AgentConfigRepository
-from app.repositories.sales_config import ProcessStageOverrideRepository
 from tests.isolation.conftest import TenantFixture
 
 
 @pytest.fixture
 def seeded(db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture) -> None:
     for label, fixture in (("A", tenant_a), ("B", tenant_b)):
-        ProcessStageOverrideRepository(db, fixture.tenant_id).upsert(
-            "productos", "cierre", instrucciones=f"Cierra como {label}", base_version=1
-        )
         AgentConfigRepository(db, fixture.tenant_id).upsert(
             ritmo="directo" if label == "A" else "paso_a_paso"
         )
-
-
-class TestStageOverridesArePerTenant:
-    def test_the_same_stage_reads_your_own_text(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, seeded: None
-    ) -> None:
-        mine = ProcessStageOverrideRepository(db, tenant_a.tenant_id).stage("productos", "cierre")
-        theirs = ProcessStageOverrideRepository(db, tenant_b.tenant_id).stage("productos", "cierre")
-
-        assert mine is not None and theirs is not None
-        assert mine.instrucciones == "Cierra como A"
-        assert theirs.instrucciones == "Cierra como B"
-
-    def test_for_template_lists_only_your_own(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, seeded: None
-    ) -> None:
-        mine = ProcessStageOverrideRepository(db, tenant_a.tenant_id).for_template("productos")
-
-        assert list(mine) == ["cierre"]
-        assert mine["cierre"].instrucciones == "Cierra como A"
-
-    def test_saving_does_not_touch_the_other_tenants_row(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, seeded: None
-    ) -> None:
-        ProcessStageOverrideRepository(db, tenant_a.tenant_id).upsert(
-            "productos", "cierre", instrucciones="Nuevo texto", base_version=2
-        )
-
-        theirs = ProcessStageOverrideRepository(db, tenant_b.tenant_id).stage("productos", "cierre")
-        assert theirs is not None
-        assert theirs.instrucciones == "Cierra como B"
-        assert theirs.base_version == 1
-
-    def test_upsert_updates_in_place(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, seeded: None
-    ) -> None:
-        repository = ProcessStageOverrideRepository(db, tenant_a.tenant_id)
-        repository.upsert("productos", "cierre", instrucciones_seguimiento="Recuerda el cupón")
-
-        assert repository.count() == 1
-        row = repository.stage("productos", "cierre")
-        assert row is not None
-        assert row.instrucciones == "Cierra como A"
-        assert row.instrucciones_seguimiento == "Recuerda el cupón"
-
-    def test_counting_is_scoped(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, seeded: None
-    ) -> None:
-        assert ProcessStageOverrideRepository(db, tenant_a.tenant_id).count() == 1
-
-    def test_a_repository_cannot_write_for_another_tenant(
-        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
-    ) -> None:
-        with pytest.raises(TenantScopeError):
-            ProcessStageOverrideRepository(db, tenant_a.tenant_id).add(
-                tenant_id=tenant_b.tenant_id,
-                template_key="productos",
-                stage_key="cierre",
-                base_version=1,
-            )
-
-    def test_reading_by_a_row_id_is_not_offered(self, db: Session, tenant_a: TenantFixture) -> None:
-        with pytest.raises(NotImplementedError):
-            ProcessStageOverrideRepository(db, tenant_a.tenant_id).get(tenant_a.conversation_id)
-
-    def test_a_stage_is_unique_per_tenant(self, db: Session, tenant_a: TenantFixture) -> None:
-        repository = ProcessStageOverrideRepository(db, tenant_a.tenant_id)
-        repository.add(template_key="productos", stage_key="inicio", base_version=1)
-
-        with pytest.raises(IntegrityError), db.begin_nested():
-            repository.add(template_key="productos", stage_key="inicio", base_version=1)
-
-    def test_the_length_limits_are_enforced_by_the_database(
-        self, db: Session, tenant_a: TenantFixture
-    ) -> None:
-        repository = ProcessStageOverrideRepository(db, tenant_a.tenant_id)
-
-        repository.add(
-            template_key="productos",
-            stage_key="limite",
-            instrucciones="x" * 4000,
-            instrucciones_seguimiento="y" * 1000,
-            base_version=1,
-        )
-        with pytest.raises(IntegrityError), db.begin_nested():
-            repository.add(
-                template_key="productos",
-                stage_key="largo",
-                instrucciones="x" * 4001,
-                base_version=1,
-            )
-        with pytest.raises(IntegrityError), db.begin_nested():
-            repository.add(
-                template_key="productos",
-                stage_key="seguimiento_largo",
-                instrucciones_seguimiento="y" * 1001,
-                base_version=1,
-            )
 
 
 class TestAgentBehaviorIsPerTenant:
