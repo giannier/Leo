@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.repositories.base import BaseRepository, TenantScopeError
@@ -23,6 +23,10 @@ def _delivery_rank(status: str | None) -> int:
     if status is None or status not in _DELIVERY_ORDER:
         return -1
     return _DELIVERY_ORDER.index(status)
+
+
+# A thread item that is not a message: takeover, return, close (Feature 007).
+EVENT = "event"
 
 
 class ConversationRepository(BaseRepository[Conversation]):
@@ -62,19 +66,30 @@ class MessageRepository(BaseRepository[Message]):
     model = Message
 
     def list_for_conversation(
-        self, conversation_id: uuid.UUID, *, limit: int | None = None
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        limit: int | None = None,
+        include_events: bool = False,
     ) -> Sequence[Message]:
         """Transcript of one thread, oldest first.
 
         The conversation id alone is not enough: it is a UUID supplied by the
         caller, so it must still be filtered by tenant. That happens in
         `_scoped()`, which is why this cannot be a bare query.
+
+        The inbox's events (takeover, return, close: `msg_type='event'`) are left
+        out unless asked for: they are not words of the customer or the business,
+        and a reader that took them for a reply (the burst, the model's history)
+        would act on something nobody said.
         """
         statement = (
             self._scoped()
             .where(Message.conversation_id == conversation_id)
             .order_by(Message.created_at)
         )
+        if not include_events:
+            statement = statement.where(Message.msg_type != EVENT)
         if limit is not None:
             statement = statement.limit(limit)
         return self._session.execute(statement).scalars().all()
@@ -104,7 +119,7 @@ class MessageRepository(BaseRepository[Message]):
             raise TenantScopeError(
                 f"Conversation {conversation_id!s} does not belong to tenant {self.tenant_id!s}"
             )
-        return self.add(
+        message = self.add(
             conversation_id=conversation_id,
             direction=direction,
             author=author,
@@ -114,12 +129,24 @@ class MessageRepository(BaseRepository[Message]):
             delivery_status=delivery_status,
             payload=payload,
         )
+        # The inbox's order and its unread counter (Feature 007). One UPDATE in the
+        # same transaction as the message, so the two never disagree.
+        values: dict[str, Any] = {"last_message_at": func.clock_timestamp()}
+        if direction == "inbound":
+            values["unread_count"] = Conversation.unread_count + 1
+        self._session.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id, Conversation.tenant_id == self.tenant_id)
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        return message
 
     def latest_for_conversation(self, conversation_id: uuid.UUID) -> Message | None:
-        """The newest message of a thread, whoever sent it."""
+        """The newest message of a thread, whoever sent it (events aside)."""
         statement = (
             self._scoped()
-            .where(Message.conversation_id == conversation_id)
+            .where(Message.conversation_id == conversation_id, Message.msg_type != EVENT)
             .order_by(Message.created_at.desc())
             .limit(1)
         )
@@ -143,7 +170,9 @@ class MessageRepository(BaseRepository[Message]):
                 )
             ).scalar_one_or_none()
         statement = self._scoped().where(
-            Message.conversation_id == conversation_id, Message.direction == "outbound"
+            Message.conversation_id == conversation_id,
+            Message.direction == "outbound",
+            Message.msg_type != EVENT,
         )
         if anchor is not None:
             statement = statement.where(Message.created_at > anchor.created_at)

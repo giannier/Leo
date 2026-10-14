@@ -11,11 +11,13 @@ from app.api.v1 import (
     connection,
     conversations,
     health,
+    inbox,
     knowledge,
     orders,
     platform_admin,
     platform_catalog,
     products,
+    realtime,
     sandbox,
     team,
     tenant,
@@ -24,6 +26,7 @@ from app.api.v1 import (
 
 router = APIRouter()
 router.include_router(health.router)
+router.include_router(inbox.router)
 router.include_router(agent.router)
 router.include_router(assistant.router)
 router.include_router(assistant_info.router)
@@ -37,6 +40,7 @@ router.include_router(platform_admin.router)
 router.include_router(platform_catalog.router)
 router.include_router(team.router)
 router.include_router(products.router)
+router.include_router(realtime.router)
 router.include_router(sandbox.router)
 router.include_router(tenant.router)
 router.include_router(wizard.router)

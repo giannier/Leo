@@ -79,7 +79,7 @@ from app.services.trial import agent_may_reply
 
 logger = logging.getLogger(__name__)
 
-GateReason = Literal["paused", "opted_out", "handover"]
+GateReason = Literal["paused", "opted_out", "handover", "takeover"]
 Outcome = Literal["answered", "gated", "unsupported", "llm_down"]
 
 # Why a stage was saved: an ordinary turn, or a payment proof that arrived in it.
@@ -493,6 +493,10 @@ class TurnPipeline:
                 )
                 if contact is not None and contact.opted_out_at is not None:
                     return "opted_out"
+        # A person has the conversation in the inbox (Feature 007): the agent is
+        # quiet, in the simulator too, and spends no quota (C-004).
+        if conversation.takeover_user_id is not None:
+            return "takeover"
         if facts.derivado_activo(now):
             return "handover"
         return None

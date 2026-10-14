@@ -68,8 +68,10 @@ CASH_ORDER = "pedido_contra_entrega"
 HANDOFF = "derivacion"
 CUSTOMER_UNREACHED = "ventana_cerrada"
 LLM_DOWN = "llm_caido"
+# Feature 007: a handover nobody took within the business's minutes.
+UNATTENDED = "derivacion_sin_atender"
 
-EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN)
+EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN, UNATTENDED)
 
 NOTIFICATION_KINDS = (*ONE_SHOT_KINDS, *EVENT_KINDS)
 

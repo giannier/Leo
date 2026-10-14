@@ -106,6 +106,7 @@ def why_not(
     contact: Contact | None,
     last_message: Message | None,
     zone: str | None,
+    taken: bool = False,
 ) -> Skip | FollowUpPlan:
     """The first condition of C-13 that fails, or the follow-up that is due."""
     if config is None or not config.seguimiento_activo:
@@ -119,6 +120,8 @@ def why_not(
         return "etapa"
     if facts.derivado_activo(now):
         return "derivado"
+    if taken:
+        return "tomada"
     if not may_reply:
         return "asistente_inactivo"
     if contact is None or contact.opted_out_at is not None:
@@ -211,6 +214,7 @@ class FollowUps:
                 conversation_id
             ),
             zone=profile.timezone if profile is not None else None,
+            taken=conversation.takeover_user_id is not None,
         )
         if not isinstance(plan, FollowUpPlan):
             return FollowUpResult(plan)

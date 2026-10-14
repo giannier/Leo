@@ -28,6 +28,7 @@ from app.models.catalog import (
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
+from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
 from app.models.media import MediaAsset
@@ -45,6 +46,8 @@ from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
+    "ConversationNote",
+    "NotificationSettings",
     "AgentConfig",
     "AgentTrace",
     "AuditLog",
