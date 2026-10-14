@@ -89,6 +89,13 @@ export const ChatIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const InboxIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 13h4l1.5 2.5h5L16 13h4" />
+    <path d="M5.5 5h13L21 13v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z" />
+  </Svg>
+);
+
 export const BoxIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M21 8 12 3 3 8l9 5 9-5Z" />

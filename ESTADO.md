@@ -12,7 +12,7 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 | 004 Motor de ventas | Fases A–E construidas (2026-10-14) | Milestones A, B y C aprobados; D (derivación, seguimientos, breaker) y E (aislamiento, evals de flujos, e2e, aceptación) hechos y verificados con el modelo real (`milestones/aceptacion.md`). Falta: TASK-459 número real (al final, por decisión de Giannier) y el merge |
 | 005 Catalog / 008 Inbox | Absorbidas | Catálogo CRUD+CSV/XLSX en 001 (TASK-011); inbox absorbido por 007 |
 | 006 Conocimiento avanzado | No iniciado | Solo RAG v0 (PDF con texto, sin OCR ni URL) |
-| 007 Inbox | No iniciado | Solo `GET …/conversations/{id}/state` y `resume-bot` (TASK-443); la bandeja es la 007 |
+| 007 Inbox | Construida (2026-10-14) | TASK-701..708 `[x]`: toma exclusiva, canal en vivo (WebSocket), API y pantalla `/bandeja`, búsqueda, auto-devolución, correo de cola desatendida; e2e de dos operadores (`007/milestones/bandeja.md`). Para ratificar: Web Push (C-101, dependencia) y borrado de contacto (C-102, datos personales). La prueba con ayudante y número real va con la TASK-459 |
 | 009 Billing | No iniciado | `providers/payments/` vacío; solo existe la tabla `plans` con límites |
 | 010 Dashboard | No iniciado | Solo panel admin de plataforma y medidor de uso |
 | 011–016 (Fase 2) | No iniciado | Docs en estado "Draft para ratificación"; ningún código |

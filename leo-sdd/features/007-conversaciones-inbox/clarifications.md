@@ -62,3 +62,15 @@ el pedido.
 ## C-110: Sin librerías nuevas en el panel
 Sin TanStack Query ni virtualización: la lista pagina por cursor ("Cargar más") y el hilo carga 50
 mensajes con "Ver anteriores". Si el volumen real lo pide, se propone la librería.
+
+## C-111: Lo que la bandeja enlaza en vez de repetir
+- **Comprobantes:** se aprueban en la pantalla del pedido (004, TASK-432), que ya tiene la lectura del
+  comprobante, las alertas y la confirmación. La bandeja muestra "Ver el pedido" cuando la conversación
+  tiene uno; no duplica los botones de aprobar y rechazar.
+- **Trazas del agente:** quedan en la depuración del simulador (004). En la bandeja el hilo muestra lo que
+  el cliente vio; las trazas por mensaje se agregan si el piloto las pide.
+- **Avisos del navegador:** con la pestaña abierta en segundo plano, el panel avisa cuando sube el número
+  de conversaciones que esperan a una persona (`Notification` del navegador, permiso pedido una vez). El
+  aviso con la pestaña cerrada es Web Push (C-101), pendiente de aprobar la dependencia.
+- **Menú:** "Bandeja" entra a la barra inferior del teléfono (máximo cinco) y sale "Catálogo", que se abre
+  desde el menú lateral o el asistente: el operador entra a la bandeja todos los días; al catálogo, poco.

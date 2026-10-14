@@ -24,6 +24,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The inbox */
+        get: operations["list_inbox_api_v1_tenant_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One conversation's header */
+        get: operations["conversation_detail_api_v1_tenant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The thread, newest page first; opening it marks it read */
+        get: operations["conversation_thread_api_v1_tenant_conversations__conversation_id__messages_get"];
+        put?: never;
+        /** Write to the customer as the business */
+        post: operations["send_message_api_v1_tenant_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/messages/{message_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A signed link to an image the customer sent (10 minutes) */
+        get: operations["message_image_api_v1_tenant_conversations__conversation_id__messages__message_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/takeover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the conversation: the assistant stops at once */
+        post: operations["take_conversation_api_v1_tenant_conversations__conversation_id__takeover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give the conversation back to the assistant */
+        post: operations["release_conversation_api_v1_tenant_conversations__conversation_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/steal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take a conversation a colleague has (owner or admin) */
+        post: operations["steal_conversation_api_v1_tenant_conversations__conversation_id__steal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The team's internal notes */
+        get: operations["list_notes_api_v1_tenant_conversations__conversation_id__notes_get"];
+        put?: never;
+        /** Add an internal note (never sent to the customer) */
+        post: operations["add_note_api_v1_tenant_conversations__conversation_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Conversation */
+        post: operations["close_conversation_api_v1_tenant_conversations__conversation_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Conversation */
+        post: operations["reopen_conversation_api_v1_tenant_conversations__conversation_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/opt-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Opt Out Contact */
+        post: operations["opt_out_contact_api_v1_tenant_conversations__conversation_id__opt_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/notification-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings__api_v1_tenant_notification_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenant_notification_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/agent/activate": {
         parameters: {
             query?: never;
@@ -2132,6 +2339,50 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ContactOut */
+        ContactOut: {
+            /** Id */
+            id: string | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Opt Out */
+            opt_out: boolean;
+            /** Posible Duplicado */
+            posible_duplicado: boolean;
+        };
+        /** ConversationDetail */
+        ConversationDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Canal */
+            canal: string;
+            /** Estado */
+            estado: string;
+            contacto: components["schemas"]["ContactOut"];
+            tomada_por: components["schemas"]["Holder"] | null;
+            /** Tomada Desde */
+            tomada_desde: string | null;
+            derivado: components["schemas"]["HandoverOut"] | null;
+            /** Etapa */
+            etapa: string | null;
+            ventana: components["schemas"]["Window"];
+            /** Pedido Id */
+            pedido_id: string | null;
+        };
+        /** ConversationPage */
+        ConversationPage: {
+            /** Items */
+            items: components["schemas"]["ListItem"][];
+            /** Siguiente */
+            siguiente: string | null;
+            /** Esperando */
+            esperando: number;
+        };
         /** ConversationStateOut */
         ConversationStateOut: {
             /** Etapa */
@@ -2429,6 +2680,18 @@ export interface components {
              */
             hasta: string;
         };
+        /** HandoverOut */
+        HandoverOut: {
+            /** Motivo */
+            motivo: string;
+            /** Resumen */
+            resumen: string | null;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
+        };
         /**
          * HealthResponse
          * @description Shape of the health check response.
@@ -2463,6 +2726,23 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** Holder */
+        Holder: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            nombre: string | null;
+        };
+        /** ImageLink */
+        ImageLink: {
+            /** Url */
+            url: string;
+            /** Expira En */
+            expira_en: number;
         };
         /** ImportConfirmResponse */
         ImportConfirmResponse: {
@@ -2575,6 +2855,32 @@ export interface components {
             /** Faltan Selecciones */
             faltan_selecciones: number;
         };
+        /** ListItem */
+        ListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Canal */
+            canal: string;
+            /** Estado */
+            estado: string;
+            contacto: components["schemas"]["ContactOut"];
+            /** Ultimo Mensaje */
+            ultimo_mensaje: string | null;
+            /** Ultimo Autor */
+            ultimo_autor: string | null;
+            /** Ultimo En */
+            ultimo_en: string | null;
+            /** No Leidos */
+            no_leidos: number;
+            tomada_por: components["schemas"]["Holder"] | null;
+            /** Necesita Humano */
+            necesita_humano: boolean;
+            /** Etapa */
+            etapa: string | null;
+        };
         /**
          * LoginRequest
          * @description Payload of `POST /auth/login`.
@@ -2682,6 +2988,43 @@ export interface components {
             /** Role */
             role: string;
         };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Autor */
+            autor: string;
+            /** Tipo */
+            tipo: string;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+            /** Estado Entrega */
+            estado_entrega: string | null;
+            /** Operador */
+            operador?: string | null;
+            /** Evento */
+            evento?: string | null;
+            /**
+             * Descartado
+             * @default false
+             */
+            descartado: boolean;
+            /** Opciones */
+            opciones?: string[];
+            /**
+             * Imagen
+             * @default false
+             */
+            imagen: boolean;
+        };
         /** MessageResponse */
         MessageResponse: {
             /**
@@ -2710,6 +3053,33 @@ export interface components {
             vista: number;
             /** Reglas */
             reglas: components["schemas"]["RuleView"][];
+        };
+        /** NoteBody */
+        NoteBody: {
+            /** Texto */
+            texto: string;
+        };
+        /** NoteList */
+        NoteList: {
+            /** Items */
+            items: components["schemas"]["NoteOut"][];
+        };
+        /** NoteOut */
+        NoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Autor */
+            autor: string | null;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
         };
         /** ObjectionIn */
         ObjectionIn: {
@@ -3449,6 +3819,11 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** SendBody */
+        SendBody: {
+            /** Texto */
+            texto: string;
+        };
         /** SendMessageResponse */
         SendMessageResponse: {
             /**
@@ -3461,6 +3836,15 @@ export interface components {
             reply?: components["schemas"]["ReplyResponse"] | null;
             trace?: components["schemas"]["TraceResponse"] | null;
             debug?: components["schemas"]["DebugResponse"] | null;
+        };
+        /** SendResult */
+        SendResult: {
+            mensaje: components["schemas"]["MessageOut"];
+            /**
+             * Aviso
+             * @enum {string}
+             */
+            aviso: "enviado" | "en_cola" | "sin_numero" | "simulador";
         };
         /**
          * SessionResponse
@@ -3487,6 +3871,20 @@ export interface components {
             memberships: components["schemas"]["MembershipSummary"][];
             /** Active Tenant Id */
             active_tenant_id: string | null;
+        };
+        /** SettingsBody */
+        SettingsBody: {
+            /** Unattended Queue Minutes */
+            unattended_queue_minutes: number;
+            /** Auto Return Minutes */
+            auto_return_minutes?: number | null;
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Unattended Queue Minutes */
+            unattended_queue_minutes: number;
+            /** Auto Return Minutes */
+            auto_return_minutes?: number | null;
         };
         /** SituationList */
         SituationList: {
@@ -3760,6 +4158,13 @@ export interface components {
              */
             created_at: string;
         };
+        /** ThreadPage */
+        ThreadPage: {
+            /** Items */
+            items: components["schemas"]["MessageOut"][];
+            /** Anteriores */
+            anteriores: string | null;
+        };
         /** TraceResponse */
         TraceResponse: {
             /** Model */
@@ -3963,6 +4368,15 @@ export interface components {
              */
             connected_at: string;
         };
+        /** Window */
+        Window: {
+            /** Abierta */
+            abierta: boolean;
+            /** Cierra En */
+            cierra_en: string | null;
+            /** Por Cerrar */
+            por_cerrar: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -3988,6 +4402,773 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_inbox_api_v1_tenant_conversations_get: {
+        parameters: {
+            query?: {
+                filtro?: "todas" | "agente" | "necesitan_humano" | "tomadas" | "mias" | "cerradas";
+                q?: string | null;
+                pruebas?: boolean;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    conversation_detail_api_v1_tenant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    conversation_thread_api_v1_tenant_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: {
+                antes_de?: string | null;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_message_api_v1_tenant_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendResult"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `outside_24h_window`: the customer has not written in 24 hours */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    message_image_api_v1_tenant_conversations__conversation_id__messages__message_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageLink"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    take_conversation_api_v1_tenant_conversations__conversation_id__takeover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    release_conversation_api_v1_tenant_conversations__conversation_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    steal_conversation_api_v1_tenant_conversations__conversation_id__steal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_tenant_conversations__conversation_id__notes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_note_api_v1_tenant_conversations__conversation_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    close_conversation_api_v1_tenant_conversations__conversation_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reopen_conversation_api_v1_tenant_conversations__conversation_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    opt_out_contact_api_v1_tenant_conversations__conversation_id__opt_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_settings__api_v1_tenant_notification_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenant_notification_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
