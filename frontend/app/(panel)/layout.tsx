@@ -24,6 +24,7 @@ import {
   BoxIcon,
   ChatIcon,
   HomeIcon,
+  InboxIcon,
   LogOutIcon,
   PhoneIcon,
   ReceiptIcon,
@@ -49,10 +50,12 @@ const NAV: NavItem[] = [
   { href: "/", label: "Inicio", icon: HomeIcon, primary: true },
   // Every role: confirming a payment is exactly the work an operator is here for.
   { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
+  // Every role: answering customers is the operator's job (Feature 007).
+  { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
   { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
   { href: "/onboarding", label: "Configuración inicial", icon: SparkIcon, roles: MANAGES_CONFIGURATION },
   { href: "/sandbox", label: "Modo prueba", icon: ChatIcon, primary: true },
-  { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION },
   { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
   { href: "/knowledge", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
   { href: "/team", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },

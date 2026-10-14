@@ -43,6 +43,13 @@ export function setAccessToken(token: string | null, tenantId?: string | null): 
   }
 }
 
+/** The live channel's address (Feature 007): the token goes in the query string. */
+export function inboxSocketUrl(): string | null {
+  if (!accessToken) return null;
+  const base = BASE_URL.replace(/^http/, "ws");
+  return `${base}/api/v1/ws?token=${encodeURIComponent(accessToken)}`;
+}
+
 export function getAccessToken(): string | null {
   return accessToken;
 }
@@ -293,6 +300,15 @@ export type PaymentMethodBody = JsonBody<
   Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
 >;
 
+export type InboxPage = Ok<Ops["/api/v1/tenant/conversations"]["get"]>;
+export type InboxItem = InboxPage["items"][number];
+export type InboxFilter = "todas" | "agente" | "necesitan_humano" | "tomadas" | "mias" | "cerradas";
+export type InboxDetail = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}"]["get"]>;
+export type ThreadPage = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/messages"]["get"]>;
+export type ThreadMessage = ThreadPage["items"][number];
+export type InboxSend = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/messages"]["post"]>;
+export type InboxNote = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/notes"]["post"]>;
+export type InboxSettings = Ok<Ops["/api/v1/tenant/notification-settings"]["get"]>;
 export type ConversationState = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/state"]["get"]>;
 export type OrderPage = Ok<Ops["/api/v1/tenant/orders"]["get"]>;
 export type OrderListItem = OrderPage["items"][number];
@@ -634,6 +650,35 @@ export const api = {
     state: (id: string) => request<ConversationState>(`/tenant/conversations/${id}/state`),
     resumeBot: (id: string) =>
       request<ConversationState>(`/tenant/conversations/${id}/resume-bot`, { method: "POST" }),
+    // The inbox (Feature 007).
+    list: (
+      query: { filtro?: InboxFilter; q?: string; pruebas?: boolean; cursor?: string },
+      signal?: AbortSignal,
+    ) => request<InboxPage>("/tenant/conversations", { query, signal }),
+    get: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}`),
+    thread: (id: string, antesDe?: string) =>
+      request<ThreadPage>(`/tenant/conversations/${id}/messages`, {
+        query: antesDe ? { antes_de: antesDe } : {},
+      }),
+    image: (id: string, messageId: string) =>
+      request<{ url: string; expira_en: number }>(
+        `/tenant/conversations/${id}/messages/${messageId}/image`,
+      ),
+    take: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/takeover`, { method: "POST" }),
+    release: (id: string) =>
+      request<InboxDetail>(`/tenant/conversations/${id}/release`, { method: "POST" }),
+    steal: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/steal`, { method: "POST" }),
+    close: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/close`, { method: "POST" }),
+    reopen: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/reopen`, { method: "POST" }),
+    optOut: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/opt-out`, { method: "POST" }),
+    send: (id: string, texto: string) =>
+      request<InboxSend>(`/tenant/conversations/${id}/messages`, { method: "POST", body: { texto } }),
+    notes: (id: string) => request<{ items: InboxNote[] }>(`/tenant/conversations/${id}/notes`),
+    addNote: (id: string, texto: string) =>
+      request<InboxNote>(`/tenant/conversations/${id}/notes`, { method: "POST", body: { texto } }),
+    settings: () => request<InboxSettings>("/tenant/notification-settings"),
+    saveSettings: (body: InboxSettings) =>
+      request<InboxSettings>("/tenant/notification-settings", { method: "PUT", body }),
   },
   orders: {
     list: (query: OrderListQuery, signal?: AbortSignal) =>

@@ -95,8 +95,8 @@ Commits: `feat(inbox): ... [TASK-7XX]`
 - [x] **TASK-704: API de bandeja** (listados/filtros/cursor, hilo, mensaje humano con guard 24h, notas, close/reopen, opt-out/erase auditados). Depends: 701. *Erase propuesto, no construido: C-102.*
 - [x] **TASK-705: Notificaciones** (Web Push VAPID, email de cola desatendida, settings). Depends: 702. *Web Push propuesto, no construido: C-101.*
 - [x] **TASK-706: Búsqueda** (tsvector español, endpoint, aislamiento verificado). Depends: 701.
-- [ ] **TASK-707: UI de bandeja** (lista virtualizada en vivo, hilo con media/trazas/eventos, compositor con estado de ventana, takeover/presencia, aprobación de comprobantes F004). Depends: 702–705.
-- [ ] **TASK-708: E2E multi-operador + endurecimiento.** Depends: todo. Milestone humano: Giannier y un ayudante simulan operación real 30 min con tráfico del número de prueba.
+- [x] **TASK-707: UI de bandeja** (lista virtualizada en vivo, hilo con media/trazas/eventos, compositor con estado de ventana, takeover/presencia, aprobación de comprobantes F004). Depends: 702–705.
+- [x] **TASK-708: E2E multi-operador + endurecimiento.** Depends: todo. Milestone humano: Giannier y un ayudante simulan operación real 30 min con tráfico del número de prueba.
 
 Dependencias: 701 → (702,703,704,706) → 705/707 → 708.
 
