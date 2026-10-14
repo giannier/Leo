@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from io import BytesIO
 
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 from pypdf.errors import PyPdfError
 
 from app.providers.pdf.base import InvalidPdfError, PdfWithoutTextError
@@ -70,6 +70,27 @@ class PypdfTextExtractor:
             raise PdfWithoutTextError(NO_TEXT_MESSAGE)
 
         return PAGE_SEPARATOR.join(extracted)
+
+    # ------------------------------------------------------- `PdfPages`
+
+    def page_texts(self, data: bytes) -> list[str]:
+        """Every page's text layer, `""` where there is none (a scanned page)."""
+        texts: list[str] = []
+        for number, page in enumerate(self._open(data).pages, start=1):
+            try:
+                texts.append((page.extract_text() or "").strip())
+            except Exception as exc:  # one bad page must not lose the rest
+                logger.warning("could not extract text from PDF page %d: %s", number, exc)
+                texts.append("")
+        return texts
+
+    def page_pdf(self, data: bytes, index: int) -> bytes:
+        """One page as a standalone PDF: what a vision model is shown, page by page."""
+        writer = PdfWriter()
+        writer.add_page(self._open(data).pages[index])
+        out = BytesIO()
+        writer.write(out)
+        return out.getvalue()
 
     def _open(self, data: bytes) -> PdfReader:
         try:

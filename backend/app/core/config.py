@@ -282,6 +282,16 @@ class Settings(BaseSettings):
     # Default `k` for `search_knowledge`.
     knowledge_search_default_k: int = 5
 
+    # OCR of scanned PDF pages with the vision model (Feature 006, TASK-602).
+    # A page whose text layer has fewer characters than `min_chars` is read by
+    # the model; at most `max_pages` pages per document (the spec's trial limit,
+    # applied always because it bounds model spend), `concurrency` at a time.
+    knowledge_ocr_max_pages: int = 30
+    knowledge_ocr_min_chars: int = 20
+    knowledge_ocr_concurrency: int = 3
+    knowledge_ocr_timeout_seconds: float = 90.0
+    knowledge_ocr_max_tokens: int = 2500
+
     # CORS
     # `NoDecode` turns off pydantic-settings' JSON decoding for this field.
     # Without it the environment source parses the value before any

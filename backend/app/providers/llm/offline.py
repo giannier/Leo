@@ -120,6 +120,18 @@ class OfflineLLMProvider:
         """
         raise LLMError("the offline provider cannot read images")
 
+    async def read_document(
+        self,
+        document: bytes,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+        max_tokens: int,
+    ) -> VisionReading:
+        """Refuses, like `read_image`: a scanned page is reported as not read."""
+        raise LLMError("the offline provider cannot read documents")
+
     async def embed(
         self,
         texts: Sequence[str],

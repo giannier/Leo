@@ -275,22 +275,52 @@ class OpenAICompatibleProvider:
         an amount is a field, not a sentence to parse.
         """
         encoded = base64.b64encode(image).decode("ascii")
+        part = {
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
+        }
+        return await self._read(part, instruction, schema, timeout_seconds, max_tokens=400)
+
+    async def read_document(
+        self,
+        document: bytes,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+        max_tokens: int,
+    ) -> VisionReading:
+        """Read a PDF (`DocumentReader`): sent inline as a file part, read by the vision model.
+
+        The model sees the page as an image and its text layer if it has one, so a
+        scanned page needs no rasterising on our side (no new dependency).
+        """
+        encoded = base64.b64encode(document).decode("ascii")
+        part = {
+            "type": "file",
+            "file": {
+                "filename": "pagina.pdf",
+                "file_data": f"data:application/pdf;base64,{encoded}",
+            },
+        }
+        return await self._read(part, instruction, schema, timeout_seconds, max_tokens=max_tokens)
+
+    async def _read(
+        self,
+        part: dict[str, Any],
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+        *,
+        max_tokens: int,
+    ) -> VisionReading:
         payload: dict[str, Any] = {
             "model": self._vision_model,
             "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": instruction},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:{mime_type};base64,{encoded}"},
-                        },
-                    ],
-                }
+                {"role": "user", "content": [{"type": "text", "text": instruction}, part]}
             ],
             "temperature": 0,
-            self._max_tokens_field: 400,
+            self._max_tokens_field: max_tokens,
             "stream": False,
             "response_format": {
                 "type": "json_schema",
