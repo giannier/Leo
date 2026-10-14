@@ -2,7 +2,7 @@
 
 "Configuración sobre código" (Constitution): a new industry must never need a
 code change. Everything that varies between businesses comes out of the
-database - identity, tone, objective, restrictions, escalation rules, opening
+database - identity, tone, objective, escalation rules, opening
 hours - and this file only decides how to phrase it.
 
 The prompt is written in Spanish because the agent answers Peruvian customers
@@ -229,10 +229,6 @@ def build_system_prompt(
         "agendado o pagado. Si el cliente quiere cerrar un pedido, resume lo que "
         "pidió y dile que una persona del negocio lo confirmará."
     )
-
-    if config is not None and config.restrictions:
-        lines.append("")
-        lines.append(f"El dueño te pide además: {config.restrictions}")
 
     escalation = _escalation_rules(config)
     if escalation:

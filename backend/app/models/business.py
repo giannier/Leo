@@ -40,6 +40,9 @@ AGENT_OBJECTIVES = ("vender", "atender", "ambos")
 AGENT_PACES = ("directo", "equilibrado", "paso_a_paso")
 AGENT_DETAIL_LEVELS = ("breve", "moderado", "extenso")
 INTELLIGENCE_LEVELS = ("economico", "medio", "mejor")
+TRATAMIENTOS = ("tu", "usted")
+EMOJI_LEVELS = ("no", "pocos", "si")
+DISCOUNT_POLICIES = ("no_ofrece", "solo_promociones", "negociable")
 DEFAULT_PROCESS_TEMPLATE = "productos"
 # How a product is sold: `precio_fijo` goes into an order, `cotizacion` is handed
 # to a person with a summary (Feature 004).
@@ -107,6 +110,15 @@ class AgentConfig(Base):
         CheckConstraint("seguimiento_horas BETWEEN 1 AND 20", name="seguimiento_horas"),
         CheckConstraint("seguimiento_max BETWEEN 1 AND 3", name="seguimiento_max"),
         CheckConstraint("derivacion_pausa_horas BETWEEN 1 AND 72", name="derivacion_pausa_horas"),
+        enum_check("tratamiento", TRATAMIENTOS, "tratamiento"),
+        enum_check("emojis", EMOJI_LEVELS, "emojis"),
+        enum_check("politica_descuentos", DISCOUNT_POLICIES, "politica_descuentos"),
+        CheckConstraint("char_length(saludo) <= 120", name="saludo_length"),
+        CheckConstraint(
+            "descuento_maximo_pct IS NULL OR descuento_maximo_pct BETWEEN 0 AND 100",
+            name="descuento_maximo_pct",
+        ),
+        CheckConstraint("max_situaciones BETWEEN 1 AND 10", name="max_situaciones"),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -116,8 +128,6 @@ class AgentConfig(Base):
     agent_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="Leo")
     tone: Mapped[str] = mapped_column(Text, nullable=False, server_default="cercano")
     objective: Mapped[str] = mapped_column(Text, nullable=False, server_default="ambos")
-    # Free text, e.g. "no ofrecer descuentos".
-    restrictions: Mapped[str | None] = mapped_column(Text, nullable=True)
     escalation_rules: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, server_default=DEFAULT_ESCALATION_RULES
     )
@@ -137,8 +147,8 @@ class AgentConfig(Base):
         JSONB, nullable=False, server_default=DEFAULT_OPT_OUT_KEYWORDS
     )
 
-    # Sales behaviour (Feature 004). `restrictions` doubles as the tenant's
-    # "additional rules"; `agent_name`, `tone` and `is_active` are reused as is.
+    # Sales behaviour (Feature 004). `agent_name`, `tone` and `is_active` are
+    # reused as is. The free-text `restrictions` became situations (017, RF-011).
     ritmo: Mapped[str] = mapped_column(Text, nullable=False, server_default="equilibrado")
     detalle: Mapped[str] = mapped_column(Text, nullable=False, server_default="moderado")
     seguimiento_activo: Mapped[bool] = mapped_column(
@@ -159,6 +169,19 @@ class AgentConfig(Base):
     process_options: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default="{}"
     )
+    # The business profile by form (017, RF-010): how the assistant addresses the
+    # customer, how many emojis, the greeting, and what it says about discounts.
+    tratamiento: Mapped[str] = mapped_column(Text, nullable=False, server_default="tu")
+    emojis: Mapped[str] = mapped_column(Text, nullable=False, server_default="pocos")
+    saludo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    politica_descuentos: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="solo_promociones"
+    )
+    # Only with `negociable`: the most a person of the business may grant. The
+    # assistant never grants it; it hands the request over (017, C-14).
+    descuento_maximo_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # Most situations a turn may carry (017, C-10).
+    max_situaciones: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
     # Edited system messages (plantillas.md section 7), by key.
     system_messages: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default="{}"
@@ -287,3 +310,6 @@ class PaymentMethodBusiness(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     media_asset_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
     )
+    # Who the account belongs to, as a receipt shows it (004 D-1, 017 RF-010):
+    # a receipt to someone else is flagged `destinatario_distinto`.
+    titular: Mapped[str | None] = mapped_column(Text, nullable=True)

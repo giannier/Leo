@@ -34,6 +34,7 @@ from app.models.media import MediaAsset
 from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
 from app.models.sales_config import BusinessInfo, Faq, Promotion
+from app.models.situation import Situation
 from app.models.tenant import (
     Invitation,
     Tenant,
@@ -79,6 +80,7 @@ __all__ = [
     "ProductCategory",
     "Promotion",
     "Rubro",
+    "Situation",
     "TenantCatalogSeen",
     "TenantRuleSwitch",
     "RefreshToken",

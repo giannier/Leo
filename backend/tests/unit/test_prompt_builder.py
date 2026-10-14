@@ -40,7 +40,6 @@ def _config(**overrides: object) -> AgentConfig:
     config.agent_name = "Leo"
     config.tone = "cercano"
     config.objective = "ambos"
-    config.restrictions = None
     config.escalation_rules = []
     config.farewell_on_pause = None
     config.is_active = False
@@ -124,12 +123,6 @@ class TestToneAndObjective:
 
 
 class TestOwnerRules:
-    def test_restrictions_are_passed_through(self) -> None:
-        prompt = build_system_prompt(
-            profile=_profile(), config=_config(restrictions="No ofrecer descuentos")
-        )
-        assert "No ofrecer descuentos" in prompt
-
     def test_escalation_triggers_are_phrased_readably(self) -> None:
         prompt = build_system_prompt(
             profile=_profile(),

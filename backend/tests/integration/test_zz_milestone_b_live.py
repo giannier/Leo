@@ -515,11 +515,18 @@ async def _tienda(api: AsyncClient, mail: Any, db: Session, rep: Report) -> None
     rep.h("T2 — rechazo y corrección")
     await chat.reset()
     await chat.say("Hola, quiero 2 polos")
+    await chat.agree_if_asked()
     await chat.say("Soy Ana Quispe, 987654321, delivery en Miraflores, Av. Larco 123")
     if "enviar_metodos_pago" not in chat.tools():
         await chat.say("Sí, pásame cómo pagar")
     await chat.image("comprobante-ok.png")
-    order = next(o for o in await _orders(api, headers) if o["estado"] == "por_confirmar")
+    order = next((o for o in await _orders(api, headers) if o["estado"] == "por_confirmar"), None)
+    if order is None:
+        rep.check(
+            "T2.1 el comprobante deja el pedido Por confirmar", False, f"etapa {chat.stage()}"
+        )
+        rep.note("Se detiene T2: no hay pedido por confirmar que rechazar.")
+        return
     await api.post(
         f"{ORDERS}/{order['id']}/reject",
         headers=headers,

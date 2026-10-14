@@ -182,3 +182,5 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     tools_enabled: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     outbound_count: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     model_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The situations that entered the turn, with their distance (017, C-10).
+    situaciones: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)

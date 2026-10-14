@@ -36,6 +36,7 @@ from app.workers.channel import (
 )
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
+from app.workers.situations import embed_situations
 from app.workers.trial_lifecycle import (
     tenant_archiver,
     trial_enforcer,
@@ -100,6 +101,7 @@ class WorkerSettings:
         process_webhook_event,
         answer_conversation,
         index_catalog_knowledge,
+        embed_situations,
     ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
@@ -125,6 +127,7 @@ class WorkerSettings:
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
         cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
+        cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
     ]
     on_startup = startup
     on_shutdown = shutdown

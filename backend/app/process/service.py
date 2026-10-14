@@ -26,6 +26,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
@@ -72,8 +73,13 @@ class Behavior:
     tone: str = DEFAULT_TONE
     ritmo: str = DEFAULT_PACE
     detalle: str = DEFAULT_DETAIL
-    # `agent_configs.restrictions`, the tenant's "additional rules".
-    reglas_adicionales: str | None = None
+    # The profile by form (017, RF-010).
+    tratamiento: str = "tu"
+    emojis: str = "pocos"
+    saludo: str | None = None
+    politica_descuentos: str = "solo_promociones"
+    descuento_maximo_pct: Decimal | None = None
+    max_situaciones: int = 5
 
 
 @dataclass(frozen=True)
@@ -292,5 +298,10 @@ def _behavior(agent: AgentConfig | None) -> Behavior:
         tone=agent.tone or DEFAULT_TONE,
         ritmo=agent.ritmo or DEFAULT_PACE,
         detalle=agent.detalle or DEFAULT_DETAIL,
-        reglas_adicionales=agent.restrictions or None,
+        tratamiento=agent.tratamiento or "tu",
+        emojis=agent.emojis or "pocos",
+        saludo=agent.saludo or None,
+        politica_descuentos=agent.politica_descuentos or "solo_promociones",
+        descuento_maximo_pct=agent.descuento_maximo_pct,
+        max_situaciones=agent.max_situaciones or 5,
     )

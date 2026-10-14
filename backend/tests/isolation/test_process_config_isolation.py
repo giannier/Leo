@@ -68,7 +68,7 @@ def _configure(db: Session, fixture: TenantFixture, label: str) -> None:
         agent_name=f"Asistente {label}",
         ritmo="directo" if cert else "paso_a_paso",
         detalle="breve" if cert else "extenso",
-        restrictions=f"Reglas de {label}",
+        saludo=f"Saludo de {label}",
     )
     BusinessProfileRepository(db, tenant).upsert(
         business_name=f"Negocio {label}",
@@ -105,10 +105,7 @@ class TestEachTenantReadsItsOwnConfiguration:
         assert (a.behavior.agent_name, b.behavior.agent_name) == ("Asistente A", "Asistente B")
         assert (a.behavior.ritmo, b.behavior.ritmo) == ("directo", "paso_a_paso")
         assert (a.behavior.detalle, b.behavior.detalle) == ("breve", "extenso")
-        assert (a.behavior.reglas_adicionales, b.behavior.reglas_adicionales) == (
-            "Reglas de A",
-            "Reglas de B",
-        )
+        assert (a.behavior.saludo, b.behavior.saludo) == ("Saludo de A", "Saludo de B")
         assert (a.business_name, b.business_name) == ("Negocio A", "Negocio B")
         assert (a.currency, b.currency) == ("PEN", "USD")
 

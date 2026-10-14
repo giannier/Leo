@@ -244,6 +244,8 @@ class TurnTrace:
     outbound_count: int
     # The configured intelligence level; None when the tenant brings its own model.
     model_tier: str | None = None
+    # The situations that entered the turn (017, TASK-463).
+    situaciones: list[dict[str, object]] | None = None
 
 
 class AgentCore:
@@ -615,6 +617,7 @@ class AgentCore:
                     "tools_enabled": turn.tools_enabled,
                     "outbound_count": turn.outbound_count,
                     "model_tier": turn.model_tier,
+                    "situaciones": turn.situaciones,
                 }
                 if turn is not None
                 else {}
