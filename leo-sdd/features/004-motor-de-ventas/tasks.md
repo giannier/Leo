@@ -595,12 +595,14 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: `pytest backend/tests/isolation` en verde, con más de 174 tests
   - Parallel: true
 
-- [ ] TASK-447: Evals "flujos de venta"
+- [x] TASK-447: Evals "flujos de venta"
   - Input: los 6 escenarios de Capacita, `plantillas.md`, criterios de la spec
   - Output: en `make evals` se suman 8 conversaciones guionadas por plantilla (24 en total), con aserciones sobre etapa final, herramientas llamadas, que no haya recursos repetidos, ≤ 3 salientes por turno, que nunca diga "confirmado" antes del operador y precios exactos
   - Depends on: TASK-433, TASK-444, TASK-445
   - Verification: ≥ 90 % por plantilla con el modelo `economico`; el resultado se adjunta al PR
   - Parallel: true
+  - Hecho (2026-10-14): `backend/evals/sales_flows.py` + `test_sales_flows.py` (corren con `make evals`).
+    24/24 en dos corridas tras las correcciones de C-24; reporte en `milestones/evals-flujos-de-venta.md`.
 
 - [ ] TASK-448: E2E Playwright
   - Input: flujos de las Fases B y C

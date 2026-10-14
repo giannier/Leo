@@ -138,8 +138,11 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
     if not chunks and not guidance:
         return ToolResult.no_disponible(
             texto=(
-                "No hay información sobre eso en los documentos del negocio. "
-                "No inventes una respuesta."
+                "No hay información sobre eso en los documentos del negocio. No inventes una "
+                "respuesta. Antes de decir que no lo sabes, revisa el bloque NEGOCIO (promociones, "
+                "entregas, pagos) y, si es sobre lo que se vende, usa buscar_productos. Si tampoco "
+                "está ahí, dilo y ofrece que lo atienda una persona; no derives sin que el cliente "
+                "lo pida o lo acepte."
             )
         )
 

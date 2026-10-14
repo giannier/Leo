@@ -317,6 +317,10 @@ class TurnPipeline:
         bubbles = to_bubbles(reply.content, config.behavior.detalle, budget)
         if reply.silent and tool_messages:
             bubbles = []
+        # The model often writes again the text it just sent as the body of the
+        # buttons or the list; the customer would read it twice (TASK-447).
+        already = {_same_text(m.content) for m in tool_messages if m.msg_type == "interactive"}
+        bubbles = [bubble for bubble in bubbles if _same_text(bubble) not in already]
         text_messages = [
             self._messages.append(
                 conversation_id=conversation_id,
@@ -531,6 +535,11 @@ class TurnPipeline:
                 continue
             return saved.state.version
         raise StateConflict("unreachable")  # pragma: no cover
+
+
+def _same_text(text: str) -> str:
+    """Text compared for repetition: case, spacing and WhatsApp markup aside."""
+    return " ".join(text.replace("*", "").replace("_", "").split()).casefold()
 
 
 def _entry_from(referral: Referral, now: datetime) -> dict[str, Any]:

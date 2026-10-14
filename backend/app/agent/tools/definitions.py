@@ -258,8 +258,8 @@ def _definitions() -> list[ToolDefinition]:
         ToolDefinition(
             name=SEARCH_TOOL,
             description=(
-                "Busca productos con su precio y stock. Úsala antes de mencionar cualquier "
-                "producto o precio."
+                "Busca en el catálogo del negocio (productos, servicios o certificados) con su "
+                "precio. Úsala antes de mencionar cualquier cosa que se vende o su precio."
             ),
             parameters=_search_schema,
             handler=buscar_productos,

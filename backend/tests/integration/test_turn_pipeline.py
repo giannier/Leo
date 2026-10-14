@@ -229,6 +229,30 @@ class TestWalkingTheFirstStages:
         assert _events(db, conversation) == []
 
 
+class TestNoRepeatedText:
+    async def test_text_that_repeats_the_buttons_body_is_not_sent_twice(self, db: Session) -> None:
+        """The model wrote again the question it had just sent with the buttons."""
+        tenant = _tenant(db)
+        conversation = _conversation(db, tenant)
+        _conversation_with_a_path_to_choose(db, tenant, conversation)
+        llm = MockLLMProvider()
+        llm.queue(
+            ChatResult(
+                content="",
+                tool_calls=(
+                    _call("mostrar_opciones", tipo="caminos", texto="Ana, ¿qué necesitas?"),
+                ),
+            )
+        )
+        llm.queue(ChatResult(content="*Ana*, ¿qué  necesitas?"))
+
+        result = await _pipeline(db, tenant, conversation, llm).run(
+            conversation.id, InboundTurn(text="hola")
+        )
+
+        assert [m.msg_type for m in result.messages] == ["interactive"]
+
+
 class TestTheStagePromptAndTools:
     async def test_the_model_gets_the_tools_of_the_stage_only(self, db: Session) -> None:
         tenant = _tenant(db)

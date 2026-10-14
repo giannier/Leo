@@ -141,6 +141,10 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
         tipo_entrega=order.tipo_entrega if order is not None else None,
         zona_envio=order.zona_envio if order is not None else None,
     )
+    if "zona_envio" in missing and not valid_zones:
+        entregas = service.entregas()
+        if entregas is not None and entregas.zonas:
+            valid_zones = tuple(zone.nombre for zone in entregas.zonas)
     data: dict[str, Any] = {"guardados": saved, "invalidos": invalid, "faltan": missing}
     if valid_zones:
         data["zonas_validas"] = list(valid_zones)
@@ -152,7 +156,7 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
         if not invalid:
             return ToolResult.error("No recibí ningún dato para guardar.")
         return ToolResult("error", data, f"No se guardó nada. {text}", None)
-    return ToolResult.hecho(data=data, texto=text, decir=_say(invalid, missing))
+    return ToolResult.hecho(data=data, texto=text, decir=_say(invalid, missing, valid_zones))
 
 
 def _settle_delivery_type(service: OrderService, order: Order) -> str | None:
@@ -189,7 +193,20 @@ def _describe(
     return "\n".join(lines)
 
 
-def _say(invalid: dict[str, str], missing: list[str]) -> str:
+def _say(invalid: dict[str, str], missing: list[str], zones: tuple[str, ...] = ()) -> str:
+    if zones and "zona_envio" in invalid:
+        return (
+            "No hacemos delivery a esa zona: dile a qué zonas sí llegamos ("
+            + ", ".join(zones)
+            + ") y pregúntale cuál le sirve. Di solo lo que quedó guardado."
+        )
+    if zones and "zona_envio" in missing:
+        return (
+            "Para la zona de envío, dile a qué zonas llegamos ("
+            + ", ".join(zones)
+            + ") y pregúntale cuál le sirve; si dio un lugar fuera de ellas, dile que ahí no "
+            "llegamos. Pide lo demás que falte sin repetir lo que ya te dio."
+        )
     if invalid:
         return (
             "Hubo datos que no se pudieron guardar: vuelve a pedírselos con tus palabras, sin "

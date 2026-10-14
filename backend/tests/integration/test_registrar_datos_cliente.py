@@ -283,6 +283,25 @@ class TestDelivery:
         assert contact.custom_data["direccion"] == ADDRESS
         assert result.data["faltan"] == []
 
+    async def test_a_missing_zone_comes_with_the_valid_ones(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """The customer named a place as the address: the zone is still missing, and
+        the model is told which ones exist so it can offer them (TASK-447)."""
+        set_deliveries(db, tenant)
+        ctx = context(db, tenant, conversation, required=["telefono"])
+        await order_with(ctx, catalogue["physical"])
+
+        result = await save(ctx, tipo_entrega="delivery", direccion="Arequipa")
+
+        assert "zona_envio" in result.data["faltan"]
+        assert result.data["zonas_validas"] == ["Bagua Grande", "Jaén"]
+        assert "Bagua Grande, Jaén" in (result.decir or "")
+
     async def test_delivery_asks_for_the_address_and_the_zone(
         self,
         db: Session,
