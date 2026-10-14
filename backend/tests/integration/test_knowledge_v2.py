@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -277,3 +279,126 @@ class TestTheMaintenanceCommand:
         stale = {source for t, source in _stale_sources(db, current="mock-embed", everything=False)}
 
         assert old in stale and fresh not in stale
+
+
+class TestTheBusinessWebsite:
+    SITE = {
+        "https://tienda.pe/robots.txt": (404, "text/plain", ""),
+        "https://tienda.pe/": (
+            200,
+            "text/html",
+            "<html><head><title>Tienda</title></head><body>"
+            "<p>Vendemos mochilas escolares.</p><a href='/envios'>Envíos</a></body></html>",
+        ),
+        "https://tienda.pe/envios": (
+            200,
+            "text/html",
+            "<html><head><title>Envíos</title></head><body>"
+            "<p>Enviamos a todo Lima en 24 horas.</p></body></html>",
+        ),
+    }
+
+    async def test_the_site_is_read_indexed_and_resynced_by_hand(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+        queue: RecordingQueue,
+    ) -> None:
+        from app.providers.pdf import PypdfTextExtractor
+        from app.providers.web import MockWebFetcher
+        from app.workers.knowledge_indexer import index_source
+
+        created = await knowledge.post(f"{KNOWLEDGE}/web", json={"url": "tienda.pe"})
+        assert created.status_code == 202, created.text
+        source_id = uuid.UUID(created.json()["id"])
+        fetcher = MockWebFetcher(dict(self.SITE))
+
+        async def run() -> Any:
+            return await index_source(
+                db,
+                tenant,
+                source_id,
+                llm=llm,
+                storage=storage,
+                pdf_extractor=PypdfTextExtractor(),
+                web_fetcher=fetcher,
+            )
+
+        assert (await run()).succeeded
+        source = _source(db, source_id)
+        assert source.type == "web" and source.priority == 50
+        assert source.source_url == "https://tienda.pe/" and source.crawled_at is not None
+        assert source.report == {
+            "web": {
+                "paginas": ["https://tienda.pe/", "https://tienda.pe/envios"],
+                "omitidas": [],
+                "robots_txt": False,
+            }
+        }
+        assert source.char_count == len(source.content or "")
+        assert any("24 horas" in c.content for c in _chunks(db, source_id))
+
+        # The site changes; nothing re-reads it until the owner asks.
+        fetcher.pages["https://tienda.pe/envios"] = (
+            200,
+            "text/html",
+            "<html><body><p>Enviamos a todo Lima en 48 horas.</p></body></html>",
+        )
+        resynced = await knowledge.post(f"{KNOWLEDGE}/{source_id}/resync")
+        assert resynced.status_code == 202
+        assert queue.jobs[-1] == (INDEX_JOB, (str(tenant), str(source_id)))
+        assert (await run()).succeeded
+        chunks = " ".join(c.content for c in _chunks(db, source_id))
+        assert "48 horas" in chunks and "24 horas" not in chunks
+
+    async def test_an_empty_site_fails_with_what_to_do(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        from app.providers.pdf import PypdfTextExtractor
+        from app.providers.web import MockWebFetcher
+        from app.services.web_crawl import EMPTY_SITE
+        from app.workers.knowledge_indexer import index_source
+
+        created = await knowledge.post(f"{KNOWLEDGE}/web", json={"url": "https://app.pe"})
+        source_id = uuid.UUID(created.json()["id"])
+        fetcher = MockWebFetcher(
+            {"https://app.pe/": (200, "text/html", "<div id=root></div><script>x()</script>")}
+        )
+
+        outcome = await index_source(
+            db,
+            tenant,
+            source_id,
+            llm=llm,
+            storage=storage,
+            pdf_extractor=PypdfTextExtractor(),
+            web_fetcher=fetcher,
+        )
+
+        assert outcome.status == "failed" and outcome.error_msg == EMPTY_SITE
+        assert llm.embed_calls == []
+
+    @pytest.mark.parametrize("url", ["localhost", "http://10.0.0.5", "ftp://tienda.pe"])
+    async def test_an_address_that_is_not_a_website_is_refused(
+        self, knowledge: AsyncClient, url: str
+    ) -> None:
+        refused = await knowledge.post(f"{KNOWLEDGE}/web", json={"url": url})
+
+        assert refused.status_code == 400 and refused.json()["error"] == "invalid_url"
+
+    async def test_an_operator_cannot_add_a_website(
+        self, knowledge: AsyncClient, db: Session, account: Account
+    ) -> None:
+        _set_role(db, account, "operator")
+
+        refused = await knowledge.post(f"{KNOWLEDGE}/web", json={"url": "tienda.pe"})
+
+        assert refused.status_code == 403
