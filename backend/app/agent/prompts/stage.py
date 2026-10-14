@@ -511,6 +511,13 @@ def _state_lines(
         lines.append("- Asesoría: asesoría ya derivada a una persona del negocio")
 
     payment = _PAYMENT_STATE_TEXT.get(facts.pago_estado or "", "—")
+    if stage is Stage.COBRO and facts.modalidad_pago == "contra_entrega" and not facts.pago_estado:
+        # Both branches of COBRO are in the prompt; the model offered accounts to a
+        # cash-on-delivery customer (Milestone B run).
+        payment = (
+            "contra entrega: resume el pedido y pídele que lo confirme; no hay métodos de pago "
+            "que enviar"
+        )
     if facts.pago_estado == "rechazado" and facts.motivo_rechazo:
         payment += f": {_one_line(facts.motivo_rechazo, limits.text)}"
     elif facts.motivo_rechazo:

@@ -13,7 +13,7 @@ Este milestone demuestra el ciclo completo de una venta: el cliente arma el pedi
 - Migraciones al día: la base debe estar en la revisión `0027`
   (`docker compose -f deploy/docker-compose.dev.yml exec backend alembic upgrade head`).
 - El **Milestone A aprobado** y el tenant `Escuela Capacita` tal como quedó (catálogo de 11 productos, plantilla `certificaciones`, recursos `saludo` y `flyer_paquetes`). Este milestone lo reutiliza.
-- **Cada mensaje del simulador y cada comprobante son llamadas reales a un modelo de pago.** El stack corre con `LLM_PROFILE=openai`. No se corrieron los evals (`make evals`) con estos cambios.
+- **Cada mensaje del simulador y cada comprobante son llamadas reales a un modelo de pago.** El stack corre con `LLM_PROFILE=openai`. Los evals (`make evals`) están en verde con los cambios (sección 7).
 - **Para ver la foto del comprobante en el panel:** pon `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` en tu
   `.env` (decisión del milestone, commit `d70cc35`). Ya no hace falta tocar el archivo `hosts`.
 - Tres imágenes de prueba (PNG, JPEG o WebP, menos de 5 MB):
@@ -376,6 +376,24 @@ la línea nueva de VERIFICACION ni la instrucción de visión. Eso lo mide TASK-
 
 **Evals (2026-10-13, después de TASK-450 a 455):** 2 de 2 en verde con OpenAI (38 s); suite completa
 3228 en verde.
+
+**Recorrido automático del checklist (2026-10-14, modelo real `gpt-5.4-mini`):** los escenarios 4 y 5
+(Capacita) y T1, T1b, T2, T3 y T3b (Tienda Demo) corren por la API del simulador y de Pedidos con
+`test_zz_milestone_b_live.py` (a mano, no en CI). Resultado final: **29 de 29** en verde. Transcripción
+completa: [`B-recorrido-automatico.md`](B-recorrido-automatico.md). La primera vuelta encontró fallas
+reales, corregidas y registradas en `clarifications.md` C-23:
+
+| Falla | Causa | Arreglo |
+|---|---|---|
+| Paquete con 2 temas quedaba con "faltan 4" | `agregar` ignoraba `seleccion` | `agregar` registra los temas del paquete |
+| "SEACE, Power BI y Gestión de museos" solo guardaba SEACE | el modelo mandaba un tema por llamada | `seleccion` admite varios, separados por comas |
+| Tocar «Paquete 5» volvía a mostrar los paquetes | el contexto del toque no decía qué hacer | el toque de un producto pide agregarlo |
+| Con pago rechazado no podía agregar una gorra | VERIFICACION no tenía `buscar_productos`; el modelo usaba `solicitar_cambio` | `buscar_productos` habilitado; texto de la plantilla y error guía |
+| Contra entrega: mandaba las cuentas de Yape | `enviar_metodos_pago` se ofrecía igual | no se ofrece con contra entrega; el ESTADO dice "pídele que lo confirme" |
+
+**Comportamiento del modelo que queda (no es un bug):** con "quiero una mochila y una gorra" el agente a
+veces pregunta "¿te los agrego?" antes de agregar, aunque la plantilla de productos ya le dice que no lo
+haga. Con un "sí" del cliente sigue bien. Los evals siguen en verde (2 de 2) con los prompts nuevos.
 
 **Por confirmar con Giannier:** a qué decisión del reporte original corresponden la **14** ("Aceptado") y
 la **22** ("Anotado como tarea de la 007"); el reporte numerado no quedó en el repo.

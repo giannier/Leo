@@ -190,6 +190,20 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 **Impacto en implementación:** `orders.tipo_entrega` y `datos_faltantes` dinámicos (plantillas.md §1). La plantilla no tiene opción `delivery`.
 **Registrado por:** Claude — por ratificar
 
+## C-23: Ajustes del recorrido automático del Milestone B (2026-10-13)
+**Situación:** El recorrido del checklist B con el modelo real (`tests/integration/test_zz_milestone_b_live.py`) mostró cuatro fallas del motor, no de los datos.
+**Decisión (lectura conservadora):**
+- `gestionar_pedido(agregar)` con `seleccion` y un paquete registra esos temas en la misma llamada. Antes se perdían.
+- `seleccion` acepta varios temas separados por comas, en una sola llamada (la descripción de la tool lo dice).
+- Tocar un producto (`producto:{id}`) le dice al modelo que lo agregue y no vuelva a mostrar las opciones.
+- Con el pago rechazado, la plantilla dice que el pedido sí se puede cambiar con agregar, quitar o cambiar_cantidad. `solicitar_cambio` fuera de revisión responde error con esa indicación.
+- IDENTIFICAR [productos]: si el cliente ya dijo los productos y cada uno coincide con uno solo, se agregan en el mismo turno, sin preguntar "¿quieres que lo agregue?".
+- En COBRO con contra entrega, la línea "Pago" del ESTADO dice "contra entrega: resume el pedido y pídele que lo confirme" (el prompt de COBRO trae las dos ramas y el modelo ofrecía cuentas).
+- Con contra entrega no se ofrece `enviar_metodos_pago` (el recorrido mandó las cuentas de Yape a un pedido contra entrega; el checklist T3 dice que no).
+- VERIFICACION con pago rechazado habilita también `buscar_productos` (amplía C-21): sin buscar, el modelo no tiene el `producto_id` de lo que el cliente quiere agregar.
+**Impacto en implementación:** `agent/tools/orders.py`, `agent/tools/definitions.py`, `process/interactive.py`, `process/templates/{base,productos}.py`, `plantillas.md` §IDENTIFICAR. Evals corridos.
+**Registrado por:** Claude — por ratificar
+
 ---
 
 ## Clarificaciones Pendientes
