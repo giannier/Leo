@@ -21,12 +21,12 @@ from fastapi import APIRouter, Query, Response, status
 from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 from sqlalchemy import func, select, update
 
+from app.agent.model_policy import allowed_levels
 from app.api.deps import ConfigurationManagerDep, JobQueueDep, SessionDep
 from app.api.errors import ApiError, error_responses
 from app.models.business import Product, ProductCategory
 from app.models.orders import Order
 from app.models.sales_config import BUSINESS_INFO_SECTIONS, Faq, Promotion
-from app.models.tenant import Tenant
 from app.process.service import DEFAULT_CACHE
 from app.process.templates.base import (
     DEFAULT_SYSTEM_MESSAGES,
@@ -34,7 +34,6 @@ from app.process.templates.base import (
     placeholders_in,
 )
 from app.repositories.business import AgentConfigRepository
-from app.repositories.plan import PlanRepository
 from app.repositories.product import ProductCategoryRepository, ProductRepository
 from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import SECTION_SCHEMAS
@@ -46,7 +45,6 @@ from app.services.knowledge import (
     SourceNotFoundError,
 )
 from app.services.overview import build_overview
-from app.services.trial import billing_enforced
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -494,11 +492,7 @@ class BehaviorResponse(BaseModel):
 
 def _allowed_levels(session: SessionDep, tenant_id: uuid.UUID) -> list[str]:
     """Every level while billing is off (CLAUDE.md, "Cobro de la plataforma")."""
-    if not billing_enforced():
-        return list(ALL_LEVELS)
-    tenant = session.get(Tenant, tenant_id)
-    plan = PlanRepository(session).get(tenant.plan_id) if tenant else None
-    return list(plan.allowed_intelligence) if plan else ["economico"]
+    return allowed_levels(session, tenant_id)
 
 
 def _behavior(session: SessionDep, tenant_id: uuid.UUID) -> BehaviorResponse:

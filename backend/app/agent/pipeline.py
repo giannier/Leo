@@ -53,6 +53,7 @@ from sqlalchemy.orm import Session
 from app.agent.budget import TurnBudget
 from app.agent.core import AgentCore, AgentReply, TurnTrace
 from app.agent.formatter import to_bubbles
+from app.agent.model_policy import allowed_levels, effective_level
 from app.agent.outbound import TurnOutbound
 from app.agent.prompts.stage import build_stage_prompt
 from app.agent.situations import SelectedSituation, select_situations
@@ -79,7 +80,7 @@ from app.services.trial import agent_may_reply
 logger = logging.getLogger(__name__)
 
 GateReason = Literal["paused", "opted_out", "handover"]
-Outcome = Literal["answered", "gated", "unsupported"]
+Outcome = Literal["answered", "gated", "unsupported", "llm_down"]
 
 # Why a stage was saved: an ordinary turn, or a payment proof that arrived in it.
 REASON_TURN = "turno"
@@ -159,6 +160,7 @@ class TurnPipeline:
         images: ImageReader | None = None,
         notices: OrderNotices | None = None,
         situation_drafts: Sequence[uuid.UUID] = (),
+        llm_open: bool = False,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._session = session
@@ -177,6 +179,8 @@ class TurnPipeline:
         self._notices = notices
         # Drafts the simulator tries in this turn as if active (017, RF-009).
         self._situation_drafts = tuple(situation_drafts) if sandbox else ()
+        # The tenant's circuit breaker is open (TASK-445): no model this turn.
+        self._llm_open = llm_open
         self._clock = clock
         self._states = StateRepo(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
@@ -255,6 +259,10 @@ class TurnPipeline:
             # A voice note, a sticker, a location: the stage is untouched and the
             # caller answers with the tenant's own "I can only read text".
             return result("unsupported")
+        if self._llm_open:
+            # After the gates: a paused or handed-over conversation stays quiet
+            # rather than getting the fallback.
+            return result("llm_down")
 
         # 8-9. prompt and tools
         budget = TurnBudget()
@@ -346,7 +354,13 @@ class TurnPipeline:
             )
 
         # 14. trace
-        tier = config.intelligence_level if self._tier_applies else None
+        tier = (
+            effective_level(
+                config.intelligence_level, allowed_levels(self._session, self._tenant_id)
+            )
+            if self._tier_applies
+            else None
+        )
         sent = [*tool_messages, *text_messages]
         if sent:
             core.persist_trace(

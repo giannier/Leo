@@ -73,7 +73,7 @@ MAX_TOOL_ROUNDS = 3
 # and still leaves the tool results room to be the part that decides the
 # answer. A rolling summary (TASK-304) is what removes the ceiling; this only
 # raises it.
-HISTORY_TURNS = 30
+HISTORY_TURNS = 20
 
 FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
@@ -232,6 +232,8 @@ class AgentReply:
     silent: bool = False
     # Tool rounds the model used before answering (0 when it answered straight away).
     tool_rounds: int = 0
+    # The provider itself failed (not the answer): what the circuit breaker counts.
+    llm_failed: bool = False
 
 
 @dataclass(frozen=True)
@@ -339,6 +341,7 @@ class AgentCore:
                     output_tokens=output_tokens,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     degraded=True,
+                    llm_failed=True,
                 )
 
             input_tokens += result.input_tokens

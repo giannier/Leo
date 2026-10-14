@@ -124,6 +124,17 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_chat_model: str = "gpt-5.4-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    # The model behind each intelligence level (TASK-445, C-02). Unset: the level
+    # runs on `openai_chat_model`, so choosing a level changes nothing until the
+    # platform decides what a better model is worth (Giannier ratifies: LLM cost).
+    llm_model_economico: str | None = None
+    llm_model_medio: str | None = None
+    llm_model_mejor: str | None = None
+    # How many credits one agent reply costs at each level (Milestone B, decision 4).
+    # Charged by Feature 009; equal while every level runs the same model.
+    llm_credits_economico: int = 1
+    llm_credits_medio: int = 1
+    llm_credits_mejor: int = 1
 
     # Fernet key for credentials stored in the database (tenant API keys,
     # WhatsApp provider tokens). Generate with:
