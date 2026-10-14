@@ -279,7 +279,10 @@ export type Saliente = SandboxTurn["salientes"][number];
 /** The debug panel of a turn (`?debug=true`). */
 export type SandboxDebug = NonNullable<SandboxTurn["debug"]>;
 /** What the customer did: wrote, or tapped a button or a list row. */
-export type SandboxInput = { content: string } | { interactive_id: string; title: string };
+export type SandboxInput = ({ content: string } | { interactive_id: string; title: string }) & {
+  /** Draft situations tried in this turn only (017, RF-009). */
+  situaciones_prueba?: string[];
+};
 export type SandboxHistory = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["get"]
 >;
@@ -308,6 +311,33 @@ export type CustomerNotice = OrderDecision["aviso_cliente"];
 export type OperatorState = JsonBody<
   Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]["requestBody"]
 >["estado"];
+// ------------------------------------------------- the assistant by layers (017)
+export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+export type InfoSection = "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
+export type SectionData = Ok<Ops["/api/v1/assistant/business-info/{section}"]["get"]>;
+export type Faq = Ok<Ops["/api/v1/assistant/faqs"]["get"]>["items"][number];
+export type Promotion = Ok<Ops["/api/v1/assistant/promotions"]["get"]>["items"][number];
+export type PromotionBody = JsonBody<Ops["/api/v1/assistant/promotions"]["post"]["requestBody"]>;
+export type Behavior = Ok<Ops["/api/v1/assistant/behavior"]["get"]>;
+export type BehaviorBody = JsonBody<Ops["/api/v1/assistant/behavior"]["put"]["requestBody"]>;
+export type Category = Ok<Ops["/api/v1/assistant/categories"]["get"]>["items"][number];
+export type ProcessTemplate = Ok<Ops["/api/v1/assistant/templates"]["get"]>["items"][number];
+export type ProcessView = Ok<Ops["/api/v1/assistant/process"]["get"]>;
+export type RuleView = ProcessView["etapas"][number]["reglas"][number];
+export type RubroView = Ok<Ops["/api/v1/assistant/rubro"]["get"]>;
+export type PromptPreview = Ok<Ops["/api/v1/assistant/prompt-preview"]["get"]>;
+export type Situation = Ok<Ops["/api/v1/assistant/situations"]["get"]>["items"][number];
+export type SituationBody = JsonBody<Ops["/api/v1/assistant/situations"]["post"]["requestBody"]>;
+export type MediaAsset = Ok<Ops["/api/v1/assistant/media"]["get"]>["items"][number];
+export type CatalogList = Ok<Ops["/api/v1/platform-admin/catalog"]["get"]>;
+export type CatalogVersion = Ok<
+  Ops["/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}"]["get"]
+>;
+export type CatalogContent = JsonBody<
+  Ops["/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}"]["put"]["requestBody"]
+>;
+export type CatalogKind = "proceso" | "rubro";
+
 export type OrderListQuery = {
   estado?: readonly string[];
   desde?: string;
@@ -456,8 +486,11 @@ export const api = {
       request<void>(`/tenant/team/invitations/${id}/resend`, { method: "POST" }),
     revokeInvitation: (id: string) =>
       request<void>(`/tenant/team/invitations/${id}`, { method: "DELETE" }),
-    updateMember: (membershipId: string, body: { role?: string; status?: string }) =>
-      request<TeamMember>(`/tenant/team/members/${membershipId}`, { method: "PATCH", body }),
+    // PUT: the backend has no PATCH here (a 405 broke role changes before 017).
+    updateMember: (
+      membershipId: string,
+      body: { role?: string; status?: string; puede_revisar?: boolean },
+    ) => request<TeamMember>(`/tenant/team/members/${membershipId}`, { method: "PUT", body }),
   },
 
   sandbox: {
@@ -469,9 +502,10 @@ export const api = {
         body: input,
         query: debug ? { debug: true } : undefined,
       }),
-    sendImage: (conversationId: string, image: File, debug = false) => {
+    sendImage: (conversationId: string, image: File, debug = false, drafts: string[] = []) => {
       const form = new FormData();
       form.append("image", image);
+      if (drafts.length) form.append("situaciones_prueba", drafts.join(","));
       return request<SandboxTurn>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
         method: "POST",
         body: form,
@@ -495,9 +529,106 @@ export const api = {
     create: (body: PaymentMethodBody) =>
       request<PaymentMethod>("/tenant/payment-methods", { method: "POST", body }),
     update: (id: string, body: Partial<PaymentMethodBody>) =>
-      request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PATCH", body }),
+      request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PUT", body }),
     remove: (id: string) => request<void>(`/tenant/payment-methods/${id}`, { method: "DELETE" }),
   },
+  assistant: {
+    overview: () => request<Overview>("/assistant/overview"),
+    section: (section: InfoSection) => request<SectionData>(`/assistant/business-info/${section}`),
+    saveSection: (section: InfoSection, body: Record<string, unknown>) =>
+      request<SectionData>(`/assistant/business-info/${section}`, { method: "PUT", body }),
+    faqs: () => request<{ items: Faq[] }>("/assistant/faqs"),
+    createFaq: (body: { pregunta: string; respuesta: string }) =>
+      request<Faq>("/assistant/faqs", { method: "POST", body }),
+    updateFaq: (id: string, body: Partial<{ pregunta: string; respuesta: string; is_active: boolean }>) =>
+      request<Faq>(`/assistant/faqs/${id}`, { method: "PATCH", body }),
+    removeFaq: (id: string) => request<void>(`/assistant/faqs/${id}`, { method: "DELETE" }),
+    promotions: () => request<{ items: Promotion[] }>("/assistant/promotions"),
+    createPromotion: (body: PromotionBody) =>
+      request<Promotion>("/assistant/promotions", { method: "POST", body }),
+    updatePromotion: (id: string, body: PromotionBody) =>
+      request<Promotion>(`/assistant/promotions/${id}`, { method: "PUT", body }),
+    removePromotion: (id: string) =>
+      request<void>(`/assistant/promotions/${id}`, { method: "DELETE" }),
+    behavior: () => request<Behavior>("/assistant/behavior"),
+    saveBehavior: (body: BehaviorBody) =>
+      request<Behavior>("/assistant/behavior", { method: "PUT", body }),
+    categories: () => request<{ items: Category[] }>("/assistant/categories"),
+    saveCategory: (id: string, body: { nombre: string; orden: number; activa: boolean }) =>
+      request<Category>(`/assistant/categories/${id}`, { method: "PUT", body }),
+    templates: () => request<{ items: ProcessTemplate[] }>("/assistant/templates"),
+    process: () => request<ProcessView>("/assistant/process"),
+    saveProcess: (template_key: string, options: Record<string, unknown> = {}) =>
+      request<ProcessView>("/assistant/process", { method: "PUT", body: { template_key, options } }),
+    switchRule: (kind: CatalogKind, ruleKey: string, apagada: boolean) =>
+      request<RuleView>(`/assistant/rules/${kind}/${encodeURIComponent(ruleKey)}`, {
+        method: "PUT",
+        body: { apagada },
+      }),
+    rubro: () => request<RubroView>("/assistant/rubro"),
+    newsSeen: (kind: CatalogKind) =>
+      request<void>(`/assistant/novedades/${kind}/vistas`, { method: "POST" }),
+    preview: (stage: string) =>
+      request<PromptPreview>("/assistant/prompt-preview", { query: { stage } }),
+    situations: (query?: { estado?: string; origen?: string }) =>
+      request<{ items: Situation[] }>("/assistant/situations", { query }),
+    createSituation: (body: SituationBody) =>
+      request<Situation>("/assistant/situations", { method: "POST", body }),
+    updateSituation: (id: string, body: SituationBody) =>
+      request<Situation>(`/assistant/situations/${id}`, { method: "PUT", body }),
+    removeSituation: (id: string) =>
+      request<void>(`/assistant/situations/${id}`, { method: "DELETE" }),
+    setSituation: (id: string, active: boolean) =>
+      request<Situation>(`/assistant/situations/${id}/${active ? "activar" : "desactivar"}`, {
+        method: "POST",
+      }),
+    fromSuggested: (id: string, valores: Record<string, string>) =>
+      request<Situation>(`/assistant/situations/desde-sugerida/${id}`, {
+        method: "POST",
+        body: { valores },
+      }),
+    media: () => request<{ items: MediaAsset[] }>("/assistant/media"),
+    uploadMedia: (file: File, fields: { clave: string; titulo: string; cuando_usar: string; caption?: string }) => {
+      const form = new FormData();
+      form.append("file", file);
+      for (const [key, value] of Object.entries(fields)) {
+        if (value) form.append(key, value);
+      }
+      return request<MediaAsset>("/assistant/media", { method: "POST", body: form });
+    },
+    updateMedia: (id: string, body: Partial<{ clave: string; titulo: string; cuando_usar: string; caption: string; is_active: boolean }>) =>
+      request<MediaAsset>(`/assistant/media/${id}`, { method: "PATCH", body }),
+    replaceMediaFile: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<MediaAsset>(`/assistant/media/${id}/file`, { method: "POST", body: form });
+    },
+    removeMedia: (id: string) => request<void>(`/assistant/media/${id}`, { method: "DELETE" }),
+  },
+
+  catalog: {
+    list: () => request<CatalogList>("/platform-admin/catalog"),
+    get: (kind: CatalogKind, key: string, version: number) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions/${version}`),
+    draft: (kind: CatalogKind, key: string) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions`, { method: "POST" }),
+    save: (kind: CatalogKind, key: string, version: number, body: CatalogContent) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions/${version}`, {
+        method: "PUT",
+        body,
+      }),
+    runEvals: (kind: CatalogKind, key: string, version: number) =>
+      request<{ estado: string }>(
+        `/platform-admin/catalog/${kind}/${key}/versions/${version}/evals`,
+        { method: "POST" },
+      ),
+    publish: (kind: CatalogKind, key: string, version: number) =>
+      request<CatalogVersion>(
+        `/platform-admin/catalog/${kind}/${key}/versions/${version}/publicar`,
+        { method: "POST" },
+      ),
+  },
+
   orders: {
     list: (query: OrderListQuery, signal?: AbortSignal) =>
       request<OrderPage>("/tenant/orders", { query, signal }),

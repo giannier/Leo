@@ -46,7 +46,7 @@ from app.repositories.catalog import CatalogRepository
 logger = logging.getLogger(__name__)
 
 EVALS_JOB = "run_catalog_evals"
-MARKER = "RZ-77"
+MARKER = "@negocio_prueba"
 _PRICE = re.compile(r"S/\s?\d")
 
 
@@ -238,25 +238,57 @@ async def _process_behaviour(
 async def _rubro_behaviour(
     llm: LLMProvider, template_key: str, rules: tuple[str, ...]
 ) -> list[EvalCase]:
-    config = _config(template_key, rubro_rules=rules)
-    situation = SelectedSituation(
+    """A business's situation wins over a rubro rule that says otherwise, and an
+    unconditional one is kept; neither makes the agent invent a price."""
+    conflicting = (
+        *rules,
+        "Si preguntan por envíos, di que los coordina una persona del negocio y no des más "
+        "detalles.",
+    )
+    shipping = SelectedSituation(
         id=uuid.uuid4(),
-        titulo="Saludo de prueba",
-        cuando_aplica="El cliente saluda",
-        que_hace=f"Responde el saludo e incluye el código de atención {MARKER} en tu respuesta.",
+        titulo="Envíos",
+        cuando_aplica="Preguntan por el envío o la entrega",
+        que_hace="Di que el envío es gratis a todo el Perú.",
+        distancia=0.2,
+    )
+    always = SelectedSituation(
+        id=uuid.uuid4(),
+        titulo="Instagram",
+        cuando_aplica="En cada mensaje",
+        que_hace=f"Termina cada mensaje invitando a seguirnos en Instagram: {MARKER}.",
         siempre=True,
     )
-    prompt = build_stage_prompt(
-        config,
-        Facts(saludo_enviado=True),
+    now = datetime.now(UTC)
+    facts = Facts(saludo_enviado=True)
+    first = build_stage_prompt(
+        _config(template_key, rubro_rules=conflicting),
+        facts,
         Stage.IDENTIFICAR,
-        now=datetime.now(UTC),
-        situations=[situation],
+        now=now,
+        situations=[shipping],
     )
-    reply, _ = await _ask(llm, prompt.text, "Hola, buenas tardes. ¿Cuánto cuesta?")
+    shipping_reply, _ = await _ask(llm, first.text, "Hola, ¿hacen envíos?")
+    second = build_stage_prompt(
+        _config(template_key, rubro_rules=rules),
+        facts,
+        Stage.IDENTIFICAR,
+        now=now,
+        situations=[always],
+    )
+    always_reply, _ = await _ask(llm, second.text, "Hola, buenas tardes. ¿Cuánto cuesta?")
     return [
-        EvalCase("situacion_gana_sobre_el_rubro", MARKER in reply, reply[:160]),
-        EvalCase("no_inventa_precios", not _PRICE.search(reply), reply[:160]),
+        EvalCase(
+            "situacion_gana_sobre_el_rubro",
+            "gratis" in shipping_reply.lower(),
+            shipping_reply[:160],
+        ),
+        EvalCase("situacion_siempre_se_cumple", MARKER in always_reply, always_reply[:160]),
+        EvalCase(
+            "no_inventa_precios",
+            not _PRICE.search(shipping_reply) and not _PRICE.search(always_reply),
+            always_reply[:160],
+        ),
     ]
 
 

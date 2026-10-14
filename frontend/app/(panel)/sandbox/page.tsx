@@ -70,6 +70,22 @@ export default function SandboxPage() {
   const [starting, setStarting] = useState(true);
   const [debugOn, setDebugOn] = useState(false);
   const [debug, setDebug] = useState<SandboxDebug | null>(null);
+  /** A draft situation tried from Situaciones (`?probar=<id>`, 017 RF-009). */
+  const [trying, setTrying] = useState<{ id: string; titulo: string } | null>(null);
+  const drafts = trying ? [trying.id] : [];
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("probar");
+    if (!id) return;
+    setDebugOn(true);
+    api.assistant
+      .situations()
+      .then(({ items }) => {
+        const found = items.find((s) => s.id === id);
+        if (found) setTrying({ id: found.id, titulo: found.titulo });
+      })
+      .catch(() => setTrying(null));
+  }, []);
 
   const endOfThread = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -196,27 +212,36 @@ export default function SandboxPage() {
       const content = text.trim();
       if (!content) return;
       setDraft("");
-      await deliver({ content }, (id) => api.sandbox.send(id, { content }, debugOn));
+      await deliver({ content }, (id) =>
+        api.sandbox.send(id, { content, situaciones_prueba: drafts }, debugOn),
+      );
     },
-    [deliver, debugOn],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deliver, debugOn, trying],
   );
 
   /** A tap sends the id the agent gave the option; the customer's bubble shows its title. */
   const tap = useCallback(
     async (option: { id: string; title: string }) => {
-      const body: SandboxInput = { interactive_id: option.id, title: option.title };
+      const body: SandboxInput = {
+        interactive_id: option.id,
+        title: option.title,
+        situaciones_prueba: drafts,
+      };
       await deliver({ content: option.title }, (id) => api.sandbox.send(id, body, debugOn));
     },
-    [deliver, debugOn],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deliver, debugOn, trying],
   );
 
   const sendImage = useCallback(
     async (file: File) => {
       await deliver({ content: "Imagen enviada", imageUrl: URL.createObjectURL(file) }, (id) =>
-        api.sandbox.sendImage(id, file, debugOn),
+        api.sandbox.sendImage(id, file, debugOn, drafts),
       );
     },
-    [deliver, debugOn],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deliver, debugOn, trying],
   );
 
   /** Forget everything - state, messages, sandbox orders - and greet again. */
@@ -267,6 +292,28 @@ export default function SandboxPage() {
         debugOn={debugOn}
         onDebug={setDebugOn}
       />
+
+      {trying ? (
+        <Alert
+          tone="info"
+          title={`Probando la situación «${trying.titulo}»`}
+          action={
+            <button
+              type="button"
+              className="text-sm font-semibold text-accent"
+              onClick={() => {
+                setTrying(null);
+                window.history.replaceState(null, "", "/sandbox");
+              }}
+            >
+              Dejar de probar
+            </button>
+          }
+        >
+          Está en borrador: entra solo aquí, como si estuviera activa. Tus clientes reales no la ven
+          hasta que la actives.
+        </Alert>
+      ) : null}
 
       <div className={cx("grid gap-4", debugOn && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
         <div className="flex min-h-[60vh] flex-col overflow-hidden rounded-xl border border-line bg-surface">
@@ -691,6 +738,38 @@ function DebugPanel({ debug }: { debug: SandboxDebug | null }) {
               </ul>
             )}
           </div>
+
+          <div>
+            <p className="font-medium text-ink">Situaciones en este mensaje</p>
+            {!debug.situaciones?.length ? (
+              <p className="mt-1 text-ink-faint">Ninguna.</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5" data-testid="debug-situations">
+                {debug.situaciones.map((s) => (
+                  <li key={s.id} className="text-ink-soft">
+                    {s.titulo}
+                    {s.borrador ? " (borrador)" : ""}
+                    {s.siempre ? " · siempre" : s.distancia !== null && s.distancia !== undefined ? ` · distancia ${s.distancia}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {Object.values(debug.reglas_apagadas ?? {}).some((keys) => keys.length) ? (
+            <div>
+              <p className="font-medium text-ink">Reglas apagadas</p>
+              <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-ink-faint">
+                {Object.entries(debug.reglas_apagadas ?? {}).flatMap(([kind, keys]) =>
+                  keys.map((key) => (
+                    <li key={`${kind}:${key}`}>
+                      {kind}: {key}
+                    </li>
+                  )),
+                )}
+              </ul>
+            </div>
+          ) : null}
 
           <div>
             <p className="font-medium text-ink">Hechos</p>

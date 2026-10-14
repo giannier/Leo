@@ -16,7 +16,8 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckIcon, CircleIcon } from "@/components/icons";
 import { Alert, Button, Card, Skeleton, cx } from "@/components/ui";
 import { UsageMeter } from "@/components/usage-meter";
-import { api, type Checklist } from "@/lib/api/client";
+import { ActivationSteps, ProgressBar } from "@/components/assistant/overview";
+import { api, type Checklist, type Overview } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useHasRole, useSession } from "@/lib/session";
 
@@ -117,7 +118,36 @@ export default function PanelHome() {
       ) : null}
 
       {checklist ? <ChecklistCard checklist={checklist} canConfigure={canConfigure} /> : null}
+
+      {canConfigure ? <AssistantWidget /> : null}
     </div>
+  );
+}
+
+/** Where the assistant's configuration stands (TASK-441): progress and the next step. */
+function AssistantWidget() {
+  const [overview, setOverview] = useState<Overview | null>(null);
+  useEffect(() => {
+    api.assistant
+      .overview()
+      .then(setOverview)
+      .catch(() => setOverview(null));
+  }, []);
+  if (!overview) return null;
+  return (
+    <Card
+      title="Tu asistente"
+      footer={
+        <Link href="/asistente" className="text-sm font-semibold text-accent">
+          Ver todo
+        </Link>
+      }
+    >
+      <div className="space-y-4" data-testid="assistant-widget">
+        <ProgressBar value={overview.progreso} />
+        <ActivationSteps overview={overview} />
+      </div>
+    </Card>
   );
 }
 
