@@ -37,6 +37,7 @@ from app.models.knowledge import KnowledgeSource
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageError, StorageProvider
 from app.repositories.knowledge import (
+    STATUS_INDEXING,
     STATUS_PENDING,
     KnowledgeChunkRepository,
     KnowledgeSourceRepository,
@@ -50,6 +51,11 @@ logger = logging.getLogger(__name__)
 # Source types whose content arrives inline as JSON.
 INLINE_TYPES = ("faq", "policy", "text")
 PDF_TYPE = "pdf"
+WEB_TYPE = "web"
+
+# Which source the agent trusts when two disagree (006 C-003): what the business
+# wrote for the agent first, then its documents, then its website. 0-100.
+DEFAULT_PRIORITY = {"faq": 100, "policy": 100, "text": 100, "pdf": 90, WEB_TYPE: 50}
 
 PDF_CONTENT_TYPE = "application/pdf"
 # Every PDF starts with this signature. Checking it costs nothing and stops
@@ -162,6 +168,10 @@ class SourceNotFoundError(KnowledgeError):
     """No such source for this tenant. Never distinguished from 'foreign'."""
 
 
+class SourceBusyError(KnowledgeError):
+    """The source is being indexed right now; an edit would race the worker."""
+
+
 class IndexingUnavailableError(KnowledgeError):
     """The job could not be queued, so nothing will ever index it."""
 
@@ -229,6 +239,7 @@ class KnowledgeService:
             content=body,
             char_count=chars,
             status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[source_type],
         )
         source_id = source.id
         self._session.commit()
@@ -270,12 +281,82 @@ class KnowledgeService:
             file_key=key,
             char_count=0,
             status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[PDF_TYPE],
         )
         source_id = source.id
         self._session.commit()
 
         await self._enqueue(source_id)
         return IngestResult(id=source_id, status=STATUS_PENDING)
+
+    # -------------------------------------------------------------- editing
+
+    async def update(
+        self,
+        source_id: uuid.UUID,
+        *,
+        title: str | None = None,
+        content: str | None = None,
+        priority: int | None = None,
+    ) -> KnowledgeSource:
+        """Change a source; new text is re-indexed (Feature 006, HU-03).
+
+        The old chunks keep answering until the worker swaps them for the new ones
+        in one transaction (`replace_for_source`), so the agent never reads half a
+        document. If re-indexing fails, the old version stays in use and the panel
+        says so. A source being indexed right now is refused rather than raced.
+        """
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        if title is not None:
+            source.title = _clean_title(title)
+        if priority is not None:
+            source.priority = priority
+        reindex = False
+        if content is not None:
+            if source.type not in INLINE_TYPES:
+                raise UnsupportedSourceTypeError(
+                    "only faq, policy and text sources are edited as text"
+                )
+            body = content.strip()
+            if not body:
+                raise EmptyContentError("the source has no content to index")
+            if body != source.content:
+                if source.status == STATUS_INDEXING:
+                    self._session.rollback()
+                    raise SourceBusyError(str(source_id))
+                # Only the difference counts against the plan.
+                self._reserve(chars=len(body) - source.char_count)
+                source.content = body
+                source.char_count = len(body)
+                source.status = STATUS_PENDING
+                source.error_msg = None
+                reindex = True
+        self._session.commit()
+        if reindex:
+            await self._enqueue(source_id, keep_on_failure=True)
+        return source
+
+    async def reindex(self, source_id: uuid.UUID) -> KnowledgeSource:
+        """Process a source again: re-read a website, retry a failed document."""
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        if source.status in (STATUS_PENDING, STATUS_INDEXING):
+            raise SourceBusyError(str(source_id))
+        source.status = STATUS_PENDING
+        source.error_msg = None
+        self._session.commit()
+        await self._enqueue(source_id, keep_on_failure=True)
+        return source
+
+    def chunks(self, source_id: uuid.UUID) -> Sequence[str]:
+        """What the agent can retrieve from one source, in order (debug view)."""
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        return [chunk.content for chunk in self._chunks.list_for_source(source_id)]
 
     # ------------------------------------------------------------- deletion
 
@@ -368,7 +449,7 @@ class KnowledgeService:
             raise
         return usage
 
-    async def _enqueue(self, source_id: uuid.UUID) -> None:
+    async def _enqueue(self, source_id: uuid.UUID, *, keep_on_failure: bool = False) -> None:
         """Hand the source to the indexing worker.
 
         A queue that cannot be reached is not something to swallow: the row
@@ -386,7 +467,13 @@ class KnowledgeService:
                 "knowledge source could not be queued for indexing",
                 extra={"tenant_id": str(self._tenant_id), "source_id": str(source_id)},
             )
-            self._sources.soft_delete(source_id)
+            if keep_on_failure:
+                # An existing source keeps its old chunks; it is only marked.
+                self._sources.mark_failed(
+                    source_id, "No se pudo poner en cola. Vuelve a intentarlo en un momento."
+                )
+            else:
+                self._sources.soft_delete(source_id)
             self._session.commit()
             raise IndexingUnavailableError(
                 "The indexing queue is unavailable, so the source was not accepted."

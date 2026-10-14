@@ -1,0 +1,279 @@
+"""Knowledge v2 (Feature 006): editing, re-indexing, dedup and the debug views.
+
+Reuses the ingestion module's fixtures: a real signed-in owner, the real API,
+and the production worker driven in-process with mock storage, queue and model.
+"""
+
+# The ingestion module's fixtures are imported and then requested by name, which
+# ruff reads as a redefinition.
+# ruff: noqa: F811
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Sequence
+
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import KnowledgeChunk
+from app.providers.llm import LLMError, MockLLMProvider
+from app.providers.llm.base import InputType
+from app.providers.storage import MockStorageProvider
+from app.services.chunking import chunk_text, content_hash, normalise
+from app.services.knowledge import INDEX_JOB
+from app.workers.knowledge_indexer import KEPT_PREVIOUS
+from tests.integration.test_knowledge_ingestion import (  # noqa: F401 - fixtures
+    KNOWLEDGE,
+    Account,
+    RecordingQueue,
+    _run_worker,
+    _set_role,
+    _source,
+    account,
+    knowledge,
+    llm,
+    plan,
+    queue,
+    storage,
+    tenant,
+)
+
+POLICY = "Hacemos envíos a todo Lima en 24 horas. El envío cuesta 10 soles."
+FOOTER = "Panadería Leo · Av. Larco 123 · Miraflores · Teléfono 01 555 0000."
+
+
+class _BrokenEmbeddings(MockLLMProvider):
+    async def embed(
+        self, texts: Sequence[str], *, input_type: InputType = "passage"
+    ) -> list[list[float]]:
+        raise LLMError("the embedding endpoint is down")
+
+
+def _chunks(db: Session, source_id: uuid.UUID) -> list[KnowledgeChunk]:
+    db.expire_all()
+    return list(
+        db.execute(select(KnowledgeChunk).where(KnowledgeChunk.source_id == source_id))
+        .scalars()
+        .all()
+    )
+
+
+async def _indexed(
+    client: AsyncClient,
+    db: Session,
+    tenant_id: uuid.UUID,
+    llm: MockLLMProvider,
+    storage: MockStorageProvider,
+    *,
+    content: str = POLICY,
+    kind: str = "policy",
+) -> uuid.UUID:
+    created = await client.post(
+        KNOWLEDGE, json={"type": kind, "title": "Envíos", "content": content}
+    )
+    assert created.status_code == 202, created.text
+    source_id = uuid.UUID(created.json()["id"])
+    outcome = await _run_worker(db, tenant_id, source_id, llm=llm, storage=storage)
+    assert outcome.succeeded, outcome
+    return source_id
+
+
+class TestDedup:
+    async def test_a_repeated_block_is_embedded_once_and_hashed(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        # A long block repeated (the same terms printed after every section): with
+        # the overlap, every repetition after the second is the same chunk.
+        block = "Términos: " + ("Pan de masa madre horneado cada mañana. " * 22)
+        text = "Presentación de la panadería.\n\n" + "\n\n".join([block] * 4)
+
+        source_id = await _indexed(knowledge, db, tenant, llm, storage, content=text, kind="text")
+
+        rows = _chunks(db, source_id)
+        hashes = [row.content_hash for row in rows]
+        assert all(hashes) and len(hashes) == len(set(hashes))
+        assert all(row.content_hash == content_hash(row.content) for row in rows)
+        embedded = [t for call in llm.embed_calls for t in call.texts]
+        assert len(embedded) == len(rows)
+        # Dedup actually removed something.
+        assert len(chunk_text(normalise(text))) > len(rows)
+
+
+class TestEditing:
+    async def test_new_text_replaces_the_old_only_once_indexed(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+        queue: RecordingQueue,
+    ) -> None:
+        source_id = await _indexed(knowledge, db, tenant, llm, storage)
+        jobs_before = len(queue.jobs)
+
+        edited = await knowledge.patch(
+            f"{KNOWLEDGE}/{source_id}",
+            json={"content": "Hacemos envíos a todo Lima en 48 horas. El envío es gratis."},
+        )
+
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["status"] == "pending"
+        assert queue.jobs[-1] == (INDEX_JOB, (str(tenant), str(source_id)))
+        assert len(queue.jobs) == jobs_before + 1
+        # Until the worker runs, the agent still reads the old version.
+        assert all("24 horas" in c.content for c in _chunks(db, source_id))
+
+        await _run_worker(db, tenant, source_id, llm=llm, storage=storage)
+
+        chunks = _chunks(db, source_id)
+        assert chunks and all("48 horas" in c.content for c in chunks)
+        source = _source(db, source_id)
+        assert source.status == "indexed"
+        assert source.char_count == len(
+            "Hacemos envíos a todo Lima en 48 horas. El envío es gratis."
+        )
+
+    async def test_title_and_priority_change_without_reindexing(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+        queue: RecordingQueue,
+    ) -> None:
+        source_id = await _indexed(knowledge, db, tenant, llm, storage)
+        jobs_before = len(queue.jobs)
+
+        edited = await knowledge.patch(
+            f"{KNOWLEDGE}/{source_id}",
+            json={"title": "Política de envíos", "priority": 70, "content": POLICY},
+        )
+
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["status"] == "indexed"
+        assert edited.json()["title"] == "Política de envíos"
+        assert edited.json()["priority"] == 70
+        assert len(queue.jobs) == jobs_before
+
+    async def test_a_source_being_indexed_is_not_raced(
+        self, knowledge: AsyncClient, db: Session, tenant: uuid.UUID
+    ) -> None:
+        created = await knowledge.post(
+            KNOWLEDGE, json={"type": "faq", "title": "FAQ", "content": POLICY}
+        )
+        source_id = uuid.UUID(created.json()["id"])
+        source = _source(db, source_id)
+        source.status = "indexing"
+        db.flush()
+
+        edited = await knowledge.patch(f"{KNOWLEDGE}/{source_id}", json={"content": "Otra cosa."})
+        resynced = await knowledge.post(f"{KNOWLEDGE}/{source_id}/resync")
+
+        assert edited.status_code == 409 and edited.json()["error"] == "source_busy"
+        assert resynced.status_code == 409
+
+    async def test_a_failed_reindex_keeps_the_previous_version(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        source_id = await _indexed(knowledge, db, tenant, llm, storage)
+        await knowledge.patch(f"{KNOWLEDGE}/{source_id}", json={"content": "Texto nuevo."})
+
+        outcome = await _run_worker(db, tenant, source_id, llm=_BrokenEmbeddings(), storage=storage)
+
+        assert outcome.status == "failed"
+        assert outcome.error_msg is not None and outcome.error_msg.endswith(KEPT_PREVIOUS)
+        assert all("24 horas" in c.content for c in _chunks(db, source_id))
+
+        # And a retry picks it up again.
+        retried = await knowledge.post(f"{KNOWLEDGE}/{source_id}/resync")
+        assert retried.status_code == 202 and retried.json()["status"] == "pending"
+        await _run_worker(db, tenant, source_id, llm=llm, storage=storage)
+        assert all("Texto nuevo" in c.content for c in _chunks(db, source_id))
+
+    async def test_a_pdf_is_not_edited_as_text(
+        self, knowledge: AsyncClient, db: Session, tenant: uuid.UUID
+    ) -> None:
+        from tests.integration.test_knowledge_ingestion import _post_pdf, _text_pdf
+
+        created = await _post_pdf(knowledge, _text_pdf("Carta"))
+        source_id = created.json()["id"]
+
+        edited = await knowledge.patch(f"{KNOWLEDGE}/{source_id}", json={"content": "x"})
+
+        assert edited.status_code == 400
+
+    async def test_an_operator_reads_but_does_not_edit(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        account: Account,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        source_id = await _indexed(knowledge, db, tenant, llm, storage)
+        _set_role(db, account, "operator")
+
+        detail = await knowledge.get(f"{KNOWLEDGE}/{source_id}")
+        edited = await knowledge.patch(f"{KNOWLEDGE}/{source_id}", json={"priority": 1})
+        chunks = await knowledge.get(f"{KNOWLEDGE}/{source_id}/chunks")
+
+        assert detail.status_code == 200 and detail.json()["content"] == POLICY
+        assert edited.status_code == 403
+        assert chunks.status_code == 403
+
+
+class TestDebugViews:
+    async def test_detail_and_chunks(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        source_id = await _indexed(knowledge, db, tenant, llm, storage)
+
+        detail = (await knowledge.get(f"{KNOWLEDGE}/{source_id}")).json()
+        chunks = (await knowledge.get(f"{KNOWLEDGE}/{source_id}/chunks")).json()
+        listed = (await knowledge.get(KNOWLEDGE)).json()["sources"][0]
+
+        assert detail["content"] == POLICY and detail["priority"] == 100
+        assert chunks == {"chunks": [POLICY]}
+        assert listed["priority"] == 100 and listed["report"] is None
+
+
+class TestTheMaintenanceCommand:
+    async def test_sources_chunked_before_006_are_selected_for_rechunking(
+        self,
+        knowledge: AsyncClient,
+        db: Session,
+        tenant: uuid.UUID,
+        llm: MockLLMProvider,
+        storage: MockStorageProvider,
+    ) -> None:
+        from scripts.reindex_knowledge import _stale_sources
+
+        fresh = await _indexed(knowledge, db, tenant, llm, storage)
+        old = await _indexed(knowledge, db, tenant, llm, storage, content="Abrimos a las 7.")
+        for chunk in _chunks(db, old):
+            chunk.content_hash = None
+        db.flush()
+
+        stale = {source for t, source in _stale_sources(db, current="mock-embed", everything=False)}
+
+        assert old in stale and fresh not in stale

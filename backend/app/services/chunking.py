@@ -32,6 +32,7 @@ previous chunk costs a little storage and makes that case work.
 
 from __future__ import annotations
 
+import hashlib
 import re
 
 # Target size of one chunk, in characters.
@@ -191,3 +192,26 @@ def _apply_overlap(chunks: list[str], overlap: int) -> list[str]:
         tail = tail.strip()
         result.append(f"{tail}{JOIN}{chunk}" if tail else chunk)
     return result
+
+
+def content_hash(text: str) -> str:
+    """SHA-256 of a chunk's text with case and whitespace ignored (Feature 006, RF-003).
+
+    Two chunks that differ only in spacing or capitals are the same passage to a
+    reader and nearly the same vector to the model: embedding both spends money
+    and shows the agent the same sentence twice.
+    """
+    normalised = " ".join(text.split()).casefold()
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
+def dedupe(chunks: list[str]) -> list[str]:
+    """`chunks` without the near-identical repeats, first occurrence kept, order kept."""
+    seen: set[str] = set()
+    kept: list[str] = []
+    for chunk in chunks:
+        digest = content_hash(chunk)
+        if digest not in seen:
+            seen.add(digest)
+            kept.append(chunk)
+    return kept

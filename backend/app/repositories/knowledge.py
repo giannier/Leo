@@ -12,6 +12,7 @@ from sqlalchemy.orm import aliased
 
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.repositories.base import BaseRepository, TenantScopeError
+from app.services.chunking import content_hash
 
 # Statuses a source may be claimed from. `failed` is included so a retry
 # after a transient provider outage is an ordinary re-enqueue rather than a
@@ -219,11 +220,19 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
             )
 
         self.delete_for_source(source_id)
+        seen: set[str] = set()
         for content, embedding in chunks:
+            digest = content_hash(content)
+            if digest in seen:
+                # One copy per source (unique index); the worker dedupes before
+                # embedding, so this only guards a caller that did not.
+                continue
+            seen.add(digest)
             self.add(
                 source_id=source_id,
                 content=content,
+                content_hash=digest,
                 embedding=list(embedding),
                 embedding_model=embedding_model,
             )
-        return len(chunks)
+        return len(seen)
