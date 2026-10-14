@@ -367,8 +367,8 @@ Los nombres exactos de los campos de YCloud se verifican en su documentación (T
 
 | Job | Frecuencia | Qué hace |
 |---|---|---|
-| `followups.run` | cada 15 min | Seguimientos según C-13 (incluye VERIFICACION con rechazo). Candado `followup:{conversation_id}` con TTL de 10 min |
-| `orders.discard_stale` | diario 03:00 (America/Lima) | Pasa a `descartado` los borradores con más de 7 días sin actividad y recalcula la etapa (evento `pedido_descartado`) |
+| `followups.run` | cada 15 min | Seguimientos según C-13 (incluye VERIFICACION con rechazo). Candado: el mismo de la conversación que toma un turno (`channel:lock:{conversation_id}`, TTL 10 min), más el intento reclamado con escritura versionada de `seguimiento` antes de llamar al modelo |
+| `orders.discard_stale` | diario 03:10 (America/Lima) | Pasa a `descartado` los borradores con más de 7 días sin actividad y recalcula la etapa (evento `pedido_descartado`). Un borrador con comprobante no se toca |
 | `handoff.expire` | cada 5 min | Limpia `facts.derivado` vencidos, recalcula la etapa y crea el evento `pausa_vencida`. No envía nada: el bot espera a que el cliente escriba |
 | `media.refresh_provider_ids` | diario | Vuelve a subir los `provider_media_id` que vencen en menos de 48 h |
 
