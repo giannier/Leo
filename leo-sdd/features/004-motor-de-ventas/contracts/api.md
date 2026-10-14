@@ -130,6 +130,25 @@ Restaura el texto por defecto → 204.
 ### GET /api/v1/assistant/prompt-preview?stage=COBRO — admin
 Devuelve el prompt armado con hechos de ejemplo para esa etapa: `{ "prompt": "…", "tokens_estimados": 4120, "herramientas": [ … ] }`. Sirve para depurar y para el test de presupuesto de tokens.
 
+### Situaciones (017, TASK-462) — admin
+Reglas propias del negocio, como tarjetas. Nacen en `borrador`; solo las `activa` llegan al canal real.
+- `GET /api/v1/assistant/situations?estado=&origen=` → `{ "items": [Situacion] }`
+- `POST /api/v1/assistant/situations` → 201 `Situacion`. Cuerpo:
+  `{ "titulo" (≤80), "cuando_aplica" (≤300), "que_hace" (≤1000), "media_asset_ids": [] (≤5),
+  "derivar": false, "ejemplo_respuesta": null (≤600), "etapas": null | ["COBRO", …], "siempre": false }`.
+  Errores 422: `que_hace_too_long`, `unknown_stage`, `unknown_media`. Encola el embedding de
+  "cuándo aplica" (`embed_situations`); si la cola falla, lo hace el barrido de cada hora.
+- `GET | PUT | DELETE /api/v1/assistant/situations/{id}` (404 `situation_not_found`). Cambiar "cuándo
+  aplica" borra el embedding hasta que el worker lo recalcula.
+- `POST /api/v1/assistant/situations/{id}/activar` y `…/desactivar` → `Situacion`.
+- `POST /api/v1/assistant/situations/desde-sugerida/{id}` `{ "valores": {campo: valor} }` → 201, copia
+  una situación sugerida del rubro del negocio (origen `sugerida_rubro`). 422 `unknown_suggestion` o
+  `missing_fields`.
+- `Situacion`: los campos del cuerpo más `id`, `estado`, `origen` (`manual | sugerida_rubro | migrada |
+  aprendida`), `lista_para_coincidir` (ya tiene embedding), `created_at`, `updated_at`.
+- `PUT /api/v1/tenant/agent-config` (wizard) acepta `tratamiento`, `emojis` y `saludo`; su
+  `restrictions` se guarda como la situación `migrada` hasta que TASK-468 lo retire del wizard.
+
 ---
 
 ## 3. Multimedia — admin
@@ -158,10 +177,15 @@ Devuelve el prompt armado con hechos de ejemplo para esa etapa: `{ "prompt": "�
     "hechos": { "…guardados + derivados (enmascarados)…" },
     "herramientas_habilitadas": ["mostrar_opciones", "elegir_camino", "consultar_conocimiento", "enviar_recurso", "derivar_a_humano"],
     "herramientas_llamadas": [{ "nombre": "mostrar_opciones", "status": "hecho" }],
-    "tokens": { "prompt": 4210, "completion": 180 }, "modelo": "economico"
+    "tokens": { "prompt": 4210, "completion": 180 }, "modelo": "economico",
+    "situaciones": [{ "id": "…", "titulo": "Si piden factura", "siempre": false, "borrador": true, "distancia": 0.21 }],
+    "reglas_apagadas": { "proceso": ["COBRO.pedido_datos_completos"], "rubro": [] }
   }
 }
 ```
+- 017 (TASK-465): el cuerpo acepta `"situaciones_prueba": [id, …]` (≤10; en multipart, ids separados por
+  comas): esas situaciones en borrador entran como activas **solo en ese turno**. El canal real nunca
+  las usa.
 - `GET /api/v1/sandbox/messages?after=<message_id>` → salientes asíncronos posteriores (aviso de confirmación o rechazo, derivación, seguimiento). El simulador consulta cada 3 s mientras está abierto.
 - `POST /api/v1/sandbox/reset` → borra el estado, los mensajes y los pedidos sandbox → 204.
 - Reglas sandbox (C-19): nada se envía al proveedor, la ventana siempre está abierta, no hay correos y no cuenta en el resumen ni en `codigo_repetido`.

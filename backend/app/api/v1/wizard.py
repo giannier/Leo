@@ -80,8 +80,12 @@ class AgentConfigRequest(ConcurrencyAware):
     agent_name: ShortText | None = None
     tone: Tone | None = None
     objective: Objective | None = None
+    # Kept as the migrated situation (017, RF-011); TASK-468 retires it.
     restrictions: LongText | None = None
     escalation_rules: list[str] | None = Field(default=None, max_length=20)
+    tratamiento: Literal["tu", "usted"] | None = None
+    emojis: Literal["no", "pocos", "si"] | None = None
+    saludo: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
     farewell_on_pause: LongText | None = None
 
 
@@ -91,6 +95,9 @@ class AgentConfigResponse(BaseModel):
     objective: str
     restrictions: str | None
     escalation_rules: list[str]
+    tratamiento: str = "tu"
+    emojis: str = "pocos"
+    saludo: str | None = None
     farewell_on_pause: str | None
     is_active: bool
     updated_at: datetime | None
@@ -143,14 +150,19 @@ def _profile_response(record: Any, *, overwrote_newer: bool = False) -> Business
     )
 
 
-def _agent_response(record: Any, *, overwrote_newer: bool = False) -> AgentConfigResponse:
+def _agent_response(
+    record: Any, *, restrictions: str | None = None, overwrote_newer: bool = False
+) -> AgentConfigResponse:
     if record is None:
-        return AGENT_DEFAULTS
+        return AGENT_DEFAULTS.model_copy(update={"restrictions": restrictions})
     return AgentConfigResponse(
         agent_name=record.agent_name,
         tone=record.tone,
         objective=record.objective,
-        restrictions=record.restrictions,
+        restrictions=restrictions,
+        tratamiento=record.tratamiento,
+        emojis=record.emojis,
+        saludo=record.saludo,
         escalation_rules=record.escalation_rules,
         farewell_on_pause=record.farewell_on_pause,
         is_active=record.is_active,
@@ -203,7 +215,8 @@ async def put_business_profile(
     responses=error_responses(*AUTH_RESPONSES),
 )
 async def get_agent_config(principal: MemberDep, session: SessionDep) -> AgentConfigResponse:
-    return _agent_response(WizardService(session, principal.tenant_id).agent_config())
+    service = WizardService(session, principal.tenant_id)
+    return _agent_response(service.agent_config(), restrictions=service.migrated_rules())
 
 
 @router.put(
@@ -217,7 +230,10 @@ async def put_agent_config(
     session: SessionDep,
 ) -> AgentConfigResponse:
     values = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
-    outcome = WizardService(session, principal.tenant_id).save_agent_config(
-        expected_updated_at=payload.expected_updated_at, **values
+    service = WizardService(session, principal.tenant_id)
+    outcome = service.save_agent_config(expected_updated_at=payload.expected_updated_at, **values)
+    return _agent_response(
+        outcome.record,
+        restrictions=service.migrated_rules(),
+        overwrote_newer=outcome.overwrote_newer,
     )
-    return _agent_response(outcome.record, overwrote_newer=outcome.overwrote_newer)

@@ -43,7 +43,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -55,6 +55,7 @@ from app.agent.core import AgentCore, AgentReply, TurnTrace
 from app.agent.formatter import to_bubbles
 from app.agent.outbound import TurnOutbound
 from app.agent.prompts.stage import build_stage_prompt
+from app.agent.situations import SelectedSituation, select_situations
 from app.agent.tools.definitions import registry_for_stage
 from app.agent.tools.registry import ToolContext
 from app.models.conversation import Conversation, Message
@@ -131,6 +132,8 @@ class TurnResult:
     # The text bubbles of the answer, in order.
     text_messages: list[Message] = field(default_factory=list)
     model_tier: str | None = None
+    # The business's situations that entered the turn (017, TASK-463).
+    situations: list[SelectedSituation] = field(default_factory=list)
 
     @property
     def messages(self) -> list[Message]:
@@ -155,6 +158,7 @@ class TurnPipeline:
         proofs: ProofPipeline | None = None,
         images: ImageReader | None = None,
         notices: OrderNotices | None = None,
+        situation_drafts: Sequence[uuid.UUID] = (),
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._session = session
@@ -171,6 +175,8 @@ class TurnPipeline:
         self._images = images
         # Where the business is told what waits for a person (TASK-431).
         self._notices = notices
+        # Drafts the simulator tries in this turn as if active (017, RF-009).
+        self._situation_drafts = tuple(situation_drafts) if sandbox else ()
         self._clock = clock
         self._states = StateRepo(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
@@ -267,8 +273,23 @@ class TurnPipeline:
             notices=None if self._sandbox else self._notices,
             rubro_version_id=config.rubro_version_id,
         )
+        situations = await select_situations(
+            self._session,
+            self._tenant_id,
+            stage=stage.value,
+            message=inbound.text,
+            llm=self._llm,
+            max_situaciones=config.behavior.max_situaciones,
+            drafts=self._situation_drafts,
+        )
         prompt = build_stage_prompt(
-            config, facts, stage, now=now, turn=turn, tool_specs=registry.specs()
+            config,
+            facts,
+            stage,
+            now=now,
+            turn=turn,
+            tool_specs=registry.specs(),
+            situations=situations,
         )
 
         # 10. model
@@ -337,6 +358,7 @@ class TurnPipeline:
                     tools_enabled=list(registry.names()),
                     outbound_count=len(sent),
                     model_tier=tier,
+                    situaciones=[s.trace() for s in situations] or None,
                 ),
             )
 
@@ -352,6 +374,7 @@ class TurnPipeline:
             tool_messages=tool_messages,
             text_messages=text_messages,
             model_tier=tier,
+            situations=situations,
         )
 
     # ----------------------------------------------------------------- helpers

@@ -357,7 +357,12 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     comprobante con el titular configurado sale sin `destinatario_no_verificado`
   - Parallel: true
 
-- [ ] TASK-462: Situaciones
+- [x] TASK-462: Situaciones
+  - **Hecho (2026-10-14):** migración 0032 (`situations`, campos del perfil en `agent_configs`,
+    `payment_methods_business.titular`, `agent_traces.situaciones`); `restrictions` pasa a una situación
+    `migrada` y la columna se elimina; API `/assistant/situations` (CRUD, activar/desactivar, desde
+    sugerida); embedding por el job `embed_situations` y barrido cada hora; el wizard guarda su texto
+    libre como la situación migrada hasta TASK-468.
   - Input: RF-006, RF-011, RF-013 de la 017
   - Output: tabla `situations` con embedding; repositorio y API (crear, editar, borrador, activar,
     desactivar, desde sugerida del rubro); embedding calculado por el worker al guardar; migración de
@@ -366,7 +371,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de API y aislamiento; un borrador no es visible para el canal real
   - Parallel: true
 
-- [ ] TASK-463: Selector de situaciones en el pipeline
+- [x] TASK-463: Selector de situaciones en el pipeline
+  - **Hecho (2026-10-14):** `agent/situations.py`; sin situaciones que comparar no hay llamada de
+    embedding; umbral 0,55 (C-15).
   - Input: C-10 de la 017
   - Output: `agent/situations.py`: "siempre" + coincidentes con el mensaje y la etapa hasta
     `max_situaciones` (5 por defecto); una llamada de embedding por turno; si falla, solo las "siempre";
@@ -376,7 +383,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     respeta; el fallo del embedding no tira el turno
   - Parallel: false
 
-- [ ] TASK-464: Prompt por capas
+- [x] TASK-464: Prompt por capas
+  - **Hecho (2026-10-14):** PROCESO → RUBRO → NEGOCIO → SITUACIONES → PRIORIDAD; ESTILO con tratamiento,
+    emojis y saludo; política de descuentos en NEGOCIO (C-14); topes repartidos sin subir de 6 000 (C-16);
+    snapshots regenerados. La prueba de presupuesto lleva 5 situaciones largas y las reglas del rubro.
   - Input: C-03 y C-11 de la 017
   - Output: secciones PROCESO, RUBRO, NEGOCIO y SITUACIONES DEL NEGOCIO con la regla de prioridad; ESTILO
     sin "reglas adicionales" y con tratamiento, emojis y saludo; topes y test de presupuesto con 5
@@ -396,7 +406,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     cambia el siguiente mensaje del simulador
   - Parallel: true
 
-- [ ] TASK-465: Simulador con situaciones en borrador
+- [x] TASK-465: Simulador con situaciones en borrador
+  - **Hecho (2026-10-14):** `situaciones_prueba` en el cuerpo; depuración con `situaciones` (con
+    distancia) y `reglas_apagadas`. El panel (frontend) va en TASK-467.
   - Input: RF-009 de la 017, TASK-422
   - Output: `situaciones_prueba` en el simulador; el panel de depuración muestra reglas apagadas,
     situaciones elegidas y su puntaje

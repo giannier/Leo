@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agent,
+    assistant,
     auth,
     connection,
     health,
@@ -20,6 +21,7 @@ from app.api.v1 import (
 router = APIRouter()
 router.include_router(health.router)
 router.include_router(agent.router)
+router.include_router(assistant.router)
 router.include_router(auth.router)
 router.include_router(connection.router)
 router.include_router(knowledge.router)

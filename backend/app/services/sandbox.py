@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -164,6 +165,7 @@ class SandboxService:
         content: str,
         interactive: InteractiveReply | None = None,
         image: ReceivedImage | None = None,
+        drafts: Sequence[uuid.UUID] = (),
     ) -> SandboxTurn:
         """Record the customer's message, answer it, record the answer.
 
@@ -205,6 +207,7 @@ class SandboxService:
                 storage=self._storage,
             ),
             images=InboundImageReader(self._session, self._tenant_id, storage=self._storage),
+            situation_drafts=drafts,
         )
         tap = interactive_of(customer_message.payload)
         stored = stored_image_of(customer_message.payload)

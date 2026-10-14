@@ -71,3 +71,21 @@ implementa hasta esa aprobación; mientras tanto se escriben spec, plan y tasks 
 **Decisión:** "Sigue con la Fase C, termina de construir todo el proyecto y al final conecto el número". La
 Fase 1 ya no depende de TASK-459: TASK-460 depende de TASK-433 (Milestone B aprobado). La prueba con número
 real va después de construir el resto del MVP. Detalle de la secuencia en `CLAUDE.md`.
+
+## C-14: Política de descuentos "negociable" (lectura conservadora, para ratificar)
+**Situación:** RF-010 pide la política de descuentos con un máximo; no dice si el agente concede descuentos.
+**Decisión:** el agente **nunca** concede un descuento fuera de las promociones del sistema: con
+`negociable`, deriva a una persona del negocio; `descuento_maximo_pct` es lo que esa persona puede dar, no
+el agente. Toca dinero, así que se ratifica antes de cambiarlo. Con `no_ofrece` el agente no los ofrece;
+con `solo_promociones` (por defecto) solo existen las promociones.
+
+## C-15: Umbrales de similitud (para calibrar con el modelo real)
+**Decisión:** una situación coincide con el mensaje si la distancia coseno entre el mensaje y su "cuándo
+aplica" es menor que 0,55; una FAQ u objeción del rubro, menor que 0,6. Se calibran en el recorrido del
+Milestone C con `text-embedding-3-small` y se dejan en `agent/situations.py` y
+`services/catalog_knowledge.py`.
+
+## C-16: Presupuesto del prompt con las capas
+**Decisión:** el límite de 6 000 tokens no cambia (no sube el costo del LLM). Los topes se reparten:
+plataforma 450, estilo 300, estado 500, proceso 700, rubro 350, negocio 1 300, situaciones 1 000,
+herramientas 1 400. Cada situación se recorta a su parte (con "…") y todas conservan su título.
