@@ -15,12 +15,15 @@ from app.models.business import (
     ProductCategory,
 )
 from app.models.catalog import (
+    CatalogEmbedding,
     CatalogFaq,
     CatalogObjection,
     CatalogRule,
     CatalogSuggestedSituation,
     CatalogVersion,
     Rubro,
+    TenantCatalogSeen,
+    TenantRuleSwitch,
 )
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
@@ -46,6 +49,7 @@ __all__ = [
     "AuditLog",
     "Base",
     "BusinessInfo",
+    "CatalogEmbedding",
     "CatalogFaq",
     "CatalogObjection",
     "CatalogRule",
@@ -75,6 +79,8 @@ __all__ = [
     "ProductCategory",
     "Promotion",
     "Rubro",
+    "TenantCatalogSeen",
+    "TenantRuleSwitch",
     "RefreshToken",
     "Tenant",
     "TenantLLMSettings",

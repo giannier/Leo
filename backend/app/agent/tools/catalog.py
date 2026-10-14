@@ -41,6 +41,7 @@ from app.repositories.knowledge import KnowledgeChunkRepository
 from app.repositories.media import MediaAssetRepository
 from app.repositories.product import ProductRepository
 from app.repositories.sales_config import PromotionRepository
+from app.services.catalog_knowledge import search_rubro
 
 MAX_CATALOG_RESULTS = 12
 MAX_KNOWLEDGE_RESULTS = 4
@@ -127,7 +128,14 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
     chunks = KnowledgeChunkRepository(context.session, context.tenant_id).search(
         vectors[0], limit=MAX_KNOWLEDGE_RESULTS
     )
-    if not chunks:
+    # The rubro's guidance (017, TASK-461): how to answer, never a business fact.
+    guidance = search_rubro(
+        context.session,
+        context.rubro_version_id,
+        vectors[0],
+        embedding_model=context.llm.embedding_model,
+    )
+    if not chunks and not guidance:
         return ToolResult.no_disponible(
             texto=(
                 "No hay información sobre eso en los documentos del negocio. "
@@ -135,10 +143,18 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
             )
         )
 
-    passages = [chunk.content[:MAX_CHUNK_CHARS] for chunk in chunks]
+    parts: list[str] = []
+    if chunks:
+        passages = [chunk.content[:MAX_CHUNK_CHARS] for chunk in chunks]
+        parts.append("Información del negocio:\n" + "\n---\n".join(passages))
+    if guidance:
+        parts.append(
+            "Guía del rubro (cómo responder; los datos salen solo del negocio):\n"
+            + "\n".join(f"- {hit.text}" for hit in guidance)
+        )
     return ToolResult.hecho(
-        data={"fragmentos": len(passages)},
-        texto="Información del negocio:\n" + "\n---\n".join(passages),
+        data={"fragmentos": len(chunks), "guia_rubro": len(guidance)},
+        texto="\n\n".join(parts),
     )
 
 

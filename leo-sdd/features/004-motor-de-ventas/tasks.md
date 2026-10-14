@@ -327,7 +327,16 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     versión publicada no se puede modificar
   - Parallel: false
 
-- [ ] TASK-461: Resolución de capas e interruptores
+- [x] TASK-461: Resolución de capas e interruptores
+  - **Hecho (2026-10-14):** migración 0031; `process/layers.py` (`LayerResolver`: reglas de proceso y de
+    rubro menos las apagadas, novedades por versión vista); `repositories/layers.py`; el texto de cada
+    etapa y las reglas del rubro salen de ahí en `ProcessConfigService` (8 consultas por lectura); un
+    interruptor invalida la caché; FAQ y objeciones del rubro en `catalog_embeddings` (job
+    `index_catalog_knowledge` al arrancar el worker y cada hora) y `consultar_conocimiento` las devuelve
+    como "Guía del rubro" bajo un umbral de distancia; `tenant_users.puede_revisar` (el dueño siempre).
+    **Decisión:** las FAQ del rubro no se guardan como `knowledge_source` del negocio (tendrían que
+    copiarse a cada negocio o romper el aislamiento): van a una tabla de plataforma y se buscan con el
+    mismo vector de la consulta, sin llamada extra.
   - Input: `017/plan.md` (resolución de capas), C-04, C-09 de la 017
   - Output: `process/layers.py` (`LayerResolver`), `tenant_rule_switches`, `tenant_catalog_seen` (aviso
     de novedades) y la caché invalidada al publicar o al cambiar un interruptor; FAQ y objeciones del
