@@ -548,12 +548,17 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 ## Fase D · Autonomía
 
-- [ ] TASK-443: Derivación con pausa
+- [x] TASK-443: Derivación con pausa
   - Input: C-14, `contracts/api.md §6, §7, §9`
   - Output: tool `derivar_a_humano` (reemplaza el stub; termina el turno, envía el mensaje de derivación y con `asesoria` guarda `asesoria_derivada_en`), job `handoff.expire`, `GET /conversations/{id}/state`, `POST …/resume-bot`
   - Depends on: TASK-421, TASK-431
   - Verification: tests de que durante la pausa no se llama al LLM y se guardan los mensajes; al vencer se recalcula la etapa; el aviso al tenant incluye el resumen; después de vencer la pausa, ASESORIA no vuelve a derivar sola
   - Parallel: true
+  - Hecho (2026-10-14): `agent/tools/handover.py` (la pausa sale de `derivacion_pausa_horas`, el mensaje de
+    `mensajes_sistema.derivacion`), el loop corta en cuanto la tool termina (`ToolContext.ending`),
+    `services/handoff.py` + job `handoff.expire`, `api/v1/conversations.py` y el aviso con "Reactivar
+    asistente" en el detalle del pedido. Tests: `test_handover.py`, `test_conversation_state_isolation.py`.
+    En el simulador la pausa también vale (así el dueño la ve); una conversación nueva empieza sin ella.
 
 - [ ] TASK-444: Seguimiento y descarte de borradores
   - Input: C-13, `plantillas.md §6`

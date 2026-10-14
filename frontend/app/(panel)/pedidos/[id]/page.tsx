@@ -23,6 +23,7 @@ import {
   ProofsCard,
   type ProofImageState,
 } from "@/components/orders/order-detail";
+import { HandoverBanner } from "@/components/orders/handover-banner";
 import { StateBadge, formatDateTime, noticeMessage } from "@/components/orders/labels";
 import { ReviewPanel } from "@/components/orders/review-panel";
 import { Alert, Skeleton } from "@/components/ui";
@@ -134,6 +135,8 @@ export default function PedidoPage() {
               <span data-testid="order-outcome">{outcome.text}</span>
             </Alert>
           ) : null}
+
+          <HandoverBanner conversationId={order.conversation_id} />
 
           <OrderNotes order={order} />
 

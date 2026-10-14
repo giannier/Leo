@@ -495,28 +495,6 @@ class TestTheHandover:
         assert properties["resumen"]["maxLength"] == 500
 
 
-# ------------------------------------------------------------------------ stubs
-
-
-class TestTheToolsOfLaterTasksAnswerNotAvailable:
-    @pytest.mark.parametrize(
-        ("tool", "stage"),
-        [
-            ("derivar_a_humano", Stage.IDENTIFICAR),
-        ],
-    )
-    async def test_the_stub(self, tool: str, stage: Stage) -> None:
-        registry = registry_for_stage(CERT, stage, Facts(), CERT_OPTIONS)
-
-        result = await _call(registry, tool)
-
-        assert isinstance(result, ToolResult)
-        assert result.status == "no_disponible"
-        assert result.data == {"herramienta": tool}
-        # The model is told not to mention it; it must not promise anything.
-        assert "No la menciones" in (result.decir or "")
-
-
 # ------------------------------------------------------------------- the alias
 
 

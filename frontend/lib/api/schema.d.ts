@@ -753,6 +753,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/conversations/{conversation_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the sales engine has a conversation */
+        get: operations["conversation_state_api_v1_tenant_conversations__conversation_id__state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/resume-bot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give the conversation back to the assistant before the pause ends */
+        post: operations["resume_conversation_bot_api_v1_tenant_conversations__conversation_id__resume_bot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/knowledge": {
         parameters: {
             query?: never;
@@ -2098,6 +2132,20 @@ export interface components {
              */
             updated_at: string;
         };
+        /** ConversationStateOut */
+        ConversationStateOut: {
+            /** Etapa */
+            etapa: string;
+            /** Embudo */
+            embudo: string;
+            /** Hechos */
+            hechos: {
+                [key: string]: unknown;
+            };
+            derivado: components["schemas"]["Handover"] | null;
+            /** Eventos */
+            eventos: components["schemas"]["StageEvent"][];
+        };
         /**
          * CreateSourceResponse
          * @description `202` body: the source exists, indexing has been queued.
@@ -2368,6 +2416,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Handover */
+        Handover: {
+            /** Motivo */
+            motivo: string;
+            /** Resumen */
+            resumen: string | null;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
         };
         /**
          * HealthResponse
@@ -3510,6 +3570,22 @@ export interface components {
          * @enum {string}
          */
         Stage: "INICIO" | "CALIFICAR" | "ANUNCIO" | "IDENTIFICAR" | "PEDIDO" | "DATOS" | "COBRO" | "VERIFICACION" | "CERRADO" | "ASESORIA" | "DERIVADO";
+        /** StageEvent */
+        StageEvent: {
+            /** De */
+            de: string | null;
+            /** A */
+            a: string;
+            /** Embudo */
+            embudo: string;
+            /** Motivo */
+            motivo: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
         /** StageView */
         StageView: {
             /** Key */
@@ -6192,6 +6268,104 @@ export interface operations {
                 };
             };
             /** @description `no_number` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    conversation_state_api_v1_tenant_conversations__conversation_id__state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationStateOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the conversation does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resume_conversation_bot_api_v1_tenant_conversations__conversation_id__resume_bot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationStateOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the conversation does not exist or is another business's */
             404: {
                 headers: {
                     [name: string]: unknown;

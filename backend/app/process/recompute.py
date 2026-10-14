@@ -10,7 +10,9 @@ does. The same two pure functions (`compute_stage`, `funnel_for`) decide.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -34,6 +36,7 @@ def recompute_stage(
     reason: str,
     now: datetime | None = None,
     force_event: bool = False,
+    facts_patch: Mapping[str, Any] | None = None,
 ) -> SaveResult | None:
     """Recompute and save the stage of one conversation.
 
@@ -42,6 +45,10 @@ def recompute_stage(
     that must stay in the history even when the stage did not move, such as
     rejecting a receipt. Retries once on a concurrent write: the bot may be
     answering at the same moment.
+
+    `facts_patch` changes stored facts first (resuming the bot clears `derivado`,
+    TASK-443); the stage is computed as if it were already saved, and a patch is
+    always written, even if the stage does not move.
     """
     if conversation.tenant_id != tenant_id:
         raise TenantScopeError("the conversation belongs to another tenant")
@@ -50,9 +57,13 @@ def recompute_stage(
     states = StateRepo(session, tenant_id)
     state = states.get_or_create(conversation, config.template)
     facts = FactsLoader(session, tenant_id, config.facts_config()).load(conversation, now=moment)
+    patch = dict(facts_patch or {})
+    if patch:
+        facts = facts.model_copy(update=patch)
     stage = compute_stage(config.template, config.options, facts, moment)
     funnel = funnel_for(config.template, stage, facts)
-    if not force_event and (stage.value, funnel.value) == (state.stage_key, state.funnel_code):
+    unchanged = (stage.value, funnel.value) == (state.stage_key, state.funnel_code)
+    if not force_event and not patch and unchanged:
         return None
 
     version = state.version
@@ -62,7 +73,7 @@ def recompute_stage(
                 conversation.id,
                 stage=stage,
                 funnel=funnel,
-                facts_patch=None,
+                facts_patch=patch or None,
                 reason=reason,
                 expected_version=version,
                 snapshot=facts_snapshot(facts),
