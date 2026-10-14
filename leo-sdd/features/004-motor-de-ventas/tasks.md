@@ -588,12 +588,19 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 
 ## Fase E · Cierre
 
-- [ ] TASK-446: Aislamiento de todo lo nuevo
+- [x] TASK-446: Aislamiento de todo lo nuevo
   - Input: todas las tablas y endpoints nuevos
   - Output: tests cruzados de tenant en `backend/tests/isolation` para cada endpoint (lista, detalle, edición) y cada tool (que un ID de otro tenant devuelva `no_disponible`)
   - Depends on: TASK-426, TASK-427, TASK-428, TASK-430, TASK-434, TASK-435, TASK-436, TASK-443
   - Verification: `pytest backend/tests/isolation` en verde, con más de 174 tests
   - Parallel: true
+  - Hecho (2026-10-14): auditoría de cada endpoint con id y cada tool con id. Se cerraron los huecos: resumen de
+    pedidos, imagen de una nota, editar, borrar y desactivar situaciones, categorías, archivo de multimedia,
+    FAQ, promociones, reinicio del simulador, invitaciones del equipo, vista previa, resumen y rubro sin datos
+    de otro negocio, y las tools `quitar`/`cantidad` y los filtros por categoría (`test_api_gaps_isolation.py`
+    y ampliaciones). Encontró un bug real: `GET /assistant/categories` daba 500 con productos (corregido).
+    Antes, en la 445, la búsqueda vectorial que podía dejar sin resultados a un negocio (corregida). 605
+    tests de aislamiento.
 
 - [x] TASK-447: Evals "flujos de venta"
   - Input: los 6 escenarios de Capacita, `plantillas.md`, criterios de la spec
