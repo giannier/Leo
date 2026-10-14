@@ -1,4 +1,4 @@
-"""Process templates v2: CALIFICAR never holds an answer back for the name.
+"""Process templates v2: CALIFICAR and ANUNCIO never hold an answer back for the name.
 
 Revision ID: 0033
 Revises: 0032
@@ -7,7 +7,8 @@ The sales-flow evals (TASK-447) found the assistant answering "before I tell you
 the price, what's your name?" and ignoring a path the customer had already stated
 ("solo certificar, quiero el paquete de 5"): the v1 rule said "if you do not know
 their name, ask for it and stop". v2 keeps asking for the name, but records the
-stated path first and answers the question.
+stated path first and answers the question. The acceptance walk (TASK-449) found the
+same in ANUNCIO: a customer from an ad got only "what's your name?".
 
 Published versions are frozen (017, C-04), so this is version 2 of each template:
 every rule of v1, with the same `rule_key`s (a business that switched a rule off
@@ -28,13 +29,29 @@ depends_on: str | Sequence[str] | None = None
 
 KEYS = ("productos", "certificaciones", "servicios")
 CHANGED = {
+    "IDENTIFICAR.cuando_elija_llama_gestionar_pedido": (
+        "Cuando elija, o si ya dijo antes qué paquete quiere (no le muestres los paquetes otra "
+        'vez), llama a gestionar_pedido(accion="agregar") con el paquete y las selecciones que '
+        "ya dijo."
+    ),
+    "IDENTIFICAR.servicio_es_precio_fijo_explicalo": (
+        "- Si el servicio es de precio fijo y el cliente dice que lo quiere o lo contrata, agrégalo "
+        "en el mismo turno con gestionar_pedido: no le preguntes si quieres agregarlo. Si solo "
+        "pregunta, explícalo."
+    ),
+    "ANUNCIO.no_sabes_su_nombre_pidelo": (
+        "- Si no sabes su nombre, pídelo, pero en el mismo mensaje ve a lo anunciado: nunca "
+        "condiciones la información a que te dé su nombre."
+    ),
     "CALIFICAR.aun_no_sabes_su_nombre": (
         "- Si aún no sabes su nombre, pídelo. Si en ese mismo mensaje ya dijo qué busca o hizo "
         "una pregunta, primero registra el camino con elegir_camino y responde su pregunta: "
         "nunca condiciones una respuesta a que te dé su nombre."
     ),
 }
-NOTE = "v2 (TASK-447): CALIFICAR registra el camino y responde aunque falte el nombre"
+NOTE = (
+    "v2 (TASK-447/449): CALIFICAR y ANUNCIO responden y registran el camino aunque falte el nombre"
+)
 
 
 def upgrade() -> None:

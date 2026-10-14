@@ -319,8 +319,9 @@ def _agregar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     )
     turn.service.add_product(order, product, quantity, max_lines=context.max_lines)
     says = (
-        "El producto quedó en el pedido. Cuéntale al cliente lo que quedó, con los montos de "
-        "este resultado y sin recalcular nada."
+        "El producto quedó en el pedido. Si en su mensaje pidió otros productos, agrégalos "
+        "también ahora, sin preguntarle si los quiere. Después cuéntale lo que quedó, con los "
+        "montos del último resultado y sin recalcular nada."
     )
     names = _names(arguments.get("seleccion"))
     if not (names and product.bundle_size):
@@ -373,7 +374,11 @@ def _elegir(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     order = turn.draft()
     if order is None:
         return turn.result(
-            "no_disponible", turn.active(), "No hay un paquete en el pedido para elegir."
+            "no_disponible",
+            turn.active(),
+            "Todavía no hay un paquete en el pedido. Si el cliente ya dijo qué paquete quiere, "
+            'agrégalo ahora con gestionar_pedido(accion="agregar", producto_id=<el del '
+            "paquete>, seleccion=<sus temas>). No digas que los temas quedaron registrados.",
         )
     context = turn.context
     product_id = _product_id(arguments)
@@ -478,15 +483,27 @@ def _vaciar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
 
 
 def _aplicar_promocion(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
-    promotion_id = _uuid(arguments.get("promocion_id"))
-    if promotion_id is None:
-        return ToolResult.error("promocion_id no es válido: usa el id de la promoción del ESTADO.")
-
+    raw = str(arguments.get("promocion_id") or "").strip()
     context = turn.context
     service = turn.service
     now = service.now
-    in_force = PromotionRepository(context.session, context.tenant_id).in_force(now=now)
-    promotion = next((p for p in in_force if p.id == promotion_id and p.uso == "cierre"), None)
+    in_force = [
+        p
+        for p in PromotionRepository(context.session, context.tenant_id).in_force(now=now)
+        if p.uso == "cierre"
+    ]
+    promotion_id = _uuid(raw)
+    if promotion_id is not None:
+        promotion = next((p for p in in_force if p.id == promotion_id), None)
+    else:
+        # The model sometimes passes the name it read in the ESTADO: an exact name of a
+        # closing promotion of this business is unambiguous enough.
+        named = [p for p in in_force if p.nombre.casefold() == raw.casefold()]
+        if not raw or len(named) != 1:
+            return ToolResult.error(
+                "promocion_id no es válido: usa el promocion_id que muestra el ESTADO."
+            )
+        promotion = named[0]
     if promotion is None:
         return turn.result(
             "no_disponible",

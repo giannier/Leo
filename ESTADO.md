@@ -8,11 +8,11 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 |---|---|---|
 | 001 Onboarding | Parcial (25/26 tasks) | TASK-001..025 marcadas `[x]`; TASK-026 (deploy Contabo) sin hacer. No existe `docker-compose.prod.yml` ni Caddy/Sentry/backups en `deploy/` |
 | 002 Canal WhatsApp | Hecho salvo milestone humano | TASK-201..208 `[x]`; 209 `[~]`: test de caos hecho, falta la prueba real con número propio |
-| 003 Agent-core | Parcial | `tasks.md` 301..308 sin marcar, pero existe motor v0 (`agent/core.py`), prompt builder, trazas, `catalog_guard`. No hay circuit breaker, memoria ni `model_policies` (no verificado en detalle) |
-| 004 Motor de ventas | En curso | Milestones A y B aprobados (B el 2026-10-14). Sigue TASK-459 (número real por túnel) y luego la Fase C = Fase 1 de la 017 |
+| 003 Agent-core | Cerrada en versión mínima (2026-10-14) | 301..308 marcadas por la 004 (C-02, TASK-445): circuit breaker por tenant, nivel → modelo desde settings, ventana de 20 mensajes. Sin resumen continuo, perfil de contacto ni panel de `model_policies` |
+| 004 Motor de ventas | Fases A–E construidas (2026-10-14) | Milestones A, B y C aprobados; D (derivación, seguimientos, breaker) y E (aislamiento, evals de flujos, e2e, aceptación) hechos y verificados con el modelo real (`milestones/aceptacion.md`). Falta: TASK-459 número real (al final, por decisión de Giannier) y el merge |
 | 005 Catalog / 008 Inbox | Absorbidas | Catálogo CRUD+CSV/XLSX en 001 (TASK-011); inbox absorbido por 007 |
 | 006 Conocimiento avanzado | No iniciado | Solo RAG v0 (PDF con texto, sin OCR ni URL) |
-| 007 Inbox | No iniciado | No hay endpoints de conversaciones fuera del sandbox |
+| 007 Inbox | No iniciado | Solo `GET …/conversations/{id}/state` y `resume-bot` (TASK-443); la bandeja es la 007 |
 | 009 Billing | No iniciado | `providers/payments/` vacío; solo existe la tabla `plans` con límites |
 | 010 Dashboard | No iniciado | Solo panel admin de plataforma y medidor de uso |
 | 011–016 (Fase 2) | No iniciado | Docs en estado "Draft para ratificación"; ningún código |

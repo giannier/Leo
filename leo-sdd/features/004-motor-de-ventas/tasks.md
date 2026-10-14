@@ -599,7 +599,7 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     FAQ, promociones, reinicio del simulador, invitaciones del equipo, vista previa, resumen y rubro sin datos
     de otro negocio, y las tools `quitar`/`cantidad` y los filtros por categoría (`test_api_gaps_isolation.py`
     y ampliaciones). Encontró un bug real: `GET /assistant/categories` daba 500 con productos (corregido).
-    Antes, en la 445, la búsqueda vectorial que podía dejar sin resultados a un negocio (corregida). 605
+    Antes, en la 445, la búsqueda vectorial que podía dejar sin resultados a un negocio (corregida). 601
     tests de aislamiento.
 
 - [x] TASK-447: Evals "flujos de venta"
@@ -611,14 +611,17 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Hecho (2026-10-14): `backend/evals/sales_flows.py` + `test_sales_flows.py` (corren con `make evals`).
     24/24 en dos corridas tras las correcciones de C-24; reporte en `milestones/evals-flujos-de-venta.md`.
 
-- [ ] TASK-448: E2E Playwright
+- [x] TASK-448: E2E Playwright
   - Input: flujos de las Fases B y C
   - Output: specs e2e para configurar una tienda desde cero, completar un pedido sandbox con comprobante, confirmarlo desde Pedidos y editar y restaurar una etapa
   - Depends on: TASK-432, TASK-442
   - Verification: `npx playwright test` en verde y `next build` sin errores
   - Parallel: true
+  - Hecho (2026-10-14): la mayoría ya existía (onboarding, pedidos, asistente, simulador). Nuevo: aviso de
+    derivación y "Reactivar asistente" en el detalle del pedido. 77/84 en la corrida completa; las fallas son
+    MinIO ausente en este entorno (2) y `admin.spec` en Android (3, anotado en `milestones/aceptacion.md`).
 
-- [ ] TASK-449: 🧑 Aceptación y PR
+- [~] TASK-449: 🧑 Aceptación y PR
   - Input: criterios de aceptación de la spec
   - Output:
     - `milestones/aceptacion.md` con Capacita (6 escenarios), Tienda y Zentek360 (cotización derivada + hosting de precio fijo);
@@ -628,6 +631,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Depends on: TASK-446, TASK-447, TASK-448
   - Verification: Giannier aprueba los 3 negocios y hace el merge
   - Parallel: false
+  - Evidencia lista (2026-10-14): `milestones/aceptacion.md`, cobertura 95 %, `ESTADO.md` actualizado. Falta
+    la aprobación de Giannier y el PR (se abre cuando él lo pida).
 
 ## Antes de producción (salidas del Milestone B)
 

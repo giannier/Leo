@@ -871,6 +871,25 @@ class TestPromotions:
         assert order.rechazo_vigente is False
         assert str(coupon.id) in offers_of(context)
 
+    async def test_the_exact_name_of_a_closing_promotion_also_works(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """The model passed the name it read in the ESTADO (acceptance, TASK-449)."""
+        coupon = promotion(db, tenant)
+        context = make_context(db, tenant, conversation)
+        await act(context, accion="agregar", producto_id=str(catalogue["excel"].id))
+
+        named = await act(context, accion="aplicar_promocion", promocion_id=coupon.nombre.upper())
+        unknown = await act(context, accion="aplicar_promocion", promocion_id="Otra promo")
+
+        assert named.status == "hecho"
+        assert str(coupon.id) in offers_of(context)
+        assert unknown.status == "error"
+
     async def test_a_later_change_keeps_the_offer_made_in_this_turn(
         self,
         db: Session,
