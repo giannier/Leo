@@ -509,3 +509,43 @@ class TestThePipelineGate:
             .all()
         )
         assert [m.msg_type for m in events] == ["event"]
+
+
+class TestTheThreadCitesItsSources:
+    async def test_an_agent_reply_shows_the_documents_it_used(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        """Feature 006, HU-05: "respondió usando: Política de envíos"."""
+        from app.models.conversation import AgentTrace
+        from app.repositories.conversation import MessageRepository
+
+        tenant_id, owner, _ = await _team(api, mail, db)
+        conversation = _thread(db, tenant_id, name="Rosa", said="¿Cuánto cuesta el envío?")
+        reply = MessageRepository(db, tenant_id).append(
+            conversation_id=conversation.id,
+            direction="outbound",
+            author="agent",
+            content="El envío cuesta 10 soles.",
+        )
+        db.add(
+            AgentTrace(
+                tenant_id=tenant_id,
+                message_id=reply.id,
+                model="mock",
+                rag_sources=[
+                    {
+                        "tool": "consultar_conocimiento",
+                        "consulta": "envío",
+                        "fuentes": ["Política de envíos", "Mi web"],
+                    },
+                    {"tool": "consultar_conocimiento", "fuentes": ["Política de envíos"]},
+                ],
+            )
+        )
+        db.flush()
+
+        thread = (await api.get(f"{C}/{conversation.id}/messages", headers=owner)).json()["items"]
+
+        by_author = {m["autor"]: m for m in thread}
+        assert by_author["agent"]["fuentes"] == ["Política de envíos", "Mi web"]
+        assert by_author["customer"]["fuentes"] == []

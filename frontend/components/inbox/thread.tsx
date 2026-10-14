@@ -76,6 +76,11 @@ function Bubble({ message, conversationId }: { message: ThreadMessage; conversat
         <div className="whitespace-pre-wrap break-words">
           <WhatsAppText text={message.texto} />
         </div>
+        {message.fuentes?.length ? (
+          <p className="mt-1 text-xs opacity-75" data-testid="message-sources">
+            Respondió usando: {message.fuentes.join(", ")}
+          </p>
+        ) : null}
         {message.opciones?.length ? (
           <p className="mt-1 text-xs opacity-75">Opciones: {message.opciones.join(" · ")}</p>
         ) : null}

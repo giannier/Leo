@@ -573,7 +573,11 @@ class AgentCore:
 
         sources: list[dict[str, object]] = []
         if call.name == "consultar_conocimiento" and found:
-            sources.append({"tool": call.name, "consulta": _summarise(call.arguments)})
+            entry: dict[str, object] = {"tool": call.name, "consulta": _summarise(call.arguments)}
+            if isinstance(produced, ToolResult) and produced.data.get("fuentes"):
+                # Which documents the answer leaned on (006 HU-05).
+                entry["fuentes"] = produced.data["fuentes"]
+            sources.append(entry)
 
         if tool.effect:
             cache.writes += 1

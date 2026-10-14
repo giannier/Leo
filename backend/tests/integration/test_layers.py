@@ -5,12 +5,13 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.agent.tools.catalog import consultar_conocimiento
 from app.agent.tools.registry import ToolContext
 from app.models.business import BusinessProfile
-from app.models.catalog import CatalogRule
+from app.models.catalog import CatalogEmbedding, CatalogRule
 from app.models.tenant import Tenant, TenantUser
 from app.process.layers import LayerResolver, UnknownRule
 from app.process.service import DEFAULT_CACHE, ProcessConfigCache, ProcessConfigService
@@ -125,6 +126,11 @@ class TestRubroKnowledge:
         self, db: Session, tenant: Tenant
     ) -> None:
         llm = OfflineLLMProvider(environment="test")
+        # A dev worker may already have embedded the published rubros in this
+        # database; start from none (rolled back with the test).
+        db.execute(
+            delete(CatalogEmbedding).where(CatalogEmbedding.embedding_model == llm.embedding_model)
+        )
         assert await index_published_rubros(db, llm) > 0
         assert await index_published_rubros(db, llm) == 0  # already done
         config = _config(db, tenant)

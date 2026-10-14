@@ -178,6 +178,31 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
         statement = select(chunk).order_by(chunk.embedding.cosine_distance(embedding)).limit(limit)
         return self._session.execute(statement).scalars().all()
 
+    def search_with_sources(
+        self, embedding: Sequence[float], *, limit: int
+    ) -> list[tuple[KnowledgeChunk, KnowledgeSource, float]]:
+        """`search`, with each chunk's source and its cosine distance (Feature 006).
+
+        Same shape as `search` (the tenant's rows first, in a materialised CTE),
+        joined to the live sources of the same tenant: the agent cites the source
+        and ranks by its priority.
+        """
+        own = self._scoped().cte("own_chunks").prefix_with("MATERIALIZED")
+        chunk = aliased(KnowledgeChunk, own)
+        distance = chunk.embedding.cosine_distance(embedding)
+        statement = (
+            select(chunk, KnowledgeSource, distance)
+            .join(
+                KnowledgeSource,
+                (KnowledgeSource.id == chunk.source_id)
+                & (KnowledgeSource.tenant_id == self.tenant_id)
+                & KnowledgeSource.deleted_at.is_(None),
+            )
+            .order_by(distance)
+            .limit(limit)
+        )
+        return [(row[0], row[1], float(row[2])) for row in self._session.execute(statement).all()]
+
     def list_for_source(self, source_id: uuid.UUID) -> Sequence[KnowledgeChunk]:
         """Chunks of one source belonging to this tenant, oldest first."""
         statement = (

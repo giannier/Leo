@@ -246,6 +246,7 @@ export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
+export type KnowledgeDetail = Ok<Ops["/api/v1/tenant/knowledge/{source_id}"]["get"]>;
 export type KnowledgeSource = KnowledgeList["sources"][number];
 export type KnowledgeUsage = KnowledgeList["usage"];
 
@@ -450,6 +451,18 @@ export const api = {
       });
     },
     remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+    // Feature 006.
+    get: (id: string) => request<KnowledgeDetail>(`/tenant/knowledge/${id}`),
+    update: (id: string, body: { title?: string; content?: string; priority?: number }) =>
+      request<KnowledgeSource>(`/tenant/knowledge/${id}`, { method: "PATCH", body }),
+    resync: (id: string) =>
+      request<KnowledgeSource>(`/tenant/knowledge/${id}/resync`, { method: "POST" }),
+    chunks: (id: string) => request<{ chunks: string[] }>(`/tenant/knowledge/${id}/chunks`),
+    addWeb: (url: string, title?: string) =>
+      request<{ id: string; status: string }>("/tenant/knowledge/web", {
+        method: "POST",
+        body: title ? { url, title } : { url },
+      }),
   },
 
   admin: {

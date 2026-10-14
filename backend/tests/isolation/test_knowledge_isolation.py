@@ -515,3 +515,16 @@ class TestTheFeature006EndpointsStayInTheirBusiness:
         assert untouched is not None
         assert untouched.content == "Delivery a Miraflores por S/ 5."
         assert untouched.priority == 100 and untouched.status == "pending"
+
+
+class TestRetrievalWithSourcesIsScoped:
+    async def test_retrieve_never_returns_another_tenants_passage_or_title(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        from app.services.knowledge import retrieve
+
+        vector = (await MockLLMProvider().embed(["secret"]))[0]
+
+        passages = retrieve(db, tenant_a.tenant_id, vector, k=20)
+
+        assert tenant_b.source_id not in {p.source_id for p in passages}

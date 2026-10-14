@@ -243,3 +243,18 @@ class AgentTraceRepository(BaseRepository[AgentTrace]):
 
     def for_message(self, message_id: uuid.UUID) -> Sequence[AgentTrace]:
         return self.list(AgentTrace.message_id == message_id)
+
+    def sources_by_message(self, message_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, list[str]]:
+        """The knowledge sources each reply leaned on (Feature 006, HU-05), by message id."""
+        if not message_ids:
+            return {}
+        found: dict[uuid.UUID, list[str]] = {}
+        for trace in self.list(AgentTrace.message_id.in_(list(message_ids))):
+            titles = found.setdefault(trace.message_id, [])
+            for entry in trace.rag_sources or []:
+                if not isinstance(entry, dict):
+                    continue
+                for title in entry.get("fuentes") or []:
+                    if isinstance(title, str) and title not in titles:
+                        titles.append(title)
+        return {k: v for k, v in found.items() if v}

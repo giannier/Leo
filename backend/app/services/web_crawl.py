@@ -181,18 +181,14 @@ def _decode(body: bytes, charset: str | None) -> str:
 async def _robots(fetcher: WebFetcher, start: str) -> tuple[RobotFileParser | None, bool]:
     """The site's robots.txt, `(None, False)` when there is none.
 
-    A missing file (4xx) allows everything. A file that cannot be read (5xx, a
-    network error) allows nothing: when in doubt, the site said no.
+    A missing file (4xx) allows everything. A file the server fails to give (5xx)
+    allows nothing: when in doubt, the site said no. A site that cannot be reached
+    at all raises: that is "your address does not work", not a robots rule.
     """
     parts = urlsplit(start)
     address = urlunsplit((parts.scheme, parts.netloc, "/robots.txt", "", ""))
     parser = RobotFileParser()
-    try:
-        page = await fetcher.fetch(address)
-    except BlockedAddressError:
-        raise
-    except WebFetchError:
-        return _deny_all(parser), True
+    page = await fetcher.fetch(address)
     if page.status >= 500:
         return _deny_all(parser), True
     if page.status >= 400 or not page.body:
@@ -217,6 +213,9 @@ async def crawl(fetcher: WebFetcher, start_url: str, *, max_pages: int) -> Crawl
         robots, result.robots = await _robots(fetcher, start)
     except BlockedAddressError as exc:
         result.error = f"No podemos leer esa dirección: {exc}."
+        return result
+    except WebFetchError as exc:
+        result.error = f"No pudimos abrir tu web: {exc}. Revisa la dirección."
         return result
 
     queue = [start]
@@ -269,6 +268,13 @@ async def crawl(fetcher: WebFetcher, start_url: str, *, max_pages: int) -> Crawl
                 queue.append(link)
 
     _drop_repeated_lines(result.pages)
+    if not result.pages and result.skipped and result.skipped[0]["url"] == start:
+        reason = result.skipped[0]["motivo"]
+        result.error = (
+            "Tu web pide que no la lean robots como el nuestro (robots.txt)."
+            if reason == "robots.txt"
+            else f"No pudimos leer tu web: {reason}."
+        )
     return result
 
 
