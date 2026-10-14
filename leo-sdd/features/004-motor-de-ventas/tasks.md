@@ -560,12 +560,17 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     asistente" en el detalle del pedido. Tests: `test_handover.py`, `test_conversation_state_isolation.py`.
     En el simulador la pausa también vale (así el dueño la ve); una conversación nueva empieza sin ella.
 
-- [ ] TASK-444: Seguimiento y descarte de borradores
+- [x] TASK-444: Seguimiento y descarte de borradores
   - Input: C-13, `plantillas.md §6`
   - Output: jobs `followups.run` (ventana con margen de 30 min, horario de 08:00 a 21:00 del tenant, intentos, etapas IDENTIFICAR, PEDIDO, DATOS, COBRO y VERIFICACION con rechazo, opt-out existente, derivación, y promoción para seguimiento en el último intento registrada en `promos_ofrecidas`) y `orders.discard_stale` (con evento `pedido_descartado`)
   - Depends on: TASK-425, TASK-443
   - Verification: tests con reloj congelado para cada condición que impide enviar; reset cuando el cliente escribe; candado contra doble envío
   - Parallel: false
+  - Hecho (2026-10-14): `services/followups.py` (`why_not` puro con cada condición de C-13), workers
+    `followups.run` y `orders.discard_stale`. Candado: el de la conversación más el intento reclamado con
+    compare-and-set (`StateRepo.save(retry=False)`). La espera cuenta desde el último mensaje o el último
+    seguimiento, lo más reciente. El seguimiento cuenta como respuesta del agente (`record_ai_message`).
+    Tests: `test_followup_rules.py` (29), `test_followups.py` (9); probado con el modelo real.
 
 - [ ] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
   - Input: C-02

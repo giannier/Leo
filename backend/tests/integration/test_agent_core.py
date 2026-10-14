@@ -20,7 +20,7 @@ from app.agent.core import (
     FALLBACK_REPLY,
     MAX_TOOL_ROUNDS,
     AgentCore,
-    _usable_answer,
+    usable_answer,
 )
 from app.agent.tools.registry import ToolRegistry
 from app.models.business import AgentConfig, BusinessProfile, Product
@@ -601,7 +601,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
             "</function>\n</tool_call>"
         )
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert unusable is True
         assert content == FALLBACK_REPLY
@@ -618,7 +618,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         ],
     )
     def test_anything_without_a_real_answer_falls_back(self, raw: str) -> None:
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert unusable is True
         assert content == FALLBACK_REPLY
@@ -628,7 +628,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         would be a far more common failure than the one being prevented."""
         raw = "Lo siento mucho. Te derivo con una persona ahora mismo."
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert content == raw
         assert unusable is False
@@ -638,7 +638,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         would throw away the part the customer needed."""
         raw = '<tool_call>{"a":1}</tool_call> El pan ciabatta cuesta S/ 8.50 en total.'
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert unusable is False
         assert "tool_call" not in content
@@ -659,7 +659,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         against brevity. A customer who says "ok" gets "¡De nada! 👍", and
         answering that with an apology for a failure that never happened is
         the worse of the two errors."""
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert content == raw
         assert unusable is False
@@ -669,7 +669,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         a shard of the call rather than something to send anybody."""
         raw = "<function=consultar_catalogo>pan</function>"
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert content == FALLBACK_REPLY
         assert unusable is True
@@ -679,7 +679,7 @@ class TestToolSyntaxNeverReachesTheCustomer:
         that happens to contain one is not a leak."""
         raw = "Te toma menos de <5 minutos preparar el pedido, avisame."
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert content == raw
         assert unusable is False
@@ -1086,7 +1086,7 @@ class TestWhatsAppMarkup:
         ],
     )
     def test_a_reply_is_converted_on_the_way_out(self, raw: str, expected: str) -> None:
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert unusable is False
         assert content == expected
@@ -1094,7 +1094,7 @@ class TestWhatsAppMarkup:
     def test_ordinary_prose_is_untouched(self) -> None:
         raw = "Son 3 litros de leche a S/ 3.00 c/u, en total S/ 9.00."
 
-        assert _usable_answer(raw) == (raw, False)
+        assert usable_answer(raw) == (raw, False)
 
 
 class TestReplyLayout:
@@ -1103,17 +1103,17 @@ class TestReplyLayout:
         the cleanup collapsed every newline. On a phone it is unreadable."""
         raw = "Tenemos:\n- Leche: S/ 3.00\n- Queso: S/ 16.00"
 
-        content, unusable = _usable_answer(raw)
+        content, unusable = usable_answer(raw)
 
         assert unusable is False
         assert content == "Tenemos:\n• Leche: S/ 3.00\n• Queso: S/ 16.00"
 
     def test_runs_of_blank_lines_are_capped(self) -> None:
-        content, _ = _usable_answer("Hola, buenas tardes.\n\n\n\nTe ayudo con eso.")
+        content, _ = usable_answer("Hola, buenas tardes.\n\n\n\nTe ayudo con eso.")
 
         assert content == "Hola, buenas tardes.\n\nTe ayudo con eso."
 
     def test_trailing_spaces_are_dropped(self) -> None:
-        content, _ = _usable_answer("Leche: S/ 3.00   \nQueso: S/ 16.00")
+        content, _ = usable_answer("Leche: S/ 3.00   \nQueso: S/ 16.00")
 
         assert content == "Leche: S/ 3.00\nQueso: S/ 16.00"

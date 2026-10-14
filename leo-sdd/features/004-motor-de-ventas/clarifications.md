@@ -120,6 +120,12 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 - Valores por defecto: 4 horas de espera y 2 intentos como máximo.
 - El opt-out ya existe en Leo (`contacts.opted_out_at` y `agent_configs.opt_out_keywords`) y se reutiliza tal cual.
 **Impacto en implementación:** Cron de ARQ cada 15 minutos con un candado por conversación. Se resetea cuando el cliente vuelve a escribir.
+**Implementado (TASK-444, 2026-10-14), lecturas conservadoras:** viene apagado por negocio
+(`seguimiento_activo=false`) hasta que el dueño lo encienda; solo canal real, nunca el simulador; si el
+intento se reclamó y el modelo falla, el intento se pierde (mejor un recordatorio de menos que dos); la
+promoción del último intento es la primera promoción de cierre activa marcada `para_seguimiento`; si no hay,
+el prompt dice que no ofrezca descuentos. El seguimiento cuenta como un mensaje del agente en el cupo
+(respetando `billing_enforced()`).
 **Registrado por:** Claude — por ratificar
 
 ## C-14: Derivación a humano sin bandeja

@@ -35,6 +35,12 @@ from app.workers.channel import (
     process_webhook_event,
     retry_stranded_replies,
 )
+from app.workers.followups import (
+    DISCARD_JOB,
+    FOLLOW_UP_JOB,
+    discard_stale_orders,
+    run_followups,
+)
 from app.workers.handoff import EXPIRE_JOB, expire_handoff_pauses
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
@@ -133,6 +139,10 @@ class WorkerSettings:
         cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
         # gives the bot back within five minutes of its `hasta`.
+        # C-13: every 15 minutes, off the quarter hours.
+        cron(run_followups, name=f"cron:{FOLLOW_UP_JOB}", minute={4, 19, 34, 49}),
+        # 08:10 UTC is 03:10 in Lima (`contracts/api.md` section 9).
+        cron(discard_stale_orders, name=f"cron:{DISCARD_JOB}", hour=8, minute=10),
         cron(
             expire_handoff_pauses,
             name=f"cron:{EXPIRE_JOB}",

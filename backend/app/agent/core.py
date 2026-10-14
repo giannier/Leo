@@ -148,7 +148,7 @@ def _tidy(text: str) -> str:
     return _RUN_OF_NEWLINES.sub("\n\n", text).strip()
 
 
-def _usable_answer(raw: str) -> tuple[str, bool]:
+def usable_answer(raw: str) -> tuple[str, bool]:
     """The reply to show, and whether the model failed to produce one.
 
     Any leftover tool-call markup is removed rather than shown. The answer is
@@ -299,7 +299,7 @@ class AgentCore:
             ChatMessage(
                 "system", system_prompt if system_prompt is not None else self.system_prompt()
             ),
-            *self._history(conversation_id),
+            *self.history(conversation_id),
             ChatMessage("user", customer_message),
         ]
 
@@ -389,7 +389,7 @@ class AgentCore:
         # worse than one that says it cannot help: the customer sees an empty
         # bubble or a pile of angle brackets, and no next step either way.
         silent = result is not None and not result.content.strip()
-        content, unusable = _usable_answer(result.content if result else "")
+        content, unusable = usable_answer(result.content if result else "")
 
         guard_note: dict[str, object] | None = None
         if not unusable:
@@ -469,7 +469,7 @@ class AgentCore:
                 blocked=True,
             )
 
-        corrected, unusable = _usable_answer(retry.content)
+        corrected, unusable = usable_answer(retry.content)
         still_invented = guard.invented_names(corrected)
         blocked = unusable or bool(still_invented)
 
@@ -577,7 +577,7 @@ class AgentCore:
         cache.entries[key] = (output, sources, cache.writes)
         return output, sources, False
 
-    def _history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
+    def history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
         """Recent turns of this conversation, oldest first.
 
         A DNI or RUC the customer already registered is replaced by a label
