@@ -484,3 +484,34 @@ class TestOneBusinessNeverReachesAnothersKnowledgeBase:
 
         assert victim.tenant_id != attacker.tenant_id
         assert victim.user_id != attacker.user_id
+
+
+class TestTheFeature006EndpointsStayInTheirBusiness:
+    """Detail, edit, re-process and the chunk view (Feature 006) answer 404 with
+    another business's source id, and change nothing."""
+
+    async def test_every_new_endpoint_answers_404(
+        self, ingestion: FastAPI, api: AsyncClient, db: Session, mail: MockEmailProvider
+    ) -> None:
+        victim = await _signed_in_owner(api, mail, "Panaderia Quispe")
+        attacker = await _signed_in_owner(api, mail, "Bodega Rival")
+        secret = await _add_source(api, victim, "Recetas de la casa")
+        headers = _bearer(attacker.access_token)
+
+        answers = [
+            await api.get(f"{KNOWLEDGE}/{secret}", headers=headers),
+            await api.patch(
+                f"{KNOWLEDGE}/{secret}",
+                json={"content": "Cerramos para siempre.", "priority": 0},
+                headers=headers,
+            ),
+            await api.post(f"{KNOWLEDGE}/{secret}/resync", headers=headers),
+            await api.get(f"{KNOWLEDGE}/{secret}/chunks", headers=headers),
+        ]
+
+        assert [a.status_code for a in answers] == [404, 404, 404, 404]
+        db.expire_all()
+        untouched = db.get(KnowledgeSource, secret)
+        assert untouched is not None
+        assert untouched.content == "Delivery a Miraflores por S/ 5."
+        assert untouched.priority == 100 and untouched.status == "pending"

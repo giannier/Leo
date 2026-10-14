@@ -92,7 +92,7 @@ async def main(*, reindex_all: bool, dry_run: bool) -> int:
 def _stale_sources(
     session: object, *, current: str, everything: bool
 ) -> Sequence[tuple[uuid.UUID, uuid.UUID]]:
-    """Sources whose chunks were not produced by the current model.
+    """Sources whose chunks were not produced by the current model, or predate 006.
 
     A source with no chunks at all counts as stale: it either failed or was
     never indexed, and in both cases running it again is the right answer.
@@ -110,7 +110,14 @@ def _stale_sources(
             .where(KnowledgeChunk.embedding_model == current)
             .distinct()
         )
-        statement = statement.where(KnowledgeSource.id.not_in(embedded_by_current))
+        # Chunked before Feature 006 (no `content_hash`): re-chunked with the
+        # dedup and the hash the search relies on.
+        unhashed = (
+            select(KnowledgeChunk.source_id).where(KnowledgeChunk.content_hash.is_(None)).distinct()
+        )
+        statement = statement.where(
+            KnowledgeSource.id.not_in(embedded_by_current) | KnowledgeSource.id.in_(unhashed)
+        )
 
     return [(row[0], row[1]) for row in session.execute(statement).all()]
 

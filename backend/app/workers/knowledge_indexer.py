@@ -36,7 +36,7 @@ from app.repositories.knowledge import (
     KnowledgeSourceRepository,
 )
 from app.repositories.tenant import TenantRepository
-from app.services.chunking import chunk_text
+from app.services.chunking import chunk_text, dedupe
 from app.services.knowledge import PDF_TYPE, KnowledgeError, KnowledgeService
 from app.services.trial import billing_enforced
 
@@ -51,6 +51,7 @@ EMPTY_TEXT_MESSAGE = "This source contains no text to index. Add content and upl
 NO_CHUNKS_MESSAGE = (
     "The text could not be split into anything indexable. Check the document's content."
 )
+KEPT_PREVIOUS = "El asistente sigue usando la versión anterior."
 UNEXPECTED_MESSAGE = (
     "Indexing failed unexpectedly. The platform has been notified; try uploading again."
 )
@@ -182,10 +183,14 @@ async def _index_extracted_text(
     if refusal is not None:
         return _fail(session, sources, source_id, refusal)
 
-    chunks = chunk_text(
-        text,
-        max_chars=settings.knowledge_chunk_chars,
-        overlap=settings.knowledge_chunk_overlap_chars,
+    # A repeated block (a footer on every page, the same FAQ pasted twice) is
+    # embedded once (Feature 006, RF-003).
+    chunks = dedupe(
+        chunk_text(
+            text,
+            max_chars=settings.knowledge_chunk_chars,
+            overlap=settings.knowledge_chunk_overlap_chars,
+        )
     )
     if not chunks:  # pragma: no cover - non-empty text always yields a chunk
         return _fail(session, sources, source_id, NO_CHUNKS_MESSAGE)
@@ -298,7 +303,13 @@ def _fail(
     source_id: uuid.UUID,
     reason: str,
 ) -> IndexingOutcome:
-    """Record a terminal failure with its reason, and commit it."""
+    """Record a terminal failure with its reason, and commit it.
+
+    A source that was already indexed (an edit, a re-read website) keeps its old
+    chunks: the agent goes on with the previous version, and the reason says so.
+    """
+    if KnowledgeChunkRepository(session, sources.tenant_id).count_for_source(source_id):
+        reason = f"{reason} {KEPT_PREVIOUS}"
     sources.mark_failed(source_id, reason)
     session.commit()
     logger.warning(

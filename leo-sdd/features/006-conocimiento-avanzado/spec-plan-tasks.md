@@ -1,6 +1,6 @@
 # Spec + Plan — Conocimiento Avanzado (RAG v2)
 
-**Feature ID:** 006 · **Módulo:** 06-knowledge · **Estado:** Draft para ratificación
+**Feature ID:** 006 · **Módulo:** 06-knowledge · **Estado:** En construcción (2026-10-14). Decisiones en [clarifications.md](clarifications.md)
 **Depende de:** 001 (ingesta base), 004 (visión disponible)
 **Tamaño:** feature corta — spec, plan y tasks en un solo documento.
 
@@ -36,7 +36,7 @@ Zaia, Darwin) como práctica estándar que Leo debe igualar.
 
 ## Tasks
 Commits: `feat(knowledge): ... [TASK-6XX]`
-- [ ] **TASK-601: Migraciones + chunking v2 + dedup** (re-chunk de sources existentes vía comando de mantenimiento).
+- [x] **TASK-601: Migraciones + chunking v2 + dedup** (re-chunk de sources existentes vía comando de mantenimiento).
 - [ ] **TASK-602: OCR de PDFs escaneados** (rasterizado + visión + límites por plan). Depends: 601, F004 visión.
 - [ ] **TASK-603: Ingesta web** (crawler acotado + limpieza + resync manual + UI). Depends: 601.
 - [ ] **TASK-604: Prioridad de fuentes + citas en traza + recall@5 en CI + UI de fuentes.** Depends: 601–603. Milestone humano: probar con la web real de un cliente de Zentek360.
