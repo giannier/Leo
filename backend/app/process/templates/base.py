@@ -7,7 +7,10 @@
 A template is code, not data (C-05): the order of the stages, their conditions,
 the tools each one enables and the funnel column it maps to are versioned here
 and reviewed in a PR. A tenant customises only the *options* (which the template
-validates) and the *instruction text* of each stage (stored as an override).
+validates). The instruction texts below are the source of the catalogue's
+`proceso v1` (017, TASK-460): at run time the stage text comes from the
+published version in the database, as rules a business can switch off, and these
+texts are only the fallback when nothing is published.
 
 This module holds the pieces every template shares: the stage vocabulary, the
 tool vocabulary, the default texts that apply to all templates (`[base]` in

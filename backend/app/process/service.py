@@ -3,7 +3,8 @@
 `ProcessConfigService.effective(tenant_id)` answers one question for the turn
 pipeline and the prompt builder: *what process does this business run today?*
 That is the template (code), the tenant's options laid over its defaults, the
-instruction text of every stage (the tenant's edit, or the template's own), the
+instruction text of every stage (the rules of the published process version in
+the catalogue, 017 TASK-460; the code text if there is none), the
 behaviour settings (tone, pace, detail), and the business information the prompt
 shows in compact form.
 
@@ -13,8 +14,8 @@ schemas, detached promotion copies) and never an ORM row bound to a session that
 has since been closed. A write (TASK-435) calls `invalidate()`; any other worker
 sees it within the TTL, which is the staleness the plan accepts.
 
-This is the read side only. Saving options, overrides and "restore default"
-arrives with TASK-435.
+This is the read side only. Saving options arrives with TASK-435; stages are no
+longer edited (017, C-01).
 """
 
 from __future__ import annotations
@@ -35,15 +36,13 @@ from sqlalchemy.orm import Session
 from app.models.business import AgentConfig, BusinessProfile
 from app.models.sales_config import Promotion
 from app.process.facts import FactsConfig
+from app.process.rule_split import join_rules
 from app.process.templates import TEMPLATES, get_template
 from app.process.templates.base import EffectiveOptions, Stage, Template
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
+from app.repositories.catalog import CatalogRepository
 from app.repositories.payment import PaymentMethodRepository
-from app.repositories.sales_config import (
-    BusinessInfoRepository,
-    ProcessStageOverrideRepository,
-    PromotionRepository,
-)
+from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import (
     SECTION_SCHEMAS,
     Contacto,
@@ -96,9 +95,10 @@ class EffectiveProcessConfig:
     tenant_id: uuid.UUID
     template: Template
     options: EffectiveOptions
-    # The text of every stage as it runs: the tenant's edit if it has one.
+    # The text of every stage as it runs: the published process rules.
     stage_instructions: Mapping[Stage, str]
-    customized_stages: frozenset[Stage] = frozenset()
+    # The catalogue version the texts came from; None means the code fallback.
+    process_version: int | None = None
     behavior: Behavior = field(default_factory=Behavior)
     # The tenant's configured intelligence level (`agent_configs.nivel_inteligencia`).
     intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
@@ -235,18 +235,7 @@ class ProcessConfigService:
         template = _template_for(agent)
         options = _options_for(template, agent)
 
-        overrides = ProcessStageOverrideRepository(self._session, tenant_id).for_template(
-            template.key
-        )
-        texts: dict[Stage, str] = {}
-        customized: set[Stage] = set()
-        for stage in Stage:
-            text = template.stage(stage).instrucciones
-            override = overrides.get(stage.value)
-            if override is not None and override.instrucciones:
-                text = override.instrucciones
-                customized.add(stage)
-            texts[stage] = text
+        texts, process_version = _stage_texts(self._session, template)
 
         sections = BusinessInfoRepository(self._session, tenant_id).sections()
         methods = PaymentMethodRepository(self._session, tenant_id).list_active()
@@ -257,7 +246,7 @@ class ProcessConfigService:
             template=template,
             options=options,
             stage_instructions=MappingProxyType(texts),
-            customized_stages=frozenset(customized),
+            process_version=process_version,
             behavior=_behavior(agent),
             intelligence_level=(agent.nivel_inteligencia if agent else None)
             or DEFAULT_INTELLIGENCE_LEVEL,
@@ -271,6 +260,33 @@ class ProcessConfigService:
             payment_methods=tuple(method.method for method in methods),
             promotions=tuple(_detach(promotion) for promotion in promotions),
         )
+
+
+def _stage_texts(session: Session, template: Template) -> tuple[dict[Stage, str], int | None]:
+    """Every stage's text from the published process version, stage by stage.
+
+    A stage the version has no rules for keeps the code text, and so does every
+    stage if nothing is published: a missing catalogue must not take every
+    conversation down.
+    """
+    catalog = CatalogRepository(session)
+    version = catalog.published("proceso", template.key)
+    by_stage: dict[str, list[str]] = {}
+    if version is None:
+        logger.warning(
+            "no published process version; using the code texts", extra={"template": template.key}
+        )
+    else:
+        for rule in catalog.rules(version.id):
+            if rule.etapa is not None:
+                by_stage.setdefault(rule.etapa, []).append(rule.texto)
+    texts = {
+        stage: join_rules(by_stage[stage.value])
+        if stage.value in by_stage
+        else template.stage(stage).instrucciones
+        for stage in Stage
+    }
+    return texts, version.version if version is not None else None
 
 
 def _behavior(agent: AgentConfig | None) -> Behavior:

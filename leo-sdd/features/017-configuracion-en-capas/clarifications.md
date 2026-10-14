@@ -66,3 +66,8 @@ menos a la más específica, para que lo último que lea el modelo sea lo que ma
 ## C-12: Milestone B y arranque
 **Decisión (Giannier):** confirma el Milestone B después de probar los escenarios 4 y 5. La Fase 1 no se
 implementa hasta esa aprobación; mientras tanto se escriben spec, plan y tasks y el glosario.
+
+## C-13: TASK-459 al final (Giannier, 2026-10-14)
+**Decisión:** "Sigue con la Fase C, termina de construir todo el proyecto y al final conecto el número". La
+Fase 1 ya no depende de TASK-459: TASK-460 depende de TASK-433 (Milestone B aprobado). La prueba con número
+real va después de construir el resto del MVP. Detalle de la secuencia en `CLAUDE.md`.

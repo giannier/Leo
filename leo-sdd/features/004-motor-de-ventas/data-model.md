@@ -212,6 +212,8 @@ ALTER TABLE agent_configs
 -- Plan: qué niveles de inteligencia permite
 ALTER TABLE plans ADD COLUMN allowed_intelligence text[] NOT NULL DEFAULT '{economico}';
 
+-- Eliminada en la migración 0030 (017, C-01 y TASK-460): las etapas ya no se editan; sus reglas
+-- viven en `catalog_rules` (versión publicada de la plantilla) y el negocio las apaga.
 CREATE TABLE process_stage_overrides (
     tenant_id                  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     template_key               text NOT NULL,
@@ -466,3 +468,30 @@ No estaban en este documento; cada una se justifica en `conciliacion.md` y en su
 `payment_proofs.observaciones` admite además `monto_negativo`, `destinatario_distinto`,
 `destinatario_no_verificado` y `fecha_anterior_al_pedido` (revisión D-1 y D-2). Una lista vacía significa
 que todas las comprobaciones corrieron y pasaron.
+
+## 0030 · Catálogo versionado de plantillas y rubros (017, TASK-460)
+
+Datos de plataforma, sin `tenant_id`. Detalle en `017-configuracion-en-capas/plan.md`.
+
+```sql
+CREATE TABLE rubros (key text PRIMARY KEY, nombre text NOT NULL, plantilla_sugerida text NOT NULL);
+CREATE TABLE catalog_versions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind text NOT NULL CHECK (kind IN ('proceso','rubro')),
+    key text NOT NULL, version integer NOT NULL,
+    estado text NOT NULL DEFAULT 'borrador' CHECK (estado IN ('borrador','publicada','retirada')),
+    evals jsonb, notas text, publicada_en timestamptz, publicada_por uuid REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (kind, key, version)
+);
+-- Hijas (version_id → catalog_versions ON DELETE CASCADE, orden):
+--   catalog_rules (rule_key, etapa NULL en rubros, texto; UNIQUE (version_id, rule_key))
+--   catalog_faqs (pregunta, respuesta) · catalog_objections (objecion, manejo)
+--   catalog_suggested_situations (titulo, cuando_aplica, que_hace, campos jsonb)
+-- Triggers: una versión publicada o retirada no cambia; sus hijas no se insertan, editan ni borran.
+```
+
+Datos v1: las tres plantillas partidas en 118 reglas (`alembic/data/procesos_v1.json`, generado por
+`scripts/build_procesos_v1.py`) y seis rubros (`alembic/data/rubros_v1.json`). La tabla
+`process_stage_overrides` se elimina.
+

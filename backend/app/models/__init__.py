@@ -14,6 +14,14 @@ from app.models.business import (
     Product,
     ProductCategory,
 )
+from app.models.catalog import (
+    CatalogFaq,
+    CatalogObjection,
+    CatalogRule,
+    CatalogSuggestedSituation,
+    CatalogVersion,
+    Rubro,
+)
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
@@ -22,7 +30,7 @@ from app.models.llm_settings import TenantLLMSettings
 from app.models.media import MediaAsset
 from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
-from app.models.sales_config import BusinessInfo, Faq, ProcessStageOverride, Promotion
+from app.models.sales_config import BusinessInfo, Faq, Promotion
 from app.models.tenant import (
     Invitation,
     Tenant,
@@ -38,6 +46,11 @@ __all__ = [
     "AuditLog",
     "Base",
     "BusinessInfo",
+    "CatalogFaq",
+    "CatalogObjection",
+    "CatalogRule",
+    "CatalogSuggestedSituation",
+    "CatalogVersion",
     "BusinessProfile",
     "ConnectionRequest",
     "Contact",
@@ -58,10 +71,10 @@ __all__ = [
     "PaymentProof",
     "PaymentMethodBusiness",
     "Plan",
-    "ProcessStageOverride",
     "Product",
     "ProductCategory",
     "Promotion",
+    "Rubro",
     "RefreshToken",
     "Tenant",
     "TenantLLMSettings",
