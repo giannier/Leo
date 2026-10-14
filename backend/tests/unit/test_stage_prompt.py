@@ -742,7 +742,7 @@ def test_the_closing_promotion_is_shown_where_the_customer_weighs_the_price(stag
     facts = Facts(promos_cierre=[PromoCierre(id="1", nombre="Cupón 20 %", vigencia_horas=24)])
 
     assert (
-        '- Promoción de cierre disponible (solo si duda): "Cupón 20 %"'
+        '- Promoción de cierre disponible (solo si duda): "Cupón 20 %" (promocion_id=1)'
         " · vale 24 h desde que se ofrece · no ofrecida"
     ) in _prompt(stage, facts)
 

@@ -182,7 +182,7 @@ Necesitas saber qué busca el cliente para llevarlo por el camino correcto.
 ANUNCIO_BASE = """\
 El cliente llegó por un anuncio y YA vio la oferta (está en el ESTADO). No hagas preguntas de calificación
 ni le muestres el catálogo desde cero.
-- Si no sabes su nombre, pídelo y te detienes.
+- Si no sabes su nombre, pídelo, pero en el mismo mensaje ve a lo anunciado: nunca condiciones la información a que te dé su nombre.
 - Ve directo a lo anunciado: búscalo con buscar_productos, muéstralo y envía el recurso del producto si existe.
 - Si lo anunciado corresponde a un camino, llama a elegir_camino en este mismo turno.
 - Si dice que lo quiere, agrégalo con gestionar_pedido."""

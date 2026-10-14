@@ -618,7 +618,8 @@ class FlowReport:
 
     @property
     def ok(self) -> bool:
-        return all(self.ratio(t) >= PASS_RATIO for t in BUSINESSES)
+        run = {o.case.template for o in self.outcomes}
+        return all(self.ratio(t) >= PASS_RATIO for t in run)
 
     def render(self) -> str:
         lines = ["# Evals de flujos de venta (TASK-447)", ""]

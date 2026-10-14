@@ -132,6 +132,38 @@ async function seedOrders(email: string): Promise<void> {
   `);
 }
 
+/** A WhatsApp order whose conversation the assistant handed to a person (TASK-443). */
+async function seedHandedOver(email: string): Promise<string> {
+  // `psql -At` prints the command tag ("INSERT 0 1") after the returned id.
+  const out = await psql(`
+    with t as (
+      select tu.tenant_id as id from tenant_users tu join users u on u.id = tu.user_id
+       where u.email = '${email}'
+    ), c as (
+      insert into contacts (tenant_id, phone_e164, profile_name, custom_data)
+        select id, '+51912345777', 'Rosa Díaz', '{"nombres": "Rosa Díaz"}' from t returning id, tenant_id
+    ), conv as (
+      insert into conversations (tenant_id, channel, contact_id)
+        select tenant_id, 'whatsapp', id from c returning id, tenant_id, contact_id
+    ), st as (
+      insert into conversation_state (conversation_id, tenant_id, template_key, template_version,
+                                      stage_key, funnel_code, facts)
+        select id, tenant_id, 'productos', 2, 'DERIVADO', 'DERIVADO',
+               jsonb_build_object('saludo_enviado', true, 'derivado', jsonb_build_object(
+                 'motivo', 'queja', 'resumen', 'Su pedido llegó incompleto',
+                 'hasta', to_char((now() + interval '3 hours') at time zone 'UTC',
+                                  'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')))
+          from conv returning conversation_id
+    )
+    insert into orders (tenant_id, conversation_id, contact_id, numero, estado, modalidad_pago, moneda,
+                        subtotal, total, is_sandbox, datos_cliente)
+      select conv.tenant_id, conv.id, conv.contact_id, 9, 'por_confirmar', 'contra_entrega', 'PEN',
+             45, 45, false, '{"nombres": "Rosa Díaz"}'
+        from conv, st returning id;
+  `);
+  return out.split("\n")[0].trim();
+}
+
 test.describe("Pedidos", () => {
   test("la lista filtra, busca y cuenta lo que espera revisión", async ({ page }) => {
     const email = await signedIn(page);
@@ -269,5 +301,18 @@ test.describe("Pedidos", () => {
     await expect(page.getByTestId("order-outcome")).toContainText(
       "La ventana de 24 h está cerrada: el aviso no se envió por WhatsApp",
     );
+  });
+
+  test("un pedido derivado muestra la pausa y se reactiva el asistente", async ({ page }) => {
+    const email = await signedIn(page);
+    const orderId = await seedHandedOver(email);
+
+    await page.goto(`/pedidos/${orderId}`);
+    const banner = page.getByTestId("handover");
+    await expect(banner).toContainText("Queja: Su pedido llegó incompleto");
+    await expect(page.getByText(/El asistente está pausado hasta/)).toBeVisible();
+
+    await page.getByRole("button", { name: "Reactivar asistente" }).click();
+    await expect(banner).toHaveCount(0);
   });
 });

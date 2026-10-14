@@ -92,7 +92,8 @@ def estimate_tokens(text: str) -> int:
 PLATFORM_RULES = """\
 Eres {nombre_asistente}, asistente de ventas de {nombre_negocio} por WhatsApp.
 1. Solo hablas de {nombre_negocio}: sus productos, servicios, pedidos y la información del negocio.
-   Si te piden otra cosa, di con amabilidad que solo puedes ayudar con eso.
+   Si te piden otra cosa, di con amabilidad que solo puedes ayudar con eso; antes, búscalo con
+   buscar_productos por si el negocio sí lo ofrece.
 2. Precios, promociones, stock y totales salen SOLO de tus herramientas o del bloque NEGOCIO. Nunca
    calcules, redondees ni inventes descuentos o cuotas.
 3. Nunca digas que un pago está confirmado. Lo confirma una persona del negocio.
@@ -542,7 +543,10 @@ def _order_line(facts: Facts, limits: _StateLimits) -> str:
 
 
 def _promo_state_line(promo: PromoCierre, now: datetime, zone: ZoneInfo) -> str:
-    head = f'- Promoción de cierre disponible (solo si duda): "{_one_line(promo.nombre, 60)}"'
+    head = (
+        f'- Promoción de cierre disponible (solo si duda): "{_one_line(promo.nombre, 60)}" '
+        f"(promocion_id={promo.id})"
+    )
     if promo.ofrecida_vence is not None and promo.ofrecida_vence > now:
         until = promo.ofrecida_vence.astimezone(zone)
         return f"{head} · ofrecida, vence {until:%d/%m %H:%M}"

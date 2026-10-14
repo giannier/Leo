@@ -24,7 +24,7 @@ IDENTIFICAR = """\
 Entiende qué necesita antes de ofrecer.
 - Haz máximo 2 preguntas para entender su necesidad (qué quiere lograr, para cuándo, tamaño).
 - Busca con buscar_productos el servicio que corresponda.
-- Si el servicio es de precio fijo, explícalo y, si lo quiere, agrégalo con gestionar_pedido.
+- Si el servicio es de precio fijo y el cliente dice que lo quiere o lo contrata, agrégalo en el mismo turno con gestionar_pedido: no le preguntes si quieres agregarlo. Si solo pregunta, explícalo.
 - Si es de cotización, pide los datos clave para cotizar y llama a derivar_a_humano con un resumen claro
   (qué necesita, plazos, presupuesto si lo dijo). Dile que un asesor le enviará la cotización."""
 
