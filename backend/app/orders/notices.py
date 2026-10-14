@@ -8,6 +8,7 @@ never fail the sale it is about.
 
 from __future__ import annotations
 
+import uuid
 from typing import Literal, Protocol
 
 from app.models.orders import Order, PaymentProof
@@ -28,4 +29,8 @@ class OrderNotices(Protocol):
 
     def customer_not_notified(self, order: Order, reason: NotReached) -> None:
         """The operator's decision was saved but the customer was not told."""
+        ...
+
+    def handoff(self, conversation_id: uuid.UUID, *, motivo: str, resumen: str | None) -> None:
+        """The assistant handed the conversation to a person (`derivar_a_humano`)."""
         ...

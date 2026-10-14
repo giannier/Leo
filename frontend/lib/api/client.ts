@@ -293,6 +293,7 @@ export type PaymentMethodBody = JsonBody<
   Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
 >;
 
+export type ConversationState = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/state"]["get"]>;
 export type OrderPage = Ok<Ops["/api/v1/tenant/orders"]["get"]>;
 export type OrderListItem = OrderPage["items"][number];
 export type OrderSummary = Ok<Ops["/api/v1/tenant/orders/summary"]["get"]>;
@@ -629,6 +630,11 @@ export const api = {
       ),
   },
 
+  conversations: {
+    state: (id: string) => request<ConversationState>(`/tenant/conversations/${id}/state`),
+    resumeBot: (id: string) =>
+      request<ConversationState>(`/tenant/conversations/${id}/resume-bot`, { method: "POST" }),
+  },
   orders: {
     list: (query: OrderListQuery, signal?: AbortSignal) =>
       request<OrderPage>("/tenant/orders", { query, signal }),

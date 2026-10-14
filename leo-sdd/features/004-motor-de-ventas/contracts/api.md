@@ -290,8 +290,11 @@ En contra entrega no hay comprobante: el pedido vuelve a `borrador` con `motivo_
 
 ## 6. Conversaciones
 
-- `GET /api/v1/conversations/{id}/state` — operador → `{ "etapa", "embudo", "hechos" (enmascarados), "derivado", "eventos": [ … últimos 50 … ] }`
-- `POST /api/v1/conversations/{id}/resume-bot` — operador → limpia `facts.derivado`, recalcula la etapa y crea el evento `reason=operador:reanudar` → 200.
+Prefijo real del repo: `/api/v1/tenant/conversations` (como `/api/v1/tenant/orders`).
+
+- `GET /api/v1/tenant/conversations/{id}/state` — operador → `{ "etapa", "embudo", "hechos" (sin datos personales: sin `nombre_cliente` ni el resumen de la derivación), "derivado": {motivo, resumen, hasta} | null (solo si la pausa sigue vigente), "eventos": [ {de, a, embudo, motivo, en} … últimos 50 ] }`
+- `POST /api/v1/tenant/conversations/{id}/resume-bot` — operador → limpia `facts.derivado`, recalcula la etapa y crea el evento `reason=operador:reanudar` (aunque la etapa no cambie) → 200 con el mismo cuerpo que `state`. `asesoria_derivada_en` no se borra.
+- Otro negocio → 404. El panel lo muestra en el detalle del pedido (aviso "El asistente está pausado" con el botón "Reactivar asistente").
 
 ---
 
@@ -366,7 +369,7 @@ Los nombres exactos de los campos de YCloud se verifican en su documentación (T
 |---|---|---|
 | `followups.run` | cada 15 min | Seguimientos según C-13 (incluye VERIFICACION con rechazo). Candado `followup:{conversation_id}` con TTL de 10 min |
 | `orders.discard_stale` | diario 03:00 (America/Lima) | Pasa a `descartado` los borradores con más de 7 días sin actividad y recalcula la etapa (evento `pedido_descartado`) |
-| `handoff.expire` | cada 5 min | Limpia `facts.derivado` vencidos y crea el evento `pausa_vencida` |
+| `handoff.expire` | cada 5 min | Limpia `facts.derivado` vencidos, recalcula la etapa y crea el evento `pausa_vencida`. No envía nada: el bot espera a que el cliente escriba |
 | `media.refresh_provider_ids` | diario | Vuelve a subir los `provider_media_id` que vencen en menos de 48 h |
 
 ## 10. Notificaciones al tenant (`tenant_notifications` + correo)

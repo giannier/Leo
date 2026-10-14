@@ -369,6 +369,21 @@ class AgentCore:
                 )
                 rag_sources.extend(sources)
                 messages.append(ChatMessage("tool", output, tool_call_id=call.id, name=call.name))
+                if context.ending.ended:
+                    break
+            if context.ending.ended:
+                # A handover closes the turn (TASK-443): the customer gets the
+                # business's message, and the model is not asked for another word.
+                return AgentReply(
+                    content=context.ending.reply or "",
+                    model=result.model,
+                    tools_called=tools_called,
+                    rag_sources=rag_sources,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    tool_rounds=rounds_used,
+                )
 
         # A model that answers nothing, or answers with tool-call syntax, is
         # worse than one that says it cannot help: the customer sees an empty

@@ -11,10 +11,7 @@ Which ones do something today:
 * `enviar_recurso`, `mostrar_opciones`, `elegir_camino` (`tools/sales.py`).
 * `gestionar_pedido` (`tools/orders.py`), `registrar_datos_cliente`
   (`tools/customer.py`), `enviar_metodos_pago` (`tools/payments.py`).
-* `derivar_a_humano` (Phase D): declared with its final schema and bound to a stub
-  that answers `no_disponible`. The schema is final on purpose, so the prompt budget
-  and the per-stage rules are tested against the real thing, and each later task
-  only replaces the handler.
+* `derivar_a_humano` (`tools/handover.py`, TASK-443): ends the turn.
 
 The tools that write (the order, the customer's data, a message) are declared with
 `effect=True`, so the agent loop never answers one from its per-turn cache after
@@ -38,11 +35,11 @@ from app.agent.tools.catalog import (
     ver_producto,
 )
 from app.agent.tools.customer import registrar_datos_cliente
+from app.agent.tools.handover import derivar_a_humano
 from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.payments import enviar_metodos_pago
 from app.agent.tools.registry import (
     ToolCatalog,
-    ToolContext,
     ToolDefinition,
     ToolRegistry,
     ToolResult,
@@ -76,10 +73,6 @@ _DELIVERY_FIELDS = ("tipo_entrega", "direccion", "referencia", "zona_envio")
 _MAX_OPTION_BODY = 1024
 _MAX_SUMMARY = 500
 
-_STUB_SAYS = (
-    "Esa función todavía no está disponible. No la menciones: sigue la conversación sin usarla."
-)
-
 
 def _object(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
     schema: dict[str, Any] = {"type": "object", "properties": properties}
@@ -90,18 +83,6 @@ def _object(properties: dict[str, Any], required: list[str] | None = None) -> di
 
 def _text(description: str, **extra: Any) -> dict[str, Any]:
     return {"type": "string", "description": description, **extra}
-
-
-# --------------------------------------------------------------------- stubs
-
-
-def _stub(name: str) -> Any:
-    """A handler for a tool whose behaviour arrives in a later task."""
-
-    async def handler(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
-        return ToolResult.no_disponible(decir=_STUB_SAYS, data={"herramienta": name})
-
-    return handler
 
 
 # ------------------------------------------------------------------- schemas
@@ -351,7 +332,8 @@ def _definitions() -> list[ToolDefinition]:
                 "escribas después se descarta."
             ),
             parameters=_handover_schema,
-            handler=_stub("derivar_a_humano"),
+            handler=derivar_a_humano,
+            effect=True,
         ),
     ]
 

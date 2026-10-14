@@ -9,6 +9,7 @@ from app.api.v1 import (
     assistant_media,
     auth,
     connection,
+    conversations,
     health,
     knowledge,
     orders,
@@ -29,6 +30,7 @@ router.include_router(assistant_info.router)
 router.include_router(assistant_media.router)
 router.include_router(auth.router)
 router.include_router(connection.router)
+router.include_router(conversations.router)
 router.include_router(knowledge.router)
 router.include_router(orders.router)
 router.include_router(platform_admin.router)

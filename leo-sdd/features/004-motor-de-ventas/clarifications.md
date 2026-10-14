@@ -131,6 +131,9 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 - Mientras tanto se guardan los mensajes del cliente sin respuesta. Al vencer la pausa, el bot vuelve con la etapa recalculada.
 - El operador puede reactivar el bot antes desde el detalle del pedido o de la conversación (`POST /conversations/{id}/resume-bot`).
 **Impacto en implementación:** Hecho `derivado = {motivo, resumen, hasta}`. La 007 reutiliza el mismo hecho.
+**Implementado (TASK-443, 2026-10-14):** N = `agent_configs.derivacion_pausa_horas` (1 a 72, 6 por defecto). El
+cliente recibe el mensaje `derivacion` del negocio y nada más del modelo en ese turno. El aviso al negocio
+solo sale del canal real (en el simulador no). Al vencer o al reactivar no se envía nada al cliente.
 **Registrado por:** Claude — por ratificar
 
 ## C-15: Respuestas a botones y listas
