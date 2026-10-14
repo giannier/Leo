@@ -153,6 +153,9 @@ class ToolContext:
     # Where the business is told that something waits for a person (a cash-on-delivery
     # order, TASK-431). None in the simulator and wherever nobody is to be told.
     notices: OrderNotices | None = None
+    # The published rubro version whose FAQs and objections `consultar_conocimiento`
+    # also searches (017, TASK-461). None: no rubro, or none published.
+    rubro_version_id: uuid.UUID | None = None
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult]]

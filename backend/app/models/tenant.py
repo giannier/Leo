@@ -182,6 +182,13 @@ class TenantUser(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     role: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    # The reviewer permission (017, C-09): approves what the assistant learns and
+    # sees the catalogue's news. The owner always has it (`can_review`).
+    puede_revisar: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    @property
+    def can_review(self) -> bool:
+        return self.role == "owner" or self.puede_revisar
 
 
 class Invitation(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):

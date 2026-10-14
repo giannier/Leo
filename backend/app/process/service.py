@@ -36,11 +36,10 @@ from sqlalchemy.orm import Session
 from app.models.business import AgentConfig, BusinessProfile
 from app.models.sales_config import Promotion
 from app.process.facts import FactsConfig
-from app.process.rule_split import join_rules
+from app.process.layers import LayerResolver, stage_texts_from
 from app.process.templates import TEMPLATES, get_template
 from app.process.templates.base import EffectiveOptions, Stage, Template
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
-from app.repositories.catalog import CatalogRepository
 from app.repositories.payment import PaymentMethodRepository
 from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import (
@@ -99,6 +98,11 @@ class EffectiveProcessConfig:
     stage_instructions: Mapping[Stage, str]
     # The catalogue version the texts came from; None means the code fallback.
     process_version: int | None = None
+    # The rubro's active rules (017, TASK-461) and the version they came from.
+    rubro_rules: tuple[str, ...] = ()
+    rubro_version: int | None = None
+    # Where `consultar_conocimiento` finds the rubro's FAQs and objections.
+    rubro_version_id: uuid.UUID | None = None
     behavior: Behavior = field(default_factory=Behavior)
     # The tenant's configured intelligence level (`agent_configs.nivel_inteligencia`).
     intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
@@ -235,7 +239,22 @@ class ProcessConfigService:
         template = _template_for(agent)
         options = _options_for(template, agent)
 
-        texts, process_version = _stage_texts(self._session, template)
+        layers = LayerResolver(self._session, tenant_id).resolve(
+            template.key, profile.industry if profile else None
+        )
+        if layers.process_version is None:
+            logger.warning(
+                "no published process version; using the code texts",
+                extra={"template": template.key},
+            )
+        texts = {
+            Stage(stage): text
+            for stage, text in stage_texts_from(
+                layers,
+                {s.value: template.stage(s).instrucciones for s in Stage},
+                [s.value for s in Stage],
+            ).items()
+        }
 
         sections = BusinessInfoRepository(self._session, tenant_id).sections()
         methods = PaymentMethodRepository(self._session, tenant_id).list_active()
@@ -246,7 +265,10 @@ class ProcessConfigService:
             template=template,
             options=options,
             stage_instructions=MappingProxyType(texts),
-            process_version=process_version,
+            process_version=layers.process_version,
+            rubro_rules=layers.rubro_rules,
+            rubro_version=layers.rubro_version,
+            rubro_version_id=layers.rubro_version_id,
             behavior=_behavior(agent),
             intelligence_level=(agent.nivel_inteligencia if agent else None)
             or DEFAULT_INTELLIGENCE_LEVEL,
@@ -260,33 +282,6 @@ class ProcessConfigService:
             payment_methods=tuple(method.method for method in methods),
             promotions=tuple(_detach(promotion) for promotion in promotions),
         )
-
-
-def _stage_texts(session: Session, template: Template) -> tuple[dict[Stage, str], int | None]:
-    """Every stage's text from the published process version, stage by stage.
-
-    A stage the version has no rules for keeps the code text, and so does every
-    stage if nothing is published: a missing catalogue must not take every
-    conversation down.
-    """
-    catalog = CatalogRepository(session)
-    version = catalog.published("proceso", template.key)
-    by_stage: dict[str, list[str]] = {}
-    if version is None:
-        logger.warning(
-            "no published process version; using the code texts", extra={"template": template.key}
-        )
-    else:
-        for rule in catalog.rules(version.id):
-            if rule.etapa is not None:
-                by_stage.setdefault(rule.etapa, []).append(rule.texto)
-    texts = {
-        stage: join_rules(by_stage[stage.value])
-        if stage.value in by_stage
-        else template.stage(stage).instrucciones
-        for stage in Stage
-    }
-    return texts, version.version if version is not None else None
 
 
 def _behavior(agent: AgentConfig | None) -> Behavior:

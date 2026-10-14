@@ -7,8 +7,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
+from app.process.layers import LayerResolver, stage_texts_from
 from app.process.rule_split import join_rules, rule_keys, split_rules
-from app.process.service import ProcessConfigCache, ProcessConfigService, _stage_texts
+from app.process.service import ProcessConfigCache, ProcessConfigService
 from app.process.templates import TEMPLATES
 from app.process.templates.base import Stage
 from app.repositories.catalog import CatalogRepository, VersionFrozen
@@ -45,11 +46,14 @@ class TestTheSplit:
 class TestVersionOne:
     @pytest.mark.parametrize("key", sorted(TEMPLATES))
     def test_the_prompt_text_from_the_database_is_today_s_text(self, db: Session, key: str) -> None:
-        texts, version = _stage_texts(db, TEMPLATES[key])
+        from uuid import uuid4
 
-        assert version == 1
-        for stage in Stage:
-            assert texts[stage] == TEMPLATES[key].stage(stage).instrucciones, stage
+        rules = LayerResolver(db, uuid4()).resolve(key, None)
+        code = {s.value: TEMPLATES[key].stage(s).instrucciones for s in Stage}
+        texts = stage_texts_from(rules, code, list(code))
+
+        assert rules.process_version == 1
+        assert texts == code
 
     def test_six_rubros_with_content_and_a_suggested_template(self, db: Session) -> None:
         catalog = CatalogRepository(db)

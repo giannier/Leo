@@ -54,9 +54,7 @@ def split_rules(text: str) -> list[str]:
             else:
                 blocks.append([line])
         elif (
-            _is_header(current)
-            or current[-1].rstrip().endswith(_ENDS_SENTENCE)
-            or not current[-1]
+            _is_header(current) or current[-1].rstrip().endswith(_ENDS_SENTENCE) or not current[-1]
         ):
             blocks.append([line])
         else:

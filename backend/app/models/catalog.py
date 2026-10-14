@@ -13,8 +13,10 @@ situations). They live here, versioned:
   business switches off (TASK-461).
 
 The order of the stages, their conditions, tools and funnel stay in code
-(`process/templates/`). These tables are platform data: no `tenant_id`, read by
-every business, written only from the platform panel (TASK-466).
+(`process/templates/`). The catalogue tables are platform data: no `tenant_id`,
+read by every business, written only from the platform panel (TASK-466). Two
+tables at the end are per business: the rules it switched off and the version
+whose news its reviewer saw (TASK-461).
 """
 
 from __future__ import annotations
@@ -23,12 +25,14 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAtMixin, UUIDPrimaryKeyMixin, enum_check
+from app.models.knowledge import EMBEDDING_DIMENSIONS
 
 CATALOG_KINDS = ("proceso", "rubro")
 VERSION_STATES = ("borrador", "publicada", "retirada")
@@ -113,3 +117,59 @@ class CatalogSuggestedSituation(_VersionChild, Base):
     que_hace: Mapped[str] = mapped_column(Text, nullable=False)
     # {campo: etiqueta}: what the business fills in ("minimo_unidades": "Desde cuántas...").
     campos: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, server_default="{}")
+
+
+class CatalogEmbedding(Base):
+    """The vector of a rubro FAQ or objection, so `consultar_conocimiento` finds it.
+
+    Kept apart from the frozen version rows: computing a vector is not a change to
+    the published content (migration 0031).
+    """
+
+    __tablename__ = "catalog_embeddings"
+    __table_args__ = (enum_check("item_kind", ("faq", "objecion"), "item_kind"),)
+
+    item_id: Mapped[uuid.UUID] = mapped_column(PgUUID(as_uuid=True), primary_key=True)
+    item_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("catalog_versions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class TenantRuleSwitch(Base):
+    """A template or rubro rule a business switched off (017, C-01 and C-04)."""
+
+    __tablename__ = "tenant_rule_switches"
+    __table_args__ = (enum_check("kind", CATALOG_KINDS, "kind"),)
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    rule_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    apagada: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    cambiado_por: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class TenantCatalogSeen(Base):
+    """The version of a template or rubro whose news the reviewer already saw."""
+
+    __tablename__ = "tenant_catalog_seen"
+    __table_args__ = (enum_check("kind", CATALOG_KINDS, "kind"),)
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    version_vista: Mapped[int] = mapped_column(Integer, nullable=False)

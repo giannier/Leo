@@ -278,14 +278,15 @@ class TestTheCache:
         assert queries == 0
         assert service.effective(tenant_a.tenant_id) is first
 
-    def test_the_first_read_takes_seven_statements(
+    def test_the_first_read_takes_eight_statements(
         self, engine: Engine, db: Session, tenant_a: TenantFixture
     ) -> None:
-        # Agent, profile, the published process version and its rules (017),
-        # business info, payment methods and promotions.
+        # Agent, profile, the published process version, the business's switches
+        # and the process rules (017), business info, payment methods and
+        # promotions. A business with a rubro adds its version and its rules.
         service = _service(db)
 
-        assert self._count(engine, lambda: service.effective(tenant_a.tenant_id)) == 7
+        assert self._count(engine, lambda: service.effective(tenant_a.tenant_id)) == 8
 
     def test_an_edit_is_seen_after_the_cache_expires(
         self, db: Session, tenant_a: TenantFixture

@@ -28,6 +28,7 @@ from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.catalog_indexer import index_catalog_knowledge
 from app.workers.channel import (
     answer_conversation,
     process_webhook_event,
@@ -75,6 +76,11 @@ async def startup(ctx: dict[str, Any]) -> None:
     # The channel adapter. Stateless - credentials travel with each call - so
     # one instance serves every tenant.
     ctx["whatsapp"] = YCloudProvider(base_url=settings.ycloud_base_url)
+    try:
+        # The rubro knowledge must exist before the first question about it.
+        await index_catalog_knowledge(ctx)
+    except Exception:  # noqa: BLE001 - a missing key must not stop the worker
+        logger.warning("could not index the catalogue knowledge at startup")
     logger.info("worker ready")
 
 
@@ -89,7 +95,12 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
-    functions = [index_knowledge_source, process_webhook_event, answer_conversation]
+    functions = [
+        index_knowledge_source,
+        process_webhook_event,
+        answer_conversation,
+        index_catalog_knowledge,
+    ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
     # that fires at :00 competes with everything else that fires at :00.
@@ -113,6 +124,7 @@ class WorkerSettings:
         # provider still holds for 48 hours has time to be uploaded again
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
+        cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
     ]
     on_startup = startup
     on_shutdown = shutdown

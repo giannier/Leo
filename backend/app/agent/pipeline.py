@@ -265,6 +265,7 @@ class TurnPipeline:
             turn=turn,
             facts=facts,
             notices=None if self._sandbox else self._notices,
+            rubro_version_id=config.rubro_version_id,
         )
         prompt = build_stage_prompt(
             config, facts, stage, now=now, turn=turn, tool_specs=registry.specs()
