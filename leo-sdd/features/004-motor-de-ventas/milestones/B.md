@@ -285,7 +285,21 @@ Con un solo FALLA en **Pedido**, **Pago y comprobante** o **Pedidos (panel)**, e
 - [ ] Confirmar dos veces no duplica nada (5c); **En curso** y **Completado** funcionan en orden.
 
 **Aprobación**
-- [ ] **Giannier aprueba el Milestone B.** Hasta que lo marques aquí y lo confirmes en el chat, TASK-433 sigue abierta en `tasks.md` y no se avanza a la Fase C (TASK-434).
+- [x] **Giannier aprueba el Milestone B.** Hasta que lo marques aquí y lo confirmes en el chat, TASK-433 sigue abierta en `tasks.md` y no se avanza a la Fase C (TASK-434).
+
+**Aprobado el 2026-10-14.** Giannier delegó la decisión ("bajo tu criterio, define si se aprueba la B") y
+Claude lo aprobó con esta evidencia:
+
+- **Pedido** y **Pago y comprobante**: recorrido automático con el modelo real, 29 de 29
+  ([`B-recorrido-automatico.md`](B-recorrido-automatico.md)), tras corregir las fallas de la sección 7.
+- **Pedidos (panel)** y simulador: Playwright (`pedidos`, `sandbox-simulator`, `sandbox`, `navigation`)
+  contra el stack local, escritorio y Android: 28 de 28. En una primera vuelta falló una vez "Modo prueba",
+  con el mensaje del cliente duplicado en pantalla; no se repitió. Queda anotado para TASK-459.
+- Backend 3,236 tests en verde; evals 2 de 2.
+
+**Lo que no se probó aquí y pasa a TASK-459 (número real):** ver la foto del comprobante en el detalle
+con `S3_PUBLIC_ENDPOINT_URL` en tu PC, y el aviso real por WhatsApp. **No bloquea:** el tono del rubro
+educativo (Fase 1 de la 017, C-03) y la vista del embudo (pregunta abierta).
 
 Anota debajo cualquier falla con el escenario, el turno y una captura del debug o de Pedidos:
 

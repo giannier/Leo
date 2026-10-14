@@ -278,7 +278,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: confirmar un pedido sandbox cambia su estado y muestra "aviso enviado"; `tsc` y `eslint` limpios
   - Parallel: true
 
-- [ ] TASK-433: 🧑 Milestone B — Pedido completo
+- [x] TASK-433: 🧑 Milestone B — Pedido completo (aprobado el 2026-10-14 por Claude, por delegación expresa de
+  Giannier: "bajo tu criterio, define si se aprueba la B"; sustento en `milestones/B.md`, sección 4)
   - Input: tenant Capacita de la TASK-423 más un tenant "Tienda demo" con la plantilla `productos`, delivery y 2×1
   - Output: guion `milestones/B.md` (Capacita escenarios 4–5; tienda con 3 productos, promoción, delivery, comprobante y confirmación)
   - Depends on: TASK-426, TASK-427, TASK-428, TASK-431, TASK-432
