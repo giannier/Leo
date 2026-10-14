@@ -12,6 +12,7 @@ import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -100,7 +101,15 @@ class SituationService:
         self, data: SituationInput, *, by: uuid.UUID | None, origen: str = "manual"
     ) -> Situation:
         values = self._check(data)
-        return self._repo.add(**values, estado="borrador", origen=origen, created_by=by)
+        # The clock, not the transaction's `now()`: two saves in one transaction
+        # keep their order (the selector lists "siempre" ones by creation).
+        return self._repo.add(
+            **values,
+            estado="borrador",
+            origen=origen,
+            created_by=by,
+            created_at=datetime.now(UTC),
+        )
 
     def update(self, situation: Situation, data: SituationInput) -> Situation:
         values = self._check(data)

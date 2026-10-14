@@ -39,8 +39,10 @@ class SituationRepository(BaseRepository[Situation]):
         state = Situation.estado == "activa"
         if drafts:
             state = or_(state, (Situation.estado == "borrador") & Situation.id.in_(drafts))
-        statement = self._scoped().where(
-            state, or_(Situation.etapas.is_(None), Situation.etapas.contains([stage]))
+        statement = (
+            self._scoped()
+            .where(state, or_(Situation.etapas.is_(None), Situation.etapas.contains([stage])))
+            .order_by(Situation.created_at, Situation.id)
         )
         return self._session.execute(statement).scalars().all()
 

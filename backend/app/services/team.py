@@ -208,8 +208,9 @@ class TeamService:
         *,
         role: str | None = None,
         status: str | None = None,
+        puede_revisar: bool | None = None,
     ) -> TenantUser:
-        """Change a member's role or status.
+        """Change a member's role, status or reviewer permission.
 
         Deactivating revokes their refresh tokens in the same transaction.
         Their access token keeps its signature until it expires, but every
@@ -230,6 +231,9 @@ class TeamService:
             membership.status = status
             if status == DISABLED_MEMBERSHIP:
                 self._revoke_sessions(membership.user_id)
+
+        if puede_revisar is not None:
+            membership.puede_revisar = puede_revisar
 
         self._session.flush()
         self._session.commit()

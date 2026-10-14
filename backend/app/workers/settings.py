@@ -28,6 +28,7 @@ from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.catalog_evals import run_catalog_evals
 from app.workers.catalog_indexer import index_catalog_knowledge
 from app.workers.channel import (
     answer_conversation,
@@ -102,6 +103,7 @@ class WorkerSettings:
         answer_conversation,
         index_catalog_knowledge,
         embed_situations,
+        run_catalog_evals,
     ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
