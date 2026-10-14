@@ -57,6 +57,7 @@ from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InboundMedia
 from app.repositories.channel import ContactRepository
 from app.repositories.orders import PaymentProofRepository
+from app.repositories.payment import PaymentMethodRepository
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +149,7 @@ class ProofPipeline:
         llm: LLMProvider,
         storage: StorageProvider | None,
         notices: ProofNotices | None = None,
-        payees: Sequence[str] = (),
+        payees: Sequence[str] | None = None,
         process_config: ProcessConfigService | None = None,
     ) -> None:
         self._session = session
@@ -156,9 +157,15 @@ class ProofPipeline:
         self._llm = llm
         self._storage = storage
         self._notices = notices
-        # The names the business collects under (its Yape/Plin, bank account
-        # holders). None configured: no recipient can be checked, and every proof
-        # says so. The business profile gains these accounts in Phase C.
+        # The names the business collects under: the `titular` of its active
+        # payment methods (017 RF-010, 004 D-1) unless the caller passes them.
+        # None configured: no recipient can be checked, and every proof says so.
+        if payees is None:
+            payees = [
+                method.titular
+                for method in PaymentMethodRepository(session, tenant_id).list_active()
+                if method.titular
+            ]
         self._payees = tuple(name for name in payees if _name_tokens(name))
         self._process = process_config or ProcessConfigService(session)
         self._orders = OrderService(session, tenant_id)

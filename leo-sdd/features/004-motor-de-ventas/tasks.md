@@ -346,7 +346,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     respeta las apagadas; el aviso aparece hasta marcarse visto; tests de aislamiento
   - Parallel: false
 
-- [ ] TASK-434: API de información del negocio, FAQ, promociones y perfil
+- [x] TASK-434: API de información del negocio, FAQ, promociones y perfil
+  - **Hecho (2026-10-14):** `api/v1/assistant_info.py` (business-info, FAQ indexadas como conocimiento,
+    promociones, behavior con el perfil por formulario, categorías); `titular` y `media_asset_id` en
+    métodos de pago; `ProofPipeline` compara con los titulares.
   - Input: `contracts/api.md §1`, RF-010 de la 017
   - Output: routers; las FAQ se indexan como `knowledge_source` de tipo `faq`; borrar una FAQ borra su
     fuente. Perfil por formulario: tratamiento (tú o usted), emojis, saludo, política de descuentos.
@@ -395,7 +398,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: test de presupuesto; snapshots revisados en el diff
   - Parallel: false
 
-- [ ] TASK-435: API de comportamiento y proceso (sin edición de etapas)
+- [x] TASK-435: API de comportamiento y proceso (sin edición de etapas)
+  - **Hecho (2026-10-14):** templates, process (GET/PUT), rules con interruptor (admin o revisor), rubro con
+    novedades, prompt-preview; `puede_revisar` en Equipo; dependencia `ReviewerDep`.
   - Input: `contracts/api.md §1–§2`, C-01 de la 017
   - Output: behavior, templates, process (opciones validadas contra el schema de la plantilla) y reglas
     por etapa con su interruptor (`PUT /assistant/rules/{kind}/{rule_key}`); **se retiran** `PUT` y
@@ -416,7 +421,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: un borrador probado en el simulador entra; en el canal real no
   - Parallel: true
 
-- [ ] TASK-466: Panel de plataforma — catálogo, evals y publicación
+- [x] TASK-466: Panel de plataforma — catálogo, evals y publicación (API; la pantalla va con el frontend)
+  - **Hecho (2026-10-14):** `api/v1/platform_catalog.py`, `services/catalog_evals.py` (estructura y dos
+    casos con el modelo: COBRO envía métodos; una situación gana sobre el rubro sin inventar precios),
+    job `run_catalog_evals`; publicar exige evals verdes sobre el contenido actual (hash).
   - Input: C-04 de la 017
   - Output: API y pantalla de versiones de plantillas y rubros (borrador editable, evals encolados,
     publicar con 409 si no pasaron); evals de catálogo en `backend/evals/catalog/`; auditoría de plataforma
@@ -424,7 +432,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: publicar sin evals verdes es imposible; los negocios ven la novedad
   - Parallel: true
 
-- [ ] TASK-436: API de multimedia
+- [x] TASK-436: API de multimedia
+  - **Hecho (2026-10-14):** `api/v1/assistant_media.py` y `services/media_library.py`: tipo por bytes
+    (magic bytes), límites de WhatsApp, vista previa firmada, reemplazo del archivo (mismo tipo).
   - Input: `contracts/api.md §3`, límites de `data-model.md §0017`
   - Output: subida a MinIO privado con validación de tipo real (magic bytes) y tamaño; preview firmado;
     reemplazo de archivo invalida `provider_media_id`; el `PATCH` de métodos de pago acepta
@@ -433,7 +443,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de límites (imagen de 6 MB rechazada; un .exe renombrado a .jpg rechazado)
   - Parallel: true
 
-- [ ] TASK-437: Overview y lista de activación
+- [x] TASK-437: Overview y lista de activación
+  - **Hecho (2026-10-14):** `services/overview.py`; pasos nuevos `primera_situacion` y `probar_situacion`.
   - Input: `contracts/api.md §1` (overview)
   - Output: estado por sección y progreso; suma "activaste tu primera situación" y "probaste una
     situación en el simulador"; `probar_simulador` se marca con la primera conversación sandbox que llega
