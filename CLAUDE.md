@@ -31,6 +31,11 @@ automáticas contra el modelo real y Playwright, deja la evidencia en `milestone
 prueba a mano al conectar el número. Las decisiones de dinero, datos personales, contratos públicos y costo
 del LLM se siguen consultando.
 
+### Experiencia simple (Giannier, 2026-10-15)
+Tras comparar con Ventor: antes del número real se construye la **018-experiencia-simple** (catálogo de verdad,
+asistente en un solo lugar, "¿Respondió bien?" en el simulador), sin copiloto ni diagnóstico con IA (costo
+del LLM), sin login con Google y sin dependencias nuevas. Orden: 018 → TASK-459 (número real) → VPS → piloto.
+
 ## Fase 2 (post-MVP) — solo tras cerrar el MVP y con ratificación de Giannier por feature
 011-campanas → 012-crm-leads → 013-analytics-csat → (014-citas o 016-pedidos-delivery,
 según tenants reales) → la restante → 015-integraciones. Ver `leo-sdd/post-mvp/README.md`.
