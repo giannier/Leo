@@ -48,8 +48,9 @@ class Plan(Base, TimestampMixin):
     # Only meaningful for the 'trial' plan.
     trial_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    # Reference price only. Actual billing arrives with Feature 009.
+    # List prices (Feature 009). NULL means the plan is not bought (the trial).
     # Money is always Decimal, never float (Constitution).
     price_usd_month: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    price_usd_year: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")

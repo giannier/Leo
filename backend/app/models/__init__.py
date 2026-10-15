@@ -7,6 +7,16 @@ is invisible to autogenerate and would silently never get a migration.
 
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.billing import (
+    BillingLedger,
+    Charge,
+    Coupon,
+    CouponRedemption,
+    Payment,
+    PlanAddon,
+    Subscription,
+    UsagePeriod,
+)
 from app.models.business import (
     AgentConfig,
     BusinessProfile,
@@ -78,7 +88,15 @@ __all__ = [
     "OtpCode",
     "PaymentProof",
     "PaymentMethodBusiness",
+    "BillingLedger",
+    "Charge",
+    "Coupon",
+    "CouponRedemption",
+    "Payment",
     "Plan",
+    "PlanAddon",
+    "Subscription",
+    "UsagePeriod",
     "Product",
     "ProductCategory",
     "Promotion",
