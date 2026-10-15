@@ -30,6 +30,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.billing import UsagePeriod
 from app.models.business import AgentConfig
 from app.models.conversation import Conversation, Message
 from app.models.plan import Plan
@@ -93,15 +94,37 @@ def record_ai_message(session: Session, tenant_id: uuid.UUID, *, channel: str) -
     if tenant is None:
         return MeteringResult(counted=False, used=0, limit=0)
 
-    plan = session.get(Plan, tenant.plan_id)
-    limit = plan.max_ai_messages if plan else 0
+    limit = message_limit(session, tenant)
 
     if channel != "whatsapp":
         return MeteringResult(counted=False, used=tenant.ai_messages_used, limit=limit)
 
     tenant.ai_messages_used += 1
+    # The billing period's own count (Feature 009, RF-004); the tenant column is
+    # the same number for the period in course, kept because it is the hot path.
+    period = _open_period(session, tenant.id)
+    if period is not None:
+        period.ai_messages_used = tenant.ai_messages_used
     session.flush()
     return MeteringResult(counted=True, used=tenant.ai_messages_used, limit=limit)
+
+
+def _open_period(session: Session, tenant_id: uuid.UUID) -> UsagePeriod | None:
+    return session.execute(
+        select(UsagePeriod)
+        .where(UsagePeriod.tenant_id == tenant_id, UsagePeriod.closed.is_(False))
+        .order_by(UsagePeriod.period_start.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
+def message_limit(session: Session, tenant: Tenant) -> int:
+    """This period's allowance: the plan's, plus the packs bought for it (Feature 009)."""
+    period = _open_period(session, tenant.id)
+    if period is not None:
+        return period.ai_messages_limit
+    plan = session.get(Plan, tenant.plan_id)
+    return plan.max_ai_messages if plan else 0
 
 
 def billing_enforced() -> bool:
@@ -131,18 +154,20 @@ def agent_may_reply(session: Session, tenant: Tenant) -> bool:
     """
     if tenant.status not in ("trial", "active"):
         return False
-    if tenant.status == "trial" and billing_enforced() and quota_exhausted(session, tenant):
+    # Out of messages: the trial ends; a paying business waits for a pack or the
+    # next period (Feature 009, HU-04). Never with billing off.
+    if billing_enforced() and quota_exhausted(session, tenant):
         return False
     config = session.get(AgentConfig, tenant.id)
     return bool(config and config.is_active)
 
 
 def quota_exhausted(session: Session, tenant: Tenant) -> bool:
-    """Whether this tenant has spent its message allowance."""
-    plan = session.get(Plan, tenant.plan_id)
-    if plan is None:
+    """Whether this tenant has spent this period's message allowance."""
+    limit = message_limit(session, tenant)
+    if limit <= 0:
         return False
-    return tenant.ai_messages_used >= plan.max_ai_messages
+    return tenant.ai_messages_used >= limit
 
 
 def is_expired(session: Session, tenant: Tenant, *, now: datetime) -> bool:
