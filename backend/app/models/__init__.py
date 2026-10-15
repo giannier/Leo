@@ -42,6 +42,7 @@ from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
 from app.models.media import MediaAsset
+from app.models.metrics import DashboardSettings, MetricsDaily, ModelCost
 from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
 from app.models.sales_config import BusinessInfo, Faq, Promotion
@@ -93,6 +94,9 @@ __all__ = [
     "Coupon",
     "CouponRedemption",
     "Payment",
+    "DashboardSettings",
+    "MetricsDaily",
+    "ModelCost",
     "Plan",
     "PlanAddon",
     "Subscription",

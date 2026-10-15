@@ -9,9 +9,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ARRAY, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, func
+from sqlalchemy import (
+    ARRAY,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -174,6 +185,9 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
     # [{"tool": ..., "args_resumen": ..., "ok": ..., "cached": ..., "ronda": 1..N}]
+    # What the trace cost, from `model_costs` when it was written (Feature 010).
+    # NULL when the model has no price configured.
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     tools_called: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )
