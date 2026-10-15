@@ -51,6 +51,9 @@ dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
   "coverage>=7.6",
+  # Property-based tests for money (009 billing: proration to the cent).
+  # Approved by Giannier on 2026-10-14. Test-only, never imported by `app/`.
+  "hypothesis>=6.100",
 ]
 
 [tool.uv]

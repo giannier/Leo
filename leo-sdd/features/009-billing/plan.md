@@ -112,14 +112,50 @@ Unit: máquina de estados completa, prorrateo al centavo (property-based con Hyp
 # Tasks — Billing
 Commits: `feat(billing): ... [TASK-9XX]` — **todas requieren revisión humana del diff (Constitution)**
 
-- [ ] **TASK-901: Migraciones + ledger + migración del contador a usage_periods.**
-- [ ] **TASK-902: PaymentProvider + MercadoPagoProvider (checkout único + webhook firmado idempotente)** con sandbox. Depends: 901.
-- [ ] **TASK-903: SPIKE (1 día): suscripciones MP en Perú** — preapproval vs cobro programado; decisión documentada en este plan (actualizarlo). Depends: 902.
-- [ ] **TASK-904: BillingService — máquina de estados + apply_payment + sincronización con tenants** + emails. Depends: 902.
-- [ ] **TASK-905: Renovación + dunning + period_roller** según decisión de 903, con reloj simulado. Depends: 903, 904.
-- [ ] **TASK-906: Cambios de plan (prorrateo/downgrade validado) + cancelación + C-005 (días de trial como crédito).** Depends: 904.
-- [ ] **TASK-907: Add-on de mensajes + cupones + pagos manuales + comprobante PDF con correlativo.** Depends: 904.
-- [ ] **TASK-908: UI — página de planes, checkout, billing del tenant, admin de suscripciones.** Depends: 904–907.
-- [ ] **TASK-909: Endurecimiento + property tests de dinero + revisión humana línea por línea del BillingService.** Depends: todo. Milestone humano: Giannier ejecuta un ciclo completo real con tarjeta propia en producción (monto mínimo) antes del lanzamiento.
+- [x] **TASK-901: Migraciones + ledger + migración del contador a usage_periods.**
+- [x] **TASK-902 (adaptada: puerto `PaymentProvider` con adaptador manual; Mercado Pago después): PaymentProvider + MercadoPagoProvider (checkout único + webhook firmado idempotente)** con sandbox. Depends: 901.
+- [x] **TASK-903 (resuelta por decisión 3: renovación con cobro pendiente; el spike de MP queda para cuando haya cuenta): SPIKE (1 día): suscripciones MP en Perú** — preapproval vs cobro programado; decisión documentada en este plan (actualizarlo). Depends: 902.
+- [x] **TASK-904: BillingService — máquina de estados + apply_payment + sincronización con tenants** + emails. Depends: 902.
+- [x] **TASK-905: Renovación + dunning + period_roller** según decisión de 903, con reloj simulado. Depends: 903, 904.
+- [x] **TASK-906: Cambios de plan (prorrateo/downgrade validado) + cancelación + C-005 (días de trial como crédito).** Depends: 904.
+- [x] **TASK-907: Add-on de mensajes + cupones + pagos manuales + comprobante PDF con correlativo.** Depends: 904.
+- [x] **TASK-908: UI — página de planes, checkout, billing del tenant, admin de suscripciones.** Depends: 904–907.
+- [x] **TASK-909 (pendiente la revisión humana línea por línea; evidencia en `milestones/cobro.md`): Endurecimiento + property tests de dinero + revisión humana línea por línea del BillingService.** Depends: todo. Milestone humano: Giannier ejecuta un ciclo completo real con tarjeta propia en producción (monto mínimo) antes del lanzamiento.
 
 Dependencias: 901 → 902 → 903 → 905; 902 → 904 → 906/907 → 908 → 909.
+
+---
+
+## Decisiones Posteriores (Giannier, 2026-10-14)
+
+Consultadas antes de construir (son decisiones de dinero):
+
+1. **Precios de lista:** los de la spec, en base de datos (RF-008): Emprende US$29, Crece US$59, Pro US$99
+   al mes; anual con −20 % (US$278.40, 566.40 y 950.40); paquete de +500 mensajes por US$8. Editables en
+   la tabla. El asiento extra (US$10, 001 clarificación) no entra en v1: la spec de la 009 no lo pide.
+2. **Pasarela:** **solo pagos manuales primero.** El negocio ve lo que debe con una referencia y las
+   instrucciones de pago de la plataforma; el admin registra la transferencia o el Yape (RF-007) y eso tiene
+   el mismo efecto que un webhook. `PaymentProvider` queda como puerto con el adaptador manual; Mercado Pago
+   (TASK-902 tal como estaba) llega después sin tocar el resto.
+3. **Renovación (TASK-903):** **con cobro pendiente y aviso**, sin guardar tarjetas: se genera el cobro de
+   renovación y se avisa por correo con la referencia; si vence sin pagar, gracia de 5 días con avisos los
+   días 1, 3 y 5, y luego pausa. El spike de preapproval de Mercado Pago se hace cuando haya cuenta.
+4. **Dependencias aprobadas:** `hypothesis` (solo desarrollo, pruebas de dinero) y `recharts` (gráficas
+   de la 010). **Sin librería de PDF:** el comprobante se genera con un escritor mínimo propio.
+
+Decididas por Claude con la lectura conservadora (registradas para revisión):
+
+5. Todo respeta `billing_enforced()`: con el cobro apagado se generan cobros, se registran pagos y corren
+   los períodos, pero nada pausa a un negocio ni corta mensajes.
+6. El cobro de renovación se genera **7 días antes** del fin del período (la spec no lo dice).
+7. Un negocio en gracia (`past_due`) que paga sigue en su calendario (el nuevo período empieza donde
+   terminó el anterior); uno pausado que paga empieza un período nuevo ese día.
+8. Moneda: el cobro es en dólares. El pago manual registra lo recibido en dólares y, aparte, el monto y la
+   moneda local que llegaron. Leo no fija tipos de cambio (C-001); la referencia en soles solo se muestra si
+   se configura una tasa referencial.
+9. `tenants.ai_messages_used` pasa a ser el contador **del período vigente** (se reinicia al cerrar el
+   período). `usage_periods` guarda cada período con su límite (plan más paquetes extra).
+10. La renovación cobra el **menor** entre el precio fijado del negocio y el de lista (C-004): una baja de
+    precios le llega y una suba nunca lo sorprende; subir precios necesita su propio aviso y proceso.
+11. Un pago manual debe coincidir **al centavo** con el cobro (`amount_mismatch` si no). Un cobro de US$0
+    (cupón del 100 %) se aplica solo, sin fila de pago, y queda en el ledger.
