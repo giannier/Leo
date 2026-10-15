@@ -1997,7 +1997,7 @@ export interface paths {
         };
         /**
          * List products
-         * @description Soft-deleted products are never listed.
+         * @description Soft-deleted products are never listed. `search` matches the name or a tag.
          */
         get: operations["list_products_api_v1_tenant_products_get"];
         put?: never;
@@ -2093,6 +2093,75 @@ export interface paths {
          */
         post: operations["import_confirm_api_v1_tenant_products_import__preview_id__confirm_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy a product, inactive, without its photos */
+        post: operations["duplicate_product_api_v1_tenant_products__product_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The product's photos, in order */
+        get: operations["list_photos_api_v1_tenant_products__product_id__photos_get"];
+        put?: never;
+        /** Add a photo (at most 10) */
+        post: operations["add_photo_api_v1_tenant_products__product_id__photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of the photos; the first is the main one */
+        put: operations["order_photos_api_v1_tenant_products__product_id__photos_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a photo */
+        delete: operations["delete_photo_api_v1_tenant_products__product_id__photos__photo_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2502,6 +2571,11 @@ export interface components {
             pagos: components["schemas"]["PaymentOut"][];
             /** Cobro Activo */
             cobro_activo: boolean;
+        };
+        /** Body_add_photo_api_v1_tenant_products__product_id__photos_post */
+        Body_add_photo_api_v1_tenant_products__product_id__photos_post: {
+            /** File */
+            file: string;
         };
         /** Body_import_preview_api_v1_tenant_products_import_post */
         Body_import_preview_api_v1_tenant_products_import_post: {
@@ -4003,6 +4077,30 @@ export interface components {
              */
             repetido: boolean;
         };
+        /** PhotoList */
+        PhotoList: {
+            /** Items */
+            items: components["schemas"]["PhotoResponse"][];
+        };
+        /** PhotoOrder */
+        PhotoOrder: {
+            /** Ids */
+            ids: string[];
+        };
+        /** PhotoResponse */
+        PhotoResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Url */
+            url: string | null;
+            /** Filename */
+            filename: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
         /** PlanOut */
         PlanOut: {
             /** Id */
@@ -4082,6 +4180,8 @@ export interface components {
             bundle_permite_libres?: boolean | null;
             /** Destacado */
             destacado?: boolean | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** ProductRequest */
         ProductRequest: {
@@ -4123,6 +4223,8 @@ export interface components {
              * @default false
              */
             destacado: boolean;
+            /** Tags */
+            tags?: string[];
         };
         /** ProductResponse */
         ProductResponse: {
@@ -4156,6 +4258,10 @@ export interface components {
             bundle_permite_libres: boolean;
             /** Destacado */
             destacado: boolean;
+            /** Tags */
+            tags: string[];
+            /** Foto Url */
+            foto_url?: string | null;
         };
         /** PromotionList */
         PromotionList: {
@@ -10984,6 +11090,7 @@ export interface operations {
                 search?: string | null;
                 category?: string | null;
                 is_active?: boolean | null;
+                tag?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11366,6 +11473,267 @@ export interface operations {
                 };
             };
             /** @description `preview_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    duplicate_product_api_v1_tenant_products__product_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_photos_api_v1_tenant_products__product_id__photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_photo_api_v1_tenant_products__product_id__photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_photo_api_v1_tenant_products__product_id__photos_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `storage_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    order_photos_api_v1_tenant_products__product_id__photos_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_photo_api_v1_tenant_products__product_id__photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
             404: {
                 headers: {
                     [name: string]: unknown;

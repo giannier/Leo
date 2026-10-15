@@ -34,6 +34,8 @@ from decimal import Decimal, InvalidOperation
 
 import openpyxl
 
+from app.services.product_tags import TagsInvalid, clean_tags, split_tags
+
 # Bounds an upload before any of it is parsed. Generous for a real catalogue,
 # small enough that a hostile file cannot exhaust memory.
 MAX_ROWS = 5_000
@@ -58,6 +60,8 @@ CANONICAL_COLUMNS = (
     "bundle_size",
     "bundle_permite_libres",
     "destacado",
+    # Feature 018: "oferta, verano" in one cell.
+    "tags",
 )
 REQUIRED_COLUMNS = ("name", "price")
 
@@ -106,6 +110,9 @@ _HEADER_ALIASES = {
     "permite_libres": "bundle_permite_libres",
     "libres": "bundle_permite_libres",
     "destacado": "destacado",
+    "etiquetas": "tags",
+    "etiqueta": "tags",
+    "tags": "tags",
 }
 
 _CURRENCY_NOISE = re.compile(r"[^\d,.\-]")
@@ -381,6 +388,11 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         except ValueError:
             return InvalidRow(row=number, reason=f"{column}_invalido")
 
+    try:
+        tags = clean_tags(neutralise_formula(t) for t in split_tags(record.get("tags") or ""))
+    except TagsInvalid:
+        return InvalidRow(row=number, reason="etiquetas_invalidas")
+
     description = (record.get("description") or "").strip()[:MAX_FIELD_CHARS]
     category = (record.get("category") or "").strip()[:MAX_FIELD_CHARS]
 
@@ -394,12 +406,13 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         "category": neutralise_formula(category) or None,
         "modo_venta": sale_mode,
         "bundle_size": bundle_size,
+        "tags": tags,
         **flags,
     }
 
 
 TEMPLATE_CSV = (
-    "nombre,descripcion,precio,stock,categoria\r\n"
-    "Lomo saltado,Plato criollo con arroz,32.00,,Platos de fondo\r\n"
-    "Inca Kola 500ml,Bebida gaseosa,5.50,48,Bebidas\r\n"
+    "nombre,descripcion,precio,stock,categoria,etiquetas\r\n"
+    'Lomo saltado,Plato criollo con arroz,32.00,,Platos de fondo,"criollo, almuerzo"\r\n'
+    "Inca Kola 500ml,Bebida gaseosa,5.50,48,Bebidas,\r\n"
 )
