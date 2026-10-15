@@ -54,6 +54,7 @@ from app.repositories.conversation import (
     MessageRepository,
 )
 from app.repositories.product import ProductRepository
+from app.services.metrics.costs import call_cost
 
 logger = logging.getLogger(__name__)
 
@@ -630,6 +631,14 @@ class AgentCore:
             rag_sources=reply.rag_sources,
             input_tokens=reply.input_tokens,
             output_tokens=reply.output_tokens,
+            # The price in force now (Feature 010); None when the model has none.
+            cost_usd=call_cost(
+                self._session,
+                reply.model,
+                reply.input_tokens,
+                reply.output_tokens,
+                datetime.now(UTC),
+            ),
             latency_ms=reply.latency_ms,
             catalog_guard=reply.catalog_guard,
             **(
