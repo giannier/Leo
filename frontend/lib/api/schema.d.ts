@@ -914,6 +914,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plans, prices and packs */
+        get: operations["plans_api_v1_tenant_billing_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscription, usage, charges and payments */
+        get: operations["overview_api_v1_tenant_billing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Buy a plan */
+        post: operations["checkout_api_v1_tenant_billing_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/change-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upgrade or downgrade */
+        post: operations["change_plan_api_v1_tenant_billing_change_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_tenant_billing_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_v1_tenant_billing_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/addons/{addon_id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Addon Checkout */
+        post: operations["addon_checkout_api_v1_tenant_billing_addons__addon_id__checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/charges/{charge_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Charge */
+        post: operations["cancel_charge_api_v1_tenant_billing_charges__charge_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/payments/{payment_id}/receipt.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The receipt of one payment */
+        get: operations["receipt_api_v1_tenant_billing_payments__payment_id__receipt_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/connection-requests": {
         parameters: {
             query?: never;
@@ -1439,6 +1592,101 @@ export interface paths {
          *     indistinguishable from an account quietly kept free.
          */
         post: operations["extend_trial_api_v1_platform_admin_tenants__tenant_id__extend_trial_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscriptions */
+        get: operations["subscriptions_api_v1_platform_admin_billing_subscriptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Payment
+         * @description A transfer or Yape arrived: the same effect a gateway's webhook would have (RF-007).
+         */
+        post: operations["record_payment_api_v1_platform_admin_billing_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/payments/{payment_id}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund
+         * @description Recorded only: the money goes back outside Leo (manual refund, RF-001).
+         */
+        post: operations["refund_api_v1_platform_admin_billing_payments__payment_id__refund_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coupons */
+        get: operations["coupons_api_v1_platform_admin_billing_coupons_get"];
+        put?: never;
+        /** Create Coupon */
+        post: operations["create_coupon_api_v1_platform_admin_billing_coupons_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/tenants/{tenant_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend
+         * @description A courtesy: the current period, and its message period, last `dias` longer.
+         */
+        post: operations["extend_api_v1_platform_admin_billing_tenants__tenant_id__extend_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2012,6 +2260,17 @@ export interface components {
             /** Password */
             password?: string | null;
         };
+        /** AddonOut */
+        AddonOut: {
+            /** Id */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Mensajes */
+            mensajes: number;
+            /** Precio */
+            precio: string;
+        };
         /** AgentConfigRequest */
         AgentConfigRequest: {
             /** Expected Updated At */
@@ -2139,6 +2398,21 @@ export interface components {
             /** Max Situaciones */
             max_situaciones: number;
         };
+        /** BillingOut */
+        BillingOut: {
+            /** Estado Negocio */
+            estado_negocio: string;
+            /** Prueba Hasta */
+            prueba_hasta: string | null;
+            suscripcion: components["schemas"]["SubscriptionOut"] | null;
+            consumo: components["schemas"]["UsageOut"];
+            /** Pendientes */
+            pendientes: components["schemas"]["ChargeOut"][];
+            /** Pagos */
+            pagos: components["schemas"]["PaymentOut"][];
+            /** Cobro Activo */
+            cobro_activo: boolean;
+        };
         /** Body_import_preview_api_v1_tenant_products_import_post */
         Body_import_preview_api_v1_tenant_products_import_post: {
             /** File */
@@ -2228,6 +2502,17 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Catalog */
+        Catalog: {
+            /** Planes */
+            planes: components["schemas"]["PlanOut"][];
+            /** Paquetes */
+            paquetes: components["schemas"]["AddonOut"][];
+            /** Soles Por Dolar */
+            soles_por_dolar: string | null;
+            /** Instrucciones Pago */
+            instrucciones_pago: string;
+        };
         /** CatalogEntry */
         CatalogEntry: {
             /** Kind */
@@ -2288,6 +2573,22 @@ export interface components {
             /** Productos */
             productos: number;
         };
+        /** ChangePlanBody */
+        ChangePlanBody: {
+            /** Plan Id */
+            plan_id: string;
+            /**
+             * Ciclo
+             * @default monthly
+             * @enum {string}
+             */
+            ciclo: "monthly" | "annual";
+        };
+        /** ChangeResult */
+        ChangeResult: {
+            cobro?: components["schemas"]["ChargeOut"] | null;
+            programado?: components["schemas"]["SubscriptionOut"] | null;
+        };
         /** ChannelMetricsResponse */
         ChannelMetricsResponse: {
             /** Messages In */
@@ -2300,6 +2601,36 @@ export interface components {
             p50_response_ms: number | null;
             /** P95 Response Ms */
             p95_response_ms: number | null;
+        };
+        /** ChargeOut */
+        ChargeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Referencia */
+            referencia: string;
+            /** Tipo */
+            tipo: string;
+            /** Concepto */
+            concepto: string;
+            /** Lista */
+            lista: string;
+            /** Descuento */
+            descuento: string;
+            /** Credito */
+            credito: string;
+            /** Monto */
+            monto: string;
+            /** Cupon */
+            cupon: string | null;
+            /** Estado */
+            estado: string;
+            /** Vence */
+            vence: string | null;
+            /** Instrucciones */
+            instrucciones: string;
         };
         /** ChecklistItemResponse */
         ChecklistItemResponse: {
@@ -2318,6 +2649,19 @@ export interface components {
             sandbox_ready: boolean;
             /** Activation Ready */
             activation_ready: boolean;
+        };
+        /** CheckoutBody */
+        CheckoutBody: {
+            /** Plan Id */
+            plan_id: string;
+            /**
+             * Ciclo
+             * @default monthly
+             * @enum {string}
+             */
+            ciclo: "monthly" | "annual";
+            /** Cupon */
+            cupon?: string | null;
         };
         /** ChunkList */
         ChunkList: {
@@ -2466,6 +2810,28 @@ export interface components {
             derivado: components["schemas"]["Handover"] | null;
             /** Eventos */
             eventos: components["schemas"]["StageEvent"][];
+        };
+        /** CouponBody */
+        CouponBody: {
+            /** Codigo */
+            codigo: string;
+            /** Porcentaje */
+            porcentaje: number;
+            /** Vence */
+            vence?: string | null;
+            /** Usos Maximos */
+            usos_maximos?: number | null;
+        };
+        /** CouponRow */
+        CouponRow: {
+            /** Codigo */
+            codigo: string;
+            /** Porcentaje */
+            porcentaje: number;
+            /** Vence */
+            vence: string | null;
+            /** Usos Maximos */
+            usos_maximos: number | null;
         };
         /**
          * CreateSourceResponse
@@ -2635,6 +3001,13 @@ export interface components {
             fields?: {
                 [key: string]: string;
             } | null;
+        };
+        /** ExtendBody */
+        ExtendBody: {
+            /** Dias */
+            dias: number;
+            /** Motivo */
+            motivo: string;
         };
         /** ExtendTrialPayload */
         ExtendTrialPayload: {
@@ -3013,6 +3386,21 @@ export interface components {
             password: string;
             /** Tenant Id */
             tenant_id?: string | null;
+        };
+        /** ManualPaymentBody */
+        ManualPaymentBody: {
+            /** Referencia */
+            referencia: string;
+            /** Operacion */
+            operacion: string;
+            /** Monto Usd */
+            monto_usd: number | string;
+            /** Monto Local */
+            monto_local?: number | string | null;
+            /** Moneda Local */
+            moneda_local?: string | null;
+            /** Nota */
+            nota?: string | null;
         };
         /** MediaList */
         MediaList: {
@@ -3448,6 +3836,74 @@ export interface components {
             /** Media Asset Id */
             media_asset_id?: string | null;
         };
+        /** PaymentOut */
+        PaymentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Comprobante */
+            comprobante: string;
+            /** Concepto */
+            concepto: string;
+            /** Monto */
+            monto: string;
+            /** Estado */
+            estado: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
+        /** PaymentRow */
+        PaymentRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Comprobante */
+            comprobante: string;
+            /** Concepto */
+            concepto: string;
+            /** Monto */
+            monto: string;
+            /** Estado */
+            estado: string;
+            /**
+             * Repetido
+             * @default false
+             */
+            repetido: boolean;
+        };
+        /** PlanOut */
+        PlanOut: {
+            /** Id */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Precio Mensual */
+            precio_mensual: string | null;
+            /** Precio Anual */
+            precio_anual: string | null;
+            /** Asientos */
+            asientos: number;
+            /** Mensajes */
+            mensajes: number;
+            /** Caracteres Conocimiento */
+            caracteres_conocimiento: number;
+            /** Fuentes Conocimiento */
+            fuentes_conocimiento: number;
+            /** Niveles */
+            niveles: string[];
+        };
         /** ProcessRequest */
         ProcessRequest: {
             /** Template Key */
@@ -3771,6 +4227,11 @@ export interface components {
         RefreshRequest: {
             /** Tenant Id */
             tenant_id?: string | null;
+        };
+        /** RefundBody */
+        RefundBody: {
+            /** Motivo */
+            motivo: string;
         };
         /**
          * RegisterRequest
@@ -4146,6 +4607,55 @@ export interface components {
              */
             devolucion_pendiente: boolean;
         };
+        /** SubscriptionOut */
+        SubscriptionOut: {
+            /** Plan */
+            plan: string;
+            /** Plan Nombre */
+            plan_nombre: string;
+            /** Estado */
+            estado: string;
+            /** Ciclo */
+            ciclo: string;
+            /** Precio */
+            precio: string;
+            /**
+             * Desde
+             * Format: date-time
+             */
+            desde: string;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
+            /** Gracia Hasta */
+            gracia_hasta: string | null;
+            /** Cancela Al Final */
+            cancela_al_final: boolean;
+            /** Cambio Programado */
+            cambio_programado: string | null;
+        };
+        /** SubscriptionRow */
+        SubscriptionRow: {
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Negocio */
+            negocio: string;
+            /** Estado Negocio */
+            estado_negocio: string;
+            /** Plan */
+            plan: string;
+            /** Estado */
+            estado: string | null;
+            /** Hasta */
+            hasta: string | null;
+            /** Pendientes */
+            pendientes: components["schemas"]["ChargeOut"][];
+        };
         /** SuggestedIn */
         SuggestedIn: {
             /** Titulo */
@@ -4357,6 +4867,17 @@ export interface components {
             content?: string | null;
             /** Priority */
             priority?: number | null;
+        };
+        /** UsageOut */
+        UsageOut: {
+            /** Usados */
+            usados: number;
+            /** Limite */
+            limite: number;
+            /** Desde */
+            desde: string | null;
+            /** Hasta */
+            hasta: string | null;
         };
         /**
          * UsageResponse
@@ -7453,6 +7974,423 @@ export interface operations {
             };
         };
     };
+    plans_api_v1_tenant_billing_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Catalog"];
+                };
+            };
+        };
+    };
+    overview_api_v1_tenant_billing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingOut"];
+                };
+            };
+        };
+    };
+    checkout_api_v1_tenant_billing_checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_plan_api_v1_tenant_billing_change_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePlanBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeResult"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_tenant_billing_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resume_api_v1_tenant_billing_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    addon_checkout_api_v1_tenant_billing_addons__addon_id__checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_charge_api_v1_tenant_billing_charges__charge_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    receipt_api_v1_tenant_billing_payments__payment_id__receipt_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_requests_api_v1_tenant_connection_requests_get: {
         parameters: {
             query?: never;
@@ -8975,6 +9913,211 @@ export interface operations {
             };
             /** @description `not_found` - including for a caller who is not a platform admin */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    subscriptions_api_v1_platform_admin_billing_subscriptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRow"][];
+                };
+            };
+        };
+    };
+    record_payment_api_v1_platform_admin_billing_payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPaymentBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRow"];
+                };
+            };
+            /** @description `not_found`: no charge with that reference */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `charge_not_pending` or `amount_mismatch` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refund_api_v1_platform_admin_billing_payments__payment_id__refund_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRow"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_refunded` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    coupons_api_v1_platform_admin_billing_coupons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponRow"][];
+                };
+            };
+        };
+    };
+    create_coupon_api_v1_platform_admin_billing_coupons_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponRow"];
+                };
+            };
+            /** @description `coupon_exists` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    extend_api_v1_platform_admin_billing_tenants__tenant_id__extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_active_subscription` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

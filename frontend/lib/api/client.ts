@@ -199,6 +199,24 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (await response.json()) as T;
 }
 
+/** A file from the API (a receipt PDF): same auth and refresh as `request`. */
+export async function requestBlob(path: string): Promise<Blob> {
+  let response = await send(path, {});
+  if (response.status === 401) {
+    const session = await refreshSession();
+    if (session === null) {
+      accessToken = null;
+      onSessionLost?.();
+      throw await readError(response);
+    }
+    response = await send(path, {});
+  }
+  if (!response.ok) {
+    throw await readError(response);
+  }
+  return response.blob();
+}
+
 /* ------------------------------------------------------------------ *
  * Named operations.
  *
@@ -246,6 +264,15 @@ export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
+// Billing (Feature 009).
+export type BillingCatalog = Ok<Ops["/api/v1/tenant/billing/plans"]["get"]>;
+export type BillingOverview = Ok<Ops["/api/v1/tenant/billing"]["get"]>;
+export type BillingCharge = Ok<Ops["/api/v1/tenant/billing/checkout"]["post"]>;
+export type BillingChange = Ok<Ops["/api/v1/tenant/billing/change-plan"]["post"]>;
+export type BillingCycle = "monthly" | "annual";
+export type AdminSubscription = Ok<Ops["/api/v1/platform-admin/billing/subscriptions"]["get"]>[number];
+export type AdminPayment = Ok<Ops["/api/v1/platform-admin/billing/payments"]["post"]>;
+export type AdminCoupon = Ok<Ops["/api/v1/platform-admin/billing/coupons"]["get"]>[number];
 export type KnowledgeDetail = Ok<Ops["/api/v1/tenant/knowledge/{source_id}"]["get"]>;
 export type KnowledgeSource = KnowledgeList["sources"][number];
 export type KnowledgeUsage = KnowledgeList["usage"];
@@ -465,7 +492,42 @@ export const api = {
       }),
   },
 
+  billing: {
+    plans: () => request<BillingCatalog>("/tenant/billing/plans"),
+    overview: () => request<BillingOverview>("/tenant/billing"),
+    checkout: (body: { plan_id: string; ciclo: BillingCycle; cupon?: string }) =>
+      request<BillingCharge>("/tenant/billing/checkout", { method: "POST", body }),
+    changePlan: (body: { plan_id: string; ciclo: BillingCycle }) =>
+      request<BillingChange>("/tenant/billing/change-plan", { method: "POST", body }),
+    cancel: () => request<unknown>("/tenant/billing/cancel", { method: "POST" }),
+    resume: () => request<unknown>("/tenant/billing/resume", { method: "POST" }),
+    addon: (id: string) =>
+      request<BillingCharge>(`/tenant/billing/addons/${id}/checkout`, { method: "POST" }),
+    cancelCharge: (id: string) =>
+      request<BillingCharge>(`/tenant/billing/charges/${id}/cancel`, { method: "POST" }),
+    receipt: (id: string) => requestBlob(`/tenant/billing/payments/${id}/receipt.pdf`),
+  },
+
   admin: {
+    billing: {
+      subscriptions: () => request<AdminSubscription[]>("/platform-admin/billing/subscriptions"),
+      recordPayment: (body: {
+        referencia: string;
+        operacion: string;
+        monto_usd: string;
+        monto_local?: string;
+        moneda_local?: string;
+        nota?: string;
+      }) => request<AdminPayment>("/platform-admin/billing/payments", { method: "POST", body }),
+      coupons: () => request<AdminCoupon[]>("/platform-admin/billing/coupons"),
+      createCoupon: (body: { codigo: string; porcentaje: number; vence?: string; usos_maximos?: number }) =>
+        request<AdminCoupon>("/platform-admin/billing/coupons", { method: "POST", body }),
+      extend: (tenantId: string, body: { dias: number; motivo: string }) =>
+        request<unknown>(`/platform-admin/billing/tenants/${tenantId}/extend`, {
+          method: "POST",
+          body,
+        }),
+    },
     queue: (status?: string) =>
       request<AdminRequest[]>("/platform-admin/connection-requests", {
         query: status ? { status } : undefined,

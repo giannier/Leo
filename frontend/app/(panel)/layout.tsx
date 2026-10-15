@@ -59,6 +59,8 @@ const NAV: NavItem[] = [
   { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
   { href: "/knowledge", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
   { href: "/team", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },
+  // Feature 009: money is for the owner and the admins; operators work the inbox.
+  { href: "/plans", label: "Mi plan", icon: ReceiptIcon, roles: MANAGES_CONFIGURATION },
 ];
 
 function visibleTo(role: Role | null): NavItem[] {
