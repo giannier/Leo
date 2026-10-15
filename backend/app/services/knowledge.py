@@ -28,6 +28,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
@@ -37,19 +38,27 @@ from app.models.knowledge import KnowledgeSource
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageError, StorageProvider
 from app.repositories.knowledge import (
+    STATUS_INDEXING,
     STATUS_PENDING,
     KnowledgeChunkRepository,
     KnowledgeSourceRepository,
 )
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
+from app.services.chunking import content_hash
 from app.services.trial import billing_enforced
+from app.services.web_crawl import normalise_start
 
 logger = logging.getLogger(__name__)
 
 # Source types whose content arrives inline as JSON.
 INLINE_TYPES = ("faq", "policy", "text")
 PDF_TYPE = "pdf"
+WEB_TYPE = "web"
+
+# Which source the agent trusts when two disagree (006 C-003): what the business
+# wrote for the agent first, then its documents, then its website. 0-100.
+DEFAULT_PRIORITY = {"faq": 100, "policy": 100, "text": 100, "pdf": 90, WEB_TYPE: 50}
 
 PDF_CONTENT_TYPE = "application/pdf"
 # Every PDF starts with this signature. Checking it costs nothing and stops
@@ -113,6 +122,18 @@ class KnowledgeHit:
     content: str
 
 
+@dataclass(frozen=True)
+class Passage:
+    """A retrieved chunk with the source it comes from (Feature 006)."""
+
+    content: str
+    source_id: uuid.UUID
+    title: str
+    source_type: str
+    priority: int
+    distance: float
+
+
 class KnowledgeError(Exception):
     """Base class for everything that can stop an ingestion."""
 
@@ -160,6 +181,10 @@ class PlanUnavailableError(KnowledgeError):
 
 class SourceNotFoundError(KnowledgeError):
     """No such source for this tenant. Never distinguished from 'foreign'."""
+
+
+class SourceBusyError(KnowledgeError):
+    """The source is being indexed right now; an edit would race the worker."""
 
 
 class IndexingUnavailableError(KnowledgeError):
@@ -229,6 +254,7 @@ class KnowledgeService:
             content=body,
             char_count=chars,
             status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[source_type],
         )
         source_id = source.id
         self._session.commit()
@@ -270,10 +296,101 @@ class KnowledgeService:
             file_key=key,
             char_count=0,
             status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[PDF_TYPE],
         )
         source_id = source.id
         self._session.commit()
 
+        await self._enqueue(source_id)
+        return IngestResult(id=source_id, status=STATUS_PENDING)
+
+    # -------------------------------------------------------------- editing
+
+    async def update(
+        self,
+        source_id: uuid.UUID,
+        *,
+        title: str | None = None,
+        content: str | None = None,
+        priority: int | None = None,
+    ) -> KnowledgeSource:
+        """Change a source; new text is re-indexed (Feature 006, HU-03).
+
+        The old chunks keep answering until the worker swaps them for the new ones
+        in one transaction (`replace_for_source`), so the agent never reads half a
+        document. If re-indexing fails, the old version stays in use and the panel
+        says so. A source being indexed right now is refused rather than raced.
+        """
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        if title is not None:
+            source.title = _clean_title(title)
+        if priority is not None:
+            source.priority = priority
+        reindex = False
+        if content is not None:
+            if source.type not in INLINE_TYPES:
+                raise UnsupportedSourceTypeError(
+                    "only faq, policy and text sources are edited as text"
+                )
+            body = content.strip()
+            if not body:
+                raise EmptyContentError("the source has no content to index")
+            if body != source.content:
+                if source.status == STATUS_INDEXING:
+                    self._session.rollback()
+                    raise SourceBusyError(str(source_id))
+                # Only the difference counts against the plan.
+                self._reserve(chars=len(body) - source.char_count)
+                source.content = body
+                source.char_count = len(body)
+                source.status = STATUS_PENDING
+                source.error_msg = None
+                reindex = True
+        self._session.commit()
+        if reindex:
+            await self._enqueue(source_id, keep_on_failure=True)
+        return source
+
+    async def reindex(self, source_id: uuid.UUID) -> KnowledgeSource:
+        """Process a source again: re-read a website, retry a failed document."""
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        if source.status in (STATUS_PENDING, STATUS_INDEXING):
+            raise SourceBusyError(str(source_id))
+        source.status = STATUS_PENDING
+        source.error_msg = None
+        self._session.commit()
+        await self._enqueue(source_id, keep_on_failure=True)
+        return source
+
+    def chunks(self, source_id: uuid.UUID) -> Sequence[str]:
+        """What the agent can retrieve from one source, in order (debug view)."""
+        source = self._sources.get(source_id)
+        if source is None or source.deleted_at is not None:
+            raise SourceNotFoundError(str(source_id))
+        return [chunk.content for chunk in self._chunks.list_for_source(source_id)]
+
+    async def ingest_web(self, *, url: str, title: str | None = None) -> IngestResult:
+        """Accept the business's website for reading (Feature 006, HU-02).
+
+        Like a PDF, its size is unknown until the worker has read it: the file
+        count and "some budget left" are enforced here, the characters there.
+        """
+        start = normalise_start(url)
+        self._reserve(chars=0)
+        source = self._sources.add(
+            type=WEB_TYPE,
+            title=_clean_title(title or (urlsplit(start).hostname or start)),
+            source_url=start,
+            char_count=0,
+            status=STATUS_PENDING,
+            priority=DEFAULT_PRIORITY[WEB_TYPE],
+        )
+        source_id = source.id
+        self._session.commit()
         await self._enqueue(source_id)
         return IngestResult(id=source_id, status=STATUS_PENDING)
 
@@ -368,7 +485,7 @@ class KnowledgeService:
             raise
         return usage
 
-    async def _enqueue(self, source_id: uuid.UUID) -> None:
+    async def _enqueue(self, source_id: uuid.UUID, *, keep_on_failure: bool = False) -> None:
         """Hand the source to the indexing worker.
 
         A queue that cannot be reached is not something to swallow: the row
@@ -386,7 +503,13 @@ class KnowledgeService:
                 "knowledge source could not be queued for indexing",
                 extra={"tenant_id": str(self._tenant_id), "source_id": str(source_id)},
             )
-            self._sources.soft_delete(source_id)
+            if keep_on_failure:
+                # An existing source keeps its old chunks; it is only marked.
+                self._sources.mark_failed(
+                    source_id, "No se pudo poner en cola. Vuelve a intentarlo en un momento."
+                )
+            else:
+                self._sources.soft_delete(source_id)
             self._session.commit()
             raise IndexingUnavailableError(
                 "The indexing queue is unavailable, so the source was not accepted."
@@ -453,3 +576,39 @@ async def search_knowledge(
         KnowledgeHit(chunk_id=chunk.id, source_id=chunk.source_id, content=chunk.content)
         for chunk in chunks
     ]
+
+
+def retrieve(
+    session: Session, tenant_id: uuid.UUID, vector: Sequence[float], *, k: int
+) -> list[Passage]:
+    """The `k` passages closest to a question, one copy each, most trusted source first.
+
+    Feature 006: the same paragraph in two sources (the FAQ and the website) is
+    shown once, from the higher-priority source (C-101). The `k` closest are then
+    ordered by the source's priority, so when two passages disagree the one the
+    business trusts more comes first and the tool says that the first one wins
+    (C-003). Distance breaks ties.
+    """
+    if k <= 0:
+        return []
+    rows = KnowledgeChunkRepository(session, tenant_id).search_with_sources(vector, limit=k * 3)
+    best: dict[str, Passage] = {}
+    order: list[str] = []
+    for chunk, source, distance in rows:
+        digest = chunk.content_hash or content_hash(chunk.content)
+        passage = Passage(
+            content=chunk.content,
+            source_id=source.id,
+            title=source.title,
+            source_type=source.type,
+            priority=source.priority,
+            distance=distance,
+        )
+        kept = best.get(digest)
+        if kept is None:
+            best[digest] = passage
+            order.append(digest)
+        elif passage.priority > kept.priority:
+            best[digest] = passage
+    closest = [best[digest] for digest in order][:k]
+    return sorted(closest, key=lambda p: (-p.priority, p.distance))

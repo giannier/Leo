@@ -70,6 +70,9 @@ class MockLLMProvider:
         self.vision_delay = 0.0
         self.vision_calls: list[RecordedImage] = []
         self.embed_calls: list[RecordedEmbed] = []
+        # What `read_document` answers, in order (Feature 006 OCR).
+        self.document_responses: list[dict[str, Any] | Exception] = []
+        self.document_calls: list[bytes] = []
 
     @property
     def chat_model(self) -> str:
@@ -119,6 +122,24 @@ class MockLLMProvider:
         if isinstance(answer, Exception):
             raise answer
         return VisionReading(data=answer, model="mock-vision")
+
+    async def read_document(
+        self,
+        document: bytes,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+        max_tokens: int,
+    ) -> VisionReading:
+        """The scripted reading of one PDF page (`DocumentReader`)."""
+        self.document_calls.append(document)
+        if not self.document_responses:
+            raise LLMError("MockLLMProvider has no queued document response.")
+        answer = self.document_responses.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return VisionReading(data=answer, model="mock-vision", input_tokens=900, output_tokens=120)
 
     async def embed(
         self, texts: Sequence[str], *, input_type: InputType = "passage"

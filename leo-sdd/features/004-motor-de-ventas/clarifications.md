@@ -120,6 +120,12 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 - Valores por defecto: 4 horas de espera y 2 intentos como máximo.
 - El opt-out ya existe en Leo (`contacts.opted_out_at` y `agent_configs.opt_out_keywords`) y se reutiliza tal cual.
 **Impacto en implementación:** Cron de ARQ cada 15 minutos con un candado por conversación. Se resetea cuando el cliente vuelve a escribir.
+**Implementado (TASK-444, 2026-10-14), lecturas conservadoras:** viene apagado por negocio
+(`seguimiento_activo=false`) hasta que el dueño lo encienda; solo canal real, nunca el simulador; si el
+intento se reclamó y el modelo falla, el intento se pierde (mejor un recordatorio de menos que dos); la
+promoción del último intento es la primera promoción de cierre activa marcada `para_seguimiento`; si no hay,
+el prompt dice que no ofrezca descuentos. El seguimiento cuenta como un mensaje del agente en el cupo
+(respetando `billing_enforced()`).
 **Registrado por:** Claude — por ratificar
 
 ## C-14: Derivación a humano sin bandeja
@@ -131,6 +137,9 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 - Mientras tanto se guardan los mensajes del cliente sin respuesta. Al vencer la pausa, el bot vuelve con la etapa recalculada.
 - El operador puede reactivar el bot antes desde el detalle del pedido o de la conversación (`POST /conversations/{id}/resume-bot`).
 **Impacto en implementación:** Hecho `derivado = {motivo, resumen, hasta}`. La 007 reutiliza el mismo hecho.
+**Implementado (TASK-443, 2026-10-14):** N = `agent_configs.derivacion_pausa_horas` (1 a 72, 6 por defecto). El
+cliente recibe el mensaje `derivacion` del negocio y nada más del modelo en ese turno. El aviso al negocio
+solo sale del canal real (en el simulador no). Al vencer o al reactivar no se envía nada al cliente.
 **Registrado por:** Claude — por ratificar
 
 ## C-15: Respuestas a botones y listas
@@ -190,8 +199,46 @@ Si la visión dice que no es un comprobante, el modelo lo sabe y le pide la foto
 **Impacto en implementación:** `orders.tipo_entrega` y `datos_faltantes` dinámicos (plantillas.md §1). La plantilla no tiene opción `delivery`.
 **Registrado por:** Claude — por ratificar
 
+## C-23: Ajustes del recorrido automático del Milestone B (2026-10-13)
+**Situación:** El recorrido del checklist B con el modelo real (`tests/integration/test_zz_milestone_b_live.py`) mostró cuatro fallas del motor, no de los datos.
+**Decisión (lectura conservadora):**
+- `gestionar_pedido(agregar)` con `seleccion` y un paquete registra esos temas en la misma llamada. Antes se perdían.
+- `seleccion` acepta varios temas separados por comas, en una sola llamada (la descripción de la tool lo dice).
+- Tocar un producto (`producto:{id}`) le dice al modelo que lo agregue y no vuelva a mostrar las opciones.
+- Con el pago rechazado, la plantilla dice que el pedido sí se puede cambiar con agregar, quitar o cambiar_cantidad. `solicitar_cambio` fuera de revisión responde error con esa indicación.
+- IDENTIFICAR [productos]: si el cliente ya dijo los productos y cada uno coincide con uno solo, se agregan en el mismo turno, sin preguntar "¿quieres que lo agregue?".
+- En COBRO con contra entrega, la línea "Pago" del ESTADO dice "contra entrega: resume el pedido y pídele que lo confirme" (el prompt de COBRO trae las dos ramas y el modelo ofrecía cuentas).
+- Con contra entrega no se ofrece `enviar_metodos_pago` (el recorrido mandó las cuentas de Yape a un pedido contra entrega; el checklist T3 dice que no).
+- VERIFICACION con pago rechazado habilita también `buscar_productos` (amplía C-21): sin buscar, el modelo no tiene el `producto_id` de lo que el cliente quiere agregar.
+**Impacto en implementación:** `agent/tools/orders.py`, `agent/tools/definitions.py`, `process/interactive.py`, `process/templates/{base,productos}.py`, `plantillas.md` §IDENTIFICAR. Evals corridos.
+**Registrado por:** Claude — por ratificar
+
 ---
 
 ## Clarificaciones Pendientes
 - [ ] ¿Aviso al operador por WhatsApp además del correo? Decisión provisional: no en esta versión (va con la 007).
 - [ ] ¿Horario permitido de seguimiento configurable por tenant? Decisión provisional: fijo de 08:00 a 21:00 por ahora.
+
+## C-24: Lo que encontraron los evals de flujos de venta (TASK-447, 2026-10-14)
+**Situación:** Las 24 conversaciones guionadas (8 por plantilla) empezaron en 12/24 con el modelo real.
+Una parte eran guiones poco realistas (el cliente nunca decía "sí, agrégalo"); el resto, fallas del agente.
+**Decisión (lectura conservadora, para ratificar):**
+- **CALIFICAR no retiene respuestas por el nombre.** Plantillas de proceso **v2** (migración 0033) con la
+  regla `CALIFICAR.aun_no_sabes_su_nombre` reescrita: sigue pidiendo el nombre, pero si el cliente ya dijo
+  qué busca, registra el camino y responde. Mismo `rule_key`, así que un negocio que la apagó la sigue
+  teniendo apagada. Los negocios ven la novedad.
+- **Regla de plataforma 2:** precios y promociones salen "de tus herramientas **o del bloque NEGOCIO**".
+  Antes el modelo ignoraba las promociones vigentes del prompt y decía que no había.
+- **`consultar_conocimiento` vacío** ya no empuja a derivar: primero revisa NEGOCIO y `buscar_productos`; solo
+  deriva si el cliente lo pide o lo acepta.
+- **`buscar_productos`** se describe como el catálogo completo (productos, servicios o certificados): con
+  servicios el modelo no lo usaba.
+- **Texto repetido:** si el modelo escribe de nuevo el cuerpo de los botones o la lista del mismo turno, esa
+  burbuja no se envía (el cliente la leía dos veces; también se vio en el Milestone C).
+- **Zona de envío que falta:** la herramienta le pasa al modelo las zonas válidas para que las ofrezca.
+- **No se cambió:** los datos de entrega dichos antes de tener pedido siguen sin guardarse en el pedido (el
+  esquema solo ofrece esos campos cuando el pedido los necesita, para cuidar el tope de tokens); en DATOS el
+  modelo los toma del historial o los vuelve a pedir.
+**Resultado:** 24/24 en dos corridas seguidas, `make evals` y evals de catálogo en verde. Evidencia:
+`milestones/evals-flujos-de-venta.md`.
+**Registrado por:** Claude — por ratificar

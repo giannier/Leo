@@ -3,7 +3,8 @@
 `ProcessConfigService.effective(tenant_id)` answers one question for the turn
 pipeline and the prompt builder: *what process does this business run today?*
 That is the template (code), the tenant's options laid over its defaults, the
-instruction text of every stage (the tenant's edit, or the template's own), the
+instruction text of every stage (the rules of the published process version in
+the catalogue, 017 TASK-460; the code text if there is none), the
 behaviour settings (tone, pace, detail), and the business information the prompt
 shows in compact form.
 
@@ -13,8 +14,8 @@ schemas, detached promotion copies) and never an ORM row bound to a session that
 has since been closed. A write (TASK-435) calls `invalidate()`; any other worker
 sees it within the TTL, which is the staleness the plan accepts.
 
-This is the read side only. Saving options, overrides and "restore default"
-arrives with TASK-435.
+This is the read side only. Saving options arrives with TASK-435; stages are no
+longer edited (017, C-01).
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
@@ -35,15 +37,12 @@ from sqlalchemy.orm import Session
 from app.models.business import AgentConfig, BusinessProfile
 from app.models.sales_config import Promotion
 from app.process.facts import FactsConfig
+from app.process.layers import LayerResolver, stage_texts_from
 from app.process.templates import TEMPLATES, get_template
 from app.process.templates.base import EffectiveOptions, Stage, Template
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
-from app.repositories.sales_config import (
-    BusinessInfoRepository,
-    ProcessStageOverrideRepository,
-    PromotionRepository,
-)
+from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import (
     SECTION_SCHEMAS,
     Contacto,
@@ -74,8 +73,13 @@ class Behavior:
     tone: str = DEFAULT_TONE
     ritmo: str = DEFAULT_PACE
     detalle: str = DEFAULT_DETAIL
-    # `agent_configs.restrictions`, the tenant's "additional rules".
-    reglas_adicionales: str | None = None
+    # The profile by form (017, RF-010).
+    tratamiento: str = "tu"
+    emojis: str = "pocos"
+    saludo: str | None = None
+    politica_descuentos: str = "solo_promociones"
+    descuento_maximo_pct: Decimal | None = None
+    max_situaciones: int = 5
 
 
 @dataclass(frozen=True)
@@ -96,9 +100,15 @@ class EffectiveProcessConfig:
     tenant_id: uuid.UUID
     template: Template
     options: EffectiveOptions
-    # The text of every stage as it runs: the tenant's edit if it has one.
+    # The text of every stage as it runs: the published process rules.
     stage_instructions: Mapping[Stage, str]
-    customized_stages: frozenset[Stage] = frozenset()
+    # The catalogue version the texts came from; None means the code fallback.
+    process_version: int | None = None
+    # The rubro's active rules (017, TASK-461) and the version they came from.
+    rubro_rules: tuple[str, ...] = ()
+    rubro_version: int | None = None
+    # Where `consultar_conocimiento` finds the rubro's FAQs and objections.
+    rubro_version_id: uuid.UUID | None = None
     behavior: Behavior = field(default_factory=Behavior)
     # The tenant's configured intelligence level (`agent_configs.nivel_inteligencia`).
     intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
@@ -235,18 +245,22 @@ class ProcessConfigService:
         template = _template_for(agent)
         options = _options_for(template, agent)
 
-        overrides = ProcessStageOverrideRepository(self._session, tenant_id).for_template(
-            template.key
+        layers = LayerResolver(self._session, tenant_id).resolve(
+            template.key, profile.industry if profile else None
         )
-        texts: dict[Stage, str] = {}
-        customized: set[Stage] = set()
-        for stage in Stage:
-            text = template.stage(stage).instrucciones
-            override = overrides.get(stage.value)
-            if override is not None and override.instrucciones:
-                text = override.instrucciones
-                customized.add(stage)
-            texts[stage] = text
+        if layers.process_version is None:
+            logger.warning(
+                "no published process version; using the code texts",
+                extra={"template": template.key},
+            )
+        texts = {
+            Stage(stage): text
+            for stage, text in stage_texts_from(
+                layers,
+                {s.value: template.stage(s).instrucciones for s in Stage},
+                [s.value for s in Stage],
+            ).items()
+        }
 
         sections = BusinessInfoRepository(self._session, tenant_id).sections()
         methods = PaymentMethodRepository(self._session, tenant_id).list_active()
@@ -257,7 +271,10 @@ class ProcessConfigService:
             template=template,
             options=options,
             stage_instructions=MappingProxyType(texts),
-            customized_stages=frozenset(customized),
+            process_version=layers.process_version,
+            rubro_rules=layers.rubro_rules,
+            rubro_version=layers.rubro_version,
+            rubro_version_id=layers.rubro_version_id,
             behavior=_behavior(agent),
             intelligence_level=(agent.nivel_inteligencia if agent else None)
             or DEFAULT_INTELLIGENCE_LEVEL,
@@ -281,5 +298,10 @@ def _behavior(agent: AgentConfig | None) -> Behavior:
         tone=agent.tone or DEFAULT_TONE,
         ritmo=agent.ritmo or DEFAULT_PACE,
         detalle=agent.detalle or DEFAULT_DETAIL,
-        reglas_adicionales=agent.restrictions or None,
+        tratamiento=agent.tratamiento or "tu",
+        emojis=agent.emojis or "pocos",
+        saludo=agent.saludo or None,
+        politica_descuentos=agent.politica_descuentos or "solo_promociones",
+        descuento_maximo_pct=agent.descuento_maximo_pct,
+        max_situaciones=agent.max_situaciones or 5,
     )

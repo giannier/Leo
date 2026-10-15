@@ -6,6 +6,7 @@ non-committed `.env`), never hardcoded.
 """
 
 import json
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -99,6 +100,17 @@ class Settings(BaseSettings):
     # (Milestone B of the 004). Usage is still metered either way. Turn it on
     # (`BILLING_ENFORCED=true`) the day Leo starts selling.
     billing_enforced: bool = False
+    # How a business pays the platform while payments are collected by hand
+    # (Feature 009, Giannier 2026-10-14): bank account, Yape number, holder.
+    # Shown in the panel and in every billing email next to the reference.
+    billing_payment_instructions: str = ""
+    # Soles per dollar, shown only as a reference next to dollar prices (009
+    # C-001: Leo does not fix exchange rates). Empty shows no soles at all.
+    billing_pen_reference_rate: Decimal | None = None
+    # Days before the period ends that the renewal charge is issued, and days of
+    # grace after it (reminders on days 1, 3 and 5).
+    billing_renewal_notice_days: int = 7
+    billing_grace_days: int = 5
 
     # --- LLM providers ----------------------------------------------------
     # Which profile the platform itself uses. Tenants may override the *chat*
@@ -124,6 +136,17 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_chat_model: str = "gpt-5.4-mini"
     openai_embedding_model: str = "text-embedding-3-small"
+    # The model behind each intelligence level (TASK-445, C-02). Unset: the level
+    # runs on `openai_chat_model`, so choosing a level changes nothing until the
+    # platform decides what a better model is worth (Giannier ratifies: LLM cost).
+    llm_model_economico: str | None = None
+    llm_model_medio: str | None = None
+    llm_model_mejor: str | None = None
+    # How many credits one agent reply costs at each level (Milestone B, decision 4).
+    # Charged by Feature 009; equal while every level runs the same model.
+    llm_credits_economico: int = 1
+    llm_credits_medio: int = 1
+    llm_credits_mejor: int = 1
 
     # Fernet key for credentials stored in the database (tenant API keys,
     # WhatsApp provider tokens). Generate with:
@@ -270,6 +293,22 @@ class Settings(BaseSettings):
 
     # Default `k` for `search_knowledge`.
     knowledge_search_default_k: int = 5
+
+    # OCR of scanned PDF pages with the vision model (Feature 006, TASK-602).
+    # A page whose text layer has fewer characters than `min_chars` is read by
+    # the model; at most `max_pages` pages per document (the spec's trial limit,
+    # applied always because it bounds model spend), `concurrency` at a time.
+    knowledge_ocr_max_pages: int = 30
+    knowledge_ocr_min_chars: int = 20
+    knowledge_ocr_concurrency: int = 3
+    knowledge_ocr_timeout_seconds: float = 90.0
+    knowledge_ocr_max_tokens: int = 2500
+
+    # Reading the business's website (Feature 006, TASK-603): pages per crawl,
+    # seconds per request and bytes per page.
+    knowledge_web_max_pages: int = 20
+    knowledge_web_timeout_seconds: float = 10.0
+    knowledge_web_max_page_bytes: int = 2_000_000
 
     # CORS
     # `NoDecode` turns off pydantic-settings' JSON decoding for this field.

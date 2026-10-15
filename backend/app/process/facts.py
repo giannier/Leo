@@ -96,6 +96,9 @@ class Derivado(_Model):
     motivo: str
     resumen: str | None = None
     hasta: datetime
+    # When it began, and whether the business was told nobody took it (Feature 007).
+    desde: datetime | None = None
+    avisado: bool = False
 
 
 class Seguimiento(_Model):

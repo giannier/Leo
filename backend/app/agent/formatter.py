@@ -17,7 +17,7 @@ Three steps:
    allowed depends on the detail level and on what the tools already sent
    (`TurnBudget.remaining_text_bubbles`).
 
-`agent/core.py` keeps its own `whatsapp_text` and `_usable_answer` for the
+`agent/core.py` keeps its own `whatsapp_text` and `usable_answer` for the
 single-reply path that exists today; the pipeline (TASK-421) replaces that path
 with this module.
 """

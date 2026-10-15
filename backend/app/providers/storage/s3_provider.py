@@ -70,12 +70,24 @@ class S3StorageProvider:
 
     def put(self, key: str, data: bytes, *, content_type: str) -> str:
         try:
-            self._client.put_object(
-                Bucket=self._bucket, Key=key, Body=data, ContentType=content_type
-            )
-        except (ClientError, BotoCoreError) as exc:
+            self._put(key, data, content_type)
+        except ClientError as exc:
+            # A fresh MinIO has no bucket, and nothing else creates it: the
+            # first write would fail and, before this, took the request down
+            # with it (the simulator's "No pudimos contactar al servidor").
+            if exc.response.get("Error", {}).get("Code") != "NoSuchBucket":
+                raise StorageError(f"could not store {key}: {exc}") from exc
+            self.ensure_bucket()
+            try:
+                self._put(key, data, content_type)
+            except (ClientError, BotoCoreError) as retry_exc:
+                raise StorageError(f"could not store {key}: {retry_exc}") from retry_exc
+        except BotoCoreError as exc:
             raise StorageError(f"could not store {key}: {exc}") from exc
         return key
+
+    def _put(self, key: str, data: bytes, content_type: str) -> None:
+        self._client.put_object(Bucket=self._bucket, Key=key, Body=data, ContentType=content_type)
 
     def get(self, key: str) -> bytes:
         try:
@@ -83,6 +95,9 @@ class S3StorageProvider:
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
                 raise ObjectNotFoundError(key) from exc
+            raise StorageError(f"could not read {key}: {exc}") from exc
+        except BotoCoreError as exc:
+            # Unreachable endpoint, timeout: a storage failure like any other.
             raise StorageError(f"could not read {key}: {exc}") from exc
         body: bytes = response["Body"].read()
         return body

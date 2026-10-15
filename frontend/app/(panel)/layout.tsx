@@ -22,8 +22,10 @@ import { TrialBanner } from "@/components/trial-banner";
 import {
   BookIcon,
   BoxIcon,
+  ChartIcon,
   ChatIcon,
   HomeIcon,
+  InboxIcon,
   LogOutIcon,
   PhoneIcon,
   ReceiptIcon,
@@ -49,12 +51,19 @@ const NAV: NavItem[] = [
   { href: "/", label: "Inicio", icon: HomeIcon, primary: true },
   // Every role: confirming a payment is exactly the work an operator is here for.
   { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
-  { href: "/onboarding", label: "Configuración", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  // Every role: answering customers is the operator's job (Feature 007).
+  { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
+  // Every role (Feature 010); an operator sees it without money.
+  { href: "/resultados", label: "Resultados", icon: ChartIcon },
+  { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  { href: "/onboarding", label: "Configuración inicial", icon: SparkIcon, roles: MANAGES_CONFIGURATION },
   { href: "/sandbox", label: "Modo prueba", icon: ChatIcon, primary: true },
-  { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION },
   { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
   { href: "/knowledge", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
   { href: "/team", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },
+  // Feature 009: money is for the owner and the admins; operators work the inbox.
+  { href: "/plans", label: "Mi plan", icon: ReceiptIcon, roles: MANAGES_CONFIGURATION },
 ];
 
 function visibleTo(role: Role | null): NavItem[] {
@@ -208,14 +217,26 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
                 </p>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => void signOut()}
-              className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-ink-soft hover:bg-surface-muted"
-              aria-label="Cerrar sesión"
-            >
-              <LogOutIcon className="size-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* The sidebar holds this link on a computer; a platform operator on a
+               * phone had no way to reach the queue. */}
+              {isPlatformAdmin ? (
+                <Link
+                  href="/admin"
+                  className="flex min-h-11 items-center rounded-lg bg-brand px-3 text-xs font-semibold text-brand-fg"
+                >
+                  Panel de operación
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-ink-soft hover:bg-surface-muted"
+                aria-label="Cerrar sesión"
+              >
+                <LogOutIcon className="size-5" />
+              </button>
+            </div>
           </header>
 
           <main

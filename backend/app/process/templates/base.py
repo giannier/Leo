@@ -7,7 +7,10 @@
 A template is code, not data (C-05): the order of the stages, their conditions,
 the tools each one enables and the funnel column it maps to are versioned here
 and reviewed in a PR. A tenant customises only the *options* (which the template
-validates) and the *instruction text* of each stage (stored as an override).
+validates). The instruction texts below are the source of the catalogue's
+`proceso v1` (017, TASK-460): at run time the stage text comes from the
+published version in the database, as rules a business can switch off, and these
+texts are only the fallback when nothing is published.
 
 This module holds the pieces every template shares: the stage vocabulary, the
 tool vocabulary, the default texts that apply to all templates (`[base]` in
@@ -99,7 +102,8 @@ _TOOLS_BY_STAGE: Mapping[Stage, tuple[str, ...]] = MappingProxyType(
         Stage.DERIVADO: (),
     }
 )
-_VERIFICATION_TOOLS_IF_REJECTED = ("enviar_metodos_pago", "gestionar_pedido")
+# With the search: to add something the model needs its producto_id (Milestone B run).
+_VERIFICATION_TOOLS_IF_REJECTED = ("enviar_metodos_pago", "gestionar_pedido", "buscar_productos")
 
 # ------------------------------------------------------------------- funnel
 
@@ -168,7 +172,7 @@ Es tu primer mensaje en esta conversación.
 
 CALIFICAR_BASE = """\
 Necesitas saber qué busca el cliente para llevarlo por el camino correcto.
-- Si aún no sabes su nombre, pídelo y te detienes.
+- Si aún no sabes su nombre, pídelo. Si en ese mismo mensaje ya dijo qué busca o hizo una pregunta, primero registra el camino con elegir_camino y responde su pregunta: nunca condiciones una respuesta a que te dé su nombre.
 - Con el nombre, llama a mostrar_opciones(tipo="caminos") con este texto, personalizado con su nombre:
   "{pregunta_calificacion}"
 - Si responde ESCRIBIENDO en vez de tocar un botón, llama a elegir_camino con la opción que corresponda:
@@ -178,7 +182,7 @@ Necesitas saber qué busca el cliente para llevarlo por el camino correcto.
 ANUNCIO_BASE = """\
 El cliente llegó por un anuncio y YA vio la oferta (está en el ESTADO). No hagas preguntas de calificación
 ni le muestres el catálogo desde cero.
-- Si no sabes su nombre, pídelo y te detienes.
+- Si no sabes su nombre, pídelo, pero en el mismo mensaje ve a lo anunciado: nunca condiciones la información a que te dé su nombre.
 - Ve directo a lo anunciado: búscalo con buscar_productos, muéstralo y envía el recurso del producto si existe.
 - Si lo anunciado corresponde a un camino, llama a elegir_camino en este mismo turno.
 - Si dice que lo quiere, agrégalo con gestionar_pedido."""
@@ -215,7 +219,9 @@ VERIFICACION_BASE = """\
   anotado lo que pide con gestionar_pedido(accion="solicitar_cambio", nota=...). El negocio lo verá al revisar.
 - Si el pago fue rechazado: el ESTADO trae el motivo. Explícaselo con amabilidad y ayúdalo a corregirlo:
   nueva foto, nuevo pago (puedes reenviar los métodos de pago una vez), o un cambio en el pedido o en sus
-  datos con gestionar_pedido o registrar_datos_cliente. Si no se resuelve, usa derivar_a_humano.
+  datos con gestionar_pedido o registrar_datos_cliente. Con el pago rechazado el pedido sí se puede
+  cambiar: hazlo en el mismo turno (búscalo con buscar_productos y usa agregar, quitar o cambiar_cantidad;
+  nunca solicitar_cambio), sin preguntarle si quiere que lo hagas. Si no se resuelve, usa derivar_a_humano.
 - Dudas generales (tiempos, entrega): respóndelas con consultar_conocimiento. No vuelvas a vender."""
 
 CERRADO_BASE = """\

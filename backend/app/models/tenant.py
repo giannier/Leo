@@ -68,8 +68,10 @@ CASH_ORDER = "pedido_contra_entrega"
 HANDOFF = "derivacion"
 CUSTOMER_UNREACHED = "ventana_cerrada"
 LLM_DOWN = "llm_caido"
+# Feature 007: a handover nobody took within the business's minutes.
+UNATTENDED = "derivacion_sin_atender"
 
-EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN)
+EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN, UNATTENDED)
 
 NOTIFICATION_KINDS = (*ONE_SHOT_KINDS, *EVENT_KINDS)
 
@@ -182,6 +184,13 @@ class TenantUser(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     role: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    # The reviewer permission (017, C-09): approves what the assistant learns and
+    # sees the catalogue's news. The owner always has it (`can_review`).
+    puede_revisar: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+
+    @property
+    def can_review(self) -> bool:
+        return self.role == "owner" or self.puede_revisar
 
 
 class Invitation(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):

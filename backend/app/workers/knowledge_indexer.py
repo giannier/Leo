@@ -20,15 +20,17 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.models.knowledge import KnowledgeSource
-from app.providers.llm.base import LLMError, LLMProvider
-from app.providers.pdf.base import PdfError, PdfTextExtractor
+from app.providers.llm.base import DocumentReader, LLMError, LLMProvider
+from app.providers.pdf.base import PdfError, PdfPages, PdfTextExtractor
 from app.providers.storage.base import StorageError, StorageProvider
+from app.providers.web.base import WebFetcher
 from app.repositories.knowledge import (
     STATUS_FAILED,
     STATUS_INDEXED,
@@ -36,9 +38,11 @@ from app.repositories.knowledge import (
     KnowledgeSourceRepository,
 )
 from app.repositories.tenant import TenantRepository
-from app.services.chunking import chunk_text
-from app.services.knowledge import PDF_TYPE, KnowledgeError, KnowledgeService
+from app.services.chunking import chunk_text, dedupe
+from app.services.knowledge import PDF_TYPE, WEB_TYPE, KnowledgeError, KnowledgeService
+from app.services.ocr import pages_to_read, read_scanned_pages
 from app.services.trial import billing_enforced
+from app.services.web_crawl import EMPTY_SITE, crawl
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,7 @@ EMPTY_TEXT_MESSAGE = "This source contains no text to index. Add content and upl
 NO_CHUNKS_MESSAGE = (
     "The text could not be split into anything indexable. Check the document's content."
 )
+KEPT_PREVIOUS = "El asistente sigue usando la versión anterior."
 UNEXPECTED_MESSAGE = (
     "Indexing failed unexpectedly. The platform has been notified; try uploading again."
 )
@@ -75,6 +80,27 @@ class _ExtractionFailure:
     """No usable text, and the sentence explaining that to the tenant."""
 
     reason: str
+    report: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class _Extracted:
+    """The text to index, and what the panel should know about how it was read."""
+
+    text: str
+    report: dict[str, Any] | None = None
+
+
+# A scanned PDF (Feature 006, TASK-602).
+PAGE_SEPARATOR = "\n\n"
+SCANNED_WITHOUT_OCR = (
+    "Este PDF es escaneado (las páginas son imágenes) y ahora no se puede leer con el modelo. "
+    "Sube un PDF con texto o pega el contenido como texto."
+)
+SCANNED_ILLEGIBLE = (
+    "No pudimos leer ninguna página de este PDF escaneado. Prueba con una copia más nítida "
+    "o pega el contenido como texto."
+)
 
 
 async def index_source(
@@ -86,6 +112,7 @@ async def index_source(
     storage: StorageProvider,
     pdf_extractor: PdfTextExtractor,
     settings: Settings | None = None,
+    web_fetcher: WebFetcher | None = None,
 ) -> IndexingOutcome:
     """Extract, chunk, embed and store one knowledge source.
 
@@ -117,11 +144,20 @@ async def index_source(
     session.commit()
 
     try:
-        extracted = _extract(source, storage=storage, pdf_extractor=pdf_extractor)
+        extracted = await _extract(
+            source,
+            storage=storage,
+            pdf_extractor=pdf_extractor,
+            llm=llm,
+            settings=settings,
+            web_fetcher=web_fetcher,
+        )
+        source.report = extracted.report
+        session.flush()
         if isinstance(extracted, _ExtractionFailure):
             return _fail(session, sources, source_id, extracted.reason)
         return await _index_extracted_text(
-            session, tenant_id, source_id, extracted, llm=llm, settings=settings
+            session, tenant_id, source_id, extracted.text, llm=llm, settings=settings
         )
     except Exception:
         # The source has already been moved to `indexing`. Letting anything
@@ -135,16 +171,22 @@ async def index_source(
         return _fail(session, sources, source_id, UNEXPECTED_MESSAGE)
 
 
-def _extract(
+async def _extract(
     source: KnowledgeSource,
     *,
     storage: StorageProvider,
     pdf_extractor: PdfTextExtractor,
-) -> str | _ExtractionFailure:
+    llm: LLMProvider,
+    settings: Settings,
+    web_fetcher: WebFetcher | None = None,
+) -> _Extracted | _ExtractionFailure:
     """Get the source's text, or the reason there is none."""
+    if source.type == WEB_TYPE:
+        return await _extract_site(source, web_fetcher, settings)
+
     if source.type != PDF_TYPE:
         content = (source.content or "").strip()
-        return content if content else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+        return _Extracted(content) if content else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
 
     if not source.file_key:
         return _ExtractionFailure("The uploaded file is missing from storage.")
@@ -155,6 +197,9 @@ def _extract(
         logger.exception("could not read a knowledge PDF from storage")
         return _ExtractionFailure(f"The uploaded file could not be read from storage: {exc}")
 
+    if isinstance(pdf_extractor, PdfPages):
+        return await _extract_pages(data, pages=pdf_extractor, llm=llm, settings=settings)
+
     try:
         text = pdf_extractor.extract_text(data)
     except PdfError as exc:
@@ -163,7 +208,54 @@ def _extract(
         return _ExtractionFailure(str(exc))
 
     stripped = text.strip()
-    return stripped if stripped else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+    return _Extracted(stripped) if stripped else _ExtractionFailure(EMPTY_TEXT_MESSAGE)
+
+
+async def _extract_site(
+    source: KnowledgeSource, fetcher: WebFetcher | None, settings: Settings
+) -> _Extracted | _ExtractionFailure:
+    """Crawl the business's website (Feature 006, HU-02); the text is kept on the source."""
+    if fetcher is None or not source.source_url:
+        return _ExtractionFailure("No se pudo leer la web: el lector no está disponible.")
+    result = await crawl(fetcher, source.source_url, max_pages=settings.knowledge_web_max_pages)
+    report = result.report()
+    if result.error:
+        return _ExtractionFailure(result.error, report)
+    text = result.text().strip()
+    if not text:
+        return _ExtractionFailure(EMPTY_SITE, report)
+    # Kept so the panel can show what was read, and the chunks can be regenerated.
+    source.content = text
+    source.crawled_at = datetime.now(UTC)
+    return _Extracted(text, report)
+
+
+async def _extract_pages(
+    data: bytes, *, pages: PdfPages, llm: LLMProvider, settings: Settings
+) -> _Extracted | _ExtractionFailure:
+    """Page by page: the text layer where there is one, the vision model where there is not."""
+    try:
+        texts = pages.page_texts(data)
+    except PdfError as exc:
+        return _ExtractionFailure(str(exc))
+
+    scanned = pages_to_read(texts, settings)
+    report: dict[str, Any] | None = None
+    if scanned:
+        if isinstance(llm, DocumentReader) and settings.vision_enabled:
+            outcome = await read_scanned_pages(
+                data, texts, pages=pages, reader=llm, settings=settings
+            )
+            texts, report = outcome.texts, outcome.report()
+            if not any(text.strip() for text in texts):
+                return _ExtractionFailure(SCANNED_ILLEGIBLE, report)
+        else:
+            report = {"ocr": {"paginas": len(texts), "sin_leer": [i + 1 for i in scanned]}}
+
+    text = PAGE_SEPARATOR.join(t.strip() for t in texts if t.strip())
+    if not text:
+        return _ExtractionFailure(SCANNED_WITHOUT_OCR, report)
+    return _Extracted(text, report)
 
 
 async def _index_extracted_text(
@@ -182,10 +274,14 @@ async def _index_extracted_text(
     if refusal is not None:
         return _fail(session, sources, source_id, refusal)
 
-    chunks = chunk_text(
-        text,
-        max_chars=settings.knowledge_chunk_chars,
-        overlap=settings.knowledge_chunk_overlap_chars,
+    # A repeated block (a footer on every page, the same FAQ pasted twice) is
+    # embedded once (Feature 006, RF-003).
+    chunks = dedupe(
+        chunk_text(
+            text,
+            max_chars=settings.knowledge_chunk_chars,
+            overlap=settings.knowledge_chunk_overlap_chars,
+        )
     )
     if not chunks:  # pragma: no cover - non-empty text always yields a chunk
         return _fail(session, sources, source_id, NO_CHUNKS_MESSAGE)
@@ -298,7 +394,13 @@ def _fail(
     source_id: uuid.UUID,
     reason: str,
 ) -> IndexingOutcome:
-    """Record a terminal failure with its reason, and commit it."""
+    """Record a terminal failure with its reason, and commit it.
+
+    A source that was already indexed (an edit, a re-read website) keeps its old
+    chunks: the agent goes on with the previous version, and the reason says so.
+    """
+    if KnowledgeChunkRepository(session, sources.tenant_id).count_for_source(source_id):
+        reason = f"{reason} {KEPT_PREVIOUS}"
     sources.mark_failed(source_id, reason)
     session.commit()
     logger.warning(
@@ -328,5 +430,6 @@ async def index_knowledge_source(ctx: dict[str, Any], tenant_id: str, source_id:
             storage=ctx["storage"],
             pdf_extractor=ctx["pdf_extractor"],
             settings=ctx.get("settings"),
+            web_fetcher=ctx.get("web_fetcher"),
         )
     return outcome.status

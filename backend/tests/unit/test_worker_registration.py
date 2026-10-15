@@ -10,14 +10,25 @@ from __future__ import annotations
 from arq.worker import Worker
 
 from app.core.config import get_settings
+from app.services.catalog_evals import EVALS_JOB
+from app.services.catalog_knowledge import INDEX_CATALOG_JOB
 from app.services.knowledge import INDEX_JOB
+from app.services.situations import EMBED_JOB
 from app.workers.channel import ANSWER_JOB, PROCESS_EVENT_JOB
 from app.workers.settings import WorkerSettings
 
 # Every name anything enqueues by - the API, or a worker booking follow-up
 # work for itself. Adding a job means adding it here, which is the point: the
 # list is the contract between processes that never import each other.
-ENQUEUED_BY_THE_API = {INDEX_JOB, PROCESS_EVENT_JOB, ANSWER_JOB}
+# INDEX_CATALOG_JOB: the platform panel, when it publishes a rubro version.
+ENQUEUED_BY_THE_API = {
+    INDEX_JOB,
+    PROCESS_EVENT_JOB,
+    ANSWER_JOB,
+    INDEX_CATALOG_JOB,
+    EMBED_JOB,
+    EVALS_JOB,
+}
 
 
 def _registered_names() -> set[str]:

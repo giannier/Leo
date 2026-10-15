@@ -27,6 +27,7 @@ from app.agent.prompts.stage import (
     estimate_tokens,
     resolve_placeholders,
 )
+from app.agent.situations import SelectedSituation
 from app.models.sales_config import Promotion
 from app.process.facts import (
     Derivado,
@@ -123,6 +124,35 @@ def _info(*, full: bool = False) -> BusinessInfoView:
     )
 
 
+RUBRO_RULES = [
+    "Habla como un asesor académico, no como un vendedor de tienda: el cliente invierte en su "
+    "formación o en certificar su experiencia.",
+    'Di certificado, curso, programa, tema o modalidad; evita "producto", "stock" o "carrito".',
+    "Si pregunta para qué sirve, explica el valor del certificado con la información del negocio, "
+    "sin prometer convalidaciones que no estén en ella.",
+    "Nunca digas que un certificado tiene validez oficial, acreditación o horas que no estén en el "
+    "catálogo o en el conocimiento del negocio.",
+    "Si pregunta por modalidad, fechas u horarios, respóndelo con consultar_conocimiento; si no "
+    "está, deriva sin inventarlo.",
+]
+
+
+def long_situations(n: int = 5) -> list[SelectedSituation]:
+    return [
+        SelectedSituation(
+            id=uuid.uuid4(),
+            titulo=f"Situación larga {i}",
+            cuando_aplica="Cuando el cliente pregunta algo muy específico " * 6,
+            que_hace="Responde con calma y detalle, paso por paso. " * 22,
+            claves=("malla",),
+            derivar=True,
+            ejemplo_respuesta="Claro, te explico con gusto. " * 20,
+            siempre=i == 0,
+        )
+        for i in range(n)
+    ]
+
+
 def make_config(
     template_key: str = "productos",
     *,
@@ -146,8 +176,10 @@ def make_config(
             tone="cercano",
             ritmo="equilibrado",
             detalle="moderado",
-            reglas_adicionales=("No ofrecer cuotas. " * 120) if full else "No ofrecer cuotas.",
+            tratamiento="usted" if full else "tu",
+            saludo="¡Bienvenido a Escuela Capacita!" if full else None,
         ),
+        "rubro_rules": tuple(RUBRO_RULES) if full else (),
         "business_name": "Escuela Capacita",
         "business_description": ("Certificaciones y cursos para el sector público. " * 12)
         if full
@@ -322,9 +354,9 @@ def test_a_full_business_stays_under_6000_tokens_in_every_stage(
     template_key: str, stage: Stage
 ) -> None:
     config = make_config(template_key, full=True)
-    prompt = build_stage_prompt(config, full_facts(), stage, now=NOW)
+    prompt = build_stage_prompt(config, full_facts(), stage, now=NOW, situations=long_situations())
 
-    for name in ("plataforma", "estilo", "negocio", "estado", "etapa"):
+    for name in ("plataforma", "estilo", "negocio", "estado", "etapa", "rubro", "situaciones"):
         assert prompt.sections[name] <= SECTION_CAPS[name], f"{name}: {prompt.sections[name]}"
     # What the registry's tool definitions may add on top.
     assert prompt.tokens + TOOLS_ALLOWANCE <= TOKEN_LIMIT
@@ -359,12 +391,50 @@ def test_the_business_section_drops_the_least_useful_lines_when_it_is_too_long()
     assert "Métodos de pago" in prompt.text
 
 
-def test_long_additional_rules_are_cut_to_the_style_budget() -> None:
-    prompt = build_stage_prompt(make_config(full=True), Facts(), Stage.IDENTIFICAR, now=NOW)
+def test_five_long_situations_are_cut_to_their_share_and_keep_every_title() -> None:
+    prompt = build_stage_prompt(
+        make_config(full=True), Facts(), Stage.IDENTIFICAR, now=NOW, situations=long_situations()
+    )
 
-    assert prompt.sections["estilo"] <= SECTION_CAPS["estilo"]
-    assert "Reglas adicionales del dueño: No ofrecer cuotas." in prompt.text
+    assert prompt.sections["situaciones"] <= SECTION_CAPS["situaciones"]
+    for i in range(5):
+        assert f"«Situación larga {i}»" in prompt.text
     assert "…" in prompt.text
+
+
+def test_the_layers_go_from_the_least_to_the_most_specific() -> None:
+    situation = long_situations(1)[0]
+    text = build_stage_prompt(
+        make_config(full=True), Facts(), Stage.COBRO, now=NOW, situations=[situation]
+    ).text
+
+    order = [
+        text.index("PROCESO: INSTRUCCIONES DE LA ETAPA"),
+        text.index("\nRUBRO"),
+        text.index("\nNEGOCIO"),
+        text.index("SITUACIONES DEL NEGOCIO"),
+        text.index("PRIORIDAD:"),
+    ]
+    assert order == sorted(order)
+    assert "Envía con enviar_recurso: malla" in text
+    assert "usa derivar_a_humano" in text
+
+
+def test_the_priority_line_is_there_even_without_situations() -> None:
+    text = build_stage_prompt(make_config(), Facts(), Stage.COBRO, now=NOW).text
+
+    assert "SITUACIONES DEL NEGOCIO" not in text
+    assert text.rstrip().endswith("nunca se rompen.")
+
+
+def test_the_style_says_how_to_address_the_customer() -> None:
+    plain = build_stage_prompt(make_config(), Facts(), Stage.INICIO, now=NOW).text
+    full = build_stage_prompt(make_config(full=True), Facts(), Stage.INICIO, now=NOW).text
+
+    assert "Trata al cliente de tú." in plain
+    assert "Trata al cliente de usted en TODA la respuesta" in full
+    assert "nunca de tú" in full
+    assert "«¡Bienvenido a Escuela Capacita!»" in full
 
 
 def test_estimate_tokens() -> None:
@@ -672,7 +742,7 @@ def test_the_closing_promotion_is_shown_where_the_customer_weighs_the_price(stag
     facts = Facts(promos_cierre=[PromoCierre(id="1", nombre="Cupón 20 %", vigencia_horas=24)])
 
     assert (
-        '- Promoción de cierre disponible (solo si duda): "Cupón 20 %"'
+        '- Promoción de cierre disponible (solo si duda): "Cupón 20 %" (promocion_id=1)'
         " · vale 24 h desde que se ofrece · no ofrecida"
     ) in _prompt(stage, facts)
 
@@ -728,6 +798,15 @@ def test_advisory_handover_is_stated_in_the_words_the_stage_text_checks() -> Non
             Facts(motivo_rechazo="falta la dirección"),
             "- Pago: — (el negocio rechazó antes: falta la dirección)",
         ),
+        (
+            Facts(modalidad_pago="contra_entrega"),
+            "- Pago: contra entrega: resume el pedido y pídele que lo confirme; no hay métodos "
+            "de pago que enviar",
+        ),
+        (
+            Facts(modalidad_pago="contra_entrega", motivo_rechazo="falta la dirección"),
+            "que enviar (el negocio rechazó antes: falta la dirección)",
+        ),
     ],
 )
 def test_the_payment_line(facts: Facts, line: str) -> None:
@@ -764,7 +843,8 @@ def test_without_turn_context_there_is_no_this_turn_block() -> None:
 def test_the_current_stage_ends_the_state_block_and_its_instructions_follow() -> None:
     text = _prompt(Stage.DATOS, Facts(datos_faltantes=["dni"]))
 
-    assert "ETAPA ACTUAL: DATOS\n\nINSTRUCCIONES DE LA ETAPA\nEl pedido está completo." in text
+    expected = "ETAPA ACTUAL: DATOS\n\nPROCESO: INSTRUCCIONES DE LA ETAPA\nEl pedido está completo."
+    assert expected in text
 
 
 def test_an_unknown_time_zone_does_not_break_the_state_block() -> None:

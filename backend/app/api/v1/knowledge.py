@@ -7,6 +7,14 @@ Implements the `§Conocimiento` section of
     POST   /tenant/knowledge       202, indexing continues in a worker
     DELETE /tenant/knowledge/{id}  204, chunks removed with it
 
+Feature 006 adds:
+
+    GET    /tenant/knowledge/{id}         one source, with its text when it has one
+    PATCH  /tenant/knowledge/{id}         title, priority, text (re-indexed)
+    POST   /tenant/knowledge/{id}/resync  process again (re-read the website, retry)
+    GET    /tenant/knowledge/{id}/chunks  what the agent can retrieve from it
+    POST   /tenant/knowledge/web          202, crawl the business's website
+
 `POST` accepts two content types on one path, as the contract specifies:
 JSON for `faq`/`policy`/`text`, and `multipart/form-data` for a PDF. FastAPI
 cannot declare two request bodies for one operation, so the body is read from
@@ -30,7 +38,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Request, status
-from pydantic import BaseModel, StringConstraints, ValidationError
+from pydantic import BaseModel, Field, StringConstraints, ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -52,9 +60,11 @@ from app.services.knowledge import (
     PdfTooLargeError,
     PlanUnavailableError,
     RagLimitExceededError,
+    SourceBusyError,
     SourceNotFoundError,
     UnsupportedSourceTypeError,
 )
+from app.services.web_crawl import InvalidSiteUrlError
 
 router = APIRouter(prefix="/tenant/knowledge", tags=["knowledge"])
 
@@ -107,6 +117,31 @@ class KnowledgeSourceResponse(BaseModel):
     # Populated when `status` is `failed`; the sentence shown to the tenant.
     error_msg: str | None = None
     created_at: datetime
+    # Feature 006.
+    priority: int = 100
+    source_url: str | None = None
+    crawled_at: datetime | None = None
+    report: dict[str, Any] | None = None
+
+
+class KnowledgeSourceDetail(KnowledgeSourceResponse):
+    # The text of a faq/policy/text source (what the edit form starts from).
+    content: str | None = None
+
+
+class UpdateSourceRequest(BaseModel):
+    title: TitleText | None = None
+    content: BodyText | None = None
+    priority: int | None = Field(default=None, ge=0, le=100)
+
+
+class WebSourceRequest(BaseModel):
+    url: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+    title: TitleText | None = None
+
+
+class ChunkList(BaseModel):
+    chunks: list[str]
 
 
 class KnowledgeListResponse(BaseModel):
@@ -174,18 +209,7 @@ async def list_knowledge(session: SessionDep, principal: MemberDep) -> Knowledge
         raise _plan_unavailable(exc) from exc
 
     return KnowledgeListResponse(
-        sources=[
-            KnowledgeSourceResponse(
-                id=source.id,
-                type=source.type,
-                title=source.title,
-                status=source.status,
-                char_count=source.char_count,
-                error_msg=source.error_msg,
-                created_at=source.created_at,
-            )
-            for source in service.list_sources()
-        ],
+        sources=[_source(source) for source in service.list_sources()],
         usage=_usage_response(usage),
     )
 
@@ -305,7 +329,195 @@ async def delete_knowledge_source(
         ) from exc
 
 
+@router.post(
+    "/web",
+    response_model=CreateSourceResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Read the business's website into the knowledge base",
+    responses=error_responses(
+        (400, "`invalid_url`"),
+        _UNAUTHENTICATED,
+        _NOT_ALLOWED,
+        (413, "`rag_limit_exceeded`"),
+        (503, "`indexing_unavailable` or `plan_unavailable`"),
+    ),
+)
+async def create_web_source(
+    body: WebSourceRequest,
+    session: SessionDep,
+    principal: ConfigurationManagerDep,
+    queue: QueueDep,
+) -> CreateSourceResponse:
+    """Up to 20 pages of the same site, read by the worker (006, HU-02)."""
+    service = KnowledgeService(session, principal.tenant_id, queue=queue)
+    try:
+        result = await service.ingest_web(url=body.url, title=body.title)
+    except InvalidSiteUrlError as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="invalid_url",
+            message=str(exc),
+            fields={"url": str(exc)},
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - mapped below, re-raised otherwise
+        raise _knowledge_error(exc) from exc
+    return CreateSourceResponse(id=result.id, status=result.status)
+
+
+@router.get(
+    "/{source_id}",
+    response_model=KnowledgeSourceDetail,
+    summary="One knowledge source, with its text",
+    responses=error_responses(_UNAUTHENTICATED, _NOT_A_MEMBER, (404, "`not_found`")),
+)
+async def get_knowledge_source(
+    source_id: uuid.UUID, session: SessionDep, principal: MemberDep
+) -> KnowledgeSourceDetail:
+    service = KnowledgeService(session, principal.tenant_id)
+    found = next((s for s in service.list_sources() if s.id == source_id), None)
+    if found is None:
+        raise _not_found()
+    return KnowledgeSourceDetail(
+        **_source(found).model_dump(),
+        content=found.content if found.type in ("faq", "policy", "text") else None,
+    )
+
+
+@router.patch(
+    "/{source_id}",
+    response_model=KnowledgeSourceResponse,
+    summary="Change a source's title, priority or text (new text is re-indexed)",
+    responses=error_responses(
+        (400, "`validation_error`"),
+        _UNAUTHENTICATED,
+        _NOT_ALLOWED,
+        (404, "`not_found`"),
+        (409, "`source_busy`: it is being indexed right now"),
+        (413, "`rag_limit_exceeded`"),
+        (503, "`indexing_unavailable`"),
+    ),
+)
+async def update_knowledge_source(
+    source_id: uuid.UUID,
+    body: UpdateSourceRequest,
+    session: SessionDep,
+    principal: ConfigurationManagerDep,
+    queue: QueueDep,
+) -> KnowledgeSourceResponse:
+    """The old text keeps answering until the new one is indexed (006, HU-03)."""
+    service = KnowledgeService(session, principal.tenant_id, queue=queue)
+    try:
+        source = await service.update(
+            source_id, title=body.title, content=body.content, priority=body.priority
+        )
+    except Exception as exc:  # noqa: BLE001 - mapped below, re-raised otherwise
+        raise _knowledge_error(exc) from exc
+    return _source(source)
+
+
+@router.post(
+    "/{source_id}/resync",
+    response_model=KnowledgeSourceResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Process a source again: re-read the website, retry a failed document",
+    responses=error_responses(
+        _UNAUTHENTICATED,
+        _NOT_ALLOWED,
+        (404, "`not_found`"),
+        (409, "`source_busy`"),
+        (503, "`indexing_unavailable`"),
+    ),
+)
+async def resync_knowledge_source(
+    source_id: uuid.UUID,
+    session: SessionDep,
+    principal: ConfigurationManagerDep,
+    queue: QueueDep,
+) -> KnowledgeSourceResponse:
+    """Manual only (006 C-002): nothing re-reads a website on its own."""
+    service = KnowledgeService(session, principal.tenant_id, queue=queue)
+    try:
+        source = await service.reindex(source_id)
+    except Exception as exc:  # noqa: BLE001 - mapped below, re-raised otherwise
+        raise _knowledge_error(exc) from exc
+    return _source(source)
+
+
+@router.get(
+    "/{source_id}/chunks",
+    response_model=ChunkList,
+    summary="The passages the agent can retrieve from one source",
+    responses=error_responses(_UNAUTHENTICATED, _NOT_ALLOWED, (404, "`not_found`")),
+)
+async def knowledge_source_chunks(
+    source_id: uuid.UUID, session: SessionDep, principal: ConfigurationManagerDep
+) -> ChunkList:
+    """A debugging view for whoever configures the agent (006 plan)."""
+    try:
+        return ChunkList(
+            chunks=list(KnowledgeService(session, principal.tenant_id).chunks(source_id))
+        )
+    except SourceNotFoundError as exc:
+        raise _not_found() from exc
+
+
 # ---------------------------------------------------------------- internals
+
+
+def _source(source: Any) -> KnowledgeSourceResponse:
+    return KnowledgeSourceResponse(
+        id=source.id,
+        type=source.type,
+        title=source.title,
+        status=source.status,
+        char_count=source.char_count,
+        error_msg=source.error_msg,
+        created_at=source.created_at,
+        priority=source.priority,
+        source_url=source.source_url,
+        crawled_at=source.crawled_at,
+        report=source.report,
+    )
+
+
+def _not_found() -> ApiError:
+    return ApiError(
+        status_code=status.HTTP_404_NOT_FOUND,
+        error="not_found",
+        message="No knowledge source with that id.",
+    )
+
+
+def _knowledge_error(exc: Exception) -> Exception:
+    """The service's errors as the API's envelope; anything else unchanged."""
+    if isinstance(exc, SourceNotFoundError):
+        return _not_found()
+    if isinstance(exc, SourceBusyError):
+        return ApiError(
+            status_code=status.HTTP_409_CONFLICT,
+            error="source_busy",
+            message="Esta fuente se está procesando. Intenta de nuevo en unos segundos.",
+        )
+    if isinstance(exc, (UnsupportedSourceTypeError, EmptyContentError)):
+        return ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST, error=VALIDATION_ERROR, message=str(exc)
+        )
+    if isinstance(exc, RagLimitExceededError):
+        return ApiError(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            error="rag_limit_exceeded",
+            message=exc.message,
+            fields=exc.usage.as_fields(),
+        )
+    if isinstance(exc, PlanUnavailableError):
+        return _plan_unavailable(exc)
+    if isinstance(exc, IndexingUnavailableError):
+        return ApiError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            error="indexing_unavailable",
+            message=str(exc),
+        )
+    return exc
 
 
 async def _ingest_json(request: Request, service: KnowledgeService) -> Any:

@@ -114,6 +114,21 @@ class ToolResult:
         return "\n".join(lines)
 
 
+@dataclass
+class TurnEnding:
+    """Set by a tool that closes the turn (`derivar_a_humano`, TASK-443).
+
+    `reply` is what the customer receives instead of the model's next words: the
+    turn stops right after the tool, so the model never writes after a handover.
+    """
+
+    reply: str | None = None
+
+    @property
+    def ended(self) -> bool:
+        return self.reply is not None
+
+
 @dataclass(frozen=True)
 class ToolContext:
     """Everything a handler may touch, already scoped to one tenant."""
@@ -153,6 +168,11 @@ class ToolContext:
     # Where the business is told that something waits for a person (a cash-on-delivery
     # order, TASK-431). None in the simulator and wherever nobody is to be told.
     notices: OrderNotices | None = None
+    # The published rubro version whose FAQs and objections `consultar_conocimiento`
+    # also searches (017, TASK-461). None: no rubro, or none published.
+    rubro_version_id: uuid.UUID | None = None
+    # A tool that ends the turn writes here; the agent loop stops after it.
+    ending: TurnEnding = field(default_factory=TurnEnding)
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult]]

@@ -213,3 +213,45 @@ class TestOpenAIAdapter:
             await provider.read_image(
                 PHOTO, "image/png", instruction="read", schema=SCHEMA, timeout_seconds=8.0
             )
+
+
+class TestOpenAIDocumentReading:
+    """Feature 006: a scanned PDF page travels as a file part, with its own token cap."""
+
+    async def test_the_page_travels_inline_as_a_pdf_file(self) -> None:
+        seen: dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["body"] = json.loads(request.content)
+            answer = {
+                "model": "vision-1",
+                "choices": [{"message": {"content": json.dumps({"legible": True, "texto": "x"})}}],
+                "usage": {"prompt_tokens": 1100, "completion_tokens": 90},
+            }
+            return httpx.Response(200, json=answer)
+
+        provider = OpenAICompatibleProvider(
+            api_key="k" * 30,
+            base_url="https://llm.test/v1",
+            chat_model="chat-1",
+            embedding_model="emb-1",
+            vision_model="vision-1",
+            max_tokens_field="max_completion_tokens",
+            transport=httpx.MockTransport(handler),
+        )
+
+        reading = await provider.read_document(
+            b"%PDF-1.4 page",
+            instruction="transcribe",
+            schema={"type": "object"},
+            timeout_seconds=90.0,
+            max_tokens=2500,
+        )
+
+        body = seen["body"]
+        assert body["model"] == "vision-1" and body["max_completion_tokens"] == 2500
+        part = body["messages"][0]["content"][1]
+        assert part["type"] == "file"
+        assert part["file"]["file_data"].startswith("data:application/pdf;base64,")
+        assert reading.data == {"legible": True, "texto": "x"}
+        assert (reading.input_tokens, reading.output_tokens) == (1100, 90)

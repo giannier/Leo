@@ -8,9 +8,11 @@ from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, func, select, update
+from sqlalchemy.orm import aliased
 
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.repositories.base import BaseRepository, TenantScopeError
+from app.services.chunking import content_hash
 
 # Statuses a source may be claimed from. `failed` is included so a retry
 # after a transient provider outage is an ordinary re-enqueue rather than a
@@ -162,13 +164,44 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
         The tenant filter is applied before ordering, so another tenant's
         chunk can never win the ranking - the reason this must live in a
         repository rather than in an ad-hoc query at the call site.
+
+        "Before" has to be enforced, not hoped for. Given `ORDER BY distance
+        LIMIT n`, Postgres picks the HNSW index once the table is big enough,
+        and pgvector 0.6 then filters by tenant *after* the index returned its
+        ~40 nearest rows across every tenant: a business whose chunks are not
+        among them gets fewer results or none. The tenant's rows are therefore
+        selected in a `MATERIALIZED` CTE (through the `tenant_id` index) and
+        ranked exactly; a tenant holds thousands of chunks at most.
         """
+        own = self._scoped().cte("own_chunks").prefix_with("MATERIALIZED")
+        chunk = aliased(KnowledgeChunk, own)
+        statement = select(chunk).order_by(chunk.embedding.cosine_distance(embedding)).limit(limit)
+        return self._session.execute(statement).scalars().all()
+
+    def search_with_sources(
+        self, embedding: Sequence[float], *, limit: int
+    ) -> list[tuple[KnowledgeChunk, KnowledgeSource, float]]:
+        """`search`, with each chunk's source and its cosine distance (Feature 006).
+
+        Same shape as `search` (the tenant's rows first, in a materialised CTE),
+        joined to the live sources of the same tenant: the agent cites the source
+        and ranks by its priority.
+        """
+        own = self._scoped().cte("own_chunks").prefix_with("MATERIALIZED")
+        chunk = aliased(KnowledgeChunk, own)
+        distance = chunk.embedding.cosine_distance(embedding)
         statement = (
-            self._scoped()
-            .order_by(KnowledgeChunk.embedding.cosine_distance(embedding))
+            select(chunk, KnowledgeSource, distance)
+            .join(
+                KnowledgeSource,
+                (KnowledgeSource.id == chunk.source_id)
+                & (KnowledgeSource.tenant_id == self.tenant_id)
+                & KnowledgeSource.deleted_at.is_(None),
+            )
+            .order_by(distance)
             .limit(limit)
         )
-        return self._session.execute(statement).scalars().all()
+        return [(row[0], row[1], float(row[2])) for row in self._session.execute(statement).all()]
 
     def list_for_source(self, source_id: uuid.UUID) -> Sequence[KnowledgeChunk]:
         """Chunks of one source belonging to this tenant, oldest first."""
@@ -212,11 +245,19 @@ class KnowledgeChunkRepository(BaseRepository[KnowledgeChunk]):
             )
 
         self.delete_for_source(source_id)
+        seen: set[str] = set()
         for content, embedding in chunks:
+            digest = content_hash(content)
+            if digest in seen:
+                # One copy per source (unique index); the worker dedupes before
+                # embedding, so this only guards a caller that did not.
+                continue
+            seen.add(digest)
             self.add(
                 source_id=source_id,
                 content=content,
+                content_hash=digest,
                 embedding=list(embedding),
                 embedding_model=embedding_model,
             )
-        return len(chunks)
+        return len(seen)

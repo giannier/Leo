@@ -24,6 +24,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The inbox */
+        get: operations["list_inbox_api_v1_tenant_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One conversation's header */
+        get: operations["conversation_detail_api_v1_tenant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The thread, newest page first; opening it marks it read */
+        get: operations["conversation_thread_api_v1_tenant_conversations__conversation_id__messages_get"];
+        put?: never;
+        /** Write to the customer as the business */
+        post: operations["send_message_api_v1_tenant_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/messages/{message_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A signed link to an image the customer sent (10 minutes) */
+        get: operations["message_image_api_v1_tenant_conversations__conversation_id__messages__message_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/takeover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the conversation: the assistant stops at once */
+        post: operations["take_conversation_api_v1_tenant_conversations__conversation_id__takeover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give the conversation back to the assistant */
+        post: operations["release_conversation_api_v1_tenant_conversations__conversation_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/steal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take a conversation a colleague has (owner or admin) */
+        post: operations["steal_conversation_api_v1_tenant_conversations__conversation_id__steal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The team's internal notes */
+        get: operations["list_notes_api_v1_tenant_conversations__conversation_id__notes_get"];
+        put?: never;
+        /** Add an internal note (never sent to the customer) */
+        post: operations["add_note_api_v1_tenant_conversations__conversation_id__notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Close Conversation */
+        post: operations["close_conversation_api_v1_tenant_conversations__conversation_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen Conversation */
+        post: operations["reopen_conversation_api_v1_tenant_conversations__conversation_id__reopen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/opt-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Opt Out Contact */
+        post: operations["opt_out_contact_api_v1_tenant_conversations__conversation_id__opt_out_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/notification-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings__api_v1_tenant_notification_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenant_notification_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/agent/activate": {
         parameters: {
             query?: never;
@@ -62,6 +269,421 @@ export interface paths {
          *     saying something wrong, and that must never be blocked by a checklist.
          */
         post: operations["deactivate_agent_api_v1_tenant_agent_deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/situations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Situations */
+        get: operations["list_situations_api_v1_assistant_situations_get"];
+        put?: never;
+        /** Create Situation */
+        post: operations["create_situation_api_v1_assistant_situations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/situations/desde-sugerida/{suggested_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create From Suggested */
+        post: operations["create_from_suggested_api_v1_assistant_situations_desde_sugerida__suggested_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/situations/{situation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Situation */
+        get: operations["get_situation_api_v1_assistant_situations__situation_id__get"];
+        /** Update Situation */
+        put: operations["update_situation_api_v1_assistant_situations__situation_id__put"];
+        post?: never;
+        /** Delete Situation */
+        delete: operations["delete_situation_api_v1_assistant_situations__situation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/situations/{situation_id}/activar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Situation */
+        post: operations["activate_situation_api_v1_assistant_situations__situation_id__activar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/situations/{situation_id}/desactivar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate Situation */
+        post: operations["deactivate_situation_api_v1_assistant_situations__situation_id__desactivar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_assistant_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Process */
+        get: operations["get_process_api_v1_assistant_process_get"];
+        /** Put Process */
+        put: operations["put_process_api_v1_assistant_process_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rules/{kind}/{rule_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch Rule
+         * @description Switch a template or rubro rule on or off. Its text is never editable (C-01).
+         */
+        put: operations["switch_rule_api_v1_assistant_rules__kind___rule_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rubro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Rubro */
+        get: operations["get_rubro_api_v1_assistant_rubro_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/novedades/{kind}/vistas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark News Seen */
+        post: operations["mark_news_seen_api_v1_assistant_novedades__kind__vistas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/prompt-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Prompt Preview
+         * @description The prompt of a stage as the model would get it, with example facts and no situations.
+         */
+        get: operations["prompt_preview_api_v1_assistant_prompt_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/business-info/{section}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Section */
+        get: operations["get_section_api_v1_assistant_business_info__section__get"];
+        /** Put Section */
+        put: operations["put_section_api_v1_assistant_business_info__section__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/faqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Faqs */
+        get: operations["list_faqs_api_v1_assistant_faqs_get"];
+        put?: never;
+        /** Create Faq */
+        post: operations["create_faq_api_v1_assistant_faqs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/faqs/{faq_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Faq */
+        delete: operations["delete_faq_api_v1_assistant_faqs__faq_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Faq */
+        patch: operations["update_faq_api_v1_assistant_faqs__faq_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/assistant/promotions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Promotions */
+        get: operations["list_promotions_api_v1_assistant_promotions_get"];
+        put?: never;
+        /** Create Promotion */
+        post: operations["create_promotion_api_v1_assistant_promotions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/promotions/{promotion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Promotion */
+        put: operations["update_promotion_api_v1_assistant_promotions__promotion_id__put"];
+        post?: never;
+        /**
+         * Delete Promotion
+         * @description Deleted, or only switched off if an order already used it (its snapshot stays).
+         */
+        delete: operations["delete_promotion_api_v1_assistant_promotions__promotion_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/behavior": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Behavior */
+        get: operations["get_behavior_api_v1_assistant_behavior_get"];
+        /** Put Behavior */
+        put: operations["put_behavior_api_v1_assistant_behavior_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories */
+        get: operations["list_categories_api_v1_assistant_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Category
+         * @description Rename, reorder or switch off. Renaming also renames the products' label.
+         */
+        put: operations["update_category_api_v1_assistant_categories__category_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Overview */
+        get: operations["get_overview_api_v1_assistant_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Media */
+        get: operations["list_media_api_v1_assistant_media_get"];
+        put?: never;
+        /** Upload Media */
+        post: operations["upload_media_api_v1_assistant_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/media/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Media */
+        delete: operations["delete_media_api_v1_assistant_media__asset_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Media */
+        patch: operations["update_media_api_v1_assistant_media__asset_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/assistant/media/{asset_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace Media File */
+        post: operations["replace_media_file_api_v1_assistant_media__asset_id__file_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -292,6 +914,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plans, prices and packs */
+        get: operations["plans_api_v1_tenant_billing_plans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscription, usage, charges and payments */
+        get: operations["overview_api_v1_tenant_billing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Buy a plan */
+        post: operations["checkout_api_v1_tenant_billing_checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/change-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upgrade or downgrade */
+        post: operations["change_plan_api_v1_tenant_billing_change_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_tenant_billing_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_v1_tenant_billing_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/addons/{addon_id}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Addon Checkout */
+        post: operations["addon_checkout_api_v1_tenant_billing_addons__addon_id__checkout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/charges/{charge_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Charge */
+        post: operations["cancel_charge_api_v1_tenant_billing_charges__charge_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/billing/payments/{payment_id}/receipt.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The receipt of one payment */
+        get: operations["receipt_api_v1_tenant_billing_payments__payment_id__receipt_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/connection-requests": {
         parameters: {
             query?: never;
@@ -338,6 +1113,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/conversations/{conversation_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the sales engine has a conversation */
+        get: operations["conversation_state_api_v1_tenant_conversations__conversation_id__state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/conversations/{conversation_id}/resume-bot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give the conversation back to the assistant before the pause ends */
+        post: operations["resume_conversation_bot_api_v1_tenant_conversations__conversation_id__resume_bot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/knowledge": {
         parameters: {
             query?: never;
@@ -378,7 +1187,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** One knowledge source, with its text */
+        get: operations["get_knowledge_source_api_v1_tenant_knowledge__source_id__get"];
         put?: never;
         post?: never;
         /**
@@ -393,6 +1203,160 @@ export interface paths {
          *     first, so an operator is refused before the lookup either way.
          */
         delete: operations["delete_knowledge_source_api_v1_tenant_knowledge__source_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a source's title, priority or text (new text is re-indexed)
+         * @description The old text keeps answering until the new one is indexed (006, HU-03).
+         */
+        patch: operations["update_knowledge_source_api_v1_tenant_knowledge__source_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/web": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read the business's website into the knowledge base
+         * @description Up to 20 pages of the same site, read by the worker (006, HU-02).
+         */
+        post: operations["create_web_source_api_v1_tenant_knowledge_web_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/{source_id}/resync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Process a source again: re-read the website, retry a failed document
+         * @description Manual only (006 C-002): nothing re-reads a website on its own.
+         */
+        post: operations["resync_knowledge_source_api_v1_tenant_knowledge__source_id__resync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/knowledge/{source_id}/chunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The passages the agent can retrieve from one source
+         * @description A debugging view for whoever configures the agent (006 plan).
+         */
+        get: operations["knowledge_source_chunks_api_v1_tenant_knowledge__source_id__chunks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metrics */
+        get: operations["metrics_api_v1_tenant_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/metrics/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export */
+        get: operations["export_api_v1_tenant_metrics_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/metrics/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings__api_v1_tenant_metrics_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenant_metrics_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform Metrics */
+        get: operations["platform_metrics_api_v1_platform_admin_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/model-costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Costs */
+        get: operations["model_costs_api_v1_platform_admin_model_costs_get"];
+        /**
+         * Set Model Cost
+         * @description A new price from `desde` on: past traces keep the cost they were written with.
+         */
+        put: operations["set_model_cost_api_v1_platform_admin_model_costs_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -603,7 +1567,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Every business */
+        /**
+         * Every business
+         * @description The businesses the end-to-end suite created are hidden unless `incluir_prueba`.
+         */
         get: operations["list_tenants_api_v1_platform_admin_tenants_get"];
         put?: never;
         post?: never;
@@ -715,6 +1682,196 @@ export interface paths {
          *     indistinguishable from an account quietly kept free.
          */
         post: operations["extend_trial_api_v1_platform_admin_tenants__tenant_id__extend_trial_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscriptions */
+        get: operations["subscriptions_api_v1_platform_admin_billing_subscriptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Payment
+         * @description A transfer or Yape arrived: the same effect a gateway's webhook would have (RF-007).
+         */
+        post: operations["record_payment_api_v1_platform_admin_billing_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/payments/{payment_id}/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund
+         * @description Recorded only: the money goes back outside Leo (manual refund, RF-001).
+         */
+        post: operations["refund_api_v1_platform_admin_billing_payments__payment_id__refund_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coupons */
+        get: operations["coupons_api_v1_platform_admin_billing_coupons_get"];
+        put?: never;
+        /** Create Coupon */
+        post: operations["create_coupon_api_v1_platform_admin_billing_coupons_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/billing/tenants/{tenant_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend
+         * @description A courtesy: the current period, and its message period, last `dias` longer.
+         */
+        post: operations["extend_api_v1_platform_admin_billing_tenants__tenant_id__extend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Catalog */
+        get: operations["list_catalog_api_v1_platform_admin_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_v1_platform_admin_catalog__kind___key__versions__number__get"];
+        /**
+         * Put Draft
+         * @description Replace the draft's content. Its evals no longer apply (the hash changes).
+         */
+        put: operations["put_draft_api_v1_platform_admin_catalog__kind___key__versions__number__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/catalog/{kind}/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * New Draft
+         * @description A draft copied from the newest version. One draft at a time per template or rubro.
+         */
+        post: operations["new_draft_api_v1_platform_admin_catalog__kind___key__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}/evals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Evals
+         * @description Queue the evals of the draft. The result lands on the version (`evals`).
+         */
+        post: operations["run_evals_api_v1_platform_admin_catalog__kind___key__versions__number__evals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}/publicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish */
+        post: operations["publish_api_v1_platform_admin_catalog__kind___key__versions__number__publicar_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1193,6 +2350,17 @@ export interface components {
             /** Password */
             password?: string | null;
         };
+        /** AddonOut */
+        AddonOut: {
+            /** Id */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Mensajes */
+            mensajes: number;
+            /** Precio */
+            precio: string;
+        };
         /** AgentConfigRequest */
         AgentConfigRequest: {
             /** Expected Updated At */
@@ -1207,6 +2375,12 @@ export interface components {
             restrictions?: string | null;
             /** Escalation Rules */
             escalation_rules?: string[] | null;
+            /** Tratamiento */
+            tratamiento?: ("tu" | "usted") | null;
+            /** Emojis */
+            emojis?: ("no" | "pocos" | "si") | null;
+            /** Saludo */
+            saludo?: string | null;
             /** Farewell On Pause */
             farewell_on_pause?: string | null;
         };
@@ -1222,6 +2396,18 @@ export interface components {
             restrictions: string | null;
             /** Escalation Rules */
             escalation_rules: string[];
+            /**
+             * Tratamiento
+             * @default tu
+             */
+            tratamiento: string;
+            /**
+             * Emojis
+             * @default pocos
+             */
+            emojis: string;
+            /** Saludo */
+            saludo?: string | null;
             /** Farewell On Pause */
             farewell_on_pause: string | null;
             /** Is Active */
@@ -1234,10 +2420,115 @@ export interface components {
              */
             overwrote_newer: boolean;
         };
+        /** BehaviorRequest */
+        BehaviorRequest: {
+            /** Agent Name */
+            agent_name?: string | null;
+            /** Tone */
+            tone?: ("profesional" | "cercano" | "juvenil") | null;
+            /** Ritmo */
+            ritmo?: ("directo" | "equilibrado" | "paso_a_paso") | null;
+            /** Detalle */
+            detalle?: ("breve" | "moderado" | "extenso") | null;
+            seguimiento?: components["schemas"]["FollowUp"] | null;
+            /** Nivel Inteligencia */
+            nivel_inteligencia?: ("economico" | "medio" | "mejor") | null;
+            /** Derivacion Pausa Horas */
+            derivacion_pausa_horas?: number | null;
+            /** Mensajes Sistema */
+            mensajes_sistema?: {
+                [key: string]: string | null;
+            } | null;
+            /** Tratamiento */
+            tratamiento?: ("tu" | "usted") | null;
+            /** Emojis */
+            emojis?: ("no" | "pocos" | "si") | null;
+            /** Saludo */
+            saludo?: string | null;
+            /** Politica Descuentos */
+            politica_descuentos?: ("no_ofrece" | "solo_promociones" | "negociable") | null;
+            /** Descuento Maximo Pct */
+            descuento_maximo_pct?: number | string | null;
+            /** Max Situaciones */
+            max_situaciones?: number | null;
+        };
+        /** BehaviorResponse */
+        BehaviorResponse: {
+            /** Agent Name */
+            agent_name: string;
+            /** Tone */
+            tone: string;
+            /** Ritmo */
+            ritmo: string;
+            /** Detalle */
+            detalle: string;
+            seguimiento: components["schemas"]["FollowUp"];
+            /** Nivel Inteligencia */
+            nivel_inteligencia: string;
+            /** Niveles Permitidos */
+            niveles_permitidos: string[];
+            /** Derivacion Pausa Horas */
+            derivacion_pausa_horas: number;
+            /** Activo */
+            activo: boolean;
+            /** Mensajes Sistema */
+            mensajes_sistema: {
+                [key: string]: string;
+            };
+            /** Tratamiento */
+            tratamiento: string;
+            /** Emojis */
+            emojis: string;
+            /** Saludo */
+            saludo: string | null;
+            /** Politica Descuentos */
+            politica_descuentos: string;
+            /** Descuento Maximo Pct */
+            descuento_maximo_pct: string | null;
+            /** Max Situaciones */
+            max_situaciones: number;
+        };
+        /** BillingOut */
+        BillingOut: {
+            /** Estado Negocio */
+            estado_negocio: string;
+            /** Prueba Hasta */
+            prueba_hasta: string | null;
+            suscripcion: components["schemas"]["SubscriptionOut"] | null;
+            consumo: components["schemas"]["UsageOut"];
+            /** Pendientes */
+            pendientes: components["schemas"]["ChargeOut"][];
+            /** Pagos */
+            pagos: components["schemas"]["PaymentOut"][];
+            /** Cobro Activo */
+            cobro_activo: boolean;
+        };
         /** Body_import_preview_api_v1_tenant_products_import_post */
         Body_import_preview_api_v1_tenant_products_import_post: {
             /** File */
             file: string;
+        };
+        /** Body_replace_media_file_api_v1_assistant_media__asset_id__file_post */
+        Body_replace_media_file_api_v1_assistant_media__asset_id__file_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_media_api_v1_assistant_media_post */
+        Body_upload_media_api_v1_assistant_media_post: {
+            /** File */
+            file: string;
+            /** Clave */
+            clave: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Usar */
+            cuando_usar: string;
+            /** Caption */
+            caption?: string | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Promotion Id */
+            promotion_id?: string | null;
         };
         /** BusinessProfileRequest */
         BusinessProfileRequest: {
@@ -1301,6 +2592,93 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Catalog */
+        Catalog: {
+            /** Planes */
+            planes: components["schemas"]["PlanOut"][];
+            /** Paquetes */
+            paquetes: components["schemas"]["AddonOut"][];
+            /** Soles Por Dolar */
+            soles_por_dolar: string | null;
+            /** Instrucciones Pago */
+            instrucciones_pago: string;
+        };
+        /** CatalogEntry */
+        CatalogEntry: {
+            /** Kind */
+            kind: string;
+            /** Key */
+            key: string;
+            /** Nombre */
+            nombre: string;
+            /** Publicada */
+            publicada: number | null;
+            /** Versiones */
+            versiones: components["schemas"]["VersionSummary"][];
+        };
+        /** CatalogList */
+        CatalogList: {
+            /** Items */
+            items: components["schemas"]["CatalogEntry"][];
+        };
+        /** CategoryList */
+        CategoryList: {
+            /** Items */
+            items: components["schemas"]["CategoryResponse"][];
+        };
+        /** CategoryRequest */
+        CategoryRequest: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Orden
+             * @default 0
+             */
+            orden: number;
+            /**
+             * Activa
+             * @default true
+             */
+            activa: boolean;
+        };
+        /** CategoryResponse */
+        CategoryResponse: {
+            /** Nombre */
+            nombre: string;
+            /**
+             * Orden
+             * @default 0
+             */
+            orden: number;
+            /**
+             * Activa
+             * @default true
+             */
+            activa: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Productos */
+            productos: number;
+        };
+        /** ChangePlanBody */
+        ChangePlanBody: {
+            /** Plan Id */
+            plan_id: string;
+            /**
+             * Ciclo
+             * @default monthly
+             * @enum {string}
+             */
+            ciclo: "monthly" | "annual";
+        };
+        /** ChangeResult */
+        ChangeResult: {
+            cobro?: components["schemas"]["ChargeOut"] | null;
+            programado?: components["schemas"]["SubscriptionOut"] | null;
+        };
         /** ChannelMetricsResponse */
         ChannelMetricsResponse: {
             /** Messages In */
@@ -1313,6 +2691,36 @@ export interface components {
             p50_response_ms: number | null;
             /** P95 Response Ms */
             p95_response_ms: number | null;
+        };
+        /** ChargeOut */
+        ChargeOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Referencia */
+            referencia: string;
+            /** Tipo */
+            tipo: string;
+            /** Concepto */
+            concepto: string;
+            /** Lista */
+            lista: string;
+            /** Descuento */
+            descuento: string;
+            /** Credito */
+            credito: string;
+            /** Monto */
+            monto: string;
+            /** Cupon */
+            cupon: string | null;
+            /** Estado */
+            estado: string;
+            /** Vence */
+            vence: string | null;
+            /** Instrucciones */
+            instrucciones: string;
         };
         /** ChecklistItemResponse */
         ChecklistItemResponse: {
@@ -1331,6 +2739,24 @@ export interface components {
             sandbox_ready: boolean;
             /** Activation Ready */
             activation_ready: boolean;
+        };
+        /** CheckoutBody */
+        CheckoutBody: {
+            /** Plan Id */
+            plan_id: string;
+            /**
+             * Ciclo
+             * @default monthly
+             * @enum {string}
+             */
+            ciclo: "monthly" | "annual";
+            /** Cupon */
+            cupon?: string | null;
+        };
+        /** ChunkList */
+        ChunkList: {
+            /** Chunks */
+            chunks: string[];
         };
         /** ConfirmRequest */
         ConfirmRequest: {
@@ -1416,6 +2842,86 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ContactOut */
+        ContactOut: {
+            /** Id */
+            id: string | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Opt Out */
+            opt_out: boolean;
+            /** Posible Duplicado */
+            posible_duplicado: boolean;
+        };
+        /** ConversationDetail */
+        ConversationDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Canal */
+            canal: string;
+            /** Estado */
+            estado: string;
+            contacto: components["schemas"]["ContactOut"];
+            tomada_por: components["schemas"]["Holder"] | null;
+            /** Tomada Desde */
+            tomada_desde: string | null;
+            derivado: components["schemas"]["HandoverOut"] | null;
+            /** Etapa */
+            etapa: string | null;
+            ventana: components["schemas"]["Window"];
+            /** Pedido Id */
+            pedido_id: string | null;
+        };
+        /** ConversationPage */
+        ConversationPage: {
+            /** Items */
+            items: components["schemas"]["ListItem"][];
+            /** Siguiente */
+            siguiente: string | null;
+            /** Esperando */
+            esperando: number;
+        };
+        /** ConversationStateOut */
+        ConversationStateOut: {
+            /** Etapa */
+            etapa: string;
+            /** Embudo */
+            embudo: string;
+            /** Hechos */
+            hechos: {
+                [key: string]: unknown;
+            };
+            derivado: components["schemas"]["Handover"] | null;
+            /** Eventos */
+            eventos: components["schemas"]["StageEvent"][];
+        };
+        /** CouponBody */
+        CouponBody: {
+            /** Codigo */
+            codigo: string;
+            /** Porcentaje */
+            porcentaje: number;
+            /** Vence */
+            vence?: string | null;
+            /** Usos Maximos */
+            usos_maximos?: number | null;
+        };
+        /** CouponRow */
+        CouponRow: {
+            /** Codigo */
+            codigo: string;
+            /** Porcentaje */
+            porcentaje: number;
+            /** Vence */
+            vence: string | null;
+            /** Usos Maximos */
+            usos_maximos: number | null;
         };
         /**
          * CreateSourceResponse
@@ -1525,6 +3031,25 @@ export interface components {
             modelo?: string | null;
             /** Silencio */
             silencio?: string | null;
+            /** Situaciones */
+            situaciones?: components["schemas"]["DebugSituation"][];
+            /** Reglas Apagadas */
+            reglas_apagadas?: {
+                [key: string]: string[];
+            };
+        };
+        /** DebugSituation */
+        DebugSituation: {
+            /** Id */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Siempre */
+            siempre: boolean;
+            /** Borrador */
+            borrador: boolean;
+            /** Distancia */
+            distancia?: number | null;
         };
         /** DebugTokens */
         DebugTokens: {
@@ -1567,6 +3092,13 @@ export interface components {
                 [key: string]: string;
             } | null;
         };
+        /** ExtendBody */
+        ExtendBody: {
+            /** Dias */
+            dias: number;
+            /** Motivo */
+            motivo: string;
+        };
         /** ExtendTrialPayload */
         ExtendTrialPayload: {
             /** Days */
@@ -1574,10 +3106,124 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** FaqIn */
+        FaqIn: {
+            /** Pregunta */
+            pregunta: string;
+            /** Respuesta */
+            respuesta: string;
+        };
+        /** FaqList */
+        FaqList: {
+            /** Items */
+            items: components["schemas"]["FaqResponse"][];
+        };
+        /** FaqPatch */
+        FaqPatch: {
+            /** Pregunta */
+            pregunta?: string | null;
+            /** Respuesta */
+            respuesta?: string | null;
+            /** Orden */
+            orden?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /** FaqRequest */
+        FaqRequest: {
+            /** Pregunta */
+            pregunta: string;
+            /** Respuesta */
+            respuesta: string;
+            /**
+             * Orden
+             * @default 0
+             */
+            orden: number;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** FaqResponse */
+        FaqResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Pregunta */
+            pregunta: string;
+            /** Respuesta */
+            respuesta: string;
+            /** Orden */
+            orden: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Indexada */
+            indexada: boolean;
+        };
+        /** FaqView */
+        FaqView: {
+            /** Pregunta */
+            pregunta: string;
+            /** Respuesta */
+            respuesta: string;
+        };
+        /** FollowUp */
+        FollowUp: {
+            /**
+             * Activo
+             * @default false
+             */
+            activo: boolean;
+            /**
+             * Horas
+             * @default 4
+             */
+            horas: number;
+            /**
+             * Max Intentos
+             * @default 2
+             */
+            max_intentos: number;
+        };
+        /** FromSuggestedRequest */
+        FromSuggestedRequest: {
+            /** Valores */
+            valores?: {
+                [key: string]: string;
+            };
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Handover */
+        Handover: {
+            /** Motivo */
+            motivo: string;
+            /** Resumen */
+            resumen: string | null;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
+        };
+        /** HandoverOut */
+        HandoverOut: {
+            /** Motivo */
+            motivo: string;
+            /** Resumen */
+            resumen: string | null;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
         };
         /**
          * HealthResponse
@@ -1613,6 +3259,23 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** Holder */
+        Holder: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            nombre: string | null;
+        };
+        /** ImageLink */
+        ImageLink: {
+            /** Url */
+            url: string;
+            /** Expira En */
+            expira_en: number;
         };
         /** ImportConfirmResponse */
         ImportConfirmResponse: {
@@ -1671,6 +3334,44 @@ export interface components {
             sources: components["schemas"]["KnowledgeSourceResponse"][];
             usage: components["schemas"]["KnowledgeUsageResponse"];
         };
+        /** KnowledgeSourceDetail */
+        KnowledgeSourceDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /** Char Count */
+            char_count: number;
+            /** Error Msg */
+            error_msg?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Priority
+             * @default 100
+             */
+            priority: number;
+            /** Source Url */
+            source_url?: string | null;
+            /** Crawled At */
+            crawled_at?: string | null;
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
+            /** Content */
+            content?: string | null;
+        };
         /** KnowledgeSourceResponse */
         KnowledgeSourceResponse: {
             /**
@@ -1693,6 +3394,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Priority
+             * @default 100
+             */
+            priority: number;
+            /** Source Url */
+            source_url?: string | null;
+            /** Crawled At */
+            crawled_at?: string | null;
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * KnowledgeUsageResponse
@@ -1725,6 +3439,32 @@ export interface components {
             /** Faltan Selecciones */
             faltan_selecciones: number;
         };
+        /** ListItem */
+        ListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Canal */
+            canal: string;
+            /** Estado */
+            estado: string;
+            contacto: components["schemas"]["ContactOut"];
+            /** Ultimo Mensaje */
+            ultimo_mensaje: string | null;
+            /** Ultimo Autor */
+            ultimo_autor: string | null;
+            /** Ultimo En */
+            ultimo_en: string | null;
+            /** No Leidos */
+            no_leidos: number;
+            tomada_por: components["schemas"]["Holder"] | null;
+            /** Necesita Humano */
+            necesita_humano: boolean;
+            /** Etapa */
+            etapa: string | null;
+        };
         /**
          * LoginRequest
          * @description Payload of `POST /auth/login`.
@@ -1736,6 +3476,75 @@ export interface components {
             password: string;
             /** Tenant Id */
             tenant_id?: string | null;
+        };
+        /** ManualPaymentBody */
+        ManualPaymentBody: {
+            /** Referencia */
+            referencia: string;
+            /** Operacion */
+            operacion: string;
+            /** Monto Usd */
+            monto_usd: number | string;
+            /** Monto Local */
+            monto_local?: number | string | null;
+            /** Moneda Local */
+            moneda_local?: string | null;
+            /** Nota */
+            nota?: string | null;
+        };
+        /** MediaList */
+        MediaList: {
+            /** Items */
+            items: components["schemas"]["MediaResponse"][];
+        };
+        /** MediaPatch */
+        MediaPatch: {
+            /** Clave */
+            clave?: string | null;
+            /** Titulo */
+            titulo?: string | null;
+            /** Cuando Usar */
+            cuando_usar?: string | null;
+            /** Caption */
+            caption?: string | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Promotion Id */
+            promotion_id?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /** MediaResponse */
+        MediaResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Clave */
+            clave: string;
+            /** Tipo */
+            tipo: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Usar */
+            cuando_usar: string;
+            /** Caption */
+            caption: string | null;
+            /** Product Id */
+            product_id: string | null;
+            /** Promotion Id */
+            promotion_id: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Filename */
+            filename: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Preview Url */
+            preview_url: string | null;
+            /** Preview Expires At */
+            preview_expires_at: string | null;
         };
         /** MemberResponse */
         MemberResponse: {
@@ -1757,6 +3566,11 @@ export interface components {
             role: string;
             /** Status */
             status: string;
+            /**
+             * Puede Revisar
+             * @default false
+             */
+            puede_revisar: boolean;
         };
         /**
          * MembershipSummary
@@ -1772,6 +3586,45 @@ export interface components {
             tenant_name: string;
             /** Role */
             role: string;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Autor */
+            autor: string;
+            /** Tipo */
+            tipo: string;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+            /** Estado Entrega */
+            estado_entrega: string | null;
+            /** Operador */
+            operador?: string | null;
+            /** Evento */
+            evento?: string | null;
+            /**
+             * Descartado
+             * @default false
+             */
+            descartado: boolean;
+            /** Opciones */
+            opciones?: string[];
+            /**
+             * Imagen
+             * @default false
+             */
+            imagen: boolean;
+            /** Fuentes */
+            fuentes?: string[];
         };
         /** MessageResponse */
         MessageResponse: {
@@ -1792,6 +3645,86 @@ export interface components {
              */
             created_at: string;
             saliente?: components["schemas"]["Saliente"] | null;
+        };
+        /** MetricsSettings */
+        MetricsSettings: {
+            /** Minutos Por Conversacion */
+            minutos_por_conversacion: number;
+        };
+        /** ModelCostBody */
+        ModelCostBody: {
+            /** Modelo */
+            modelo: string;
+            /** Entrada Por 1K Usd */
+            entrada_por_1k_usd: number | string;
+            /** Salida Por 1K Usd */
+            salida_por_1k_usd: number | string;
+            /** Desde */
+            desde?: string | null;
+        };
+        /** ModelCostOut */
+        ModelCostOut: {
+            /** Modelo */
+            modelo: string;
+            /** Entrada Por 1K Usd */
+            entrada_por_1k_usd: string;
+            /** Salida Por 1K Usd */
+            salida_por_1k_usd: string;
+            /**
+             * Desde
+             * Format: date-time
+             */
+            desde: string;
+        };
+        /** NewsView */
+        NewsView: {
+            /** Version */
+            version: number;
+            /** Vista */
+            vista: number;
+            /** Reglas */
+            reglas: components["schemas"]["RuleView"][];
+        };
+        /** NoteBody */
+        NoteBody: {
+            /** Texto */
+            texto: string;
+        };
+        /** NoteList */
+        NoteList: {
+            /** Items */
+            items: components["schemas"]["NoteOut"][];
+        };
+        /** NoteOut */
+        NoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Autor */
+            autor: string | null;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
+        /** ObjectionIn */
+        ObjectionIn: {
+            /** Objecion */
+            objecion: string;
+            /** Manejo */
+            manejo: string;
+        };
+        /** ObjectionView */
+        ObjectionView: {
+            /** Objecion */
+            objecion: string;
+            /** Manejo */
+            manejo: string;
         };
         /** OrderDetail */
         OrderDetail: {
@@ -1935,6 +3868,37 @@ export interface components {
             /** Pendientes Revision */
             pendientes_revision: number;
         };
+        /** OverviewResponse */
+        OverviewResponse: {
+            /** Progreso */
+            progreso: number;
+            /** Secciones */
+            secciones: components["schemas"]["OverviewSection"][];
+            /** Activacion */
+            activacion: components["schemas"]["OverviewStep"][];
+            /** Siguiente Paso */
+            siguiente_paso: string | null;
+        };
+        /** OverviewSection */
+        OverviewSection: {
+            /** Clave */
+            clave: string;
+            /** Estado */
+            estado: string;
+            /** Detalle */
+            detalle?: {
+                [key: string]: string;
+            };
+        };
+        /** OverviewStep */
+        OverviewStep: {
+            /** Paso */
+            paso: string;
+            /** Hecho */
+            hecho: boolean;
+            /** Accion */
+            accion: string;
+        };
         /** PaymentMethodPatch */
         PaymentMethodPatch: {
             /** Instructions */
@@ -1943,6 +3907,10 @@ export interface components {
             validate_receipts?: boolean | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Titular */
+            titular?: string | null;
+            /** Media Asset Id */
+            media_asset_id?: string | null;
         };
         /** PaymentMethodRequest */
         PaymentMethodRequest: {
@@ -1963,6 +3931,10 @@ export interface components {
              * @default true
              */
             is_active: boolean;
+            /** Titular */
+            titular?: string | null;
+            /** Media Asset Id */
+            media_asset_id?: string | null;
         };
         /** PaymentMethodResponse */
         PaymentMethodResponse: {
@@ -1979,6 +3951,101 @@ export interface components {
             validate_receipts: boolean;
             /** Is Active */
             is_active: boolean;
+            /** Titular */
+            titular?: string | null;
+            /** Media Asset Id */
+            media_asset_id?: string | null;
+        };
+        /** PaymentOut */
+        PaymentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Comprobante */
+            comprobante: string;
+            /** Concepto */
+            concepto: string;
+            /** Monto */
+            monto: string;
+            /** Estado */
+            estado: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
+        /** PaymentRow */
+        PaymentRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Comprobante */
+            comprobante: string;
+            /** Concepto */
+            concepto: string;
+            /** Monto */
+            monto: string;
+            /** Estado */
+            estado: string;
+            /**
+             * Repetido
+             * @default false
+             */
+            repetido: boolean;
+        };
+        /** PlanOut */
+        PlanOut: {
+            /** Id */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Precio Mensual */
+            precio_mensual: string | null;
+            /** Precio Anual */
+            precio_anual: string | null;
+            /** Asientos */
+            asientos: number;
+            /** Mensajes */
+            mensajes: number;
+            /** Caracteres Conocimiento */
+            caracteres_conocimiento: number;
+            /** Fuentes Conocimiento */
+            fuentes_conocimiento: number;
+            /** Niveles */
+            niveles: string[];
+        };
+        /** ProcessRequest */
+        ProcessRequest: {
+            /** Template Key */
+            template_key: string;
+            /** Options */
+            options?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ProcessView */
+        ProcessView: {
+            /** Template Key */
+            template_key: string;
+            /** Template Version */
+            template_version: number | null;
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            };
+            /** Etapas */
+            etapas: components["schemas"]["StageView"][];
+            novedades?: components["schemas"]["NewsView"] | null;
         };
         /** ProductPage */
         ProductPage: {
@@ -2090,6 +4157,135 @@ export interface components {
             /** Destacado */
             destacado: boolean;
         };
+        /** PromotionList */
+        PromotionList: {
+            /** Items */
+            items: components["schemas"]["PromotionResponse"][];
+        };
+        /** PromotionRequest */
+        PromotionRequest: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Uso
+             * @default automatica
+             * @enum {string}
+             */
+            uso: "automatica" | "cierre";
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "porcentaje" | "monto_fijo" | "nxm" | "precio_cantidad";
+            /** Valor */
+            valor?: number | string | null;
+            /** N */
+            n?: number | null;
+            /** M */
+            m?: number | null;
+            /**
+             * Aplica A
+             * @default todo
+             * @enum {string}
+             */
+            aplica_a: "todo" | "productos" | "categorias";
+            /** Product Ids */
+            product_ids?: string[];
+            /** Categorias */
+            categorias?: string[];
+            /** Monto Minimo */
+            monto_minimo?: number | string | null;
+            /** Vigencia Horas */
+            vigencia_horas?: number | null;
+            /**
+             * Para Seguimiento
+             * @default false
+             */
+            para_seguimiento: boolean;
+            /** Inicia En */
+            inicia_en?: string | null;
+            /** Termina En */
+            termina_en?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** PromotionResponse */
+        PromotionResponse: {
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion?: string | null;
+            /**
+             * Uso
+             * @default automatica
+             * @enum {string}
+             */
+            uso: "automatica" | "cierre";
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "porcentaje" | "monto_fijo" | "nxm" | "precio_cantidad";
+            /** Valor */
+            valor?: string | null;
+            /** N */
+            n?: number | null;
+            /** M */
+            m?: number | null;
+            /**
+             * Aplica A
+             * @default todo
+             * @enum {string}
+             */
+            aplica_a: "todo" | "productos" | "categorias";
+            /** Product Ids */
+            product_ids?: string[];
+            /** Categorias */
+            categorias?: string[];
+            /** Monto Minimo */
+            monto_minimo?: string | null;
+            /** Vigencia Horas */
+            vigencia_horas?: number | null;
+            /**
+             * Para Seguimiento
+             * @default false
+             */
+            para_seguimiento: boolean;
+            /** Inicia En */
+            inicia_en?: string | null;
+            /** Termina En */
+            termina_en?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** PromptPreview */
+        PromptPreview: {
+            /** Stage */
+            stage: string;
+            /** Prompt */
+            prompt: string;
+            /** Tokens Estimados */
+            tokens_estimados: number;
+            /** Secciones */
+            secciones: {
+                [key: string]: number;
+            };
+            /** Herramientas */
+            herramientas: string[];
+        };
         /** ProofImage */
         ProofImage: {
             /** Url */
@@ -2151,6 +4347,11 @@ export interface components {
         RefreshRequest: {
             /** Tenant Id */
             tenant_id?: string | null;
+        };
+        /** RefundBody */
+        RefundBody: {
+            /** Motivo */
+            motivo: string;
         };
         /**
          * RegisterRequest
@@ -2220,6 +4421,44 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** RubroView */
+        RubroView: {
+            /** Key */
+            key: string | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Plantilla Sugerida */
+            plantilla_sugerida: string | null;
+            /** Version */
+            version: number | null;
+            /** Reglas */
+            reglas: components["schemas"]["RuleView"][];
+            /** Faqs */
+            faqs: components["schemas"]["FaqView"][];
+            /** Objeciones */
+            objeciones: components["schemas"]["ObjectionView"][];
+            /** Situaciones Sugeridas */
+            situaciones_sugeridas: components["schemas"]["SuggestedView"][];
+            novedades?: components["schemas"]["NewsView"] | null;
+        };
+        /** RuleIn */
+        RuleIn: {
+            /** Rule Key */
+            rule_key: string;
+            /** Etapa */
+            etapa?: string | null;
+            /** Texto */
+            texto: string;
+        };
+        /** RuleView */
+        RuleView: {
+            /** Rule Key */
+            rule_key: string;
+            /** Texto */
+            texto: string;
+            /** Apagada */
+            apagada: boolean;
+        };
         /**
          * Saliente
          * @description One outbound message, typed the way the panel draws it.
@@ -2270,6 +4509,25 @@ export interface components {
             /** Limit */
             limit: number;
         };
+        /** SectionResponse */
+        SectionResponse: {
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            } | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** SendBody */
+        SendBody: {
+            /** Texto */
+            texto: string;
+        };
         /** SendMessageResponse */
         SendMessageResponse: {
             /**
@@ -2282,6 +4540,15 @@ export interface components {
             reply?: components["schemas"]["ReplyResponse"] | null;
             trace?: components["schemas"]["TraceResponse"] | null;
             debug?: components["schemas"]["DebugResponse"] | null;
+        };
+        /** SendResult */
+        SendResult: {
+            mensaje: components["schemas"]["MessageOut"];
+            /**
+             * Aviso
+             * @enum {string}
+             */
+            aviso: "enviado" | "en_cola" | "sin_numero" | "simulador";
         };
         /**
          * SessionResponse
@@ -2308,6 +4575,127 @@ export interface components {
             memberships: components["schemas"]["MembershipSummary"][];
             /** Active Tenant Id */
             active_tenant_id: string | null;
+        };
+        /** SettingsBody */
+        SettingsBody: {
+            /** Unattended Queue Minutes */
+            unattended_queue_minutes: number;
+            /** Auto Return Minutes */
+            auto_return_minutes?: number | null;
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Unattended Queue Minutes */
+            unattended_queue_minutes: number;
+            /** Auto Return Minutes */
+            auto_return_minutes?: number | null;
+        };
+        /** SituationList */
+        SituationList: {
+            /** Items */
+            items: components["schemas"]["SituationResponse"][];
+        };
+        /** SituationRequest */
+        SituationRequest: {
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Media Asset Ids */
+            media_asset_ids?: string[];
+            /**
+             * Derivar
+             * @default false
+             */
+            derivar: boolean;
+            /** Ejemplo Respuesta */
+            ejemplo_respuesta?: string | null;
+            /** Etapas */
+            etapas?: string[] | null;
+            /**
+             * Siempre
+             * @default false
+             */
+            siempre: boolean;
+        };
+        /** SituationResponse */
+        SituationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Media Asset Ids */
+            media_asset_ids: string[];
+            /** Derivar */
+            derivar: boolean;
+            /** Ejemplo Respuesta */
+            ejemplo_respuesta: string | null;
+            /** Etapas */
+            etapas: string[] | null;
+            /** Siempre */
+            siempre: boolean;
+            /**
+             * Estado
+             * @enum {string}
+             */
+            estado: "borrador" | "activa" | "inactiva";
+            /**
+             * Origen
+             * @enum {string}
+             */
+            origen: "manual" | "sugerida_rubro" | "migrada" | "aprendida";
+            /** Lista Para Coincidir */
+            lista_para_coincidir: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * Stage
+         * @description Where a conversation is in the sale (`plantillas.md` section 1).
+         * @enum {string}
+         */
+        Stage: "INICIO" | "CALIFICAR" | "ANUNCIO" | "IDENTIFICAR" | "PEDIDO" | "DATOS" | "COBRO" | "VERIFICACION" | "CERRADO" | "ASESORIA" | "DERIVADO";
+        /** StageEvent */
+        StageEvent: {
+            /** De */
+            de: string | null;
+            /** A */
+            a: string;
+            /** Embudo */
+            embudo: string;
+            /** Motivo */
+            motivo: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
+        /** StageView */
+        StageView: {
+            /** Key */
+            key: string;
+            /** Embudo */
+            embudo: string;
+            /** Reglas */
+            reglas: components["schemas"]["RuleView"][];
         };
         /** StartConversationResponse */
         StartConversationResponse: {
@@ -2339,6 +4727,91 @@ export interface components {
              */
             devolucion_pendiente: boolean;
         };
+        /** SubscriptionOut */
+        SubscriptionOut: {
+            /** Plan */
+            plan: string;
+            /** Plan Nombre */
+            plan_nombre: string;
+            /** Estado */
+            estado: string;
+            /** Ciclo */
+            ciclo: string;
+            /** Precio */
+            precio: string;
+            /**
+             * Desde
+             * Format: date-time
+             */
+            desde: string;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
+            /** Gracia Hasta */
+            gracia_hasta: string | null;
+            /** Cancela Al Final */
+            cancela_al_final: boolean;
+            /** Cambio Programado */
+            cambio_programado: string | null;
+        };
+        /** SubscriptionRow */
+        SubscriptionRow: {
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Negocio */
+            negocio: string;
+            /** Estado Negocio */
+            estado_negocio: string;
+            /** Plan */
+            plan: string;
+            /** Estado */
+            estado: string | null;
+            /** Hasta */
+            hasta: string | null;
+            /** Pendientes */
+            pendientes: components["schemas"]["ChargeOut"][];
+        };
+        /** SuggestedIn */
+        SuggestedIn: {
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Campos */
+            campos?: {
+                [key: string]: string;
+            };
+        };
+        /** SuggestedView */
+        SuggestedView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Campos */
+            campos: {
+                [key: string]: string;
+            };
+        };
+        /** SwitchRequest */
+        SwitchRequest: {
+            /** Apagada */
+            apagada: boolean;
+        };
         /** TeamResponse */
         TeamResponse: {
             /** Members */
@@ -2346,6 +4819,30 @@ export interface components {
             /** Invitations */
             invitations: components["schemas"]["InvitationResponse"][];
             seats: components["schemas"]["SeatsResponse"];
+        };
+        /** TemplateList */
+        TemplateList: {
+            /** Items */
+            items: components["schemas"]["TemplateView"][];
+        };
+        /** TemplateView */
+        TemplateView: {
+            /** Key */
+            key: string;
+            /** Nombre */
+            nombre: string;
+            /** Descripcion */
+            descripcion: string;
+            /** Opciones Schema */
+            opciones_schema: {
+                [key: string]: unknown;
+            };
+            /** Opciones Default */
+            opciones_default: {
+                [key: string]: unknown;
+            };
+            /** Sugerida Por Rubro */
+            sugerida_por_rubro: boolean;
         };
         /** TenantDetailResponse */
         TenantDetailResponse: {
@@ -2414,6 +4911,13 @@ export interface components {
              */
             created_at: string;
         };
+        /** ThreadPage */
+        ThreadPage: {
+            /** Items */
+            items: components["schemas"]["MessageOut"][];
+            /** Anteriores */
+            anteriores: string | null;
+        };
         /** TraceResponse */
         TraceResponse: {
             /** Model */
@@ -2472,6 +4976,28 @@ export interface components {
             role?: ("owner" | "tenant_admin" | "operator") | null;
             /** Status */
             status?: ("active" | "disabled") | null;
+            /** Puede Revisar */
+            puede_revisar?: boolean | null;
+        };
+        /** UpdateSourceRequest */
+        UpdateSourceRequest: {
+            /** Title */
+            title?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Priority */
+            priority?: number | null;
+        };
+        /** UsageOut */
+        UsageOut: {
+            /** Usados */
+            usados: number;
+            /** Limite */
+            limite: number;
+            /** Desde */
+            desde: string | null;
+            /** Hasta */
+            hasta: string | null;
         };
         /**
          * UsageResponse
@@ -2539,6 +5065,66 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** VersionContent */
+        VersionContent: {
+            /** Reglas */
+            reglas: components["schemas"]["RuleIn"][];
+            /** Faqs */
+            faqs?: components["schemas"]["FaqIn"][];
+            /** Objeciones */
+            objeciones?: components["schemas"]["ObjectionIn"][];
+            /** Situaciones Sugeridas */
+            situaciones_sugeridas?: components["schemas"]["SuggestedIn"][];
+            /** Notas */
+            notas?: string | null;
+        };
+        /** VersionSummary */
+        VersionSummary: {
+            /** Version */
+            version: number;
+            /** Estado */
+            estado: string;
+            /** Evals Ok */
+            evals_ok: boolean | null;
+            /** Publicada En */
+            publicada_en: string | null;
+        };
+        /** VersionView */
+        VersionView: {
+            /** Reglas */
+            reglas: components["schemas"]["RuleIn"][];
+            /** Faqs */
+            faqs?: components["schemas"]["FaqIn"][];
+            /** Objeciones */
+            objeciones?: components["schemas"]["ObjectionIn"][];
+            /** Situaciones Sugeridas */
+            situaciones_sugeridas?: components["schemas"]["SuggestedIn"][];
+            /** Notas */
+            notas?: string | null;
+            /** Kind */
+            kind: string;
+            /** Key */
+            key: string;
+            /** Version */
+            version: number;
+            /** Estado */
+            estado: string;
+            /** Evals */
+            evals: {
+                [key: string]: unknown;
+            } | null;
+            /** Evals Vigentes */
+            evals_vigentes: boolean;
+            /** Publicada En */
+            publicada_en: string | null;
+        };
+        /** WebSourceRequest */
+        WebSourceRequest: {
+            /** Url */
+            url: string;
+            /** Title */
+            title?: string | null;
+        };
         /** WhatsAppNumberResponse */
         WhatsAppNumberResponse: {
             /**
@@ -2561,6 +5147,15 @@ export interface components {
              * Format: date-time
              */
             connected_at: string;
+        };
+        /** Window */
+        Window: {
+            /** Abierta */
+            abierta: boolean;
+            /** Cierra En */
+            cierra_en: string | null;
+            /** Por Cerrar */
+            por_cerrar: boolean;
         };
     };
     responses: never;
@@ -2587,6 +5182,773 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    list_inbox_api_v1_tenant_conversations_get: {
+        parameters: {
+            query?: {
+                filtro?: "todas" | "agente" | "necesitan_humano" | "tomadas" | "mias" | "cerradas";
+                q?: string | null;
+                pruebas?: boolean;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    conversation_detail_api_v1_tenant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    conversation_thread_api_v1_tenant_conversations__conversation_id__messages_get: {
+        parameters: {
+            query?: {
+                antes_de?: string | null;
+            };
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    send_message_api_v1_tenant_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendResult"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `outside_24h_window`: the customer has not written in 24 hours */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    message_image_api_v1_tenant_conversations__conversation_id__messages__message_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageLink"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    take_conversation_api_v1_tenant_conversations__conversation_id__takeover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    release_conversation_api_v1_tenant_conversations__conversation_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    steal_conversation_api_v1_tenant_conversations__conversation_id__steal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_tenant_conversations__conversation_id__notes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_note_api_v1_tenant_conversations__conversation_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    close_conversation_api_v1_tenant_conversations__conversation_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reopen_conversation_api_v1_tenant_conversations__conversation_id__reopen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_taken` (with `by`), `not_holder`, `closed` or `another_open` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    opt_out_contact_api_v1_tenant_conversations__conversation_id__opt_out_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_settings__api_v1_tenant_notification_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenant_notification_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -2663,6 +6025,1603 @@ export interface operations {
             };
             /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_situations_api_v1_assistant_situations_get: {
+        parameters: {
+            query?: {
+                estado?: ("borrador" | "activa" | "inactiva") | null;
+                origen?: ("manual" | "sugerida_rubro" | "migrada" | "aprendida") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_situation_api_v1_assistant_situations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SituationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_from_suggested_api_v1_assistant_situations_desde_sugerida__suggested_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggested_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromSuggestedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_situation_api_v1_assistant_situations__situation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                situation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `situation_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_situation_api_v1_assistant_situations__situation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                situation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SituationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `situation_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_situation_api_v1_assistant_situations__situation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                situation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `situation_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    activate_situation_api_v1_assistant_situations__situation_id__activar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                situation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `situation_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deactivate_situation_api_v1_assistant_situations__situation_id__desactivar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                situation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SituationResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `situation_not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_assistant_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_process_api_v1_assistant_process_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_process_api_v1_assistant_process_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    switch_rule_api_v1_assistant_rules__kind___rule_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SwitchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_rule` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_rubro_api_v1_assistant_rubro_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubroView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    mark_news_seen_api_v1_assistant_novedades__kind__vistas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    prompt_preview_api_v1_assistant_prompt_preview_get: {
+        parameters: {
+            query?: {
+                stage?: components["schemas"]["Stage"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptPreview"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_section_api_v1_assistant_business_info__section__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section: "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_section_api_v1_assistant_business_info__section__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section: "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SectionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_faqs_api_v1_assistant_faqs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FaqList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_faq_api_v1_assistant_faqs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaqRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FaqResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_faq_api_v1_assistant_faqs__faq_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                faq_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_faq_api_v1_assistant_faqs__faq_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                faq_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaqPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FaqResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_promotions_api_v1_assistant_promotions_get: {
+        parameters: {
+            query?: {
+                vigentes?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_promotion_api_v1_assistant_promotions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_promotion_api_v1_assistant_promotions__promotion_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromotionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromotionResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_promotion_api_v1_assistant_promotions__promotion_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                promotion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_behavior_api_v1_assistant_behavior_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BehaviorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_behavior_api_v1_assistant_behavior_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BehaviorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BehaviorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `plan_limit`: the level is not in the plan (only with billing on) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_categories_api_v1_assistant_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_category_api_v1_assistant_categories__category_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `category_exists` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_overview_api_v1_assistant_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_media_api_v1_assistant_media_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    upload_media_api_v1_assistant_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_media_api_v1_assistant_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `storage_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_media_api_v1_assistant_media__asset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_media_api_v1_assistant_media__asset_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    replace_media_file_api_v1_assistant_media__asset_id__file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_replace_media_file_api_v1_assistant_media__asset_id__file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3135,6 +8094,423 @@ export interface operations {
             };
         };
     };
+    plans_api_v1_tenant_billing_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Catalog"];
+                };
+            };
+        };
+    };
+    overview_api_v1_tenant_billing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingOut"];
+                };
+            };
+        };
+    };
+    checkout_api_v1_tenant_billing_checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    change_plan_api_v1_tenant_billing_change_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePlanBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeResult"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_tenant_billing_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resume_api_v1_tenant_billing_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    addon_checkout_api_v1_tenant_billing_addons__addon_id__checkout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                addon_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_charge_api_v1_tenant_billing_charges__charge_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChargeOut"];
+                };
+            };
+            /** @description `plan_not_purchasable` or `coupon_invalid` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `insufficient_role`: only the owner buys */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_plan` or `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `use_change_plan`, `no_active_subscription`, `same_plan`, `downgrade_blocked` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    receipt_api_v1_tenant_billing_payments__payment_id__receipt_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_requests_api_v1_tenant_connection_requests_get: {
         parameters: {
             query?: never;
@@ -3280,6 +8656,104 @@ export interface operations {
             };
         };
     };
+    conversation_state_api_v1_tenant_conversations__conversation_id__state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationStateOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the conversation does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resume_conversation_bot_api_v1_tenant_conversations__conversation_id__resume_bot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationStateOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: the conversation does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_knowledge_api_v1_tenant_knowledge_get: {
         parameters: {
             query?: never;
@@ -3406,6 +8880,55 @@ export interface operations {
             };
         };
     };
+    get_knowledge_source_api_v1_tenant_knowledge__source_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     delete_knowledge_source_api_v1_tenant_knowledge__source_id__delete: {
         parameters: {
             query?: never;
@@ -3449,6 +8972,441 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_knowledge_source_api_v1_tenant_knowledge__source_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceResponse"];
+                };
+            };
+            /** @description `validation_error` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `source_busy`: it is being indexed right now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_web_source_api_v1_tenant_knowledge_web_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebSourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateSourceResponse"];
+                };
+            };
+            /** @description `invalid_url` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `rag_limit_exceeded` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` or `plan_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resync_knowledge_source_api_v1_tenant_knowledge__source_id__resync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `source_busy` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `indexing_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    knowledge_source_chunks_api_v1_tenant_knowledge__source_id__chunks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied`, or `insufficient_role` for an `operator` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    metrics_api_v1_tenant_metrics_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    export_api_v1_tenant_metrics_export_csv_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+        };
+    };
+    get_settings__api_v1_tenant_metrics_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSettings"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenant_metrics_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricsSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSettings"];
+                };
+            };
+        };
+    };
+    platform_metrics_api_v1_platform_admin_metrics_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    model_costs_api_v1_platform_admin_model_costs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCostOut"][];
+                };
+            };
+        };
+    };
+    set_model_cost_api_v1_platform_admin_model_costs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCostBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCostOut"];
                 };
             };
         };
@@ -3992,6 +9950,7 @@ export interface operations {
                 search?: string | null;
                 status?: ("trial" | "active" | "paused" | "archived") | null;
                 limit?: number;
+                incluir_prueba?: boolean;
             };
             header?: never;
             path?: never;
@@ -4235,6 +10194,509 @@ export interface operations {
             };
             /** @description `not_found` - including for a caller who is not a platform admin */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    subscriptions_api_v1_platform_admin_billing_subscriptions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionRow"][];
+                };
+            };
+        };
+    };
+    record_payment_api_v1_platform_admin_billing_payments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualPaymentBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRow"];
+                };
+            };
+            /** @description `not_found`: no charge with that reference */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `charge_not_pending` or `amount_mismatch` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    refund_api_v1_platform_admin_billing_payments__payment_id__refund_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefundBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentRow"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_refunded` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    coupons_api_v1_platform_admin_billing_coupons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponRow"][];
+                };
+            };
+        };
+    };
+    create_coupon_api_v1_platform_admin_billing_coupons_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponRow"];
+                };
+            };
+            /** @description `coupon_exists` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    extend_api_v1_platform_admin_billing_tenants__tenant_id__extend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtendBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_active_subscription` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_catalog_api_v1_platform_admin_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogList"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_version_api_v1_platform_admin_catalog__kind___key__versions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionView"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_draft_api_v1_platform_admin_catalog__kind___key__versions__number__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VersionContent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionView"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `version_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    new_draft_api_v1_platform_admin_catalog__kind___key__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionView"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `draft_exists` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    run_evals_api_v1_platform_admin_catalog__kind___key__versions__number__evals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `version_frozen` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `queue_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    publish_api_v1_platform_admin_catalog__kind___key__versions__number__publicar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "proceso" | "rubro";
+                key: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionView"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `version_frozen` or `evals_not_passed` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5043,6 +11505,8 @@ export interface operations {
                     interactive_id?: string | null;
                     /** Title */
                     title?: string | null;
+                    /** Situaciones Prueba */
+                    situaciones_prueba?: string[];
                 };
                 "multipart/form-data": {
                     /** Format: binary */

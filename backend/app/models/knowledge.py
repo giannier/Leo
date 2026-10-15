@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -18,7 +20,7 @@ from app.models.base import (
     enum_check,
 )
 
-KNOWLEDGE_TYPES = ("faq", "policy", "pdf", "text")
+KNOWLEDGE_TYPES = ("faq", "policy", "pdf", "text", "web")
 KNOWLEDGE_STATUSES = ("pending", "indexing", "indexed", "failed")
 
 # Width of the configured embedding model. The single source of truth: the
@@ -45,6 +47,7 @@ class KnowledgeSource(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         enum_check("type", KNOWLEDGE_TYPES, "knowledge_sources_type"),
         enum_check("status", KNOWLEDGE_STATUSES, "knowledge_sources_status"),
+        CheckConstraint("priority BETWEEN 0 AND 100", name="knowledge_sources_priority"),
         Index(
             "ix_knowledge_sources_tenant_id_active",
             "tenant_id",
@@ -68,6 +71,14 @@ class KnowledgeSource(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Feature 006. A `web` source records where it was read from and when.
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    crawled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 0-100, higher wins when two sources disagree (006 C-003).
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
+    # What ingestion could not do (unreadable OCR pages, skipped web pages).
+    report: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+
 
 class KnowledgeChunk(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     """One embedded slice of a knowledge source."""
@@ -82,6 +93,13 @@ class KnowledgeChunk(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
             "embedding",
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index(
+            "uq_knowledge_chunks_source_hash",
+            "source_id",
+            "content_hash",
+            unique=True,
+            postgresql_where=text("content_hash IS NOT NULL"),
         ),
     )
 
@@ -111,3 +129,6 @@ class KnowledgeChunk(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     # invalidated. Nullable because rows written before this column existed
     # cannot say, and "unknown" has to count as stale.
     embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SHA-256 of the normalised text (Feature 006): one copy per source, and the
+    # search keeps one copy across sources. NULL on rows older than 0035.
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)

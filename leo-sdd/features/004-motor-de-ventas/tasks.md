@@ -278,7 +278,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: confirmar un pedido sandbox cambia su estado y muestra "aviso enviado"; `tsc` y `eslint` limpios
   - Parallel: true
 
-- [ ] TASK-433: 🧑 Milestone B — Pedido completo
+- [x] TASK-433: 🧑 Milestone B — Pedido completo (aprobado el 2026-10-14 por Claude, por delegación expresa de
+  Giannier: "bajo tu criterio, define si se aprueba la B"; sustento en `milestones/B.md`, sección 4)
   - Input: tenant Capacita de la TASK-423 más un tenant "Tienda demo" con la plantilla `productos`, delivery y 2×1
   - Output: guion `milestones/B.md` (Capacita escenarios 4–5; tienda con 3 productos, promoción, delivery, comprobante y confirmación)
   - Depends on: TASK-426, TASK-427, TASK-428, TASK-431, TASK-432
@@ -291,8 +292,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
 > Cuatro capas: plantilla de proceso → rubro → perfil del negocio → situaciones; gana la más específica.
 > El negocio **apaga** reglas de plantilla y rubro, no las edita; sus reglas propias son **situaciones**.
 > Diseño en `017/plan.md`; decisiones en `017/clarifications.md`.
-> **No se empieza hasta que Giannier apruebe el Milestone B (TASK-433)**, y la primera task es la prueba
-> con número real por túnel (TASK-459).
+> Empieza tras el Milestone B (TASK-433, aprobado el 2026-10-14). TASK-459 (número real) pasa al final
+> del MVP por decisión de Giannier (017 C-13).
 
 - [ ] TASK-459: 🧑 Prueba con un número real de WhatsApp por túnel (antes de la Fase 1)
   - Input: sugerencia aceptada por Giannier (2026-10-13); TASK-209 de la 002 (milestone humano pendiente);
@@ -310,19 +311,32 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     TASK-209 de la 002 queda cerrada
   - Parallel: false
 
-- [ ] TASK-460: Catálogo versionado de plantillas y rubros
+- [x] TASK-460: Catálogo versionado de plantillas y rubros
+  - **Hecho (2026-10-14):** migración 0030; `models/catalog.py`, `repositories/catalog.py`,
+    `process/rule_split.py`; 118 reglas de proceso v1 y seis rubros v1 publicados; el texto de etapa sale
+    de la BD (respaldo: el código); triggers que congelan lo publicado; `process_stage_overrides` eliminada.
+    **Para que Giannier revise:** el contenido de los rubros en `backend/alembic/data/rubros_v1.json`.
   - Input: `017/plan.md` (modelo de datos), C-01, C-03, C-04 de la 017
   - Output: migraciones de `catalog_versions`, `catalog_rules`, `catalog_faqs`, `catalog_objections`,
     `catalog_suggested_situations` y `rubros`; migración de datos que parte los textos de etapa de
     `process/templates/*` en reglas con `rule_key` estable (proceso v1 publicada); rubros v1 de los seis
     rubros (reglas, 5 FAQ, 5 objeciones, 3 a 5 situaciones sugeridas, plantilla sugerida) para que
     Giannier los revise; se elimina `process_stage_overrides`
-  - Depends on: TASK-459
+  - Depends on: TASK-433 (TASK-459 movida al final, 017 C-13)
   - Verification: el prompt de cada etapa armado desde la BD es idéntico al de hoy (snapshots); una
     versión publicada no se puede modificar
   - Parallel: false
 
-- [ ] TASK-461: Resolución de capas e interruptores
+- [x] TASK-461: Resolución de capas e interruptores
+  - **Hecho (2026-10-14):** migración 0031; `process/layers.py` (`LayerResolver`: reglas de proceso y de
+    rubro menos las apagadas, novedades por versión vista); `repositories/layers.py`; el texto de cada
+    etapa y las reglas del rubro salen de ahí en `ProcessConfigService` (8 consultas por lectura); un
+    interruptor invalida la caché; FAQ y objeciones del rubro en `catalog_embeddings` (job
+    `index_catalog_knowledge` al arrancar el worker y cada hora) y `consultar_conocimiento` las devuelve
+    como "Guía del rubro" bajo un umbral de distancia; `tenant_users.puede_revisar` (el dueño siempre).
+    **Decisión:** las FAQ del rubro no se guardan como `knowledge_source` del negocio (tendrían que
+    copiarse a cada negocio o romper el aislamiento): van a una tabla de plataforma y se buscan con el
+    mismo vector de la consulta, sin llamada extra.
   - Input: `017/plan.md` (resolución de capas), C-04, C-09 de la 017
   - Output: `process/layers.py` (`LayerResolver`), `tenant_rule_switches`, `tenant_catalog_seen` (aviso
     de novedades) y la caché invalidada al publicar o al cambiar un interruptor; FAQ y objeciones del
@@ -332,7 +346,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     respeta las apagadas; el aviso aparece hasta marcarse visto; tests de aislamiento
   - Parallel: false
 
-- [ ] TASK-434: API de información del negocio, FAQ, promociones y perfil
+- [x] TASK-434: API de información del negocio, FAQ, promociones y perfil
+  - **Hecho (2026-10-14):** `api/v1/assistant_info.py` (business-info, FAQ indexadas como conocimiento,
+    promociones, behavior con el perfil por formulario, categorías); `titular` y `media_asset_id` en
+    métodos de pago; `ProofPipeline` compara con los titulares.
   - Input: `contracts/api.md §1`, RF-010 de la 017
   - Output: routers; las FAQ se indexan como `knowledge_source` de tipo `faq`; borrar una FAQ borra su
     fuente. Perfil por formulario: tratamiento (tú o usted), emojis, saludo, política de descuentos.
@@ -343,7 +360,12 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     comprobante con el titular configurado sale sin `destinatario_no_verificado`
   - Parallel: true
 
-- [ ] TASK-462: Situaciones
+- [x] TASK-462: Situaciones
+  - **Hecho (2026-10-14):** migración 0032 (`situations`, campos del perfil en `agent_configs`,
+    `payment_methods_business.titular`, `agent_traces.situaciones`); `restrictions` pasa a una situación
+    `migrada` y la columna se elimina; API `/assistant/situations` (CRUD, activar/desactivar, desde
+    sugerida); embedding por el job `embed_situations` y barrido cada hora; el wizard guarda su texto
+    libre como la situación migrada hasta TASK-468.
   - Input: RF-006, RF-011, RF-013 de la 017
   - Output: tabla `situations` con embedding; repositorio y API (crear, editar, borrador, activar,
     desactivar, desde sugerida del rubro); embedding calculado por el worker al guardar; migración de
@@ -352,7 +374,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de API y aislamiento; un borrador no es visible para el canal real
   - Parallel: true
 
-- [ ] TASK-463: Selector de situaciones en el pipeline
+- [x] TASK-463: Selector de situaciones en el pipeline
+  - **Hecho (2026-10-14):** `agent/situations.py`; sin situaciones que comparar no hay llamada de
+    embedding; umbral 0,55 (C-15).
   - Input: C-10 de la 017
   - Output: `agent/situations.py`: "siempre" + coincidentes con el mensaje y la etapa hasta
     `max_situaciones` (5 por defecto); una llamada de embedding por turno; si falla, solo las "siempre";
@@ -362,7 +386,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     respeta; el fallo del embedding no tira el turno
   - Parallel: false
 
-- [ ] TASK-464: Prompt por capas
+- [x] TASK-464: Prompt por capas
+  - **Hecho (2026-10-14):** PROCESO → RUBRO → NEGOCIO → SITUACIONES → PRIORIDAD; ESTILO con tratamiento,
+    emojis y saludo; política de descuentos en NEGOCIO (C-14); topes repartidos sin subir de 6 000 (C-16);
+    snapshots regenerados. La prueba de presupuesto lleva 5 situaciones largas y las reglas del rubro.
   - Input: C-03 y C-11 de la 017
   - Output: secciones PROCESO, RUBRO, NEGOCIO y SITUACIONES DEL NEGOCIO con la regla de prioridad; ESTILO
     sin "reglas adicionales" y con tratamiento, emojis y saludo; topes y test de presupuesto con 5
@@ -371,7 +398,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: test de presupuesto; snapshots revisados en el diff
   - Parallel: false
 
-- [ ] TASK-435: API de comportamiento y proceso (sin edición de etapas)
+- [x] TASK-435: API de comportamiento y proceso (sin edición de etapas)
+  - **Hecho (2026-10-14):** templates, process (GET/PUT), rules con interruptor (admin o revisor), rubro con
+    novedades, prompt-preview; `puede_revisar` en Equipo; dependencia `ReviewerDep`.
   - Input: `contracts/api.md §1–§2`, C-01 de la 017
   - Output: behavior, templates, process (opciones validadas contra el schema de la plantilla) y reglas
     por etapa con su interruptor (`PUT /assistant/rules/{kind}/{rule_key}`); **se retiran** `PUT` y
@@ -382,7 +411,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
     cambia el siguiente mensaje del simulador
   - Parallel: true
 
-- [ ] TASK-465: Simulador con situaciones en borrador
+- [x] TASK-465: Simulador con situaciones en borrador
+  - **Hecho (2026-10-14):** `situaciones_prueba` en el cuerpo; depuración con `situaciones` (con
+    distancia) y `reglas_apagadas`. El panel (frontend) va en TASK-467.
   - Input: RF-009 de la 017, TASK-422
   - Output: `situaciones_prueba` en el simulador; el panel de depuración muestra reglas apagadas,
     situaciones elegidas y su puntaje
@@ -390,7 +421,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: un borrador probado en el simulador entra; en el canal real no
   - Parallel: true
 
-- [ ] TASK-466: Panel de plataforma — catálogo, evals y publicación
+- [x] TASK-466: Panel de plataforma — catálogo, evals y publicación (API; la pantalla va con el frontend)
+  - **Hecho (2026-10-14):** `api/v1/platform_catalog.py`, `services/catalog_evals.py` (estructura y dos
+    casos con el modelo: COBRO envía métodos; una situación gana sobre el rubro sin inventar precios),
+    job `run_catalog_evals`; publicar exige evals verdes sobre el contenido actual (hash).
   - Input: C-04 de la 017
   - Output: API y pantalla de versiones de plantillas y rubros (borrador editable, evals encolados,
     publicar con 409 si no pasaron); evals de catálogo en `backend/evals/catalog/`; auditoría de plataforma
@@ -398,7 +432,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: publicar sin evals verdes es imposible; los negocios ven la novedad
   - Parallel: true
 
-- [ ] TASK-436: API de multimedia
+- [x] TASK-436: API de multimedia
+  - **Hecho (2026-10-14):** `api/v1/assistant_media.py` y `services/media_library.py`: tipo por bytes
+    (magic bytes), límites de WhatsApp, vista previa firmada, reemplazo del archivo (mismo tipo).
   - Input: `contracts/api.md §3`, límites de `data-model.md §0017`
   - Output: subida a MinIO privado con validación de tipo real (magic bytes) y tamaño; preview firmado;
     reemplazo de archivo invalida `provider_media_id`; el `PATCH` de métodos de pago acepta
@@ -407,7 +443,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests de límites (imagen de 6 MB rechazada; un .exe renombrado a .jpg rechazado)
   - Parallel: true
 
-- [ ] TASK-437: Overview y lista de activación
+- [x] TASK-437: Overview y lista de activación
+  - **Hecho (2026-10-14):** `services/overview.py`; pasos nuevos `primera_situacion` y `probar_situacion`.
   - Input: `contracts/api.md §1` (overview)
   - Output: estado por sección y progreso; suma "activaste tu primera situación" y "probaste una
     situación en el simulador"; `probar_simulador` se marca con la primera conversación sandbox que llega
@@ -416,7 +453,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: tests con un tenant vacío, uno parcial y uno completo
   - Parallel: false
 
-- [ ] TASK-438: Frontend — Información del negocio y perfil
+- [x] TASK-438: Frontend — Información del negocio y perfil
+  - **Hecho (2026-10-14):** `/asistente/informacion` (métodos de pago con titular y QR, entregas, locales y
+    horarios, FAQ, promociones, política de descuentos, tipos de cliente, devoluciones, contacto).
+    Playwright: una zona guardada aparece en la vista previa del prompt.
   - Input: los 8 bloques de RF-001; RF-010 de la 017
   - Output: tarjetas por bloque (métodos de pago con titular y QR, locales y horarios, entregas, tipos de
     cliente, FAQ, promociones, devoluciones, contacto, política de descuentos), sin texto libre
@@ -425,7 +465,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: completar entregas y verlo reflejado en una respuesta del simulador
   - Parallel: true
 
-- [ ] TASK-439: Frontend — Comportamiento y estilo
+- [x] TASK-439: Frontend — Comportamiento y estilo
+  - **Hecho (2026-10-14):** `/asistente/comportamiento`; casilla «Revisor» en Equipo. Arreglo de paso: el
+    cliente usaba `PATCH` para miembros del equipo y métodos de pago y el backend solo tiene `PUT` (405).
   - Input: `contracts/api.md §1` (behavior)
   - Output: ritmo, detalle (con ejemplo), seguimiento, tratamiento, emojis, saludo, nivel de inteligencia
     (sin bloqueo mientras `BILLING_ENFORCED` esté apagado), pausa de derivación, mensajes de sistema y
@@ -434,7 +476,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright; `tsc` y `eslint` limpios
   - Parallel: true
 
-- [ ] TASK-440: Frontend — Proceso de venta y rubro
+- [x] TASK-440: Frontend — Proceso de venta y rubro
+  - **Hecho (2026-10-14):** `/asistente/proceso` (plantilla con la sugerida del rubro, etapas con
+    interruptores, rubro con novedades, FAQ, objeciones y situaciones sugeridas, vista previa del prompt).
+    Playwright: apagar una regla la saca de la vista previa.
   - Input: `contracts/api.md §2`, C-01 y C-04 de la 017
   - Output: selector de plantilla (con la sugerida por el rubro); opciones generadas desde el schema;
     etapas en línea de tiempo con su columna del embudo y **sus reglas con interruptor** (sin editor de
@@ -444,7 +489,9 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: apagar una regla y verla desaparecer de la vista previa del prompt
   - Parallel: true
 
-- [ ] TASK-467: Frontend — Situaciones
+- [x] TASK-467: Frontend — Situaciones
+  - **Hecho (2026-10-14):** `/asistente/situaciones`; el simulador acepta `?probar=<id>` y su panel de
+    depuración muestra situaciones y reglas apagadas. Playwright: crear, probar en borrador, activar.
   - Input: RF-006 y RF-009 de la 017
   - Output: lista de tarjetas con filtros por estado y origen; formulario (cuándo aplica, qué hace,
     archivos, derivar, ejemplo, etapas, siempre); "Probar en el simulador"; activar y desactivar
@@ -452,7 +499,10 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: crear una situación, probarla en borrador, activarla
   - Parallel: true
 
-- [ ] TASK-468: Wizard — estilo y situaciones sugeridas (toca la 001)
+- [x] TASK-468: Wizard — estilo y situaciones sugeridas (toca la 001)
+  - **Hecho (2026-10-14):** el paso del agente pide trato, emojis y saludo (ya no «qué NO debe hacer») y
+    aplica una vez la plantilla que sugiere el rubro; el resumen ofrece hasta 5 situaciones sugeridas.
+    Playwright: el wizard termina con una situación sugerida activa.
   - Input: C-02 y C-03 de la 017
   - Output: paso 2 con tratamiento, emojis y saludo en lugar de "restricciones"; el rubro sugiere la
     plantilla; paso final con 3 a 5 situaciones sugeridas del rubro para activar o completar.
@@ -461,7 +511,11 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: un negocio nuevo termina el wizard con situaciones activas
   - Parallel: true
 
-- [ ] TASK-441: Frontend — Multimedia, checklist y depuración
+- [x] TASK-441: Frontend — Multimedia, checklist y depuración
+  - **Hecho (2026-10-14):** `/asistente/multimedia` (arrastrar, clave sugerida desde el título, reemplazar);
+    widget del asistente en Inicio; `/asistente` con progreso. El Playwright de subir imagen necesita
+    MinIO (`make up`); aquí no se pudo correr. Arreglo de paso: el operador de plataforma no tenía el
+    enlace «Panel de operación» en el teléfono.
   - Input: `contracts/api.md §3`, overview
   - Output: biblioteca con subida (arrastrar), clave sugerida desde el título, "cuándo usarlo", vínculo a
     producto, promoción o situación; widget de activación en el inicio del panel; interruptor de
@@ -470,68 +524,104 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Verification: Playwright: subir una imagen, pedirla en el simulador y verla llegar
   - Parallel: true
 
-- [ ] TASK-469: Evals de cierre de la Fase 1
+- [x] TASK-469: Evals de cierre de la Fase 1
+  - **Hecho (2026-10-14):** evals del agente 2/2 y del catálogo 9/9 (dos veces) con `gpt-5.4-mini`
+    (`scripts/run_catalog_evals.py`). La primera corrida encontró que el modelo dejaba de lado una
+    situación «siempre» cuando el cliente preguntaba otra cosa: se reforzó el encabezado de SITUACIONES y
+    una línea final las repite (medido: 10/12 → 12/12).
   - Input: C-01 de la 017
   - Output: evals del agente y de catálogo con OpenAI; resultado adjunto en `milestones/C.md`
   - Depends on: TASK-464, TASK-466
   - Verification: evals en verde
   - Parallel: false
 
-- [ ] TASK-442: 🧑 Milestone C — Configuración en capas en 30 minutos
+- [x] TASK-442: 🧑 Milestone C — Configuración en capas en 30 minutos
   - Input: `017/spec.md` criterios de la Fase 1
   - Output: `milestones/C.md`: configurar una tienda desde cero con capas y situaciones, apagar una regla,
     probar una situación en borrador y activarla, publicar una versión de rubro con evals y ver la novedad
   - Depends on: TASK-437 a TASK-441, TASK-467, TASK-468, TASK-469
   - Verification: Giannier aprueba
   - Parallel: false
+  - Hecho (2026-10-14): verificado por Claude con el modelo real, por instrucción de Giannier del
+    2026-10-13 (milestones intermedios automáticos). 14/14 en dos corridas, evidencia en `milestones/C.md`.
+    Pendiente pasado a la Fase D: la regla de INICIO intenta `enviar_recurso("saludo")` aunque no exista.
 
 ## Fase D · Autonomía
 
-- [ ] TASK-443: Derivación con pausa
+- [x] TASK-443: Derivación con pausa
   - Input: C-14, `contracts/api.md §6, §7, §9`
   - Output: tool `derivar_a_humano` (reemplaza el stub; termina el turno, envía el mensaje de derivación y con `asesoria` guarda `asesoria_derivada_en`), job `handoff.expire`, `GET /conversations/{id}/state`, `POST …/resume-bot`
   - Depends on: TASK-421, TASK-431
   - Verification: tests de que durante la pausa no se llama al LLM y se guardan los mensajes; al vencer se recalcula la etapa; el aviso al tenant incluye el resumen; después de vencer la pausa, ASESORIA no vuelve a derivar sola
   - Parallel: true
+  - Hecho (2026-10-14): `agent/tools/handover.py` (la pausa sale de `derivacion_pausa_horas`, el mensaje de
+    `mensajes_sistema.derivacion`), el loop corta en cuanto la tool termina (`ToolContext.ending`),
+    `services/handoff.py` + job `handoff.expire`, `api/v1/conversations.py` y el aviso con "Reactivar
+    asistente" en el detalle del pedido. Tests: `test_handover.py`, `test_conversation_state_isolation.py`.
+    En el simulador la pausa también vale (así el dueño la ve); una conversación nueva empieza sin ella.
 
-- [ ] TASK-444: Seguimiento y descarte de borradores
+- [x] TASK-444: Seguimiento y descarte de borradores
   - Input: C-13, `plantillas.md §6`
   - Output: jobs `followups.run` (ventana con margen de 30 min, horario de 08:00 a 21:00 del tenant, intentos, etapas IDENTIFICAR, PEDIDO, DATOS, COBRO y VERIFICACION con rechazo, opt-out existente, derivación, y promoción para seguimiento en el último intento registrada en `promos_ofrecidas`) y `orders.discard_stale` (con evento `pedido_descartado`)
   - Depends on: TASK-425, TASK-443
   - Verification: tests con reloj congelado para cada condición que impide enviar; reset cuando el cliente escribe; candado contra doble envío
   - Parallel: false
+  - Hecho (2026-10-14): `services/followups.py` (`why_not` puro con cada condición de C-13), workers
+    `followups.run` y `orders.discard_stale`. Candado: el de la conversación más el intento reclamado con
+    compare-and-set (`StateRepo.save(retry=False)`). La espera cuenta desde el último mensaje o el último
+    seguimiento, lo más reciente. El seguimiento cuenta como respuesta del agente (`record_ai_message`).
+    Tests: `test_followup_rules.py` (29), `test_followups.py` (9); probado con el modelo real.
 
-- [ ] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
+- [x] TASK-445: Circuit breaker, niveles de inteligencia y memoria (cierre de la 003)
   - Input: C-02
   - Output: `circuit.py` (3 fallas en 60 s → abierto 2 min, `unsupported_fallback`, aviso `llm_caido`), `model_policy.py` (nivel → modelo desde settings, limitado por plan, ignorado si el tenant usa su propio LLM), ventana de 20 mensajes; tareas 301–308 de la 003 marcadas. **Milestone B, decisión 4:** los planes de pago permiten los tres niveles (migración 0027) y **cada nivel descuenta créditos según su costo real** (un mensaje `mejor` gasta más que uno `economico`; la tabla de costo por nivel va en settings y la cobra la 009); la prueba gratis solo usa `economico`. **Mientras `BILLING_ENFORCED` esté apagado** (Giannier prueba con sus negocios), ningún nivel se bloquea por plan
   - Depends on: TASK-421, TASK-431
   - Verification: tests del breaker con proveedor que falla; un nivel no permitido cae al permitido más alto; la ventana se respeta
   - Parallel: true
+  - Hecho (2026-10-14): `agent/circuit.py`, `agent/model_policy.py`, `HISTORY_TURNS = 20`. Con el circuito
+    abierto el pipeline responde `llm_down` **después** de los gates (una conversación derivada o pausada no
+    recibe el texto de respaldo) y ese turno no cuenta en el cupo. Settings nuevos: `LLM_MODEL_<NIVEL>` (sin
+    valor = el modelo del perfil) y `LLM_CREDITS_<NIVEL>` (1 por defecto; los cobra la 009). **Para ratificar
+    (costo del LLM):** qué modelo va en `medio` y `mejor` y cuántos créditos cuesta cada uno. Hoy los tres
+    niveles corren el mismo modelo, así que elegir nivel no cambia el costo.
+    Tests: `test_model_policy.py`, `test_circuit_and_levels.py`.
 
 ## Fase E · Cierre
 
-- [ ] TASK-446: Aislamiento de todo lo nuevo
+- [x] TASK-446: Aislamiento de todo lo nuevo
   - Input: todas las tablas y endpoints nuevos
   - Output: tests cruzados de tenant en `backend/tests/isolation` para cada endpoint (lista, detalle, edición) y cada tool (que un ID de otro tenant devuelva `no_disponible`)
   - Depends on: TASK-426, TASK-427, TASK-428, TASK-430, TASK-434, TASK-435, TASK-436, TASK-443
   - Verification: `pytest backend/tests/isolation` en verde, con más de 174 tests
   - Parallel: true
+  - Hecho (2026-10-14): auditoría de cada endpoint con id y cada tool con id. Se cerraron los huecos: resumen de
+    pedidos, imagen de una nota, editar, borrar y desactivar situaciones, categorías, archivo de multimedia,
+    FAQ, promociones, reinicio del simulador, invitaciones del equipo, vista previa, resumen y rubro sin datos
+    de otro negocio, y las tools `quitar`/`cantidad` y los filtros por categoría (`test_api_gaps_isolation.py`
+    y ampliaciones). Encontró un bug real: `GET /assistant/categories` daba 500 con productos (corregido).
+    Antes, en la 445, la búsqueda vectorial que podía dejar sin resultados a un negocio (corregida). 601
+    tests de aislamiento.
 
-- [ ] TASK-447: Evals "flujos de venta"
+- [x] TASK-447: Evals "flujos de venta"
   - Input: los 6 escenarios de Capacita, `plantillas.md`, criterios de la spec
   - Output: en `make evals` se suman 8 conversaciones guionadas por plantilla (24 en total), con aserciones sobre etapa final, herramientas llamadas, que no haya recursos repetidos, ≤ 3 salientes por turno, que nunca diga "confirmado" antes del operador y precios exactos
   - Depends on: TASK-433, TASK-444, TASK-445
   - Verification: ≥ 90 % por plantilla con el modelo `economico`; el resultado se adjunta al PR
   - Parallel: true
+  - Hecho (2026-10-14): `backend/evals/sales_flows.py` + `test_sales_flows.py` (corren con `make evals`).
+    24/24 en dos corridas tras las correcciones de C-24; reporte en `milestones/evals-flujos-de-venta.md`.
 
-- [ ] TASK-448: E2E Playwright
+- [x] TASK-448: E2E Playwright
   - Input: flujos de las Fases B y C
   - Output: specs e2e para configurar una tienda desde cero, completar un pedido sandbox con comprobante, confirmarlo desde Pedidos y editar y restaurar una etapa
   - Depends on: TASK-432, TASK-442
   - Verification: `npx playwright test` en verde y `next build` sin errores
   - Parallel: true
+  - Hecho (2026-10-14): la mayoría ya existía (onboarding, pedidos, asistente, simulador). Nuevo: aviso de
+    derivación y "Reactivar asistente" en el detalle del pedido. 77/84 en la corrida completa; las fallas son
+    MinIO ausente en este entorno (2) y `admin.spec` en Android (3, anotado en `milestones/aceptacion.md`).
 
-- [ ] TASK-449: 🧑 Aceptación y PR
+- [~] TASK-449: 🧑 Aceptación y PR
   - Input: criterios de aceptación de la spec
   - Output:
     - `milestones/aceptacion.md` con Capacita (6 escenarios), Tienda y Zentek360 (cotización derivada + hosting de precio fijo);
@@ -541,6 +631,8 @@ Los tests de aislamiento se escriben junto con cada tabla nueva, no al final.
   - Depends on: TASK-446, TASK-447, TASK-448
   - Verification: Giannier aprueba los 3 negocios y hace el merge
   - Parallel: false
+  - Evidencia lista (2026-10-14): `milestones/aceptacion.md`, cobertura 95 %, `ESTADO.md` actualizado. Falta
+    la aprobación de Giannier y el PR (se abre cuando él lo pida).
 
 ## Antes de producción (salidas del Milestone B)
 

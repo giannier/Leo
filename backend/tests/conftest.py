@@ -24,7 +24,7 @@ Tenant-scoped counts are fine and immune by construction - that is the point
 of them. The rule is about reads that cross the whole table.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from fastapi import FastAPI
@@ -64,3 +64,14 @@ def billing_on(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.core.config import get_settings
 
     monkeypatch.setattr(get_settings(), "billing_enforced", True)
+
+
+@pytest.fixture(autouse=True)
+def inbox_events() -> Iterator[list[tuple[str, str]]]:
+    """The inbox's real-time events, recorded instead of published (Feature 007)."""
+    from app.core import events
+
+    recorded: list[tuple[str, str]] = []
+    events.set_publisher(lambda channel, data: recorded.append((channel, data)))
+    yield recorded
+    events.set_publisher(None)

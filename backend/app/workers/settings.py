@@ -27,14 +27,33 @@ from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.billing import CALENDAR_JOB, billing_calendar
+from app.workers.catalog_evals import run_catalog_evals
+from app.workers.catalog_indexer import index_catalog_knowledge
 from app.workers.channel import (
     answer_conversation,
     process_webhook_event,
     retry_stranded_replies,
 )
+from app.workers.followups import (
+    DISCARD_JOB,
+    FOLLOW_UP_JOB,
+    discard_stale_orders,
+    run_followups,
+)
+from app.workers.handoff import EXPIRE_JOB, expire_handoff_pauses
+from app.workers.inbox import (
+    AUTO_RETURN_JOB,
+    UNATTENDED_JOB,
+    auto_return_takeovers,
+    email_unattended_handovers,
+)
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
+from app.workers.metrics import PURGE_JOB, ROLLUP_JOB, metrics_purge, metrics_rollup
+from app.workers.situations import embed_situations
 from app.workers.trial_lifecycle import (
     tenant_archiver,
     trial_enforcer,
@@ -65,6 +84,10 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["session_factory"] = get_session_factory()
     ctx["storage"] = build_storage_provider()
     ctx["pdf_extractor"] = PypdfTextExtractor()
+    ctx["web_fetcher"] = HttpxWebFetcher(
+        timeout_seconds=settings.knowledge_web_timeout_seconds,
+        max_bytes=settings.knowledge_web_max_page_bytes,
+    )
     # Embeddings are always platform-funded, never the tenant's own key -
     # see `app/models/llm_settings.py` for why that is not configurable.
     ctx["llm"] = platform_provider(settings)
@@ -75,6 +98,11 @@ async def startup(ctx: dict[str, Any]) -> None:
     # The channel adapter. Stateless - credentials travel with each call - so
     # one instance serves every tenant.
     ctx["whatsapp"] = YCloudProvider(base_url=settings.ycloud_base_url)
+    try:
+        # The rubro knowledge must exist before the first question about it.
+        await index_catalog_knowledge(ctx)
+    except Exception:  # noqa: BLE001 - a missing key must not stop the worker
+        logger.warning("could not index the catalogue knowledge at startup")
     logger.info("worker ready")
 
 
@@ -82,6 +110,7 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("llm", None)
     ctx.pop("storage", None)
     ctx.pop("pdf_extractor", None)
+    ctx.pop("web_fetcher", None)
     ctx.pop("email", None)
     ctx.pop("whatsapp", None)
 
@@ -89,7 +118,14 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
-    functions = [index_knowledge_source, process_webhook_event, answer_conversation]
+    functions = [
+        index_knowledge_source,
+        process_webhook_event,
+        answer_conversation,
+        index_catalog_knowledge,
+        embed_situations,
+        run_catalog_evals,
+    ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
     # that fires at :00 competes with everything else that fires at :00.
@@ -113,6 +149,66 @@ class WorkerSettings:
         # provider still holds for 48 hours has time to be uploaded again
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
+        cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
+        # Feature 009: renewals, the end of a period and dunning, once an hour.
+        cron(billing_calendar, name=f"cron:{CALENDAR_JOB}", minute=27),
+        # Feature 010: yesterday's metrics after midnight in Lima (06:15 UTC), then the purge.
+        cron(metrics_rollup, name=f"cron:{ROLLUP_JOB}", hour=6, minute=15),
+        cron(metrics_purge, name=f"cron:{PURGE_JOB}", hour=7, minute=5),
+        cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
+        # Every five minutes (`contracts/api.md` section 9): a pause that ran out
+        # gives the bot back within five minutes of its `hasta`.
+        # Feature 007: idle takeovers back to the agent, unattended handovers emailed.
+        cron(
+            auto_return_takeovers,
+            name=f"cron:{AUTO_RETURN_JOB}",
+            minute={3, 8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58},
+        ),
+        cron(
+            email_unattended_handovers,
+            name=f"cron:{UNATTENDED_JOB}",
+            minute={
+                0,
+                2,
+                4,
+                6,
+                8,
+                10,
+                12,
+                14,
+                16,
+                18,
+                20,
+                22,
+                24,
+                26,
+                28,
+                30,
+                32,
+                34,
+                36,
+                38,
+                40,
+                42,
+                44,
+                46,
+                48,
+                50,
+                52,
+                54,
+                56,
+                58,
+            },
+        ),
+        # C-13: every 15 minutes, off the quarter hours.
+        cron(run_followups, name=f"cron:{FOLLOW_UP_JOB}", minute={4, 19, 34, 49}),
+        # 08:10 UTC is 03:10 in Lima (`contracts/api.md` section 9).
+        cron(discard_stale_orders, name=f"cron:{DISCARD_JOB}", hour=8, minute=10),
+        cron(
+            expire_handoff_pauses,
+            name=f"cron:{EXPIRE_JOB}",
+            minute={1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56},
+        ),
     ]
     on_startup = startup
     on_shutdown = shutdown

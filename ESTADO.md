@@ -8,13 +8,13 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 |---|---|---|
 | 001 Onboarding | Parcial (25/26 tasks) | TASK-001..025 marcadas `[x]`; TASK-026 (deploy Contabo) sin hacer. No existe `docker-compose.prod.yml` ni Caddy/Sentry/backups en `deploy/` |
 | 002 Canal WhatsApp | Hecho salvo milestone humano | TASK-201..208 `[x]`; 209 `[~]`: test de caos hecho, falta la prueba real con número propio |
-| 003 Agent-core | Parcial | `tasks.md` 301..308 sin marcar, pero existe motor v0 (`agent/core.py`), prompt builder, trazas, `catalog_guard`. No hay circuit breaker, memoria ni `model_policies` (no verificado en detalle) |
-| 004 Tools | Parcial | Solo 2 tools: catálogo y conocimiento (`agent/tools/catalog.py`). No hay tools de acción |
+| 003 Agent-core | Cerrada en versión mínima (2026-10-14) | 301..308 marcadas por la 004 (C-02, TASK-445): circuit breaker por tenant, nivel → modelo desde settings, ventana de 20 mensajes. Sin resumen continuo, perfil de contacto ni panel de `model_policies` |
+| 004 Motor de ventas | Fases A–E construidas (2026-10-14) | Milestones A, B y C aprobados; D (derivación, seguimientos, breaker) y E (aislamiento, evals de flujos, e2e, aceptación) hechos y verificados con el modelo real (`milestones/aceptacion.md`). Falta: TASK-459 número real (al final, por decisión de Giannier) y el merge |
 | 005 Catalog / 008 Inbox | Absorbidas | Catálogo CRUD+CSV/XLSX en 001 (TASK-011); inbox absorbido por 007 |
-| 006 Conocimiento avanzado | No iniciado | Solo RAG v0 (PDF con texto, sin OCR ni URL) |
-| 007 Inbox | No iniciado | No hay endpoints de conversaciones fuera del sandbox |
-| 009 Billing | No iniciado | `providers/payments/` vacío; solo existe la tabla `plans` con límites |
-| 010 Dashboard | No iniciado | Solo panel admin de plataforma y medidor de uso |
+| 006 Conocimiento avanzado | Construida (2026-10-14) | TASK-601..604 `[x]`: editar y reindexar sin estados a medias, dedup, OCR de escaneados con el modelo de visión, lectura de la web con protección SSRF, prioridad de fuentes, citas en simulador y bandeja, recall@5 en los evals, pantalla `/knowledge` (`006/milestones/conocimiento.md`). Para ratificar: costo del OCR (C-105). Web real de un cliente: con el número |
+| 007 Inbox | Construida (2026-10-14) | TASK-701..708 `[x]`: toma exclusiva, canal en vivo (WebSocket), API y pantalla `/bandeja`, búsqueda, auto-devolución, correo de cola desatendida; e2e de dos operadores (`007/milestones/bandeja.md`). Para ratificar: Web Push (C-101, dependencia) y borrado de contacto (C-102, datos personales). La prueba con ayudante y número real va con la TASK-459 |
+| 009 Billing | Construida, pendiente de revisión humana (2026-10-15) | TASK-901..909 `[x]` con las decisiones de Giannier: precios de la spec en tabla, **pagos manuales** (cobro con referencia, el admin registra la transferencia o Yape), renovación con cobro pendiente y gracia de 5 días, cambios de plan con prorrateo, paquetes, cupones, comprobante PDF, ledger de solo agregar; pantallas `/plans` y `/admin/cobros` (`009/milestones/cobro.md`). Mercado Pago, después. La Constitution exige revisión línea por línea antes del merge |
+| 010 Dashboard | Construida (2026-10-15) | TASK-1001..1005 `[x]`: métricas por día local con rollup reconciliado, costo por traza con precios versionados, `/resultados` (operador sin dinero, CSV) y `/admin/metricas` (MRR, conversión, margen por negocio, operación), purga de retención (`010/milestones/dashboard.md`). Precios de modelos: los carga el admin |
 | 011–016 (Fase 2) | No iniciado | Docs en estado "Draft para ratificación"; ningún código |
 
 ## 2. Cambios respecto a la spec

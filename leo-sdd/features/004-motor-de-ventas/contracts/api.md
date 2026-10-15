@@ -63,7 +63,10 @@ PUT /api/v1/assistant/business-info/entregas
 - `DELETE /api/v1/assistant/faqs/{id}` → 204. Borra su `knowledge_source`.
 
 ### Métodos de pago (extiende el endpoint existente) — admin
-El `PATCH` del método de pago acepta `media_asset_id` (QR o imagen de cuentas) o `null`. El recurso tiene que ser del mismo tenant y de tipo `imagen`.
+El `PUT /api/v1/tenant/payment-methods/{id}` (y el `POST`) acepta `media_asset_id` (QR o imagen de
+cuentas) o `null` —tiene que ser una imagen del mismo negocio, si no 422 `invalid_media`— y `titular`
+(017, RF-010): el nombre que el comprobante debe mostrar como destinatario. Con titulares configurados,
+un comprobante a otro nombre sale con `destinatario_distinto`.
 
 ### Promociones — admin
 - `GET /api/v1/assistant/promotions?vigentes=true`
@@ -77,7 +80,9 @@ El `PATCH` del método de pago acepta `media_asset_id` (QR o imagen de cuentas) 
 ### GET | PUT /api/v1/assistant/behavior — admin
 ```json
 {
-  "agent_name": "Capacitín", "tone": "cercano", "reglas_adicionales": "No ofrecer cuotas.",
+  "agent_name": "Capacitín", "tone": "cercano",
+  "tratamiento": "tu", "emojis": "pocos", "saludo": "¡Hola! Bienvenido a Capacita",
+  "politica_descuentos": "solo_promociones", "descuento_maximo_pct": null, "max_situaciones": 5,
   "ritmo": "equilibrado", "detalle": "moderado",
   "seguimiento": { "activo": true, "horas": 4, "max_intentos": 2 },
   "nivel_inteligencia": "economico", "niveles_permitidos": ["economico", "medio"],
@@ -85,7 +90,17 @@ El `PATCH` del método de pago acepta `media_asset_id` (QR o imagen de cuentas) 
   "mensajes_sistema": { "pago_confirmado": "…", "pago_rechazado": "…", "pedido_rechazado": "…", "pedido_anulado": "…", "derivacion": "…" }
 }
 ```
-`niveles_permitidos` es solo lectura (sale del plan). Si se pide un nivel fuera del plan, responde 403 `plan_limit`. `reglas_adicionales` se guarda en `agent_configs.restrictions` (máximo 2 000 caracteres).
+`niveles_permitidos` es solo lectura (sale del plan; con `BILLING_ENFORCED` apagado son los tres). Si se
+pide un nivel fuera del plan, responde 403 `plan_limit` (solo con el cobro encendido). `mensajes_sistema`
+acepta `null` por clave para volver al texto por defecto; un marcador fuera de `{nombre_cliente}`,
+`{numero}`, `{motivo}`, `{siguiente_paso}` da 422 `unknown_placeholder`. Ya no hay `reglas_adicionales`
+(017, RF-011): las reglas propias son situaciones. Con `negociable` el agente **no** concede descuentos:
+deriva (C-14 de la 017).
+
+### Categorías — admin (decisión 13 del Milestone B)
+- `GET /api/v1/assistant/categories` → `{ "items": [{ "id", "nombre", "orden", "activa", "productos" }] }`
+- `PUT /api/v1/assistant/categories/{id}` `{ "nombre", "orden", "activa" }` → 200. Renombrar actualiza la
+  etiqueta de sus productos; 409 `category_exists`.
 
 ---
 
@@ -102,33 +117,61 @@ El `PATCH` del método de pago acepta `media_asset_id` (QR o imagen de cuentas) 
 }]}
 ```
 
-### GET /api/v1/assistant/process — admin
+### GET /api/v1/assistant/templates — admin (017)
+`{ "items": [{ "key", "nombre", "descripcion", "opciones_schema", "opciones_default", "sugerida_por_rubro" }] }`.
+`sugerida_por_rubro` marca la plantilla que sugiere el rubro del negocio (C-03); el negocio puede elegir otra.
+
+### GET /api/v1/assistant/process — admin o revisor (017)
 ```json
 {
   "template_key": "certificaciones", "template_version": 1,
   "options": { "…process_options…" },
-  "etapas": [{
-    "key": "IDENTIFICAR", "nombre": "Tema y paquete", "embudo": "ATENDIDO",
-    "activa": true,                       // false si la opción la apaga (ej. CALIFICAR sin calificación)
-    "instrucciones": "…texto efectivo…",
-    "instrucciones_seguimiento": "…",
-    "personalizada": true,
-    "hay_texto_nuevo": false               // C-05
-  }]
+  "etapas": [{ "key": "COBRO", "embudo": "NEGOCIACION",
+               "reglas": [{ "rule_key": "COBRO.pago_es_previo_metodos_pago", "texto": "…", "apagada": false }] }],
+  "novedades": null | { "version": 2, "vista": 1, "reglas": [ … ] }
 }
 ```
+Las etapas **no se editan** (017, C-01): se retiraron `PUT` y `DELETE /assistant/process/stages/{stage_key}`.
 
 ### PUT /api/v1/assistant/process — admin
-`{ "template_key": "productos", "options": { … } }` → 200. Al cambiar de plantilla, los textos editados de la plantilla anterior se conservan, pero no se usan. Las conversaciones en curso se recalculan en su siguiente turno con la plantilla nueva.
+`{ "template_key": "productos", "options": { … } }` → 200 con la vista de arriba. 422 `unknown_template` o
+`invalid_options` (validadas contra el esquema de la plantilla). Invalida la caché del negocio.
 
-### PUT /api/v1/assistant/process/stages/{stage_key} — admin
-`{ "instrucciones": "…", "instrucciones_seguimiento": "…" }` → 200. Hay que mandar al menos uno de los dos.
+### PUT /api/v1/assistant/rules/{kind}/{rule_key} — admin o revisor (017)
+`kind` ∈ `proceso | rubro`. `{ "apagada": true }` → `{ "rule_key", "texto", "apagada" }`. 404 `unknown_rule`
+si la regla no está en la versión publicada que corre el negocio. El apagado se recuerda por `rule_key`
+entre versiones; invalida la caché.
 
-### DELETE /api/v1/assistant/process/stages/{stage_key} — admin
-Restaura el texto por defecto → 204.
+### GET /api/v1/assistant/rubro — admin o revisor (017)
+`{ "key", "nombre", "plantilla_sugerida", "version", "reglas": [Regla], "faqs": [{pregunta, respuesta}],
+"objeciones": [{objecion, manejo}], "situaciones_sugeridas": [{id, titulo, cuando_aplica, que_hace, campos}],
+"novedades" }`.
+
+### POST /api/v1/assistant/novedades/{kind}/vistas — admin o revisor (017)
+Marca vista la versión publicada → 204. Un negocio que nunca vio ninguna empieza en la actual.
 
 ### GET /api/v1/assistant/prompt-preview?stage=COBRO — admin
-Devuelve el prompt armado con hechos de ejemplo para esa etapa: `{ "prompt": "…", "tokens_estimados": 4120, "herramientas": [ … ] }`. Sirve para depurar y para el test de presupuesto de tokens.
+Devuelve el prompt armado con hechos de ejemplo y sin situaciones: `{ "stage", "prompt", "tokens_estimados",
+"secciones": {…}, "herramientas": [ … ] }`. Sirve para ver qué cambia al apagar una regla.
+
+### Situaciones (017, TASK-462) — admin
+Reglas propias del negocio, como tarjetas. Nacen en `borrador`; solo las `activa` llegan al canal real.
+- `GET /api/v1/assistant/situations?estado=&origen=` → `{ "items": [Situacion] }`
+- `POST /api/v1/assistant/situations` → 201 `Situacion`. Cuerpo:
+  `{ "titulo" (≤80), "cuando_aplica" (≤300), "que_hace" (≤1000), "media_asset_ids": [] (≤5),
+  "derivar": false, "ejemplo_respuesta": null (≤600), "etapas": null | ["COBRO", …], "siempre": false }`.
+  Errores 422: `que_hace_too_long`, `unknown_stage`, `unknown_media`. Encola el embedding de
+  "cuándo aplica" (`embed_situations`); si la cola falla, lo hace el barrido de cada hora.
+- `GET | PUT | DELETE /api/v1/assistant/situations/{id}` (404 `situation_not_found`). Cambiar "cuándo
+  aplica" borra el embedding hasta que el worker lo recalcula.
+- `POST /api/v1/assistant/situations/{id}/activar` y `…/desactivar` → `Situacion`.
+- `POST /api/v1/assistant/situations/desde-sugerida/{id}` `{ "valores": {campo: valor} }` → 201, copia
+  una situación sugerida del rubro del negocio (origen `sugerida_rubro`). 422 `unknown_suggestion` o
+  `missing_fields`.
+- `Situacion`: los campos del cuerpo más `id`, `estado`, `origen` (`manual | sugerida_rubro | migrada |
+  aprendida`), `lista_para_coincidir` (ya tiene embedding), `created_at`, `updated_at`.
+- `PUT /api/v1/tenant/agent-config` (wizard) acepta `tratamiento`, `emojis` y `saludo`; su
+  `restrictions` se guarda como la situación `migrada` hasta que TASK-468 lo retire del wizard.
 
 ---
 
@@ -158,13 +201,35 @@ Devuelve el prompt armado con hechos de ejemplo para esa etapa: `{ "prompt": "�
     "hechos": { "…guardados + derivados (enmascarados)…" },
     "herramientas_habilitadas": ["mostrar_opciones", "elegir_camino", "consultar_conocimiento", "enviar_recurso", "derivar_a_humano"],
     "herramientas_llamadas": [{ "nombre": "mostrar_opciones", "status": "hecho" }],
-    "tokens": { "prompt": 4210, "completion": 180 }, "modelo": "economico"
+    "tokens": { "prompt": 4210, "completion": 180 }, "modelo": "economico",
+    "situaciones": [{ "id": "…", "titulo": "Si piden factura", "siempre": false, "borrador": true, "distancia": 0.21 }],
+    "reglas_apagadas": { "proceso": ["COBRO.pedido_datos_completos"], "rubro": [] }
   }
 }
 ```
+- 017 (TASK-465): el cuerpo acepta `"situaciones_prueba": [id, …]` (≤10; en multipart, ids separados por
+  comas): esas situaciones en borrador entran como activas **solo en ese turno**. El canal real nunca
+  las usa.
 - `GET /api/v1/sandbox/messages?after=<message_id>` → salientes asíncronos posteriores (aviso de confirmación o rechazo, derivación, seguimiento). El simulador consulta cada 3 s mientras está abierto.
 - `POST /api/v1/sandbox/reset` → borra el estado, los mensajes y los pedidos sandbox → 204.
 - Reglas sandbox (C-19): nada se envía al proveedor, la ventana siempre está abierta, no hay correos y no cuenta en el resumen ni en `codigo_repetido`.
+
+## 4b. Panel de plataforma — catálogo (017, TASK-466)
+
+Solo el operador de plataforma (404 para cualquier otro). Todo queda en `audit_logs`.
+- `GET /api/v1/platform-admin/catalog` → `{ "items": [{ "kind", "key", "nombre", "publicada", "versiones": [{ "version", "estado", "evals_ok", "publicada_en" }] }] }`
+- `POST /api/v1/platform-admin/catalog/{kind}/{key}/versions` → 201, borrador copiado de la versión más
+  nueva. 409 `draft_exists` si ya hay un borrador.
+- `GET | PUT /api/v1/platform-admin/catalog/{kind}/{key}/versions/{n}`. El `PUT` reemplaza el contenido del
+  borrador: `{ "reglas": [{ "rule_key", "etapa", "texto" }], "faqs", "objeciones", "situaciones_sugeridas", "notas" }`.
+  409 `version_frozen` si ya se publicó; 422 `invalid_content` (rule_key repetido, regla de proceso sin
+  etapa o de rubro con etapa). Editar deja sin efecto los evals anteriores.
+- `POST …/versions/{n}/evals` → 202, encola `run_catalog_evals`. El resultado queda en `evals`
+  (`{ ok, hash, modelo, corrido_en, casos: [{ nombre, ok, detalle }] }`); `evals_vigentes` dice si pasaron
+  sobre el contenido actual. Sin modelo configurado, falla con el motivo.
+- `POST …/versions/{n}/publicar` → 200. 409 `evals_not_passed` si los evals no pasaron sobre este
+  contenido. La versión anterior queda `retirada`; los negocios ven las reglas nuevas activas (salvo las
+  apagadas) y el aviso de novedades; se reindexa el conocimiento del rubro.
 
 ---
 
@@ -225,8 +290,11 @@ En contra entrega no hay comprobante: el pedido vuelve a `borrador` con `motivo_
 
 ## 6. Conversaciones
 
-- `GET /api/v1/conversations/{id}/state` — operador → `{ "etapa", "embudo", "hechos" (enmascarados), "derivado", "eventos": [ … últimos 50 … ] }`
-- `POST /api/v1/conversations/{id}/resume-bot` — operador → limpia `facts.derivado`, recalcula la etapa y crea el evento `reason=operador:reanudar` → 200.
+Prefijo real del repo: `/api/v1/tenant/conversations` (como `/api/v1/tenant/orders`).
+
+- `GET /api/v1/tenant/conversations/{id}/state` — operador → `{ "etapa", "embudo", "hechos" (sin datos personales: sin `nombre_cliente` ni el resumen de la derivación), "derivado": {motivo, resumen, hasta} | null (solo si la pausa sigue vigente), "eventos": [ {de, a, embudo, motivo, en} … últimos 50 ] }`
+- `POST /api/v1/tenant/conversations/{id}/resume-bot` — operador → limpia `facts.derivado`, recalcula la etapa y crea el evento `reason=operador:reanudar` (aunque la etapa no cambie) → 200 con el mismo cuerpo que `state`. `asesoria_derivada_en` no se borra.
+- Otro negocio → 404. El panel lo muestra en el detalle del pedido (aviso "El asistente está pausado" con el botón "Reactivar asistente").
 
 ---
 
@@ -299,9 +367,9 @@ Los nombres exactos de los campos de YCloud se verifican en su documentación (T
 
 | Job | Frecuencia | Qué hace |
 |---|---|---|
-| `followups.run` | cada 15 min | Seguimientos según C-13 (incluye VERIFICACION con rechazo). Candado `followup:{conversation_id}` con TTL de 10 min |
-| `orders.discard_stale` | diario 03:00 (America/Lima) | Pasa a `descartado` los borradores con más de 7 días sin actividad y recalcula la etapa (evento `pedido_descartado`) |
-| `handoff.expire` | cada 5 min | Limpia `facts.derivado` vencidos y crea el evento `pausa_vencida` |
+| `followups.run` | cada 15 min | Seguimientos según C-13 (incluye VERIFICACION con rechazo). Candado: el mismo de la conversación que toma un turno (`channel:lock:{conversation_id}`, TTL 10 min), más el intento reclamado con escritura versionada de `seguimiento` antes de llamar al modelo |
+| `orders.discard_stale` | diario 03:10 (America/Lima) | Pasa a `descartado` los borradores con más de 7 días sin actividad y recalcula la etapa (evento `pedido_descartado`). Un borrador con comprobante no se toca |
+| `handoff.expire` | cada 5 min | Limpia `facts.derivado` vencidos, recalcula la etapa y crea el evento `pausa_vencida`. No envía nada: el bot espera a que el cliente escriba |
 | `media.refresh_provider_ids` | diario | Vuelve a subir los `provider_media_id` que vencen en menos de 48 h |
 
 ## 10. Notificaciones al tenant (`tenant_notifications` + correo)

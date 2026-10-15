@@ -402,7 +402,9 @@ class TestTheWorkerSendsTheEmailsAfterTheCommit:
         db.flush()
         world.storage.put("k.jpg", b"jpeg", content_type="image/jpeg")
         llm = vision(receipt())
-        monkeypatch.setattr("app.workers.channel.provider_for_tenant", lambda _settings: llm)
+        monkeypatch.setattr(
+            "app.workers.channel.chat_provider_for", lambda *_args: (llm, "economico")
+        )
         mail = MockEmailProvider()
         whatsapp = FakeWhatsApp()
         ctx = {

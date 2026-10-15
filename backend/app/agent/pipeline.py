@@ -43,7 +43,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -53,8 +53,10 @@ from sqlalchemy.orm import Session
 from app.agent.budget import TurnBudget
 from app.agent.core import AgentCore, AgentReply, TurnTrace
 from app.agent.formatter import to_bubbles
+from app.agent.model_policy import allowed_levels, effective_level
 from app.agent.outbound import TurnOutbound
 from app.agent.prompts.stage import build_stage_prompt
+from app.agent.situations import SelectedSituation, select_situations
 from app.agent.tools.definitions import registry_for_stage
 from app.agent.tools.registry import ToolContext
 from app.models.conversation import Conversation, Message
@@ -77,8 +79,8 @@ from app.services.trial import agent_may_reply
 
 logger = logging.getLogger(__name__)
 
-GateReason = Literal["paused", "opted_out", "handover"]
-Outcome = Literal["answered", "gated", "unsupported"]
+GateReason = Literal["paused", "opted_out", "handover", "takeover"]
+Outcome = Literal["answered", "gated", "unsupported", "llm_down"]
 
 # Why a stage was saved: an ordinary turn, or a payment proof that arrived in it.
 REASON_TURN = "turno"
@@ -131,6 +133,8 @@ class TurnResult:
     # The text bubbles of the answer, in order.
     text_messages: list[Message] = field(default_factory=list)
     model_tier: str | None = None
+    # The business's situations that entered the turn (017, TASK-463).
+    situations: list[SelectedSituation] = field(default_factory=list)
 
     @property
     def messages(self) -> list[Message]:
@@ -155,6 +159,8 @@ class TurnPipeline:
         proofs: ProofPipeline | None = None,
         images: ImageReader | None = None,
         notices: OrderNotices | None = None,
+        situation_drafts: Sequence[uuid.UUID] = (),
+        llm_open: bool = False,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._session = session
@@ -171,6 +177,10 @@ class TurnPipeline:
         self._images = images
         # Where the business is told what waits for a person (TASK-431).
         self._notices = notices
+        # Drafts the simulator tries in this turn as if active (017, RF-009).
+        self._situation_drafts = tuple(situation_drafts) if sandbox else ()
+        # The tenant's circuit breaker is open (TASK-445): no model this turn.
+        self._llm_open = llm_open
         self._clock = clock
         self._states = StateRepo(session, tenant_id)
         self._messages = MessageRepository(session, tenant_id)
@@ -249,6 +259,10 @@ class TurnPipeline:
             # A voice note, a sticker, a location: the stage is untouched and the
             # caller answers with the tenant's own "I can only read text".
             return result("unsupported")
+        if self._llm_open:
+            # After the gates: a paused or handed-over conversation stays quiet
+            # rather than getting the fallback.
+            return result("llm_down")
 
         # 8-9. prompt and tools
         budget = TurnBudget()
@@ -265,9 +279,25 @@ class TurnPipeline:
             turn=turn,
             facts=facts,
             notices=None if self._sandbox else self._notices,
+            rubro_version_id=config.rubro_version_id,
+        )
+        situations = await select_situations(
+            self._session,
+            self._tenant_id,
+            stage=stage.value,
+            message=inbound.text,
+            llm=self._llm,
+            max_situaciones=config.behavior.max_situaciones,
+            drafts=self._situation_drafts,
         )
         prompt = build_stage_prompt(
-            config, facts, stage, now=now, turn=turn, tool_specs=registry.specs()
+            config,
+            facts,
+            stage,
+            now=now,
+            turn=turn,
+            tool_specs=registry.specs(),
+            situations=situations,
         )
 
         # 10. model
@@ -287,6 +317,10 @@ class TurnPipeline:
         bubbles = to_bubbles(reply.content, config.behavior.detalle, budget)
         if reply.silent and tool_messages:
             bubbles = []
+        # The model often writes again the text it just sent as the body of the
+        # buttons or the list; the customer would read it twice (TASK-447).
+        already = {_same_text(m.content) for m in tool_messages if m.msg_type == "interactive"}
+        bubbles = [bubble for bubble in bubbles if _same_text(bubble) not in already]
         text_messages = [
             self._messages.append(
                 conversation_id=conversation_id,
@@ -324,7 +358,13 @@ class TurnPipeline:
             )
 
         # 14. trace
-        tier = config.intelligence_level if self._tier_applies else None
+        tier = (
+            effective_level(
+                config.intelligence_level, allowed_levels(self._session, self._tenant_id)
+            )
+            if self._tier_applies
+            else None
+        )
         sent = [*tool_messages, *text_messages]
         if sent:
             core.persist_trace(
@@ -336,6 +376,7 @@ class TurnPipeline:
                     tools_enabled=list(registry.names()),
                     outbound_count=len(sent),
                     model_tier=tier,
+                    situaciones=[s.trace() for s in situations] or None,
                 ),
             )
 
@@ -351,6 +392,7 @@ class TurnPipeline:
             tool_messages=tool_messages,
             text_messages=text_messages,
             model_tier=tier,
+            situations=situations,
         )
 
     # ----------------------------------------------------------------- helpers
@@ -451,6 +493,10 @@ class TurnPipeline:
                 )
                 if contact is not None and contact.opted_out_at is not None:
                     return "opted_out"
+        # A person has the conversation in the inbox (Feature 007): the agent is
+        # quiet, in the simulator too, and spends no quota (C-004).
+        if conversation.takeover_user_id is not None:
+            return "takeover"
         if facts.derivado_activo(now):
             return "handover"
         return None
@@ -493,6 +539,11 @@ class TurnPipeline:
                 continue
             return saved.state.version
         raise StateConflict("unreachable")  # pragma: no cover
+
+
+def _same_text(text: str) -> str:
+    """Text compared for repetition: case, spacing and WhatsApp markup aside."""
+    return " ".join(text.replace("*", "").replace("_", "").split()).casefold()
 
 
 def _entry_from(referral: Referral, now: datetime) -> dict[str, Any]:

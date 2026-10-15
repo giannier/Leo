@@ -28,11 +28,13 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.agent.circuit import CircuitBreaker
+from app.agent.model_policy import chat_provider_for
+from app.core.events import publish
 from app.core.locks import LockStore, acquire_lock, claim_once
 from app.core.queue import ArqJobQueue, JobQueue
 from app.models.llm_settings import TenantLLMSettings
 from app.providers.email.base import EmailMessage, EmailProvider
-from app.providers.llm.factory import provider_for_tenant
 from app.providers.whatsapp.base import (
     InboundMessage,
     QualityUpdate,
@@ -50,6 +52,7 @@ from app.services.channel import (
     lock_key,
     stranded_replies,
 )
+from app.services.inbox import discard_replies, reply_still_wanted
 from app.services.tenant_alerts import TenantAlerts
 from app.services.turn_outbound import live_outbound_factory
 
@@ -79,6 +82,7 @@ OUTCOME_UNKNOWN_NUMBER = "unknown_number"
 OUTCOME_UNREADABLE = "unreadable"
 OUTCOME_LOCKED = "locked"
 OUTCOME_ANSWERED = "answered"
+OUTCOME_DISCARDED = "discarded_by_takeover"
 OUTCOME_NOTHING_TO_SAY = "nothing_to_say"
 OUTCOME_NOWHERE_TO_SEND = "nowhere_to_send"
 
@@ -317,6 +321,7 @@ async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
         and outcome.tenant_id is not None
         and outcome.conversation_id is not None
     ):
+        publish(outcome.tenant_id, "message.new", conversation_id=outcome.conversation_id)
         settings = ctx["settings"]
         await schedule_answer(
             ArqJobQueue(ctx["redis"]),
@@ -360,7 +365,8 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
         session_factory = ctx["session_factory"]
         with session_factory() as session:
             llm_settings = session.get(TenantLLMSettings, tenant)
-            llm = provider_for_tenant(llm_settings)
+            # The level's model (TASK-445); the tenant's own model if it has one.
+            llm, _level = chat_provider_for(session, tenant, settings)
             alerts = TenantAlerts(session, tenant)
             responder = ConversationResponder(
                 session,
@@ -369,6 +375,7 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 storage=ctx.get("storage"),
                 whatsapp=ctx["whatsapp"],
                 notices=alerts,
+                breaker=CircuitBreaker(store, tenant, on_open=alerts.llm_down),
                 outbound_for=live_outbound_factory(
                     session,
                     tenant,
@@ -398,6 +405,13 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 # options on the customer's screen, that was the answer.
                 return OUTCOME_ANSWERED if responder.sent_by_tools else OUTCOME_NOTHING_TO_SAY
 
+            # The CancelGuard (Feature 007): a person who took the conversation
+            # while the model was writing wins. The reply is kept, marked, never sent.
+            if not reply_still_wanted(session, conversation):
+                discard_replies(session, answers)
+                session.commit()
+                publish(tenant, "conversation.updated", conversation_id=conversation)
+                return OUTCOME_DISCARDED
             sender = ReplySender(
                 session,
                 tenant,
@@ -417,6 +431,7 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 session.rollback()
                 return OUTCOME_NOWHERE_TO_SEND
             session.commit()
+            publish(tenant, "message.new", conversation_id=conversation)
         return OUTCOME_ANSWERED
     finally:
         await lock.release()
