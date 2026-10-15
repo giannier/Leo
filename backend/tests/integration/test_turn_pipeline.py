@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -20,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline
 from app.core.crypto import encrypt_secret
-from app.models.business import AgentConfig, BusinessProfile
+from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.channel import Contact
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent
@@ -42,6 +43,7 @@ from app.services.channel import ConversationResponder
 from app.services.turn_outbound import SandboxOutbound, live_outbound_factory
 
 CAMINO_TAP = InteractiveReply(id="camino:certificacion", title="Solo certificar")
+PROGRAMA_TAP = InteractiveReply(id="camino:programa", title="Programa completo")
 
 
 def _call(name: str, **arguments: object) -> ToolCall:
@@ -329,6 +331,70 @@ class TestTheStagePromptAndTools:
         assert stored["headline"] == "Certifícate"
         assert result.facts.entrada_anuncio is not None
         assert "Llegó por anuncio" in llm.chat_calls[0].messages[0].content
+
+    async def test_a_package_named_before_the_topics_is_kept_for_the_next_turn(
+        self, db: Session
+    ) -> None:
+        """The flow eval's "paquete de 5 con 2 temas": the choice is stored, not remembered."""
+        tenant = _tenant(db)
+        db.add_all(
+            [
+                Product(tenant_id=tenant.id, name=name, price=Decimal(price), bundle_size=size)
+                for name, price, size in [
+                    ("Paquete 3 certificaciones", "300.00", 3),
+                    ("Paquete 5 certificaciones", "450.00", 5),
+                ]
+            ]
+        )
+        db.flush()
+        conversation = _conversation(db, tenant)
+        llm = MockLLMProvider()
+        llm.queue(ChatResult(content="¡Perfecto! ¿Qué temas quieres?"))
+        llm.queue(ChatResult(content="Anotado."))
+        pipeline = _pipeline(db, tenant, conversation, llm)
+
+        result = await pipeline.run(conversation.id, InboundTurn(text="Quiero el paquete de 5"))
+        stored = _stored(db, tenant, conversation)
+        assert stored["paquete_pedido"] == "Paquete 5 certificaciones"
+        # Asking for a package is choosing to buy, even if the model never says so.
+        assert stored["camino"] == "certificacion"
+        assert result.stage_after.value == "IDENTIFICAR"
+
+        await pipeline.run(conversation.id, InboundTurn(text="SIAF y Excel avanzado"))
+        system = llm.chat_calls[1].messages[0].content
+        assert '- Paquete que ya pidió: "Paquete 5 certificaciones"' in system
+        # Topics alone do not forget the package.
+        assert _stored(db, tenant, conversation)["paquete_pedido"] == "Paquete 5 certificaciones"
+
+    async def test_a_package_does_not_change_a_path_already_chosen(self, db: Session) -> None:
+        tenant = _tenant(db)
+        db.add(Product(tenant_id=tenant.id, name="Paquete 5", price=Decimal("450"), bundle_size=5))
+        db.flush()
+        conversation = _conversation(db, tenant)
+        llm = MockLLMProvider()
+        llm.queue(ChatResult(content="Te paso con un asesor."))
+        pipeline = _pipeline(db, tenant, conversation, llm)
+        llm.queue(ChatResult(content="Claro."))
+
+        await pipeline.run(
+            conversation.id, InboundTurn(text="programa", interactive=(PROGRAMA_TAP,))
+        )
+        await pipeline.run(conversation.id, InboundTurn(text="¿y el paquete de 5?"))
+
+        assert _stored(db, tenant, conversation)["camino"] == "programa"
+
+    async def test_no_package_line_without_one_named(self, db: Session) -> None:
+        tenant = _tenant(db)
+        conversation = _conversation(db, tenant)
+        llm = MockLLMProvider()
+        llm.queue(ChatResult(content="¡Hola!"))
+
+        await _pipeline(db, tenant, conversation, llm).run(
+            conversation.id, InboundTurn(text="quiero el paquete de 5")
+        )
+
+        assert "paquete_pedido" not in _stored(db, tenant, conversation)
+        assert "Paquete que ya pidió" not in llm.chat_calls[0].messages[0].content
 
 
 class TestWhatTheTurnSends:
