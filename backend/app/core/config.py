@@ -6,6 +6,7 @@ non-committed `.env`), never hardcoded.
 """
 
 import json
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -99,6 +100,17 @@ class Settings(BaseSettings):
     # (Milestone B of the 004). Usage is still metered either way. Turn it on
     # (`BILLING_ENFORCED=true`) the day Leo starts selling.
     billing_enforced: bool = False
+    # How a business pays the platform while payments are collected by hand
+    # (Feature 009, Giannier 2026-10-14): bank account, Yape number, holder.
+    # Shown in the panel and in every billing email next to the reference.
+    billing_payment_instructions: str = ""
+    # Soles per dollar, shown only as a reference next to dollar prices (009
+    # C-001: Leo does not fix exchange rates). Empty shows no soles at all.
+    billing_pen_reference_rate: Decimal | None = None
+    # Days before the period ends that the renewal charge is issued, and days of
+    # grace after it (reminders on days 1, 3 and 5).
+    billing_renewal_notice_days: int = 7
+    billing_grace_days: int = 5
 
     # --- LLM providers ----------------------------------------------------
     # Which profile the platform itself uses. Tenants may override the *chat*
