@@ -24,7 +24,7 @@ aquí antes de implementar; el plan y las tasks ya las asumen.
 ## C-03: Hechos guardados frente a hechos derivados
 **Situación:** Si el estado de la conversación copia datos que también viven en pedidos o contactos, tarde o temprano se desalinean.
 **Decisión:** Hay dos tipos de hechos.
-- **Guardados** en `conversation_state.facts`, porque solo existen a nivel de conversación: `saludo_enviado`, `entrada_anuncio`, `camino`, `recursos_enviados`, `opciones_mostradas`, `metodos_pago_enviados`, `derivado`, `seguimiento`, `promos_ofrecidas`.
+- **Guardados** en `conversation_state.facts`, porque solo existen a nivel de conversación: `saludo_enviado`, `entrada_anuncio`, `camino`, `paquete_pedido` (C-25), `recursos_enviados`, `opciones_mostradas`, `metodos_pago_enviados`, `derivado`, `seguimiento`, `promos_ofrecidas`.
 - **Derivados**, que se calculan en cada turno desde su tabla de origen: `pedido` (estado, completo, faltantes, total), `datos_completos` y `datos_faltantes` (contacto frente a lo que pide la plantilla), `pago_estado`.
 **Impacto en implementación:** `FactsLoader` arma los dos tipos en una sola lectura. Nadie escribe hechos derivados.
 **Registrado por:** Claude — por ratificar
@@ -241,4 +241,29 @@ Una parte eran guiones poco realistas (el cliente nunca decía "sí, agrégalo")
   modelo los toma del historial o los vuelve a pedir.
 **Resultado:** 24/24 en dos corridas seguidas, `make evals` y evals de catálogo en verde. Evidencia:
 `milestones/evals-flujos-de-venta.md`.
+**Registrado por:** Claude — por ratificar
+
+## C-25: El paquete que el cliente nombra antes de elegir temas (2026-10-15)
+**Problema:** el eval de flujos "paquete de 5 con 2 temas" fallaba cerca de la mitad de las veces (también
+antes de la 006). El cliente dice "quiero el paquete de 5" en CALIFICAR y los temas en el mensaje
+siguiente; solo se guardaba el camino, así que el modelo tenía que recordar el paquete y a veces armaba un
+paquete con los temas que oía (uno de 2), volvía a mostrar los paquetes o, sin llamar `elegir_camino`, se
+quedaba en CALIFICAR sin `gestionar_pedido`.
+**Decisión (aprobada por Giannier, "dale"):**
+- **Hecho guardado `paquete_pedido`.** El pipeline lee el texto del cliente contra los paquetes activos del
+  negocio (`app/process/bundle_request.py`, determinista, sin LLM) mientras no hay pedido. Cuenta como
+  nombrarlo: "paquete/pack/promo/combo de N" (en cifra o en palabra) cuando un solo paquete activo tiene N
+  selecciones, o el nombre completo del paquete. Un número suelto ("quiero 5") no cuenta; dos tamaños o
+  dos paquetes del mismo tamaño tampoco (ambiguo: mejor ninguno que uno equivocado). Si después nombra
+  otro, se reemplaza.
+- **Línea en el ESTADO** mientras no hay pedido: `- Paquete que ya pidió: "<nombre>" (cuando diga sus
+  temas, agrégalo con ellos con gestionar_pedido; no le muestres los paquetes otra vez)`.
+- **Pedir un paquete es elegir comprar:** si aún no hay camino, la calificación está activa y el negocio
+  tiene un solo camino de tipo venta, se guarda ese camino (igual que un camino tocado en un botón, que se
+  guarda aunque el modelo no llame `elegir_camino`). Un camino ya elegido (p. ej. programa) no se toca, y
+  un botón tocado en el mismo mensaje gana.
+**Resultado:** certificaciones 8/8 en cinco corridas seguidas con el modelo real (tres solo de la
+plantilla y dos completas); productos 8/8 en ambas completas. Queda aparte, sin relación con este
+cambio, el caso de servicios "una web se cotiza con una persona" (1 de 3 corridas completas: el modelo
+pregunta un detalle antes de derivar).
 **Registrado por:** Claude — por ratificar
