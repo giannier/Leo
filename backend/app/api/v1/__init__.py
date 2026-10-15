@@ -14,6 +14,7 @@ from app.api.v1 import (
     health,
     inbox,
     knowledge,
+    metrics,
     orders,
     platform_admin,
     platform_billing,
@@ -38,6 +39,7 @@ router.include_router(billing.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
 router.include_router(knowledge.router)
+router.include_router(metrics.router)
 router.include_router(orders.router)
 router.include_router(platform_admin.router)
 router.include_router(platform_billing.router)
