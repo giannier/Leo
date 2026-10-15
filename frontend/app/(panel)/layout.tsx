@@ -22,6 +22,7 @@ import { TrialBanner } from "@/components/trial-banner";
 import {
   BookIcon,
   BoxIcon,
+  ChartIcon,
   ChatIcon,
   HomeIcon,
   InboxIcon,
@@ -52,6 +53,8 @@ const NAV: NavItem[] = [
   { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
   // Every role: answering customers is the operator's job (Feature 007).
   { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
+  // Every role (Feature 010); an operator sees it without money.
+  { href: "/resultados", label: "Resultados", icon: ChartIcon },
   { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
   { href: "/onboarding", label: "Configuración inicial", icon: SparkIcon, roles: MANAGES_CONFIGURATION },
   { href: "/sandbox", label: "Modo prueba", icon: ChatIcon, primary: true },

@@ -1272,6 +1272,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metrics */
+        get: operations["metrics_api_v1_tenant_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/metrics/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export */
+        get: operations["export_api_v1_tenant_metrics_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/metrics/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings__api_v1_tenant_metrics_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenant_metrics_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform Metrics */
+        get: operations["platform_metrics_api_v1_platform_admin_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/model-costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Model Costs */
+        get: operations["model_costs_api_v1_platform_admin_model_costs_get"];
+        /**
+         * Set Model Cost
+         * @description A new price from `desde` on: past traces keep the cost they were written with.
+         */
+        put: operations["set_model_cost_api_v1_platform_admin_model_costs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/orders": {
         parameters: {
             query?: never;
@@ -3555,6 +3645,36 @@ export interface components {
              */
             created_at: string;
             saliente?: components["schemas"]["Saliente"] | null;
+        };
+        /** MetricsSettings */
+        MetricsSettings: {
+            /** Minutos Por Conversacion */
+            minutos_por_conversacion: number;
+        };
+        /** ModelCostBody */
+        ModelCostBody: {
+            /** Modelo */
+            modelo: string;
+            /** Entrada Por 1K Usd */
+            entrada_por_1k_usd: number | string;
+            /** Salida Por 1K Usd */
+            salida_por_1k_usd: number | string;
+            /** Desde */
+            desde?: string | null;
+        };
+        /** ModelCostOut */
+        ModelCostOut: {
+            /** Modelo */
+            modelo: string;
+            /** Entrada Por 1K Usd */
+            entrada_por_1k_usd: string;
+            /** Salida Por 1K Usd */
+            salida_por_1k_usd: string;
+            /**
+             * Desde
+             * Format: date-time
+             */
+            desde: string;
         };
         /** NewsView */
         NewsView: {
@@ -9126,6 +9246,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    metrics_api_v1_tenant_metrics_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    export_api_v1_tenant_metrics_export_csv_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+        };
+    };
+    get_settings__api_v1_tenant_metrics_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSettings"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenant_metrics_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricsSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsSettings"];
+                };
+            };
+        };
+    };
+    platform_metrics_api_v1_platform_admin_metrics_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    model_costs_api_v1_platform_admin_model_costs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCostOut"][];
+                };
+            };
+        };
+    };
+    set_model_cost_api_v1_platform_admin_model_costs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelCostBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelCostOut"];
                 };
             };
         };

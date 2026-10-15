@@ -24,6 +24,7 @@ import { useEffect } from "react";
 import {
   AlertIcon,
   BookIcon,
+  ChartIcon,
   ClockIcon,
   LogOutIcon,
   ReceiptIcon,
@@ -36,6 +37,7 @@ const NAV = [
   { href: "/admin", label: "Solicitudes", icon: ClockIcon },
   { href: "/admin/tenants", label: "Negocios", icon: UsersIcon },
   { href: "/admin/cobros", label: "Cobros", icon: ReceiptIcon },
+  { href: "/admin/metricas", label: "Métricas", icon: ChartIcon },
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
   { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },
