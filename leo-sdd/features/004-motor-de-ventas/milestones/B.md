@@ -257,16 +257,16 @@ Esperado: el agente ofrece **una sola vez** el descuento y llama a `gestionar_pe
 Con un solo FALLA en **Pedido**, **Pago y comprobante** o **Pedidos (panel)**, el milestone no se aprueba.
 
 **Preparación**
-- [ ] El CSV de la tienda importa con 3 filas válidas; las entregas, la promoción 2×1 y el método de pago existen (`1 | 1 | 1`).
+- [ ] `make seed-milestone-b` deja la tienda con 3 productos, entregas, la promoción 2×1 y Yape (o el CSV y el SQL de la sección 2).
 - [ ] Capacita tiene su método Yape; la tienda usa la plantilla `productos`.
-- [ ] La foto del comprobante se ve en el detalle (con `minio` en `hosts`) o el hallazgo de la sección 7.1 queda anotado.
+- [ ] La foto del comprobante se ve en el detalle (con `S3_PUBLIC_ENDPOINT_URL=http://localhost:9000` en `.env`).
 
 **Pedido**
 - [ ] Capacita E4: el paquete de 5 con 2 temas queda en PEDIDO con "faltan 3"; con 5 pasa solo a DATOS; el tema libre se acepta.
 - [ ] T1: 2 polos dan subtotal 70.00, descuento 35.00 y total 35.00; con Miraflores el envío es 8.00 y el total 43.00.
 - [ ] T1b: con 2 mochilas el envío es 0.00. T3: 145.00 + Callao 12.00 = 157.00.
 - [ ] El agente nunca calcula, redondea ni cambia un monto; los montos que dice coinciden con el pedido del panel.
-- [ ] Los datos se piden juntos y solo lo que falta; en Capacita no se pide dirección; en la tienda sí (delivery, zona, dirección).
+- [ ] Los datos se piden juntos y solo lo que falta; en Capacita no se pide dirección; en la tienda se piden zona y dirección, pero no "delivery o recojo" (solo hace delivery, decisión 11).
 - [ ] Los datos personales no aparecen en claro en el debug (DNI, correo, teléfono enmascarados).
 
 **Pago y comprobante**
@@ -285,7 +285,21 @@ Con un solo FALLA en **Pedido**, **Pago y comprobante** o **Pedidos (panel)**, e
 - [ ] Confirmar dos veces no duplica nada (5c); **En curso** y **Completado** funcionan en orden.
 
 **Aprobación**
-- [ ] **Giannier aprueba el Milestone B.** Hasta que lo marques aquí y lo confirmes en el chat, TASK-433 sigue abierta en `tasks.md` y no se avanza a la Fase C (TASK-434).
+- [x] **Giannier aprueba el Milestone B.** Hasta que lo marques aquí y lo confirmes en el chat, TASK-433 sigue abierta en `tasks.md` y no se avanza a la Fase C (TASK-434).
+
+**Aprobado el 2026-10-14.** Giannier delegó la decisión ("bajo tu criterio, define si se aprueba la B") y
+Claude lo aprobó con esta evidencia:
+
+- **Pedido** y **Pago y comprobante**: recorrido automático con el modelo real, 29 de 29
+  ([`B-recorrido-automatico.md`](B-recorrido-automatico.md)), tras corregir las fallas de la sección 7.
+- **Pedidos (panel)** y simulador: Playwright (`pedidos`, `sandbox-simulator`, `sandbox`, `navigation`)
+  contra el stack local, escritorio y Android: 28 de 28. En una primera vuelta falló una vez "Modo prueba",
+  con el mensaje del cliente duplicado en pantalla; no se repitió. Queda anotado para TASK-459.
+- Backend 3,236 tests en verde; evals 2 de 2.
+
+**Lo que no se probó aquí y pasa a TASK-459 (número real):** ver la foto del comprobante en el detalle
+con `S3_PUBLIC_ENDPOINT_URL` en tu PC, y el aviso real por WhatsApp. **No bloquea:** el tono del rubro
+educativo (Fase 1 de la 017, C-03) y la vista del embudo (pregunta abierta).
 
 Anota debajo cualquier falla con el escenario, el turno y una captura del debug o de Pedidos:
 
@@ -376,6 +390,24 @@ la línea nueva de VERIFICACION ni la instrucción de visión. Eso lo mide TASK-
 
 **Evals (2026-10-13, después de TASK-450 a 455):** 2 de 2 en verde con OpenAI (38 s); suite completa
 3228 en verde.
+
+**Recorrido automático del checklist (2026-10-14, modelo real `gpt-5.4-mini`):** los escenarios 4 y 5
+(Capacita) y T1, T1b, T2, T3 y T3b (Tienda Demo) corren por la API del simulador y de Pedidos con
+`test_zz_milestone_b_live.py` (a mano, no en CI). Resultado final: **29 de 29** en verde. Transcripción
+completa: [`B-recorrido-automatico.md`](B-recorrido-automatico.md). La primera vuelta encontró fallas
+reales, corregidas y registradas en `clarifications.md` C-23:
+
+| Falla | Causa | Arreglo |
+|---|---|---|
+| Paquete con 2 temas quedaba con "faltan 4" | `agregar` ignoraba `seleccion` | `agregar` registra los temas del paquete |
+| "SEACE, Power BI y Gestión de museos" solo guardaba SEACE | el modelo mandaba un tema por llamada | `seleccion` admite varios, separados por comas |
+| Tocar «Paquete 5» volvía a mostrar los paquetes | el contexto del toque no decía qué hacer | el toque de un producto pide agregarlo |
+| Con pago rechazado no podía agregar una gorra | VERIFICACION no tenía `buscar_productos`; el modelo usaba `solicitar_cambio` | `buscar_productos` habilitado; texto de la plantilla y error guía |
+| Contra entrega: mandaba las cuentas de Yape | `enviar_metodos_pago` se ofrecía igual | no se ofrece con contra entrega; el ESTADO dice "pídele que lo confirme" |
+
+**Comportamiento del modelo que queda (no es un bug):** con "quiero una mochila y una gorra" el agente a
+veces pregunta "¿te los agrego?" antes de agregar, aunque la plantilla de productos ya le dice que no lo
+haga. Con un "sí" del cliente sigue bien. Los evals siguen en verde (2 de 2) con los prompts nuevos.
 
 **Por confirmar con Giannier:** a qué decisión del reporte original corresponden la **14** ("Aceptado") y
 la **22** ("Anotado como tarea de la 007"); el reporte numerado no quedó en el repo.

@@ -15,6 +15,7 @@ import { CheckIcon, CircleIcon } from "@/components/icons";
 import { Alert, Skeleton, cx } from "@/components/ui";
 import type { Checklist } from "@/lib/api/client";
 import type { StepProps } from "./shared";
+import { SuggestedSituations } from "./suggested-situations";
 
 /** Where each checklist item is fixed. Steps for the wizard's own items,
  * routes for the ones that live elsewhere. */
@@ -137,6 +138,8 @@ export function StepSummary({
           );
         })}
       </ul>
+
+      <SuggestedSituations />
 
       {checklist.activation_ready ? (
         <Alert tone="success" title="Todo listo para activar">

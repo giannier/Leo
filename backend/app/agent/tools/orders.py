@@ -318,12 +318,20 @@ def _agregar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
         is_sandbox=context.sandbox,
     )
     turn.service.add_product(order, product, quantity, max_lines=context.max_lines)
-    return turn.result(
-        "hecho",
-        order,
-        "El producto quedó en el pedido. Cuéntale al cliente lo que quedó, con los montos de "
-        "este resultado y sin recalcular nada.",
+    says = (
+        "El producto quedó en el pedido. Si en su mensaje pidió otros productos, agrégalos "
+        "también ahora, sin preguntarle si los quiere. Después cuéntale lo que quedó, con los "
+        "montos del último resultado y sin recalcular nada."
     )
+    names = _names(arguments.get("seleccion"))
+    if not (names and product.bundle_size):
+        return turn.result("hecho", order, says)
+    # The customer often names the themes together with the package: record them
+    # in the same call instead of losing them.
+    added, refusal = _select(turn, order, names, product.id)
+    if refusal is not None:
+        says += " " + _refusal_says(refusal)
+    return turn.result("hecho", order, says, extra={"elegidos": added})
 
 
 def _quitar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
@@ -366,7 +374,11 @@ def _elegir(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     order = turn.draft()
     if order is None:
         return turn.result(
-            "no_disponible", turn.active(), "No hay un paquete en el pedido para elegir."
+            "no_disponible",
+            turn.active(),
+            "Todavía no hay un paquete en el pedido. Si el cliente ya dijo qué paquete quiere, "
+            'agrégalo ahora con gestionar_pedido(accion="agregar", producto_id=<el del '
+            "paquete>, seleccion=<sus temas>). No digas que los temas quedaron registrados.",
         )
     context = turn.context
     product_id = _product_id(arguments)
@@ -381,23 +393,7 @@ def _elegir(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
             return _bad_product_id()
         names, package_id = [chosen.name], None
 
-    added: list[str] = []
-    skipped: list[str] = []
-    refusal: SelectionRefused | None = None
-    for name in names:
-        try:
-            stored = turn.service.add_selection(order, name, package_id=package_id)
-        except SelectionRefused as exc:
-            if exc.code == "duplicate":
-                skipped.append(name)
-                continue
-            refusal = exc
-            break
-        added.append(str(stored["nombre"]))
-        # A free theme must not be mistaken for an invented product when the
-        # model repeats it to the customer.
-        context.extra_names.append(str(stored["nombre"]))
-
+    added, refusal = _select(turn, order, names, package_id)
     if not added and refusal is None:
         return turn.result("omitido", order, "Ya estaba elegido. No lo repitas; sigue adelante.")
     if not added and refusal is not None:
@@ -410,6 +406,25 @@ def _elegir(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
         or "Quedó registrado. Dile al cliente qué eligió y cuántos le faltan, según el pedido.",
         extra={"elegidos": added},
     )
+
+
+def _select(
+    turn: _Turn, order: Order, names: list[str], package_id: uuid.UUID | None
+) -> tuple[list[str], SelectionRefused | None]:
+    """Add each name to the package; a duplicate is skipped, a refusal stops."""
+    added: list[str] = []
+    for name in names:
+        try:
+            stored = turn.service.add_selection(order, name, package_id=package_id)
+        except SelectionRefused as exc:
+            if exc.code == "duplicate":
+                continue
+            return added, exc
+        added.append(str(stored["nombre"]))
+        # A free theme must not be mistaken for an invented product when the
+        # model repeats it to the customer.
+        turn.context.extra_names.append(str(stored["nombre"]))
+    return added, None
 
 
 def _refusal_says(refusal: SelectionRefused) -> str:
@@ -430,10 +445,12 @@ def _solicitar_cambio(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     """Leave the customer's change on an order the business is reviewing (decision 8)."""
     order = turn.active()
     if order is None or order.estado != "por_confirmar":
-        return turn.result(
-            "no_disponible",
-            order,
-            "El pedido no está en revisión: haz el cambio con las otras acciones.",
+        # Seen in the Milestone B run: after a rejection the model asked for a note
+        # and then told the customer the order could not change. It can.
+        return ToolResult.error(
+            "El pedido no está en revisión y sí se puede cambiar: llama ahora a gestionar_pedido "
+            "con la acción que corresponde (agregar, quitar, cambiar_cantidad). No le digas al "
+            "cliente que no se puede."
         )
     note = " ".join(str(arguments.get("nota") or "").split())
     if not note:
@@ -466,15 +483,27 @@ def _vaciar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
 
 
 def _aplicar_promocion(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
-    promotion_id = _uuid(arguments.get("promocion_id"))
-    if promotion_id is None:
-        return ToolResult.error("promocion_id no es válido: usa el id de la promoción del ESTADO.")
-
+    raw = str(arguments.get("promocion_id") or "").strip()
     context = turn.context
     service = turn.service
     now = service.now
-    in_force = PromotionRepository(context.session, context.tenant_id).in_force(now=now)
-    promotion = next((p for p in in_force if p.id == promotion_id and p.uso == "cierre"), None)
+    in_force = [
+        p
+        for p in PromotionRepository(context.session, context.tenant_id).in_force(now=now)
+        if p.uso == "cierre"
+    ]
+    promotion_id = _uuid(raw)
+    if promotion_id is not None:
+        promotion = next((p for p in in_force if p.id == promotion_id), None)
+    else:
+        # The model sometimes passes the name it read in the ESTADO: an exact name of a
+        # closing promotion of this business is unambiguous enough.
+        named = [p for p in in_force if p.nombre.casefold() == raw.casefold()]
+        if not raw or len(named) != 1:
+            return ToolResult.error(
+                "promocion_id no es válido: usa el promocion_id que muestra el ESTADO."
+            )
+        promotion = named[0]
     if promotion is None:
         return turn.result(
             "no_disponible",

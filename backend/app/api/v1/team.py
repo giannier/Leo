@@ -67,11 +67,13 @@ class UpdateMemberRequest(BaseModel):
 
     role: Literal["owner", "tenant_admin", "operator"] | None = None
     status: Literal["active", "disabled"] | None = None
+    # The reviewer permission (017, C-09). The owner always reviews.
+    puede_revisar: bool | None = None
 
     @model_validator(mode="after")
     def _at_least_one(self) -> UpdateMemberRequest:
-        if self.role is None and self.status is None:
-            raise ValueError("Send `role`, `status`, or both.")
+        if self.role is None and self.status is None and self.puede_revisar is None:
+            raise ValueError("Send `role`, `status` or `puede_revisar`.")
         return self
 
 
@@ -82,6 +84,8 @@ class MemberResponse(BaseModel):
     full_name: str
     role: str
     status: str
+    # Whether they approve what the assistant learns (017, C-09).
+    puede_revisar: bool = False
 
 
 class InvitationResponse(BaseModel):
@@ -128,6 +132,7 @@ async def list_team(principal: MemberDep, session: SessionDep) -> TeamResponse:
                 full_name=user.full_name,
                 role=membership.role,
                 status=membership.status,
+                puede_revisar=membership.can_review,
             )
         )
 
@@ -283,7 +288,12 @@ async def update_member(
     """
     service = TeamService(session, principal.tenant_id)
     try:
-        membership = service.update_member(membership_id, role=payload.role, status=payload.status)
+        membership = service.update_member(
+            membership_id,
+            role=payload.role,
+            status=payload.status,
+            puede_revisar=payload.puede_revisar,
+        )
     except MemberNotFound as exc:
         raise _not_found() from exc
     except CannotDemoteLastOwner as exc:
@@ -302,6 +312,7 @@ async def update_member(
         full_name=user.full_name,
         role=membership.role,
         status=membership.status,
+        puede_revisar=membership.can_review,
     )
 
 

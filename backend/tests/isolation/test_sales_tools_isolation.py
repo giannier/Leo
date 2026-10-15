@@ -815,3 +815,33 @@ class TestTheCatalogueSeesFilesAndPromotions:
         )
 
         assert "CLP 10.00" in _text(result)
+
+
+class TestFiltersByAnotherBusinessCategory:
+    """TASK-446: a category name is not an id, but it must not open a door either."""
+
+    async def test_the_options_list_of_b_s_category_is_empty_for_a(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        _product(db, tenant_b, "Zapatilla secreta B", category="Calzado B")
+        outbound = RecordingOutbound()
+
+        result = await mostrar_opciones(
+            _context(db, tenant_a, outbound=outbound),
+            {"tipo": "productos", "texto": "Mira", "filtro": "Calzado B"},
+        )
+
+        shown = repr(outbound.buttons) + repr(outbound.lists)
+        assert "Zapatilla secreta B" not in shown
+        assert "Zapatilla secreta B" not in result.render()
+
+    async def test_the_search_by_b_s_category_finds_nothing_of_b(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        _product(db, tenant_b, "Zapatilla secreta B", category="Calzado B")
+
+        result = await buscar_productos(
+            _context(db, tenant_a), {"consulta": "zapatilla", "categoria": "Calzado B"}
+        )
+
+        assert "Zapatilla secreta B" not in result.render()

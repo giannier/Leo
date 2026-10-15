@@ -23,6 +23,8 @@ from sqlalchemy.orm import Session
 
 from app.models.business import AgentConfig, BusinessProfile
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
+from app.repositories.situation import SituationRepository
+from app.services.situations import SituationService
 
 
 @dataclass(frozen=True)
@@ -40,10 +42,16 @@ class WizardService:
 
     def __init__(self, session: Session, tenant_id: uuid.UUID) -> None:
         self._session = session
+        self._tenant_id = tenant_id
         self._profiles = BusinessProfileRepository(session, tenant_id)
         self._agents = AgentConfigRepository(session, tenant_id)
 
     # ---------------------------------------------------------- read
+
+    def migrated_rules(self) -> str | None:
+        """The old free-text rules, if the migrated situation is still on."""
+        situation = SituationRepository(self._session, self._tenant_id).migrated()
+        return situation.que_hace if situation and situation.estado == "activa" else None
 
     def business_profile(self) -> BusinessProfile | None:
         return self._profiles.current()
@@ -69,6 +77,12 @@ class WizardService:
         # configuration form does not check.
         values.pop("is_active", None)
         stale = self._is_stale(self._agents.current(), expected_updated_at)
+        # The old free-text rules live on as the migrated situation (017, RF-011)
+        # until the wizard stops asking for them (TASK-468).
+        if "restrictions" in values:
+            SituationService(self._session, self._tenant_id).set_migrated_text(
+                values.pop("restrictions")
+            )
         record = self._agents.upsert(**values)
         self._session.commit()
         return SaveOutcome(record=record, overwrote_newer=stale)

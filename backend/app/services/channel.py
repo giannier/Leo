@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.agent.circuit import CircuitBreaker
 from app.agent.outbound import TurnOutbound
 from app.agent.pipeline import InboundTurn, TurnPipeline
 from app.core.config import get_settings
@@ -438,10 +439,13 @@ class ConversationResponder:
         storage: StorageProvider | None = None,
         whatsapp: WhatsAppProvider | None = None,
         notices: OrderNotices | None = None,
+        breaker: CircuitBreaker | None = None,
     ) -> None:
         self._session = session
         self._tenant_id = tenant_id
         self._llm = llm
+        # The model's circuit breaker (TASK-445). None: always try the model.
+        self._breaker = breaker
         # Builds the adapter the sending tools use for one conversation. Without
         # it the tools answer `no_disponible` and the turn is text only.
         self._outbound_for = outbound_for
@@ -514,8 +518,11 @@ class ConversationResponder:
             images=InboundImageReader(
                 self._session, self._tenant_id, storage=self._storage, provider=self._whatsapp
             ),
+            llm_open=self._breaker is not None and await self._breaker.is_open(),
         )
         result = await pipeline.run(conversation_id, self._read_burst(burst))
+        if self._breaker is not None and result.reply is not None and result.reply.llm_failed:
+            await self._breaker.record_failure()
 
         if result.outcome == "gated":
             # The agent is off, the trial is over, the tenant is paused, the
@@ -528,7 +535,7 @@ class ConversationResponder:
             )
             return []
 
-        if result.outcome == "unsupported":
+        if result.outcome in ("unsupported", "llm_down"):
             answers = [
                 self._messages.append(
                     conversation_id=conversation_id,
@@ -544,6 +551,9 @@ class ConversationResponder:
         else:
             answers = result.text_messages
             self.sent_by_tools = len(result.tool_messages)
+        if result.outcome == "llm_down":
+            # No model was called: nothing to count.
+            return answers
 
         # Counted here, where the model bill is actually incurred, and only
         # for the real channel - `record_ai_message` ignores the sandbox by

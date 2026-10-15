@@ -7,6 +7,16 @@ is invisible to autogenerate and would silently never get a migration.
 
 from app.models.audit import AuditLog
 from app.models.base import Base
+from app.models.billing import (
+    BillingLedger,
+    Charge,
+    Coupon,
+    CouponRedemption,
+    Payment,
+    PlanAddon,
+    Subscription,
+    UsagePeriod,
+)
 from app.models.business import (
     AgentConfig,
     BusinessProfile,
@@ -14,15 +24,29 @@ from app.models.business import (
     Product,
     ProductCategory,
 )
+from app.models.catalog import (
+    CatalogEmbedding,
+    CatalogFaq,
+    CatalogObjection,
+    CatalogRule,
+    CatalogSuggestedSituation,
+    CatalogVersion,
+    Rubro,
+    TenantCatalogSeen,
+    TenantRuleSwitch,
+)
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
+from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
 from app.models.media import MediaAsset
+from app.models.metrics import DashboardSettings, MetricsDaily, ModelCost
 from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
-from app.models.sales_config import BusinessInfo, Faq, ProcessStageOverride, Promotion
+from app.models.sales_config import BusinessInfo, Faq, Promotion
+from app.models.situation import Situation
 from app.models.tenant import (
     Invitation,
     Tenant,
@@ -33,11 +57,19 @@ from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
+    "ConversationNote",
+    "NotificationSettings",
     "AgentConfig",
     "AgentTrace",
     "AuditLog",
     "Base",
     "BusinessInfo",
+    "CatalogEmbedding",
+    "CatalogFaq",
+    "CatalogObjection",
+    "CatalogRule",
+    "CatalogSuggestedSituation",
+    "CatalogVersion",
     "BusinessProfile",
     "ConnectionRequest",
     "Contact",
@@ -57,11 +89,25 @@ __all__ = [
     "OtpCode",
     "PaymentProof",
     "PaymentMethodBusiness",
+    "BillingLedger",
+    "Charge",
+    "Coupon",
+    "CouponRedemption",
+    "Payment",
+    "DashboardSettings",
+    "MetricsDaily",
+    "ModelCost",
     "Plan",
-    "ProcessStageOverride",
+    "PlanAddon",
+    "Subscription",
+    "UsagePeriod",
     "Product",
     "ProductCategory",
     "Promotion",
+    "Rubro",
+    "Situation",
+    "TenantCatalogSeen",
+    "TenantRuleSwitch",
     "RefreshToken",
     "Tenant",
     "TenantLLMSettings",

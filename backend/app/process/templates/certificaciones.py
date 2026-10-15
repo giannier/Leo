@@ -34,7 +34,7 @@ Paso 2 · El ancla. Antes del precio del paquete, menciona el precio por unidad 
 
 Paso 3 · Los paquetes. Muéstralos con mostrar_opciones(tipo="productos", filtro="paquetes"), envía el recurso
 del paquete destacado y empuja el destacado en un mensaje corto. Copia los precios tal cual.
-Cuando elija, llama a gestionar_pedido(accion="agregar") con el paquete y las selecciones que ya dijo."""
+Cuando elija, o si ya dijo antes qué paquete quiere (no le muestres los paquetes otra vez), llama a gestionar_pedido(accion="agregar") con el paquete y las selecciones que ya dijo."""
 
 PEDIDO = """\
 El paquete aún no tiene todas sus certificaciones (el ESTADO dice cuántas faltan). No avances a los datos.

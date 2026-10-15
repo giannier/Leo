@@ -37,10 +37,11 @@ from app.agent.tools.shared import (
 from app.models.business import Product
 from app.models.media import MediaAsset
 from app.models.sales_config import Promotion
-from app.repositories.knowledge import KnowledgeChunkRepository
 from app.repositories.media import MediaAssetRepository
 from app.repositories.product import ProductRepository
 from app.repositories.sales_config import PromotionRepository
+from app.services.catalog_knowledge import search_rubro
+from app.services.knowledge import retrieve
 
 MAX_CATALOG_RESULTS = 12
 MAX_KNOWLEDGE_RESULTS = 4
@@ -124,21 +125,43 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
         return ToolResult.error("No se indicó qué buscar.")
 
     vectors = await context.llm.embed([query], input_type="query")
-    chunks = KnowledgeChunkRepository(context.session, context.tenant_id).search(
-        vectors[0], limit=MAX_KNOWLEDGE_RESULTS
+    # One copy per passage, the most trusted source first (Feature 006, C-003).
+    chunks = retrieve(context.session, context.tenant_id, vectors[0], k=MAX_KNOWLEDGE_RESULTS)
+    # The rubro's guidance (017, TASK-461): how to answer, never a business fact.
+    guidance = search_rubro(
+        context.session,
+        context.rubro_version_id,
+        vectors[0],
+        embedding_model=context.llm.embedding_model,
     )
-    if not chunks:
+    if not chunks and not guidance:
         return ToolResult.no_disponible(
             texto=(
-                "No hay información sobre eso en los documentos del negocio. "
-                "No inventes una respuesta."
+                "No hay información sobre eso en los documentos del negocio. No inventes una "
+                "respuesta. Antes de decir que no lo sabes, revisa el bloque NEGOCIO (promociones, "
+                "entregas, pagos) y, si es sobre lo que se vende, usa buscar_productos. Si tampoco "
+                "está ahí, dilo y ofrece que lo atienda una persona; no derives sin que el cliente "
+                "lo pida o lo acepte."
             )
         )
 
-    passages = [chunk.content[:MAX_CHUNK_CHARS] for chunk in chunks]
+    parts: list[str] = []
+    if chunks:
+        passages = [f"[{chunk.title}]\n{chunk.content[:MAX_CHUNK_CHARS]}" for chunk in chunks]
+        parts.append(
+            "Información del negocio (de la fuente más confiable a la menos; si dos fragmentos "
+            "se contradicen, vale el primero):\n" + "\n---\n".join(passages)
+        )
+    if guidance:
+        parts.append(
+            "Guía del rubro (cómo responder; los datos salen solo del negocio):\n"
+            + "\n".join(f"- {hit.text}" for hit in guidance)
+        )
+    # The sources the answer can lean on, for the trace (006 HU-05).
+    sources = list(dict.fromkeys(chunk.title for chunk in chunks))
     return ToolResult.hecho(
-        data={"fragmentos": len(passages)},
-        texto="Información del negocio:\n" + "\n---\n".join(passages),
+        data={"fragmentos": len(chunks), "guia_rubro": len(guidance), "fuentes": sources},
+        texto="\n\n".join(parts),
     )
 
 

@@ -522,7 +522,12 @@ class TestPdfIngestion:
 
 
 class TestAScannedPdfFails:
-    """tasks.md verification 2: a PDF with no text ends `failed`, with a reason."""
+    """tasks.md verification 2: a PDF with no text ends `failed`, with a reason.
+
+    Since Feature 006 a scanned page goes to the vision model first; here the
+    model reads nothing (no scripted answer), which is the case that must still
+    fail with a reason. The OCR itself is `test_knowledge_ocr.py`.
+    """
 
     async def test_it_is_marked_failed_rather_than_indexed(
         self,
@@ -556,8 +561,8 @@ class TestAScannedPdfFails:
         await _run_worker(db, tenant, source_id, llm=llm, storage=storage)
 
         message = (_source(db, source_id).error_msg or "").lower()
-        assert "no extractable text" in message
-        assert "scan" in message
+        assert "escaneado" in message
+        assert "pega el contenido como texto" in message
 
     async def test_it_produces_no_chunks_and_costs_no_embeddings(
         self,

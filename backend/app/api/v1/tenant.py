@@ -22,14 +22,16 @@ from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
 from app.api.errors import ApiError, error_responses
 from app.repositories.business import AgentConfigRepository
 from app.repositories.conversation import MessageRepository
+from app.repositories.media import MediaAssetRepository
 from app.repositories.payment import PaymentMethodRepository
 from app.repositories.plan import PlanRepository
 from app.repositories.tenant import TenantRepository
 from app.services.activation import build_checklist
-from app.services.trial import billing_enforced
+from app.services.trial import billing_enforced, message_limit
 
 router = APIRouter(prefix="/tenant", tags=["tenant"])
 
+Holder = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=120)]
 PaymentMethodName = Literal["yape", "plin", "transferencia", "tarjeta", "efectivo", "link"]
 Instructions = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
@@ -90,12 +92,18 @@ class PaymentMethodRequest(BaseModel):
     # Turns on the receipt-vision tool that arrives in Feature 004.
     validate_receipts: bool = False
     is_active: bool = True
+    # Who the account belongs to, as a receipt shows it (017 RF-010).
+    titular: Holder | None = None
+    # The QR or account image (004 contract §1): an image of this tenant.
+    media_asset_id: uuid.UUID | None = None
 
 
 class PaymentMethodPatch(BaseModel):
     instructions: Instructions | None = None
     validate_receipts: bool | None = None
     is_active: bool | None = None
+    titular: Holder | None = None
+    media_asset_id: uuid.UUID | None = None
 
 
 class PaymentMethodResponse(BaseModel):
@@ -104,6 +112,21 @@ class PaymentMethodResponse(BaseModel):
     instructions: str
     validate_receipts: bool
     is_active: bool
+    titular: str | None = None
+    media_asset_id: uuid.UUID | None = None
+
+
+def _check_media(session: SessionDep, tenant_id: uuid.UUID, asset_id: uuid.UUID | None) -> None:
+    """The QR must be an image of this business."""
+    if asset_id is None:
+        return
+    asset = MediaAssetRepository(session, tenant_id).get(asset_id)
+    if asset is None or asset.tipo != "imagen":
+        raise ApiError(
+            status_code=422,
+            error="invalid_media",
+            message="The QR must be an image from your media library.",
+        )
 
 
 def _not_found() -> ApiError:
@@ -129,7 +152,7 @@ async def get_tenant(principal: MemberDep, session: SessionDep) -> TenantRespons
         trial = TrialStatus(
             ends_at=tenant.trial_ends_at,
             ai_messages_used=tenant.ai_messages_used,
-            ai_messages_limit=plan.max_ai_messages,
+            ai_messages_limit=message_limit(session, tenant),
             days_left=days_left,
         )
 
@@ -164,8 +187,7 @@ async def get_usage(principal: MemberDep, session: SessionDep) -> UsageResponse:
     tenant = TenantRepository(session).get(principal.tenant_id)
     if tenant is None:  # pragma: no cover - the caller is a member of it
         raise _not_found()
-    plan = PlanRepository(session).get(tenant.plan_id)
-    limit = plan.max_ai_messages if plan else 0
+    limit = message_limit(session, tenant)
 
     since = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     messages = MessageRepository(session, principal.tenant_id)
@@ -237,6 +259,7 @@ async def create_payment_method(
     """One row per method. A business has one set of Yape instructions, not
     several, so the unique constraint is the point rather than a limitation."""
     repository = PaymentMethodRepository(session, principal.tenant_id)
+    _check_media(session, principal.tenant_id, payload.media_asset_id)
     try:
         method = repository.add(**payload.model_dump())
         session.commit()
@@ -271,6 +294,7 @@ async def update_payment_method(
     """`method` itself is not editable: changing Yape into Plin would silently
     rewrite instructions customers were already given. Delete and add."""
     repository = PaymentMethodRepository(session, principal.tenant_id)
+    _check_media(session, principal.tenant_id, payload.media_asset_id)
     updated = repository.update(method_id, **payload.model_dump(exclude_unset=True))
     if updated is None:
         raise _not_found()

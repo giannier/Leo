@@ -256,7 +256,12 @@ class TestEachStageExposesOnlyItsOwnTools:
 
         registry = registry_for_stage(SHOP, Stage.VERIFICACION, facts, SHOP_OPTIONS)
 
-        assert _names(registry) == {"enviar_metodos_pago", "gestionar_pedido", *GLOBAL_TOOLS}
+        assert _names(registry) == {
+            "enviar_metodos_pago",
+            "gestionar_pedido",
+            "buscar_productos",
+            *GLOBAL_TOOLS,
+        }
 
     def test_every_tool_offered_exists_in_the_vocabulary(self) -> None:
         for template in TEMPLATES.values():
@@ -358,6 +363,16 @@ class TestConfirmingAnOrder:
 
     def test_confirm_is_not_offered_when_the_payment_is_up_front(self) -> None:
         assert "confirmar" not in self._actions(Stage.COBRO, Facts(modalidad_pago="previo"))
+
+    def test_cash_on_delivery_sends_no_payment_methods(self) -> None:
+        # Milestone B run: the model sent the Yape account to a cash-on-delivery order.
+        cash = _names(registry_for_stage(SHOP, Stage.COBRO, self.cash, SHOP_OPTIONS))
+        prepaid = _names(
+            registry_for_stage(SHOP, Stage.COBRO, Facts(modalidad_pago="previo"), SHOP_OPTIONS)
+        )
+
+        assert "enviar_metodos_pago" not in cash
+        assert "enviar_metodos_pago" in prepaid
 
     @pytest.mark.parametrize("stage", [Stage.IDENTIFICAR, Stage.PEDIDO, Stage.DATOS, Stage.CERRADO])
     def test_confirm_is_not_offered_outside_the_charge_stage(self, stage: Stage) -> None:
@@ -478,28 +493,6 @@ class TestTheHandover:
             "otro",
         ]
         assert properties["resumen"]["maxLength"] == 500
-
-
-# ------------------------------------------------------------------------ stubs
-
-
-class TestTheToolsOfLaterTasksAnswerNotAvailable:
-    @pytest.mark.parametrize(
-        ("tool", "stage"),
-        [
-            ("derivar_a_humano", Stage.IDENTIFICAR),
-        ],
-    )
-    async def test_the_stub(self, tool: str, stage: Stage) -> None:
-        registry = registry_for_stage(CERT, stage, Facts(), CERT_OPTIONS)
-
-        result = await _call(registry, tool)
-
-        assert isinstance(result, ToolResult)
-        assert result.status == "no_disponible"
-        assert result.data == {"herramienta": tool}
-        # The model is told not to mention it; it must not promise anything.
-        assert "No la menciones" in (result.decir or "")
 
 
 # ------------------------------------------------------------------- the alias

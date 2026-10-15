@@ -22,7 +22,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
-from pydantic import BaseModel, StringConstraints, ValidationError, model_validator
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
 
@@ -40,6 +40,7 @@ from app.orders.proofs import ReceivedImage
 from app.process.state import facts_snapshot
 from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
+from app.repositories.layers import TenantRuleSwitchRepository
 from app.repositories.media import MediaAssetRepository
 from app.services.sandbox import ConversationNotFound, SandboxNotReady, SandboxService
 
@@ -83,6 +84,8 @@ class SendMessageRequest(BaseModel):
     ) = None
     # The title the customer saw on the button or row; it is what the transcript shows.
     title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    # Draft situations to try in this turn as if they were active (017, RF-009).
+    situaciones_prueba: list[uuid.UUID] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def _one_kind_of_message(self) -> SendMessageRequest:
@@ -159,6 +162,15 @@ class DebugTokens(BaseModel):
     completion: int
 
 
+class DebugSituation(BaseModel):
+    id: str
+    titulo: str
+    siempre: bool
+    borrador: bool
+    # Cosine distance to the message; None for "siempre".
+    distancia: float | None = None
+
+
 class DebugResponse(BaseModel):
     """The debug panel (C-19): where the conversation is and what the agent had."""
 
@@ -173,6 +185,10 @@ class DebugResponse(BaseModel):
     modelo: str | None = None
     # Why the assistant stayed quiet, if it did: `handover`, `paused`, `opted_out`.
     silencio: str | None = None
+    # The layers (017): situations that entered this turn, and the rules the
+    # business switched off, by kind.
+    situaciones: list[DebugSituation] = Field(default_factory=list)
+    reglas_apagadas: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class SendMessageResponse(BaseModel):
@@ -283,7 +299,7 @@ def present(
     return typed
 
 
-def _debug(result: TurnResult) -> DebugResponse:
+def _debug(result: TurnResult, switched_off: dict[str, frozenset[str]]) -> DebugResponse:
     reply = result.reply
     return DebugResponse(
         etapa_antes=result.stage_before.value,
@@ -291,6 +307,17 @@ def _debug(result: TurnResult) -> DebugResponse:
         embudo=result.funnel.value,
         hechos=facts_snapshot(result.facts),
         herramientas_habilitadas=list(result.tools_enabled),
+        situaciones=[
+            DebugSituation(
+                id=str(s.id),
+                titulo=s.titulo,
+                siempre=s.siempre,
+                borrador=s.borrador,
+                distancia=None if s.distancia is None else round(s.distancia, 3),
+            )
+            for s in result.situations
+        ],
+        reglas_apagadas={kind: sorted(keys) for kind, keys in switched_off.items()},
         herramientas_llamadas=[
             DebugTool(nombre=str(call["tool"]), status=str(call.get("status", "hecho")))
             for call in (reply.tools_called if reply else [])
@@ -306,8 +333,8 @@ def _debug(result: TurnResult) -> DebugResponse:
 
 async def _read_request(
     request: Request,
-) -> tuple[str, InteractiveReply | None, ReceivedImage | None]:
-    """The customer's message from either shape of body: (text, tap, image)."""
+) -> tuple[str, InteractiveReply | None, ReceivedImage | None, list[uuid.UUID]]:
+    """The customer's message from either shape of body: (text, tap, image, drafts)."""
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("multipart/form-data"):
         form = await request.form()
@@ -326,7 +353,16 @@ async def _read_request(
         text = (
             caption.strip() if isinstance(caption, str) and caption.strip() else IMAGE_PLACEHOLDER
         )
-        return text[:4096], None, ReceivedImage(data=data, mime_type=upload.content_type)
+        raw_drafts = form.get("situaciones_prueba")
+        try:
+            drafts = [
+                uuid.UUID(part)
+                for part in (raw_drafts if isinstance(raw_drafts, str) else "").split(",")
+                if part.strip()
+            ][:10]
+        except ValueError as exc:
+            raise _invalid("`situaciones_prueba` must be ids.", "situaciones_prueba") from exc
+        return text[:4096], None, ReceivedImage(data=data, mime_type=upload.content_type), drafts
 
     try:
         payload = SendMessageRequest.model_validate(await request.json())
@@ -337,8 +373,9 @@ async def _read_request(
             payload.title or "",
             InteractiveReply(id=payload.interactive_id, title=payload.title or ""),
             None,
+            payload.situaciones_prueba,
         )
-    return payload.content or "", None, None
+    return payload.content or "", None, None, payload.situaciones_prueba
 
 
 # --------------------------------------------------------------- endpoints
@@ -422,10 +459,12 @@ async def send_message(
             headers={"Retry-After": str(decision.retry_after_seconds)},
         )
 
-    text, tap, image = await _read_request(request)
+    text, tap, image, drafts = await _read_request(request)
     service = SandboxService(session, principal.tenant_id, llm=llm, storage=storage)
     try:
-        turn = await service.send(conversation_id, content=text, interactive=tap, image=image)
+        turn = await service.send(
+            conversation_id, content=text, interactive=tap, image=image, drafts=drafts
+        )
     except ConversationNotFound as exc:
         raise _not_found() from exc
 
@@ -449,7 +488,14 @@ async def send_message(
             if reply is not None
             else None
         ),
-        debug=_debug(turn.result) if debug else None,
+        debug=(
+            _debug(
+                turn.result,
+                TenantRuleSwitchRepository(session, principal.tenant_id).off_by_kind(),
+            )
+            if debug
+            else None
+        ),
     )
 
 

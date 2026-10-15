@@ -9,9 +9,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ARRAY, DateTime, ForeignKey, Index, Integer, SmallInteger, Text, func
+from sqlalchemy import (
+    ARRAY,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -47,6 +58,9 @@ MESSAGE_TYPES = (
     # or `video`. The structure is in `Message.payload`.
     "video",
     "interactive",
+    # Feature 007: takeover, return, close and payment decisions as items of the
+    # thread (`author='system'`, the details in `payload`).
+    "event",
 )
 
 # Where an outbound message got to. Null for anything inbound - a message the
@@ -80,6 +94,23 @@ class Conversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="open")
+    # --- the inbox (Feature 007, migration 0034) --------------------------
+    # The person who has the conversation; the agent stays quiet while set.
+    takeover_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    takeover_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # The last thing that person did here: the auto-return counts from it.
+    takeover_activity_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The inbox's order; written by `MessageRepository.append`.
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Customer messages nobody has opened yet.
+    unread_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
 
 
 class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
@@ -154,6 +185,9 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     )
     model: Mapped[str] = mapped_column(Text, nullable=False)
     # [{"tool": ..., "args_resumen": ..., "ok": ..., "cached": ..., "ronda": 1..N}]
+    # What the trace cost, from `model_costs` when it was written (Feature 010).
+    # NULL when the model has no price configured.
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     tools_called: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )
@@ -182,3 +216,5 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     tools_enabled: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     outbound_count: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     model_tier: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The situations that entered the turn, with their distance (017, C-10).
+    situaciones: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, nullable=True)

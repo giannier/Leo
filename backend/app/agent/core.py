@@ -54,6 +54,7 @@ from app.repositories.conversation import (
     MessageRepository,
 )
 from app.repositories.product import ProductRepository
+from app.services.metrics.costs import call_cost
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ MAX_TOOL_ROUNDS = 3
 # and still leaves the tool results room to be the part that decides the
 # answer. A rolling summary (TASK-304) is what removes the ceiling; this only
 # raises it.
-HISTORY_TURNS = 30
+HISTORY_TURNS = 20
 
 FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
@@ -148,7 +149,7 @@ def _tidy(text: str) -> str:
     return _RUN_OF_NEWLINES.sub("\n\n", text).strip()
 
 
-def _usable_answer(raw: str) -> tuple[str, bool]:
+def usable_answer(raw: str) -> tuple[str, bool]:
     """The reply to show, and whether the model failed to produce one.
 
     Any leftover tool-call markup is removed rather than shown. The answer is
@@ -232,6 +233,8 @@ class AgentReply:
     silent: bool = False
     # Tool rounds the model used before answering (0 when it answered straight away).
     tool_rounds: int = 0
+    # The provider itself failed (not the answer): what the circuit breaker counts.
+    llm_failed: bool = False
 
 
 @dataclass(frozen=True)
@@ -244,6 +247,8 @@ class TurnTrace:
     outbound_count: int
     # The configured intelligence level; None when the tenant brings its own model.
     model_tier: str | None = None
+    # The situations that entered the turn (017, TASK-463).
+    situaciones: list[dict[str, object]] | None = None
 
 
 class AgentCore:
@@ -297,7 +302,7 @@ class AgentCore:
             ChatMessage(
                 "system", system_prompt if system_prompt is not None else self.system_prompt()
             ),
-            *self._history(conversation_id),
+            *self.history(conversation_id),
             ChatMessage("user", customer_message),
         ]
 
@@ -337,6 +342,7 @@ class AgentCore:
                     output_tokens=output_tokens,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     degraded=True,
+                    llm_failed=True,
                 )
 
             input_tokens += result.input_tokens
@@ -367,12 +373,27 @@ class AgentCore:
                 )
                 rag_sources.extend(sources)
                 messages.append(ChatMessage("tool", output, tool_call_id=call.id, name=call.name))
+                if context.ending.ended:
+                    break
+            if context.ending.ended:
+                # A handover closes the turn (TASK-443): the customer gets the
+                # business's message, and the model is not asked for another word.
+                return AgentReply(
+                    content=context.ending.reply or "",
+                    model=result.model,
+                    tools_called=tools_called,
+                    rag_sources=rag_sources,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    latency_ms=int((time.perf_counter() - started) * 1000),
+                    tool_rounds=rounds_used,
+                )
 
         # A model that answers nothing, or answers with tool-call syntax, is
         # worse than one that says it cannot help: the customer sees an empty
         # bubble or a pile of angle brackets, and no next step either way.
         silent = result is not None and not result.content.strip()
-        content, unusable = _usable_answer(result.content if result else "")
+        content, unusable = usable_answer(result.content if result else "")
 
         guard_note: dict[str, object] | None = None
         if not unusable:
@@ -452,7 +473,7 @@ class AgentCore:
                 blocked=True,
             )
 
-        corrected, unusable = _usable_answer(retry.content)
+        corrected, unusable = usable_answer(retry.content)
         still_invented = guard.invented_names(corrected)
         blocked = unusable or bool(still_invented)
 
@@ -553,14 +574,18 @@ class AgentCore:
 
         sources: list[dict[str, object]] = []
         if call.name == "consultar_conocimiento" and found:
-            sources.append({"tool": call.name, "consulta": _summarise(call.arguments)})
+            entry: dict[str, object] = {"tool": call.name, "consulta": _summarise(call.arguments)}
+            if isinstance(produced, ToolResult) and produced.data.get("fuentes"):
+                # Which documents the answer leaned on (006 HU-05).
+                entry["fuentes"] = produced.data["fuentes"]
+            sources.append(entry)
 
         if tool.effect:
             cache.writes += 1
         cache.entries[key] = (output, sources, cache.writes)
         return output, sources, False
 
-    def _history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
+    def history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
         """Recent turns of this conversation, oldest first.
 
         A DNI or RUC the customer already registered is replaced by a label
@@ -606,6 +631,14 @@ class AgentCore:
             rag_sources=reply.rag_sources,
             input_tokens=reply.input_tokens,
             output_tokens=reply.output_tokens,
+            # The price in force now (Feature 010); None when the model has none.
+            cost_usd=call_cost(
+                self._session,
+                reply.model,
+                reply.input_tokens,
+                reply.output_tokens,
+                datetime.now(UTC),
+            ),
             latency_ms=reply.latency_ms,
             catalog_guard=reply.catalog_guard,
             **(
@@ -615,6 +648,7 @@ class AgentCore:
                     "tools_enabled": turn.tools_enabled,
                     "outbound_count": turn.outbound_count,
                     "model_tier": turn.model_tier,
+                    "situaciones": turn.situaciones,
                 }
                 if turn is not None
                 else {}

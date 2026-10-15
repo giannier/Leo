@@ -21,15 +21,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { AlertIcon, ClockIcon, LogOutIcon, UsersIcon } from "@/components/icons";
+import {
+  AlertIcon,
+  BookIcon,
+  ChartIcon,
+  ClockIcon,
+  LogOutIcon,
+  ReceiptIcon,
+  UsersIcon,
+} from "@/components/icons";
 import { Skeleton, cx } from "@/components/ui";
 import { useSession } from "@/lib/session";
 
 const NAV = [
   { href: "/admin", label: "Solicitudes", icon: ClockIcon },
   { href: "/admin/tenants", label: "Negocios", icon: UsersIcon },
+  { href: "/admin/cobros", label: "Cobros", icon: ReceiptIcon },
+  { href: "/admin/metricas", label: "Métricas", icon: ChartIcon },
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
+  { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -78,7 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </span>
           </div>
 
-          <nav aria-label="Principal" className="flex flex-1 items-center gap-1">
+          <nav aria-label="Principal" className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             {NAV.map((item) => {
               const current =
                 item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);

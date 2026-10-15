@@ -3,7 +3,7 @@
 
 `ProcessConfigService` reads six tenant-scoped tables and caches the result per
 tenant. Two things can go wrong that only two real tenants can show: one business
-reading another's template, options, overrides or promotions, and the cache
+reading another's template, options or promotions, and the cache
 handing one tenant's configuration to the other.
 """
 
@@ -26,11 +26,7 @@ from app.process.service import (
 from app.process.templates.base import Stage
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
-from app.repositories.sales_config import (
-    BusinessInfoRepository,
-    ProcessStageOverrideRepository,
-    PromotionRepository,
-)
+from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from tests.isolation.conftest import TenantFixture
 
 NOW = datetime(2026, 10, 12, 15, 0, tzinfo=UTC)
@@ -72,19 +68,13 @@ def _configure(db: Session, fixture: TenantFixture, label: str) -> None:
         agent_name=f"Asistente {label}",
         ritmo="directo" if cert else "paso_a_paso",
         detalle="breve" if cert else "extenso",
-        restrictions=f"Reglas de {label}",
+        saludo=f"Saludo de {label}",
     )
     BusinessProfileRepository(db, tenant).upsert(
         business_name=f"Negocio {label}",
         industry="instituto",
         currency="PEN" if cert else "USD",
         timezone="America/Lima",
-    )
-    ProcessStageOverrideRepository(db, tenant).upsert(
-        "certificaciones" if cert else "servicios",
-        "IDENTIFICAR",
-        instrucciones=f"Instrucciones propias de {label}",
-        base_version=1,
     )
     BusinessInfoRepository(db, tenant).upsert(
         "entregas", {"hace_delivery": cert, "zonas": [], "recojo_en_tienda": not cert}
@@ -115,14 +105,11 @@ class TestEachTenantReadsItsOwnConfiguration:
         assert (a.behavior.agent_name, b.behavior.agent_name) == ("Asistente A", "Asistente B")
         assert (a.behavior.ritmo, b.behavior.ritmo) == ("directo", "paso_a_paso")
         assert (a.behavior.detalle, b.behavior.detalle) == ("breve", "extenso")
-        assert (a.behavior.reglas_adicionales, b.behavior.reglas_adicionales) == (
-            "Reglas de A",
-            "Reglas de B",
-        )
+        assert (a.behavior.saludo, b.behavior.saludo) == ("Saludo de A", "Saludo de B")
         assert (a.business_name, b.business_name) == ("Negocio A", "Negocio B")
         assert (a.currency, b.currency) == ("PEN", "USD")
 
-    def test_stage_overrides_business_info_methods_and_promotions(
+    def test_stage_texts_business_info_methods_and_promotions(
         self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, configured: None
     ) -> None:
         service = _service(db)
@@ -130,9 +117,10 @@ class TestEachTenantReadsItsOwnConfiguration:
         a = service.effective(tenant_a.tenant_id)
         b = service.effective(tenant_b.tenant_id)
 
-        assert a.instructions_for(Stage.IDENTIFICAR) == "Instrucciones propias de A"
-        assert b.instructions_for(Stage.IDENTIFICAR) == "Instrucciones propias de B"
-        assert a.customized_stages == {Stage.IDENTIFICAR} == b.customized_stages
+        # Each reads the published rules of its own template (017, TASK-460).
+        assert a.instructions_for(Stage.IDENTIFICAR).startswith("Paso 1 · El tema.")
+        assert b.instructions_for(Stage.IDENTIFICAR).startswith("Entiende qué necesita")
+        assert (a.process_version, b.process_version) == (2, 2)  # v2: migration 0033
         assert a.info.entregas is not None and a.info.entregas.hace_delivery is True
         assert b.info.entregas is not None and b.info.entregas.hace_delivery is False
         assert (a.payment_methods, b.payment_methods) == (("yape",), ("plin",))
@@ -154,19 +142,6 @@ class TestEachTenantReadsItsOwnConfiguration:
         assert first_b.tenant_id == tenant_b.tenant_id
         assert first_a.business_name == "Negocio A"
 
-    def test_an_override_of_another_template_is_kept_but_not_used(
-        self, db: Session, tenant_a: TenantFixture
-    ) -> None:
-        AgentConfigRepository(db, tenant_a.tenant_id).upsert(process_template_key="productos")
-        ProcessStageOverrideRepository(db, tenant_a.tenant_id).upsert(
-            "certificaciones", "PEDIDO", instrucciones="De la plantilla anterior", base_version=1
-        )
-
-        config = _service(db).effective(tenant_a.tenant_id)
-
-        assert config.customized_stages == frozenset()
-        assert "De la plantilla anterior" not in config.instructions_for(Stage.PEDIDO)
-
 
 class TestDefaults:
     def test_a_tenant_with_no_configuration_runs_the_default_template(
@@ -183,28 +158,13 @@ class TestDefaults:
             "equilibrado",
             "moderado",
         )
-        assert config.customized_stages == frozenset()
+        assert config.process_version == 2  # v2: migration 0033
         assert config.currency == "PEN"
         assert config.business_name is None
         assert config.payment_methods == ()
         assert config.promotions == ()
         for stage in Stage:
             assert config.instructions_for(stage) == config.template.stage(stage).instrucciones
-
-    def test_an_override_with_no_text_means_the_template_text(
-        self, db: Session, tenant_a: TenantFixture
-    ) -> None:
-        ProcessStageOverrideRepository(db, tenant_a.tenant_id).upsert(
-            "productos",
-            "PEDIDO",
-            instrucciones=None,
-            instrucciones_seguimiento="solo seguimiento",
-            base_version=1,
-        )
-
-        config = _service(db).effective(tenant_a.tenant_id)
-
-        assert config.customized_stages == frozenset()
 
     def test_options_that_do_not_fit_the_template_fall_back_to_its_defaults(
         self, db: Session, tenant_a: TenantFixture
@@ -315,12 +275,15 @@ class TestTheCache:
         assert queries == 0
         assert service.effective(tenant_a.tenant_id) is first
 
-    def test_the_first_read_takes_six_statements(
+    def test_the_first_read_takes_eight_statements(
         self, engine: Engine, db: Session, tenant_a: TenantFixture
     ) -> None:
+        # Agent, profile, the published process version, the business's switches
+        # and the process rules (017), business info, payment methods and
+        # promotions. A business with a rubro adds its version and its rules.
         service = _service(db)
 
-        assert self._count(engine, lambda: service.effective(tenant_a.tenant_id)) == 6
+        assert self._count(engine, lambda: service.effective(tenant_a.tenant_id)) == 8
 
     def test_an_edit_is_seen_after_the_cache_expires(
         self, db: Session, tenant_a: TenantFixture

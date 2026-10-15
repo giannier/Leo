@@ -486,7 +486,9 @@ class TestAddingAndChangingLines:
         db.flush()
         empty = await act(context, accion="solicitar_cambio", nota="   ")
 
-        assert draft.status == "no_disponible"
+        # A draft can change: the model is told to do it instead of giving up.
+        assert draft.status == "error"
+        assert "sí se puede cambiar" in draft.decir
         assert empty.status == "error"
         assert order.notas == []
 
@@ -606,6 +608,44 @@ class TestPackages:
         assert result.data["pedido"]["completo"] is True
         assert result.data["pedido"]["faltan_selecciones"] == 0
         assert "El pedido está completo" in (result.texto or "")
+
+    async def test_themes_named_with_the_package_are_kept(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        # Milestone B run: the model sent `seleccion` with `agregar` and the theme was lost.
+        context = make_context(db, tenant, conversation)
+
+        result = await act(
+            context,
+            accion="agregar",
+            producto_id=str(catalogue["free5"].id),
+            seleccion="SIAF, Excel avanzado",
+        )
+
+        assert result.status == "hecho"
+        assert result.data["elegidos"] == ["SIAF", "Excel avanzado"]
+        assert result.data["pedido"]["items"][0]["selecciones"] == ["SIAF", "Excel avanzado"]
+        assert result.data["pedido"]["faltan_selecciones"] == 3
+
+    async def test_a_theme_with_a_plain_product_is_ignored(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        context = make_context(db, tenant, conversation)
+
+        result = await act(
+            context, accion="agregar", producto_id=str(catalogue["excel"].id), seleccion="SIAF"
+        )
+
+        assert result.status == "hecho"
+        assert "elegidos" not in result.data
 
     async def test_a_free_theme_is_remembered_for_the_catalogue_guard(
         self,
@@ -830,6 +870,25 @@ class TestPromotions:
         assert result.data["pedido"]["total"] == "160.00"
         assert order.rechazo_vigente is False
         assert str(coupon.id) in offers_of(context)
+
+    async def test_the_exact_name_of_a_closing_promotion_also_works(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """The model passed the name it read in the ESTADO (acceptance, TASK-449)."""
+        coupon = promotion(db, tenant)
+        context = make_context(db, tenant, conversation)
+        await act(context, accion="agregar", producto_id=str(catalogue["excel"].id))
+
+        named = await act(context, accion="aplicar_promocion", promocion_id=coupon.nombre.upper())
+        unknown = await act(context, accion="aplicar_promocion", promocion_id="Otra promo")
+
+        assert named.status == "hecho"
+        assert str(coupon.id) in offers_of(context)
+        assert unknown.status == "error"
 
     async def test_a_later_change_keeps_the_offer_made_in_this_turn(
         self,

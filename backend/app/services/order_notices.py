@@ -18,9 +18,7 @@ the decision committed, and never makes it fail:
 from __future__ import annotations
 
 import logging
-import re
 import uuid
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -32,6 +30,7 @@ from app.models.conversation import Message
 from app.models.orders import Order
 from app.orders.notices import OrderNotices
 from app.orders.review import NoticeKind
+from app.process.system_messages import render_system_message
 from app.process.templates.base import DEFAULT_SYSTEM_MESSAGES
 from app.providers.whatsapp.base import WhatsAppProvider
 from app.repositories.business import AgentConfigRepository
@@ -43,31 +42,6 @@ logger = logging.getLogger(__name__)
 
 # What the response of confirm/reject says about the customer's notice.
 CustomerNotice = Literal["enviado", "ventana_cerrada", "no_enviado"]
-
-_PLACEHOLDER = re.compile(r"\{(\w+)\}")
-_COMMA_BEFORE_NAME = re.compile(r",\s*\{nombre_cliente\}")
-_COMMA_AFTER_NAME = re.compile(r"\{nombre_cliente\}\s*,\s*")
-
-
-def render_system_message(template: str, values: Mapping[str, str | None]) -> str:
-    """Fill a system message. A value that is missing disappears with its punctuation.
-
-    "¡{nombre_cliente}, tu pago fue confirmado!" for a customer whose name we never
-    got reads "¡Tu pago fue confirmado!", not "¡, tu pago...". Unknown placeholders are
-    removed too: an owner who typed `{algo}` must not see braces reach the customer.
-    """
-    text = template
-    for key, value in values.items():
-        if value:
-            text = text.replace("{" + key + "}", value)
-    if not values.get("nombre_cliente"):
-        text = _COMMA_BEFORE_NAME.sub("", text)
-        text = _COMMA_AFTER_NAME.sub("", text)
-    text = _PLACEHOLDER.sub("", text)
-    text = re.sub(r"[ \t]{2,}", " ", text)
-    text = re.sub(r"\s+([.,;:!?])", r"\1", text).strip()
-    # The first letter after an opening mark or at the start is a capital again.
-    return re.sub(r"^([¡¿]?)([a-záéíóúñ])", lambda m: m.group(1) + m.group(2).upper(), text)
 
 
 @dataclass(frozen=True)

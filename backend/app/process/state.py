@@ -144,6 +144,7 @@ class StateRepo:
         expected_version: int,
         snapshot: Mapping[str, Any] | None = None,
         force_event: bool = False,
+        retry: bool = True,
     ) -> SaveResult:
         """Write the stage, the funnel column and a patch of the stored facts.
 
@@ -154,7 +155,8 @@ class StateRepo:
         `expected_version` is the version the caller read. If the row has moved
         on, the save is retried once on top of the fresh row - the patch is the
         caller's intent and is re-applied - and raises `StateConflict` if it
-        collides again.
+        collides again. `retry=False` makes it a strict compare-and-set: a claim
+        (a follow-up attempt, TASK-444) must lose to whoever wrote first.
 
         `force_event` records the event even when neither the stage nor the funnel
         column moved. An operator's decision (rejecting a receipt leaves the stage in
@@ -184,6 +186,8 @@ class StateRepo:
             if written is not None:
                 state, event = written
                 return SaveResult(state=state, event=event, retried=attempt == 2)
+            if not retry:
+                break
             fresh = self._read_fresh(conversation_id)
             version = fresh.version
         raise StateConflict(

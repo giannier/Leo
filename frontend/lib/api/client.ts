@@ -43,6 +43,13 @@ export function setAccessToken(token: string | null, tenantId?: string | null): 
   }
 }
 
+/** The live channel's address (Feature 007): the token goes in the query string. */
+export function inboxSocketUrl(): string | null {
+  if (!accessToken) return null;
+  const base = BASE_URL.replace(/^http/, "ws");
+  return `${base}/api/v1/ws?token=${encodeURIComponent(accessToken)}`;
+}
+
 export function getAccessToken(): string | null {
   return accessToken;
 }
@@ -192,6 +199,24 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return (await response.json()) as T;
 }
 
+/** A file from the API (a receipt PDF): same auth and refresh as `request`. */
+export async function requestBlob(path: string): Promise<Blob> {
+  let response = await send(path, {});
+  if (response.status === 401) {
+    const session = await refreshSession();
+    if (session === null) {
+      accessToken = null;
+      onSessionLost?.();
+      throw await readError(response);
+    }
+    response = await send(path, {});
+  }
+  if (!response.ok) {
+    throw await readError(response);
+  }
+  return response.blob();
+}
+
 /* ------------------------------------------------------------------ *
  * Named operations.
  *
@@ -239,6 +264,78 @@ export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
+// Dashboard (Feature 010). The report is a free-form dict on the server; typed here.
+export interface MetricsSummary {
+  conversations: number;
+  conversations_agent_only: number;
+  conversations_with_person: number;
+  messages_in: number;
+  messages_out_agent: number;
+  messages_out_person: number;
+  first_responses: number;
+  handovers: number;
+  orders_confirmed: number;
+  primera_respuesta_promedio_segundos: number | null;
+  horas_ahorradas: number;
+  derivaciones_por_motivo: Record<string, number>;
+  ventas?: Record<string, string>;
+}
+export interface MetricsDay {
+  dia: string;
+  conversaciones: number;
+  solo_agente: number;
+  con_persona: number;
+  derivaciones: number;
+  pedidos: number;
+}
+export interface MetricsReport {
+  desde: string;
+  hasta: string;
+  minutos_por_conversacion: number;
+  total: MetricsSummary;
+  anterior: MetricsSummary;
+  por_dia: MetricsDay[];
+  mas_vendidos?: { producto: string; cantidad: number }[];
+}
+export interface PlatformMetrics {
+  desde: string;
+  hasta: string;
+  negocios_por_estado: Record<string, number>;
+  registros_por_semana: Record<string, number>;
+  registros: number;
+  convertidos: number;
+  conversion: number | null;
+  bajas: number;
+  mrr_usd: string;
+  margen_por_negocio: {
+    tenant_id: string;
+    negocio: string;
+    ingreso_usd: string;
+    costo_llm_usd: string;
+    margen_usd: string;
+    tokens: number;
+  }[];
+  trazas_sin_precio: number;
+  operacion: {
+    conexiones_pendientes: number;
+    sin_procesar: number;
+    envios_fallidos: number;
+    latencia_p95_ms: number | null;
+    numeros_en_riesgo: number;
+  };
+}
+export type ModelCostRow = Ok<Ops["/api/v1/platform-admin/model-costs"]["get"]>[number];
+
+// Billing (Feature 009).
+export type BillingCatalog = Ok<Ops["/api/v1/tenant/billing/plans"]["get"]>;
+export type BillingOverview = Ok<Ops["/api/v1/tenant/billing"]["get"]>;
+export type BillingCharge = Ok<Ops["/api/v1/tenant/billing/checkout"]["post"]>;
+export type BillingChange = Ok<Ops["/api/v1/tenant/billing/change-plan"]["post"]>;
+export type BillingCycle = "monthly" | "annual";
+export type AdminSubscription = Ok<Ops["/api/v1/platform-admin/billing/subscriptions"]["get"]>[number];
+export type AdminPayment = Ok<Ops["/api/v1/platform-admin/billing/payments"]["post"]>;
+export type AdminCoupon = Ok<Ops["/api/v1/platform-admin/billing/coupons"]["get"]>[number];
+export type KnowledgeDetail = Ok<Ops["/api/v1/tenant/knowledge/{source_id}"]["get"]>;
 export type KnowledgeSource = KnowledgeList["sources"][number];
 export type KnowledgeUsage = KnowledgeList["usage"];
 
@@ -279,7 +376,10 @@ export type Saliente = SandboxTurn["salientes"][number];
 /** The debug panel of a turn (`?debug=true`). */
 export type SandboxDebug = NonNullable<SandboxTurn["debug"]>;
 /** What the customer did: wrote, or tapped a button or a list row. */
-export type SandboxInput = { content: string } | { interactive_id: string; title: string };
+export type SandboxInput = ({ content: string } | { interactive_id: string; title: string }) & {
+  /** Draft situations tried in this turn only (017, RF-009). */
+  situaciones_prueba?: string[];
+};
 export type SandboxHistory = Ok<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages"]["get"]
 >;
@@ -290,6 +390,16 @@ export type PaymentMethodBody = JsonBody<
   Ops["/api/v1/tenant/payment-methods"]["post"]["requestBody"]
 >;
 
+export type InboxPage = Ok<Ops["/api/v1/tenant/conversations"]["get"]>;
+export type InboxItem = InboxPage["items"][number];
+export type InboxFilter = "todas" | "agente" | "necesitan_humano" | "tomadas" | "mias" | "cerradas";
+export type InboxDetail = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}"]["get"]>;
+export type ThreadPage = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/messages"]["get"]>;
+export type ThreadMessage = ThreadPage["items"][number];
+export type InboxSend = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/messages"]["post"]>;
+export type InboxNote = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/notes"]["post"]>;
+export type InboxSettings = Ok<Ops["/api/v1/tenant/notification-settings"]["get"]>;
+export type ConversationState = Ok<Ops["/api/v1/tenant/conversations/{conversation_id}/state"]["get"]>;
 export type OrderPage = Ok<Ops["/api/v1/tenant/orders"]["get"]>;
 export type OrderListItem = OrderPage["items"][number];
 export type OrderSummary = Ok<Ops["/api/v1/tenant/orders/summary"]["get"]>;
@@ -308,6 +418,33 @@ export type CustomerNotice = OrderDecision["aviso_cliente"];
 export type OperatorState = JsonBody<
   Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]["requestBody"]
 >["estado"];
+// ------------------------------------------------- the assistant by layers (017)
+export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+export type InfoSection = "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
+export type SectionData = Ok<Ops["/api/v1/assistant/business-info/{section}"]["get"]>;
+export type Faq = Ok<Ops["/api/v1/assistant/faqs"]["get"]>["items"][number];
+export type Promotion = Ok<Ops["/api/v1/assistant/promotions"]["get"]>["items"][number];
+export type PromotionBody = JsonBody<Ops["/api/v1/assistant/promotions"]["post"]["requestBody"]>;
+export type Behavior = Ok<Ops["/api/v1/assistant/behavior"]["get"]>;
+export type BehaviorBody = JsonBody<Ops["/api/v1/assistant/behavior"]["put"]["requestBody"]>;
+export type Category = Ok<Ops["/api/v1/assistant/categories"]["get"]>["items"][number];
+export type ProcessTemplate = Ok<Ops["/api/v1/assistant/templates"]["get"]>["items"][number];
+export type ProcessView = Ok<Ops["/api/v1/assistant/process"]["get"]>;
+export type RuleView = ProcessView["etapas"][number]["reglas"][number];
+export type RubroView = Ok<Ops["/api/v1/assistant/rubro"]["get"]>;
+export type PromptPreview = Ok<Ops["/api/v1/assistant/prompt-preview"]["get"]>;
+export type Situation = Ok<Ops["/api/v1/assistant/situations"]["get"]>["items"][number];
+export type SituationBody = JsonBody<Ops["/api/v1/assistant/situations"]["post"]["requestBody"]>;
+export type MediaAsset = Ok<Ops["/api/v1/assistant/media"]["get"]>["items"][number];
+export type CatalogList = Ok<Ops["/api/v1/platform-admin/catalog"]["get"]>;
+export type CatalogVersion = Ok<
+  Ops["/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}"]["get"]
+>;
+export type CatalogContent = JsonBody<
+  Ops["/api/v1/platform-admin/catalog/{kind}/{key}/versions/{number}"]["put"]["requestBody"]
+>;
+export type CatalogKind = "proceso" | "rubro";
+
 export type OrderListQuery = {
   estado?: readonly string[];
   desde?: string;
@@ -403,9 +540,77 @@ export const api = {
       });
     },
     remove: (id: string) => request<void>(`/tenant/knowledge/${id}`, { method: "DELETE" }),
+    // Feature 006.
+    get: (id: string) => request<KnowledgeDetail>(`/tenant/knowledge/${id}`),
+    update: (id: string, body: { title?: string; content?: string; priority?: number }) =>
+      request<KnowledgeSource>(`/tenant/knowledge/${id}`, { method: "PATCH", body }),
+    resync: (id: string) =>
+      request<KnowledgeSource>(`/tenant/knowledge/${id}/resync`, { method: "POST" }),
+    chunks: (id: string) => request<{ chunks: string[] }>(`/tenant/knowledge/${id}/chunks`),
+    addWeb: (url: string, title?: string) =>
+      request<{ id: string; status: string }>("/tenant/knowledge/web", {
+        method: "POST",
+        body: title ? { url, title } : { url },
+      }),
+  },
+
+  metrics: {
+    report: (query: { desde?: string; hasta?: string }) =>
+      request<MetricsReport>("/tenant/metrics", { query }),
+    exportCsv: (desde: string, hasta: string) =>
+      requestBlob(`/tenant/metrics/export.csv?desde=${desde}&hasta=${hasta}`),
+    settings: () => request<{ minutos_por_conversacion: number }>("/tenant/metrics/settings"),
+    saveSettings: (minutos: number) =>
+      request<{ minutos_por_conversacion: number }>("/tenant/metrics/settings", {
+        method: "PUT",
+        body: { minutos_por_conversacion: minutos },
+      }),
+    platform: (query: { desde?: string; hasta?: string }) =>
+      request<PlatformMetrics>("/platform-admin/metrics", { query }),
+    modelCosts: () => request<ModelCostRow[]>("/platform-admin/model-costs"),
+    setModelCost: (body: {
+      modelo: string;
+      entrada_por_1k_usd: string;
+      salida_por_1k_usd: string;
+    }) => request<ModelCostRow>("/platform-admin/model-costs", { method: "PUT", body }),
+  },
+
+  billing: {
+    plans: () => request<BillingCatalog>("/tenant/billing/plans"),
+    overview: () => request<BillingOverview>("/tenant/billing"),
+    checkout: (body: { plan_id: string; ciclo: BillingCycle; cupon?: string }) =>
+      request<BillingCharge>("/tenant/billing/checkout", { method: "POST", body }),
+    changePlan: (body: { plan_id: string; ciclo: BillingCycle }) =>
+      request<BillingChange>("/tenant/billing/change-plan", { method: "POST", body }),
+    cancel: () => request<unknown>("/tenant/billing/cancel", { method: "POST" }),
+    resume: () => request<unknown>("/tenant/billing/resume", { method: "POST" }),
+    addon: (id: string) =>
+      request<BillingCharge>(`/tenant/billing/addons/${id}/checkout`, { method: "POST" }),
+    cancelCharge: (id: string) =>
+      request<BillingCharge>(`/tenant/billing/charges/${id}/cancel`, { method: "POST" }),
+    receipt: (id: string) => requestBlob(`/tenant/billing/payments/${id}/receipt.pdf`),
   },
 
   admin: {
+    billing: {
+      subscriptions: () => request<AdminSubscription[]>("/platform-admin/billing/subscriptions"),
+      recordPayment: (body: {
+        referencia: string;
+        operacion: string;
+        monto_usd: string;
+        monto_local?: string;
+        moneda_local?: string;
+        nota?: string;
+      }) => request<AdminPayment>("/platform-admin/billing/payments", { method: "POST", body }),
+      coupons: () => request<AdminCoupon[]>("/platform-admin/billing/coupons"),
+      createCoupon: (body: { codigo: string; porcentaje: number; vence?: string; usos_maximos?: number }) =>
+        request<AdminCoupon>("/platform-admin/billing/coupons", { method: "POST", body }),
+      extend: (tenantId: string, body: { dias: number; motivo: string }) =>
+        request<unknown>(`/platform-admin/billing/tenants/${tenantId}/extend`, {
+          method: "POST",
+          body,
+        }),
+    },
     queue: (status?: string) =>
       request<AdminRequest[]>("/platform-admin/connection-requests", {
         query: status ? { status } : undefined,
@@ -456,8 +661,11 @@ export const api = {
       request<void>(`/tenant/team/invitations/${id}/resend`, { method: "POST" }),
     revokeInvitation: (id: string) =>
       request<void>(`/tenant/team/invitations/${id}`, { method: "DELETE" }),
-    updateMember: (membershipId: string, body: { role?: string; status?: string }) =>
-      request<TeamMember>(`/tenant/team/members/${membershipId}`, { method: "PATCH", body }),
+    // PUT: the backend has no PATCH here (a 405 broke role changes before 017).
+    updateMember: (
+      membershipId: string,
+      body: { role?: string; status?: string; puede_revisar?: boolean },
+    ) => request<TeamMember>(`/tenant/team/members/${membershipId}`, { method: "PUT", body }),
   },
 
   sandbox: {
@@ -469,9 +677,10 @@ export const api = {
         body: input,
         query: debug ? { debug: true } : undefined,
       }),
-    sendImage: (conversationId: string, image: File, debug = false) => {
+    sendImage: (conversationId: string, image: File, debug = false, drafts: string[] = []) => {
       const form = new FormData();
       form.append("image", image);
+      if (drafts.length) form.append("situaciones_prueba", drafts.join(","));
       return request<SandboxTurn>(`/tenant/sandbox/conversations/${conversationId}/messages`, {
         method: "POST",
         body: form,
@@ -495,8 +704,139 @@ export const api = {
     create: (body: PaymentMethodBody) =>
       request<PaymentMethod>("/tenant/payment-methods", { method: "POST", body }),
     update: (id: string, body: Partial<PaymentMethodBody>) =>
-      request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PATCH", body }),
+      request<PaymentMethod>(`/tenant/payment-methods/${id}`, { method: "PUT", body }),
     remove: (id: string) => request<void>(`/tenant/payment-methods/${id}`, { method: "DELETE" }),
+  },
+  assistant: {
+    overview: () => request<Overview>("/assistant/overview"),
+    section: (section: InfoSection) => request<SectionData>(`/assistant/business-info/${section}`),
+    saveSection: (section: InfoSection, body: Record<string, unknown>) =>
+      request<SectionData>(`/assistant/business-info/${section}`, { method: "PUT", body }),
+    faqs: () => request<{ items: Faq[] }>("/assistant/faqs"),
+    createFaq: (body: { pregunta: string; respuesta: string }) =>
+      request<Faq>("/assistant/faqs", { method: "POST", body }),
+    updateFaq: (id: string, body: Partial<{ pregunta: string; respuesta: string; is_active: boolean }>) =>
+      request<Faq>(`/assistant/faqs/${id}`, { method: "PATCH", body }),
+    removeFaq: (id: string) => request<void>(`/assistant/faqs/${id}`, { method: "DELETE" }),
+    promotions: () => request<{ items: Promotion[] }>("/assistant/promotions"),
+    createPromotion: (body: PromotionBody) =>
+      request<Promotion>("/assistant/promotions", { method: "POST", body }),
+    updatePromotion: (id: string, body: PromotionBody) =>
+      request<Promotion>(`/assistant/promotions/${id}`, { method: "PUT", body }),
+    removePromotion: (id: string) =>
+      request<void>(`/assistant/promotions/${id}`, { method: "DELETE" }),
+    behavior: () => request<Behavior>("/assistant/behavior"),
+    saveBehavior: (body: BehaviorBody) =>
+      request<Behavior>("/assistant/behavior", { method: "PUT", body }),
+    categories: () => request<{ items: Category[] }>("/assistant/categories"),
+    saveCategory: (id: string, body: { nombre: string; orden: number; activa: boolean }) =>
+      request<Category>(`/assistant/categories/${id}`, { method: "PUT", body }),
+    templates: () => request<{ items: ProcessTemplate[] }>("/assistant/templates"),
+    process: () => request<ProcessView>("/assistant/process"),
+    saveProcess: (template_key: string, options: Record<string, unknown> = {}) =>
+      request<ProcessView>("/assistant/process", { method: "PUT", body: { template_key, options } }),
+    switchRule: (kind: CatalogKind, ruleKey: string, apagada: boolean) =>
+      request<RuleView>(`/assistant/rules/${kind}/${encodeURIComponent(ruleKey)}`, {
+        method: "PUT",
+        body: { apagada },
+      }),
+    rubro: () => request<RubroView>("/assistant/rubro"),
+    newsSeen: (kind: CatalogKind) =>
+      request<void>(`/assistant/novedades/${kind}/vistas`, { method: "POST" }),
+    preview: (stage: string) =>
+      request<PromptPreview>("/assistant/prompt-preview", { query: { stage } }),
+    situations: (query?: { estado?: string; origen?: string }) =>
+      request<{ items: Situation[] }>("/assistant/situations", { query }),
+    createSituation: (body: SituationBody) =>
+      request<Situation>("/assistant/situations", { method: "POST", body }),
+    updateSituation: (id: string, body: SituationBody) =>
+      request<Situation>(`/assistant/situations/${id}`, { method: "PUT", body }),
+    removeSituation: (id: string) =>
+      request<void>(`/assistant/situations/${id}`, { method: "DELETE" }),
+    setSituation: (id: string, active: boolean) =>
+      request<Situation>(`/assistant/situations/${id}/${active ? "activar" : "desactivar"}`, {
+        method: "POST",
+      }),
+    fromSuggested: (id: string, valores: Record<string, string>) =>
+      request<Situation>(`/assistant/situations/desde-sugerida/${id}`, {
+        method: "POST",
+        body: { valores },
+      }),
+    media: () => request<{ items: MediaAsset[] }>("/assistant/media"),
+    uploadMedia: (file: File, fields: { clave: string; titulo: string; cuando_usar: string; caption?: string }) => {
+      const form = new FormData();
+      form.append("file", file);
+      for (const [key, value] of Object.entries(fields)) {
+        if (value) form.append(key, value);
+      }
+      return request<MediaAsset>("/assistant/media", { method: "POST", body: form });
+    },
+    updateMedia: (id: string, body: Partial<{ clave: string; titulo: string; cuando_usar: string; caption: string; is_active: boolean }>) =>
+      request<MediaAsset>(`/assistant/media/${id}`, { method: "PATCH", body }),
+    replaceMediaFile: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<MediaAsset>(`/assistant/media/${id}/file`, { method: "POST", body: form });
+    },
+    removeMedia: (id: string) => request<void>(`/assistant/media/${id}`, { method: "DELETE" }),
+  },
+
+  catalog: {
+    list: () => request<CatalogList>("/platform-admin/catalog"),
+    get: (kind: CatalogKind, key: string, version: number) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions/${version}`),
+    draft: (kind: CatalogKind, key: string) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions`, { method: "POST" }),
+    save: (kind: CatalogKind, key: string, version: number, body: CatalogContent) =>
+      request<CatalogVersion>(`/platform-admin/catalog/${kind}/${key}/versions/${version}`, {
+        method: "PUT",
+        body,
+      }),
+    runEvals: (kind: CatalogKind, key: string, version: number) =>
+      request<{ estado: string }>(
+        `/platform-admin/catalog/${kind}/${key}/versions/${version}/evals`,
+        { method: "POST" },
+      ),
+    publish: (kind: CatalogKind, key: string, version: number) =>
+      request<CatalogVersion>(
+        `/platform-admin/catalog/${kind}/${key}/versions/${version}/publicar`,
+        { method: "POST" },
+      ),
+  },
+
+  conversations: {
+    state: (id: string) => request<ConversationState>(`/tenant/conversations/${id}/state`),
+    resumeBot: (id: string) =>
+      request<ConversationState>(`/tenant/conversations/${id}/resume-bot`, { method: "POST" }),
+    // The inbox (Feature 007).
+    list: (
+      query: { filtro?: InboxFilter; q?: string; pruebas?: boolean; cursor?: string },
+      signal?: AbortSignal,
+    ) => request<InboxPage>("/tenant/conversations", { query, signal }),
+    get: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}`),
+    thread: (id: string, antesDe?: string) =>
+      request<ThreadPage>(`/tenant/conversations/${id}/messages`, {
+        query: antesDe ? { antes_de: antesDe } : {},
+      }),
+    image: (id: string, messageId: string) =>
+      request<{ url: string; expira_en: number }>(
+        `/tenant/conversations/${id}/messages/${messageId}/image`,
+      ),
+    take: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/takeover`, { method: "POST" }),
+    release: (id: string) =>
+      request<InboxDetail>(`/tenant/conversations/${id}/release`, { method: "POST" }),
+    steal: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/steal`, { method: "POST" }),
+    close: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/close`, { method: "POST" }),
+    reopen: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/reopen`, { method: "POST" }),
+    optOut: (id: string) => request<InboxDetail>(`/tenant/conversations/${id}/opt-out`, { method: "POST" }),
+    send: (id: string, texto: string) =>
+      request<InboxSend>(`/tenant/conversations/${id}/messages`, { method: "POST", body: { texto } }),
+    notes: (id: string) => request<{ items: InboxNote[] }>(`/tenant/conversations/${id}/notes`),
+    addNote: (id: string, texto: string) =>
+      request<InboxNote>(`/tenant/conversations/${id}/notes`, { method: "POST", body: { texto } }),
+    settings: () => request<InboxSettings>("/tenant/notification-settings"),
+    saveSettings: (body: InboxSettings) =>
+      request<InboxSettings>("/tenant/notification-settings", { method: "PUT", body }),
   },
   orders: {
     list: (query: OrderListQuery, signal?: AbortSignal) =>

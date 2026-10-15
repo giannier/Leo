@@ -3,6 +3,7 @@
 from app.providers.pdf.base import (
     InvalidPdfError,
     PdfError,
+    PdfPages,
     PdfTextExtractor,
     PdfWithoutTextError,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "InvalidPdfError",
     "MockPdfTextExtractor",
     "PdfError",
+    "PdfPages",
     "PdfTextExtractor",
     "PdfWithoutTextError",
     "PypdfTextExtractor",

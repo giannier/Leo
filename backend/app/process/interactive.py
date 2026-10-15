@@ -91,4 +91,13 @@ def apply_interactive(
     if field is None:
         logger.warning("interactive reply with an unknown prefix", extra={"prefix": prefix[:20]})
         return InteractiveOutcome({}, f"El cliente eligió: {title}" if title else None)
+    if prefix == "producto":
+        # A tapped product is a choice, not a question: showing the same options
+        # again was the observed failure (Milestone B run).
+        return InteractiveOutcome(
+            {},
+            f"El cliente eligió: {title} ({field}={value}). Ya lo eligió: no vuelvas a mostrar "
+            "las opciones; agrégalo con gestionar_pedido (accion agregar, ese producto_id) y, "
+            "si es un paquete, pregúntale sus temas.",
+        )
     return InteractiveOutcome({}, f"El cliente eligió: {title} ({field}={value})")

@@ -165,3 +165,24 @@ class TestCustomerDataStaysInsideTheTenant:
         assert result.status == "error"
         contact_b = db.get(Contact, tenant_b.contact_id)
         assert contact_b is not None and contact_b.custom_data == {}
+
+
+@pytest.mark.usefixtures("with_contacts")
+class TestChangingLinesWithForeignIds:
+    """TASK-446: removing or resizing with another business's product id."""
+
+    @pytest.mark.parametrize("accion", ["quitar", "cantidad"])
+    async def test_a_foreign_product_changes_nothing(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture, accion: str
+    ) -> None:
+        context = _context(db, tenant_a)
+        await _act(context, accion="agregar", producto_id=str(tenant_a.product_id))
+
+        result = await _act(
+            _context(db, tenant_a), accion=accion, producto_id=str(tenant_b.product_id), cantidad=5
+        )
+
+        assert result.status in ("no_disponible", "error")
+        order = result.data.get("pedido") or {}
+        items = order.get("items", [])
+        assert [(i["nombre"], i["cantidad"]) for i in items] in ([], [("Product A", 1)])

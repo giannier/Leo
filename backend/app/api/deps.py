@@ -554,7 +554,24 @@ async def get_platform_admin(
     return user
 
 
+def require_reviewer_or_manager(principal: CurrentPrincipalDep, session: SessionDep) -> Principal:
+    """A configuration manager, or a member with the reviewer permission (017, C-09)."""
+    if principal.role in MANAGES_CONFIGURATION:
+        return principal
+    membership = TenantUserRepository(session, principal.tenant_id).active_membership_for(
+        principal.user_id
+    )
+    if membership is None or not membership.can_review:
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            error="insufficient_role",
+            message="Your role does not allow this action.",
+        )
+    return principal
+
+
 MemberDep = CurrentPrincipalDep
 ConfigurationManagerDep = Annotated[Principal, Depends(require_roles(*MANAGES_CONFIGURATION))]
 AccountOwnerDep = Annotated[Principal, Depends(require_roles(*OWNS_THE_ACCOUNT))]
+ReviewerDep = Annotated[Principal, Depends(require_reviewer_or_manager)]
 PlatformAdminDep = Annotated[User, Depends(get_platform_admin)]

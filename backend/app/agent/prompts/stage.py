@@ -3,17 +3,24 @@
 # included, so they cannot drift from the document the business owner reads.
 """The prompt of one turn, built from sections (Feature 004, TASK-414).
 
-Replaces "one big prompt plus every tool" with five sections, each with its own
-token cap (`plan.md`, "Prompt: presupuesto de tokens"):
+Replaces "one big prompt plus every tool" with sections, each with its own token
+cap (`plan.md`, "Prompt: presupuesto de tokens"; rebalanced by the 017, TASK-464,
+so the caps still add up to the 6 000-token limit):
 
 | section              | cap   | what it holds                                              |
 |----------------------|-------|------------------------------------------------------------|
 | plataforma           |   450 | the nine rules that never change                           |
-| estilo               |   600 | tone, pace, detail, the owner's additional rules           |
-| negocio              | 1 800 | the business in one line per topic                         |
+| estilo               |   300 | tone, pace, detail, tú or usted, emojis, greeting          |
 | estado               |   500 | where the conversation is, plus "ESTE TURNO"               |
-| etapa                | 1 200 | the instructions of the current stage                      |
+| etapa (PROCESO)      |   700 | the active rules of the current stage                      |
+| rubro                |   350 | the active rules of the rubro                              |
+| negocio              | 1 300 | the business in one line per topic                         |
+| situaciones          | 1 000 | the business's situations for this message + priority     |
 | herramientas         | 1 400 | the definitions of the enabled tools (sent as `tools`)     |
+
+The layers go from the least to the most specific (017, C-11): process, rubro,
+business, situations, and the prompt says that, if they clash, the later one
+wins. The platform rules above them never yield.
 
 Everything is built from values already loaded (`EffectiveProcessConfig`,
 `Facts`, `TurnContext`), so the function is pure and the prompt of any stage can
@@ -46,6 +53,7 @@ from app.agent.prompts.builder import (
     _format_hours,
     _format_today,
 )
+from app.agent.situations import SelectedSituation
 from app.process.engine import anuncio_vigente
 from app.process.facts import Facts, PromoCierre
 from app.process.service import EffectiveProcessConfig
@@ -60,10 +68,12 @@ logger = logging.getLogger(__name__)
 TOKEN_LIMIT = 6000
 SECTION_CAPS: Mapping[str, int] = {
     "plataforma": 450,
-    "estilo": 600,
-    "negocio": 1800,
+    "estilo": 300,
     "estado": 500,
-    "etapa": 1200,
+    "etapa": 700,
+    "rubro": 350,
+    "negocio": 1300,
+    "situaciones": 1000,
     "herramientas": 1400,
 }
 
@@ -82,9 +92,10 @@ def estimate_tokens(text: str) -> int:
 PLATFORM_RULES = """\
 Eres {nombre_asistente}, asistente de ventas de {nombre_negocio} por WhatsApp.
 1. Solo hablas de {nombre_negocio}: sus productos, servicios, pedidos y la información del negocio.
-   Si te piden otra cosa, di con amabilidad que solo puedes ayudar con eso.
-2. Precios, promociones, stock y totales salen SOLO de tus herramientas. Nunca calcules, redondees
-   ni inventes descuentos o cuotas.
+   Si te piden otra cosa, di con amabilidad que solo puedes ayudar con eso; antes, búscalo con
+   buscar_productos por si el negocio sí lo ofrece.
+2. Precios, promociones, stock y totales salen SOLO de tus herramientas o del bloque NEGOCIO. Nunca
+   calcules, redondees ni inventes descuentos o cuotas.
 3. Nunca digas que un pago está confirmado. Lo confirma una persona del negocio.
 4. Nunca digas que hiciste algo si la herramienta no devolvió "hecho".
 5. Si el cliente pide hablar con una persona, se queja del asistente o pregunta algo que tus herramientas
@@ -110,6 +121,31 @@ _DETAIL_TEXT: Mapping[str, str] = {
     "moderado": "Responde en máximo 700 caracteres.",
     "extenso": "Puedes extenderte hasta 1 400 caracteres cuando el cliente pide detalles.",
 }
+_TREATMENT_TEXT: Mapping[str, str] = {
+    "tu": "Trata al cliente de tú.",
+    "usted": (
+        "Trata al cliente de usted en TODA la respuesta (usted, le, su, quiere, tiene), "
+        "nunca de tú, aunque los ejemplos de abajo estén en tú."
+    ),
+}
+_EMOJI_TEXT: Mapping[str, str] = {
+    "no": "No uses emojis.",
+    "pocos": "Usa como máximo un emoji por mensaje, y no en todos.",
+    "si": "Puedes usar emojis con naturalidad.",
+}
+_DISCOUNT_TEXT: Mapping[str, str] = {
+    "no_ofrece": "Descuentos: el negocio no da descuentos fuera de sus promociones; no los ofrezcas.",
+    "solo_promociones": "Descuentos: solo las promociones del sistema.",
+    "negociable": (
+        "Descuentos: si el cliente pide un descuento que no está en las promociones, no lo concedas "
+        "tú: usa derivar_a_humano para que una persona del negocio lo evalúe."
+    ),
+}
+_PRIORITY = (
+    "PRIORIDAD: si dos instrucciones chocan, manda la situación del negocio, luego el NEGOCIO, luego "
+    "el RUBRO, luego el PROCESO. Las reglas 1 a 9 del inicio nunca se rompen."
+)
+_SITUATION_FIELD_CHARS = 400
 _WHATSAPP_FORMAT = (
     "Formato de WhatsApp, no Markdown: *negrita* con un asterisco, _cursiva_ con guion bajo. "
     "Sin ## ni tablas."
@@ -252,16 +288,84 @@ def _style_block(config: EffectiveProcessConfig) -> str:
         _TONE_GUIDANCE.get(behavior.tone, _TONE_GUIDANCE[DEFAULT_TONE]),
         _PACE_TEXT.get(behavior.ritmo, _PACE_TEXT["equilibrado"]),
         _DETAIL_TEXT.get(behavior.detalle, _DETAIL_TEXT["moderado"]),
+        _TREATMENT_TEXT.get(behavior.tratamiento, _TREATMENT_TEXT["tu"]),
+        _EMOJI_TEXT.get(behavior.emojis, _EMOJI_TEXT["pocos"]),
         _WHATSAPP_FORMAT,
     ]
-    if behavior.reglas_adicionales:
-        used = estimate_tokens("\n".join(lines))
-        room = max(0, SECTION_CAPS["estilo"] - used - 12)
-        rules = " ".join(behavior.reglas_adicionales.split())
-        if estimate_tokens(rules) > room:
-            logger.warning("additional rules cut to fit the style budget")
-            rules = rules[: int(room * CHARS_PER_TOKEN)].rstrip() + "…"
-        lines.append(f"Reglas adicionales del dueño: {rules}")
+    if behavior.saludo:
+        lines.append(
+            f"Saludo del negocio, para tu primer mensaje: «{_one_line(behavior.saludo, 120)}»"
+        )
+    return "\n".join(lines)
+
+
+def _rubro_block(config: EffectiveProcessConfig) -> str | None:
+    if not config.rubro_rules:
+        return None
+    lines = ["RUBRO"]
+    for rule in config.rubro_rules:
+        candidate = [*lines, f"- {_one_line(rule, 300)}"]
+        if estimate_tokens("\n".join(candidate)) > SECTION_CAPS["rubro"]:
+            logger.warning("rubro rules cut to fit the prompt budget")
+            break
+        lines = candidate
+    return "\n".join(lines)
+
+
+def _clip(text: str, chars: int) -> str:
+    """One line, cut with "…" so the model knows there was more."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= chars else flat[: chars - 1].rstrip() + "…"
+
+
+def _situation_text(situation: SelectedSituation, chars: int) -> str:
+    parts = [
+        f"- «{_one_line(situation.titulo, 80)}». Cuándo: {_clip(situation.cuando_aplica, chars)}",
+        f"  Qué haces: {_clip(situation.que_hace, chars)}",
+    ]
+    if situation.claves:
+        parts.append(f"  Envía con enviar_recurso: {', '.join(situation.claves)}")
+    if situation.derivar:
+        parts.append("  Después, usa derivar_a_humano con un resumen.")
+    if situation.ejemplo_respuesta:
+        parts.append(f"  Ejemplo de respuesta: «{_clip(situation.ejemplo_respuesta, chars)}»")
+    return "\n".join(parts)
+
+
+def _situations_block(situations: Sequence[SelectedSituation]) -> str:
+    """The situations of this message, each cut to its share of the budget, then the priority."""
+    if not situations:
+        return _PRIORITY
+    # Measured with the platform model (TASK-469): with a softer heading an
+    # unconditional "siempre" was dropped whenever the customer also asked something.
+    head = (
+        "SITUACIONES DEL NEGOCIO: aplican a este mensaje. Cúmplelas TODAS en tu respuesta, "
+        "además de responder lo que preguntó."
+    )
+    # The "siempre" ones are repeated in one closing line: without it the model
+    # dropped them in 2 of 12 turns, with it in none (TASK-469 measurement).
+    always = [s for s in situations if s.siempre]
+    reminder = (
+        "Antes de enviar, revisa que cumpliste: "
+        + "; ".join(_clip(s.que_hace, 160) for s in always)
+        if always
+        else ""
+    )
+    fixed = estimate_tokens(head) + estimate_tokens(_PRIORITY) + estimate_tokens(reminder) + 6
+    share = max(40, (SECTION_CAPS["situaciones"] - fixed) // len(situations))
+    lines = [head]
+    for situation in situations:
+        chars = _SITUATION_FIELD_CHARS
+        text = _situation_text(situation, chars)
+        while estimate_tokens(text) > share and chars > 60:
+            chars -= 40
+            text = _situation_text(situation, chars)
+        if chars < _SITUATION_FIELD_CHARS:
+            logger.warning("a situation was cut to fit the prompt budget")
+        lines.append(text)
+    if reminder:
+        lines.append(reminder)
+    lines.append(_PRIORITY)
     return "\n".join(lines)
 
 
@@ -400,6 +504,7 @@ def _business_block(config: EffectiveProcessConfig) -> str:
     if hours:
         candidates.insert(4, f"Horario de atención ({config.timezone}): {hours}.")
 
+    candidates.insert(2, _DISCOUNT_TEXT.get(config.behavior.politica_descuentos))
     lines = ["NEGOCIO", *(line for line in candidates if line)]
     # Drop from the end until it fits: the least useful topics come last.
     while len(lines) > 2 and estimate_tokens("\n".join(lines)) > SECTION_CAPS["negocio"]:
@@ -438,7 +543,10 @@ def _order_line(facts: Facts, limits: _StateLimits) -> str:
 
 
 def _promo_state_line(promo: PromoCierre, now: datetime, zone: ZoneInfo) -> str:
-    head = f'- Promoción de cierre disponible (solo si duda): "{_one_line(promo.nombre, 60)}"'
+    head = (
+        f'- Promoción de cierre disponible (solo si duda): "{_one_line(promo.nombre, 60)}" '
+        f"(promocion_id={promo.id})"
+    )
     if promo.ofrecida_vence is not None and promo.ofrecida_vence > now:
         until = promo.ofrecida_vence.astimezone(zone)
         return f"{head} · ofrecida, vence {until:%d/%m %H:%M}"
@@ -511,6 +619,13 @@ def _state_lines(
         lines.append("- Asesoría: asesoría ya derivada a una persona del negocio")
 
     payment = _PAYMENT_STATE_TEXT.get(facts.pago_estado or "", "—")
+    if stage is Stage.COBRO and facts.modalidad_pago == "contra_entrega" and not facts.pago_estado:
+        # Both branches of COBRO are in the prompt; the model offered accounts to a
+        # cash-on-delivery customer (Milestone B run).
+        payment = (
+            "contra entrega: resume el pedido y pídele que lo confirme; no hay métodos de pago "
+            "que enviar"
+        )
     if facts.pago_estado == "rechazado" and facts.motivo_rechazo:
         payment += f": {_one_line(facts.motivo_rechazo, limits.text)}"
     elif facts.motivo_rechazo:
@@ -573,6 +688,7 @@ def build_stage_prompt(
     now: datetime,
     turn: TurnContext | None = None,
     tool_specs: Sequence[ToolSpec] = (),
+    situations: Sequence[SelectedSituation] = (),
 ) -> StagePrompt:
     """The system prompt for `stage`, section by section.
 
@@ -584,11 +700,15 @@ def build_stage_prompt(
     parts: dict[str, str] = {
         "plataforma": _platform_block(values),
         "estilo": _style_block(config),
-        "negocio": _business_block(config),
         "estado": _state_block(config, facts, stage, turn or TurnContext(), now),
-        "etapa": "INSTRUCCIONES DE LA ETAPA\n"
+        "etapa": "PROCESO: INSTRUCCIONES DE LA ETAPA\n"
         + resolve_placeholders(config.instructions_for(stage), values),
     }
+    rubro = _rubro_block(config)
+    if rubro:
+        parts["rubro"] = rubro
+    parts["negocio"] = _business_block(config)
+    parts["situaciones"] = _situations_block(situations)
     text = "\n\n".join(parts.values())
     sections = {name: estimate_tokens(part) for name, part in parts.items()}
     sections["herramientas"] = _tools_tokens(tool_specs)

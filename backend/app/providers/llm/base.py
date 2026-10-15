@@ -162,3 +162,25 @@ class VisionProvider(Protocol):
     ) -> VisionReading:
         """Read `image` into an object that follows `schema`, or raise `LLMError`."""
         ...
+
+
+@runtime_checkable
+class DocumentReader(Protocol):
+    """A provider that can read a PDF page with a vision model (Feature 006, TASK-602).
+
+    Used for scanned documents: each page goes on its own, so a page the model
+    cannot read is reported by number and the others are still indexed. Separate
+    from `VisionProvider` because a vendor can read images and not documents.
+    """
+
+    async def read_document(
+        self,
+        document: bytes,
+        *,
+        instruction: str,
+        schema: dict[str, Any],
+        timeout_seconds: float,
+        max_tokens: int,
+    ) -> VisionReading:
+        """Read a PDF into an object that follows `schema`, or raise `LLMError`."""
+        ...
