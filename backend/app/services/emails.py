@@ -693,3 +693,102 @@ def build_unattended_email(
         panel_url=panel_url,
         link_label="Abrir la bandeja",
     )
+
+
+# ------------------------------------------------------------------- billing
+#
+# Feature 009. What the business owes the platform and what it paid. v1 is paid by
+# hand (transfer or Yape), so every notice carries the reference to quote and the
+# platform's payment instructions.
+
+PAYMENT_RECEIVED_SUBJECT = "Recibimos tu pago"
+RENEWAL_SUBJECT = "Tu plan de Leo se renueva pronto"
+PAST_DUE_SUBJECT = "Tu pago de Leo está pendiente"
+PAUSED_UNPAID_SUBJECT = "Pausamos tu agente por un pago pendiente"
+
+
+def _how_to_pay(reference: str, instructions: str) -> list[str]:
+    lines = [f"Al pagar, escribe esta referencia en la descripción: {reference}."]
+    if instructions.strip():
+        lines.append(f"Cómo pagar: {instructions.strip()}")
+    else:
+        lines.append("Responde este correo y te enviamos los datos para pagar.")
+    return lines
+
+
+def build_payment_received_email(
+    *, to: str, tenant_name: str, amount: str, concept: str, receipt: str, panel_url: str
+) -> EmailMessage:
+    return _alert_email(
+        to=to,
+        subject=PAYMENT_RECEIVED_SUBJECT,
+        lines=[
+            f"Recibimos tu pago de {amount} por {concept} para {tenant_name}. Gracias.",
+            f"Tu comprobante es el {receipt}; lo puedes descargar desde el panel.",
+        ],
+        panel_url=panel_url,
+        link_label="Ver mi plan y mis pagos",
+    )
+
+
+def build_renewal_email(
+    *,
+    to: str,
+    tenant_name: str,
+    plan: str,
+    amount: str,
+    due: str,
+    reference: str,
+    instructions: str,
+    panel_url: str,
+) -> EmailMessage:
+    return _alert_email(
+        to=to,
+        subject=RENEWAL_SUBJECT,
+        lines=[
+            f"El plan {plan} de {tenant_name} se renueva el {due}. El monto es {amount}.",
+            *_how_to_pay(reference, instructions),
+        ],
+        panel_url=panel_url,
+        link_label="Ver mi plan",
+    )
+
+
+def build_past_due_email(
+    *,
+    to: str,
+    tenant_name: str,
+    amount: str,
+    grace_until: str,
+    reference: str,
+    instructions: str,
+    panel_url: str,
+) -> EmailMessage:
+    return _alert_email(
+        to=to,
+        subject=PAST_DUE_SUBJECT,
+        lines=[
+            f"Todavía no registramos el pago de {amount} de {tenant_name}. Tu agente sigue "
+            f"respondiendo hasta el {grace_until}; después se pausará hasta que pagues.",
+            *_how_to_pay(reference, instructions),
+        ],
+        panel_url=panel_url,
+        link_label="Ver mi plan",
+    )
+
+
+def build_paused_unpaid_email(
+    *, to: str, tenant_name: str, amount: str, reference: str, instructions: str, panel_url: str
+) -> EmailMessage:
+    return _alert_email(
+        to=to,
+        subject=PAUSED_UNPAID_SUBJECT,
+        lines=[
+            f"El agente de {tenant_name} está en pausa porque el pago de {amount} sigue "
+            "pendiente. Tus datos, tu catálogo y tus conversaciones están intactos.",
+            "Apenas registremos el pago, tu agente vuelve a responder.",
+            *_how_to_pay(reference, instructions),
+        ],
+        panel_url=panel_url,
+        link_label="Ver mi plan",
+    )

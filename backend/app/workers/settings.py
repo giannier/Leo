@@ -29,6 +29,7 @@ from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.billing import CALENDAR_JOB, billing_calendar
 from app.workers.catalog_evals import run_catalog_evals
 from app.workers.catalog_indexer import index_catalog_knowledge
 from app.workers.channel import (
@@ -148,6 +149,8 @@ class WorkerSettings:
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
         cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
+        # Feature 009: renewals, the end of a period and dunning, once an hour.
+        cron(billing_calendar, name=f"cron:{CALENDAR_JOB}", minute=27),
         cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
         # gives the bot back within five minutes of its `hasta`.
