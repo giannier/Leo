@@ -1,6 +1,6 @@
 # Spec + Plan — Dashboard de Métricas
 
-**Feature ID:** 010 · **Módulo:** 10-dashboard · **Estado:** Draft para ratificación
+**Feature ID:** 010 · **Módulo:** 10-dashboard · **Estado:** Construida (2026-10-15). Decisiones en [clarifications.md](clarifications.md), evidencia en [milestones/dashboard.md](milestones/dashboard.md)
 **Depende de:** 002, 003, 004, 007, 009 (consume datos de todas)
 **Tamaño:** feature corta — documento combinado.
 
@@ -42,10 +42,10 @@ observa conversaciones, conversiones y CSAT").
 
 ## Tasks
 Commits: `feat(dashboard): ... [TASK-10XX]`
-- [ ] **TASK-1001: Migraciones + model_costs + costo por traza.**
-- [ ] **TASK-1002: Job metrics_rollup + tests de reconciliación.** Depends: 1001.
-- [ ] **TASK-1003: API de métricas tenant/admin + export CSV + roles.** Depends: 1002.
-- [ ] **TASK-1004: UI dashboard del tenant** (KPIs, gráficas, consumo, export). Depends: 1003.
-- [ ] **TASK-1005: UI dashboard admin** (salud, márgenes por tenant, operación) + purgas de retención. Depends: 1003. Milestone humano: validar con datos reales del primer tenant piloto que los números cuadran a mano.
+- [x] **TASK-1001: Migraciones + model_costs + costo por traza.**
+- [x] **TASK-1002: Job metrics_rollup + tests de reconciliación.** Depends: 1001.
+- [x] **TASK-1003: API de métricas tenant/admin + export CSV + roles.** Depends: 1002.
+- [x] **TASK-1004: UI dashboard del tenant** (KPIs, gráficas, consumo, export). Depends: 1003.
+- [x] **TASK-1005: UI dashboard admin** (salud, márgenes por tenant, operación) + purgas de retención. Depends: 1003. Milestone humano: validar con datos reales del primer tenant piloto que los números cuadran a mano.
 
 Estimación: 1 semana. Complejidad: Media.

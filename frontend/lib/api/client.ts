@@ -264,6 +264,68 @@ export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
+// Dashboard (Feature 010). The report is a free-form dict on the server; typed here.
+export interface MetricsSummary {
+  conversations: number;
+  conversations_agent_only: number;
+  conversations_with_person: number;
+  messages_in: number;
+  messages_out_agent: number;
+  messages_out_person: number;
+  first_responses: number;
+  handovers: number;
+  orders_confirmed: number;
+  primera_respuesta_promedio_segundos: number | null;
+  horas_ahorradas: number;
+  derivaciones_por_motivo: Record<string, number>;
+  ventas?: Record<string, string>;
+}
+export interface MetricsDay {
+  dia: string;
+  conversaciones: number;
+  solo_agente: number;
+  con_persona: number;
+  derivaciones: number;
+  pedidos: number;
+}
+export interface MetricsReport {
+  desde: string;
+  hasta: string;
+  minutos_por_conversacion: number;
+  total: MetricsSummary;
+  anterior: MetricsSummary;
+  por_dia: MetricsDay[];
+  mas_vendidos?: { producto: string; cantidad: number }[];
+}
+export interface PlatformMetrics {
+  desde: string;
+  hasta: string;
+  negocios_por_estado: Record<string, number>;
+  registros_por_semana: Record<string, number>;
+  registros: number;
+  convertidos: number;
+  conversion: number | null;
+  bajas: number;
+  mrr_usd: string;
+  margen_por_negocio: {
+    tenant_id: string;
+    negocio: string;
+    ingreso_usd: string;
+    costo_llm_usd: string;
+    margen_usd: string;
+    tokens: number;
+  }[];
+  trazas_sin_precio: number;
+  operacion: {
+    conexiones_pendientes: number;
+    sin_procesar: number;
+    envios_fallidos: number;
+    latencia_p95_ms: number | null;
+    numeros_en_riesgo: number;
+  };
+}
+export type ModelCostRow = Ok<Ops["/api/v1/platform-admin/model-costs"]["get"]>[number];
+
 // Billing (Feature 009).
 export type BillingCatalog = Ok<Ops["/api/v1/tenant/billing/plans"]["get"]>;
 export type BillingOverview = Ok<Ops["/api/v1/tenant/billing"]["get"]>;
@@ -490,6 +552,27 @@ export const api = {
         method: "POST",
         body: title ? { url, title } : { url },
       }),
+  },
+
+  metrics: {
+    report: (query: { desde?: string; hasta?: string }) =>
+      request<MetricsReport>("/tenant/metrics", { query }),
+    exportCsv: (desde: string, hasta: string) =>
+      requestBlob(`/tenant/metrics/export.csv?desde=${desde}&hasta=${hasta}`),
+    settings: () => request<{ minutos_por_conversacion: number }>("/tenant/metrics/settings"),
+    saveSettings: (minutos: number) =>
+      request<{ minutos_por_conversacion: number }>("/tenant/metrics/settings", {
+        method: "PUT",
+        body: { minutos_por_conversacion: minutos },
+      }),
+    platform: (query: { desde?: string; hasta?: string }) =>
+      request<PlatformMetrics>("/platform-admin/metrics", { query }),
+    modelCosts: () => request<ModelCostRow[]>("/platform-admin/model-costs"),
+    setModelCost: (body: {
+      modelo: string;
+      entrada_por_1k_usd: string;
+      salida_por_1k_usd: string;
+    }) => request<ModelCostRow>("/platform-admin/model-costs", { method: "PUT", body }),
   },
 
   billing: {
