@@ -96,13 +96,26 @@ const MESSAGES: Record<string, string> = {
   invalid_pdf: "Ese archivo no es un PDF que podamos abrir.",
   indexing_unavailable: "No pudimos procesarlo ahora. Intenta de nuevo en un momento.",
 
+  // Billing (Feature 009)
+  unknown_plan: "Ese plan no existe.",
+  plan_not_purchasable: "Ese plan no se puede contratar.",
+  use_change_plan: "Ya tienes un plan: usa \"Cambiar a este plan\".",
+  no_active_subscription: "Necesitas un plan vigente para esto.",
+  same_plan: "Ya estás en ese plan.",
+  charge_not_pending: "Ese cobro ya no está pendiente. Actualiza la página.",
+  amount_mismatch: "El monto no coincide con el cobro.",
+  coupon_exists: "Ese cupón ya existe.",
+  already_refunded: "Ese pago ya está reembolsado.",
+
   // Generic
   validation_error: "Revisa los datos marcados.",
   rate_limited: "Demasiados intentos. Espera un momento.",
   internal_error: "Algo falló de nuestro lado. Intenta de nuevo.",
 };
 
-const SERVER_WORDED = new Set(["invalid_url"]);
+// The server words these for the person, with what to correct (a coupon's reason,
+// what does not fit in the smaller plan).
+const SERVER_WORDED = new Set(["invalid_url", "coupon_invalid", "downgrade_blocked"]);
 
 /**
  * What to show the user. Falls back to something honest rather than to the

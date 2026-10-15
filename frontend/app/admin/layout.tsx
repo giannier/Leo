@@ -21,13 +21,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { AlertIcon, ClockIcon, LogOutIcon, UsersIcon, BookIcon } from "@/components/icons";
+import {
+  AlertIcon,
+  BookIcon,
+  ClockIcon,
+  LogOutIcon,
+  ReceiptIcon,
+  UsersIcon,
+} from "@/components/icons";
 import { Skeleton, cx } from "@/components/ui";
 import { useSession } from "@/lib/session";
 
 const NAV = [
   { href: "/admin", label: "Solicitudes", icon: ClockIcon },
   { href: "/admin/tenants", label: "Negocios", icon: UsersIcon },
+  { href: "/admin/cobros", label: "Cobros", icon: ReceiptIcon },
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
   { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },
