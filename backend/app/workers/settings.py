@@ -52,6 +52,7 @@ from app.workers.inbox import (
 )
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
+from app.workers.metrics import PURGE_JOB, ROLLUP_JOB, metrics_purge, metrics_rollup
 from app.workers.situations import embed_situations
 from app.workers.trial_lifecycle import (
     tenant_archiver,
@@ -151,6 +152,9 @@ class WorkerSettings:
         cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
         # Feature 009: renewals, the end of a period and dunning, once an hour.
         cron(billing_calendar, name=f"cron:{CALENDAR_JOB}", minute=27),
+        # Feature 010: yesterday's metrics after midnight in Lima (06:15 UTC), then the purge.
+        cron(metrics_rollup, name=f"cron:{ROLLUP_JOB}", hour=6, minute=15),
+        cron(metrics_purge, name=f"cron:{PURGE_JOB}", hour=7, minute=5),
         cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
         # gives the bot back within five minutes of its `hasta`.
