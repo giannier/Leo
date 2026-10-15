@@ -25,7 +25,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -237,6 +237,8 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "products"
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_products_products_price_non_negative"),
+        CheckConstraint("cardinality(tags) <= 10", name="products_tags_count"),
+        Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
         # out of the index keeps it small and the catalog query fast.
         Index(
@@ -280,6 +282,11 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The assistant pushes a highlighted product first.
     destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Labels the business writes ("oferta", "SIAF"): the agent also finds the
+    # product by them, and the catalogue filters by them (Feature 018).
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

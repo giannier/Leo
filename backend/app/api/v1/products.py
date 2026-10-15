@@ -14,20 +14,34 @@ import uuid
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, File, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
-from app.api.deps import ConfigurationManagerDep, MemberDep, RedisDep, SessionDep
+from app.api.deps import (
+    ConfigurationManagerDep,
+    MemberDep,
+    RedisDep,
+    SessionDep,
+    get_storage_provider,
+)
 from app.api.errors import ApiError, error_responses
-from app.models.business import BUNDLE_MAX_SIZE, BUNDLE_MIN_SIZE
+from app.models.business import BUNDLE_MAX_SIZE, BUNDLE_MIN_SIZE, Product
+from app.models.media import MediaAsset
+from app.process.service import DEFAULT_CACHE
+from app.providers.storage.base import StorageError, StorageProvider
 from app.services.catalog import CatalogService, PreviewNotFound
 from app.services.csv_import import (
     MAX_BYTES,
     TEMPLATE_CSV,
     ImportError_,
 )
+from app.services.media_library import MAX_UPLOAD, MediaRejected
+from app.services.product_photos import ProductPhotos
+from app.services.product_tags import TagsInvalid, clean_tags
 
 router = APIRouter(prefix="/tenant/products", tags=["products"])
+StorageDep = Annotated[StorageProvider, Depends(get_storage_provider)]
+PREVIEW_SECONDS = 600
 
 ProductName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
@@ -38,6 +52,18 @@ AUTH_RESPONSES = (
     (401, "`not_authenticated`, `token_expired` or `invalid_token`"),
     (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
 )
+
+
+Tags = Annotated[list[Annotated[str, StringConstraints(max_length=200)]], Field(max_length=50)]
+
+
+def _clean(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    try:
+        return clean_tags(value)
+    except TagsInvalid as exc:
+        raise ValueError(str(exc)) from exc
 
 
 class ProductRequest(BaseModel):
@@ -57,6 +83,13 @@ class ProductRequest(BaseModel):
     bundle_size: BundleSize | None = None
     bundle_permite_libres: bool = False
     destacado: bool = False
+    # Up to ten labels; the agent also finds the product by them (Feature 018).
+    tags: Tags = Field(default_factory=list)
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, value: list[str]) -> list[str]:
+        return _clean(value) or []
 
 
 class ProductPatch(BaseModel):
@@ -73,6 +106,14 @@ class ProductPatch(BaseModel):
     bundle_size: BundleSize | None = None
     bundle_permite_libres: bool | None = None
     destacado: bool | None = None
+    tags: Tags | None = None
+
+    @field_validator("tags")
+    @classmethod
+    def _tags(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            raise ValueError("must not be null")
+        return _clean(value)
 
     @field_validator("modo_venta", "es_digital", "bundle_permite_libres", "destacado")
     @classmethod
@@ -96,6 +137,9 @@ class ProductResponse(BaseModel):
     bundle_size: int | None
     bundle_permite_libres: bool
     destacado: bool
+    tags: list[str]
+    # The main photo (the first by order), for the catalogue list; None without photos.
+    foto_url: str | None = None
 
 
 class ProductPage(BaseModel):
@@ -122,8 +166,47 @@ class ImportConfirmResponse(BaseModel):
     created: int
 
 
-def _as_response(product: object) -> ProductResponse:
-    return ProductResponse.model_validate(product, from_attributes=True)
+def _url(asset: MediaAsset | None, storage: StorageProvider | None) -> str | None:
+    if asset is None or storage is None:
+        return None
+    try:
+        return storage.presigned_url(asset.storage_key, expires_in=PREVIEW_SECONDS)
+    except StorageError:
+        return None
+
+
+def _as_response(
+    product: object, photo: MediaAsset | None = None, storage: StorageProvider | None = None
+) -> ProductResponse:
+    response = ProductResponse.model_validate(product, from_attributes=True)
+    response.foto_url = _url(photo, storage)
+    return response
+
+
+class PhotoResponse(BaseModel):
+    id: uuid.UUID
+    url: str | None
+    filename: str
+    size_bytes: int
+
+
+class PhotoList(BaseModel):
+    items: list[PhotoResponse]
+
+
+class PhotoOrder(BaseModel):
+    ids: list[uuid.UUID] = Field(max_length=50)
+
+
+def _photos(items: list[MediaAsset], storage: StorageProvider) -> PhotoList:
+    return PhotoList(
+        items=[
+            PhotoResponse(
+                id=a.id, url=_url(a, storage), filename=a.filename, size_bytes=a.size_bytes
+            )
+            for a in items
+        ]
+    )
 
 
 def _not_found() -> ApiError:
@@ -139,18 +222,24 @@ def _not_found() -> ApiError:
 async def list_products(
     principal: MemberDep,
     session: SessionDep,
+    storage: StorageDep,
     search: Annotated[str | None, Query(max_length=200)] = None,
     category: Annotated[str | None, Query(max_length=200)] = None,
     is_active: bool | None = None,
+    tag: Annotated[str | None, Query(max_length=30)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ProductPage:
-    """Soft-deleted products are never listed."""
+    """Soft-deleted products are never listed. `search` matches the name or a tag."""
     items, total = CatalogService(session, principal.tenant_id).list_products(
-        search=search, category=category, is_active=is_active, limit=limit, offset=offset
+        search=search, category=category, is_active=is_active, tag=tag, limit=limit, offset=offset
     )
+    main = ProductPhotos(session, principal.tenant_id, storage).main_photos(items)
     return ProductPage(
-        items=[_as_response(item) for item in items], total=total, limit=limit, offset=offset
+        items=[_as_response(item, main.get(item.id), storage) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -313,3 +402,116 @@ def _explain(reason: str) -> str:
         "empty_file": "The file is empty.",
         "file_too_large": "The file is too large.",
     }.get(reason, "The file could not be read.")
+
+
+@router.post(
+    "/{product_id}/duplicate",
+    status_code=status.HTTP_201_CREATED,
+    summary="Copy a product, inactive, without its photos",
+    responses=error_responses((404, "`not_found`"), *AUTH_RESPONSES),
+)
+async def duplicate_product(
+    product_id: uuid.UUID, principal: ConfigurationManagerDep, session: SessionDep
+) -> ProductResponse:
+    copy = CatalogService(session, principal.tenant_id).duplicate(product_id)
+    if copy is None:
+        raise _not_found()
+    return _as_response(copy)
+
+
+def _product(session: SessionDep, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:
+    product = CatalogService(session, tenant_id).get(product_id)
+    if product is None:
+        raise _not_found()
+    return product
+
+
+@router.get(
+    "/{product_id}/photos",
+    summary="The product's photos, in order",
+    responses=error_responses((404, "`not_found`"), *AUTH_RESPONSES),
+)
+def list_photos(
+    product_id: uuid.UUID, principal: MemberDep, session: SessionDep, storage: StorageDep
+) -> PhotoList:
+    product = _product(session, principal.tenant_id, product_id)
+    return _photos(ProductPhotos(session, principal.tenant_id, storage).of(product), storage)
+
+
+@router.post(
+    "/{product_id}/photos",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a photo (at most 10)",
+    responses=error_responses(
+        (404, "`not_found`"),
+        (
+            422,
+            "`too_many_photos`, `not_an_image`, `unsupported_file`, `file_too_large` or "
+            "`empty_file`",
+        ),
+        (503, "`storage_unavailable`"),
+        *AUTH_RESPONSES,
+    ),
+)
+async def add_photo(
+    product_id: uuid.UUID,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    storage: StorageDep,
+    file: Annotated[UploadFile, File()],
+) -> PhotoList:
+    product = _product(session, principal.tenant_id, product_id)
+    data = await file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise ApiError(status_code=422, error="file_too_large", message="La foto es muy pesada.")
+    photos = ProductPhotos(session, principal.tenant_id, storage)
+    try:
+        photos.add(product, data, file.filename or "")
+    except MediaRejected as exc:
+        raise ApiError(status_code=422, error=exc.code, message=str(exc)) from exc
+    except StorageError as exc:
+        raise ApiError(
+            status_code=503, error="storage_unavailable", message="No pudimos guardar la foto."
+        ) from exc
+    session.commit()
+    DEFAULT_CACHE.invalidate(principal.tenant_id)
+    return _photos(photos.of(product), storage)
+
+
+@router.put(
+    "/{product_id}/photos/order",
+    summary="Set the order of the photos; the first is the main one",
+    responses=error_responses((404, "`not_found`"), *AUTH_RESPONSES),
+)
+def order_photos(
+    product_id: uuid.UUID,
+    body: PhotoOrder,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    storage: StorageDep,
+) -> PhotoList:
+    product = _product(session, principal.tenant_id, product_id)
+    ordered = ProductPhotos(session, principal.tenant_id, storage).reorder(product, body.ids)
+    session.commit()
+    DEFAULT_CACHE.invalidate(principal.tenant_id)
+    return _photos(ordered, storage)
+
+
+@router.delete(
+    "/{product_id}/photos/{photo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a photo",
+    responses=error_responses((404, "`not_found`"), *AUTH_RESPONSES),
+)
+def delete_photo(
+    product_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    storage: StorageDep,
+) -> None:
+    product = _product(session, principal.tenant_id, product_id)
+    if not ProductPhotos(session, principal.tenant_id, storage).remove(product, photo_id):
+        raise _not_found()
+    session.commit()
+    DEFAULT_CACHE.invalidate(principal.tenant_id)

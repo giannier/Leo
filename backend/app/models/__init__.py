@@ -38,6 +38,7 @@ from app.models.catalog import (
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
+from app.models.feedback import SandboxFeedback
 from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
@@ -58,6 +59,7 @@ from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
     "ConversationNote",
+    "SandboxFeedback",
     "NotificationSettings",
     "AgentConfig",
     "AgentTrace",
