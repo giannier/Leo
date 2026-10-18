@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from app.models.business import PaymentMethodBusiness
+from app.models.business import PAYMENT_METHODS, PaymentMethodBusiness
 from app.repositories.base import BaseRepository
 
 
@@ -14,7 +14,10 @@ class PaymentMethodRepository(BaseRepository[PaymentMethodBusiness]):
     model = PaymentMethodBusiness
 
     def list_active(self) -> Sequence[PaymentMethodBusiness]:
-        return self.list(PaymentMethodBusiness.is_active.is_(True))
+        """Active methods in a fixed order (Yape, Plin, transferencia...), so the customer
+        always reads them the same way: the table has no order of its own."""
+        methods = self.list(PaymentMethodBusiness.is_active.is_(True))
+        return sorted(methods, key=lambda m: PAYMENT_METHODS.index(m.method))
 
     def count_active(self) -> int:
         """Only active methods satisfy the activation checklist.
