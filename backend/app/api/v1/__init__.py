@@ -11,6 +11,7 @@ from app.api.v1 import (
     billing,
     connection,
     conversations,
+    crm,
     health,
     inbox,
     knowledge,
@@ -38,6 +39,7 @@ router.include_router(auth.router)
 router.include_router(billing.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
+router.include_router(crm.router)
 router.include_router(knowledge.router)
 router.include_router(metrics.router)
 router.include_router(orders.router)

@@ -155,8 +155,8 @@ Unit: matriz de transiciones completa por actor (tabla de verdad), unique de lea
 Commits: `feat(crm): ... [TASK-12XX]`
 - [x] **TASK-1201: Migraciones + seed de etapas/motivos por tenant existente.**
 - [x] **TASK-1202: LeadService + matriz de transiciones + lead_events.** Depends: 1201.
-- [ ] **TASK-1203: Tool actualizar_lead + listeners de F004/F011.** Depends: 1202; toca `agent/` → evals.
-- [ ] **TASK-1204: API de leads/pipeline + WS + export + anonimización.** Depends: 1202.
+- [x] **TASK-1203: ~~Tool actualizar_lead~~ → el lead se mueve desde `StateRepo.save` con el proceso de venta (C-102), sin tocar `agent/` ni evals.** Depends: 1202.
+- [x] **TASK-1204: API de leads/pipeline + WS + export + anonimización.** Depends: 1202.
 - [ ] **TASK-1205: UI kanban (dnd-kit — aprobar dependencia) + lista "hoy" + config de etapas.** Depends: 1204.
 - [ ] **TASK-1206: Métricas hacia metrics_daily (F010) + endurecimiento.** Depends: 1204. Milestone humano: una semana de uso real con tenant piloto; revisar si el umbral de creación de leads genera ruido.
 
