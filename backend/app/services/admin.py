@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,7 @@ from app.models.conversation import Conversation, Message
 from app.models.knowledge import KnowledgeSource
 from app.models.tenant import Tenant, TenantUser
 from app.models.user import User
-from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
+from app.models.whatsapp import OPEN_REQUEST_STATUSES, ConnectionRequest, WhatsAppNumber
 from app.providers.whatsapp.base import InvalidCredentials, NumberCredentials, WhatsAppProvider
 from app.repositories.channel import WebhookEventRepository
 from app.services.connection import store_credentials
@@ -139,12 +139,27 @@ class PlatformAdminService:
     # ------------------------------------------------------- request queue
 
     def queue(self, *, status: str | None = None, limit: int = 50) -> Sequence[ConnectionRequest]:
-        """The work queue, oldest first - it is a queue, not a feed."""
+        """The work queue, oldest first - it is a queue, not a feed.
+
+        Without a status filter the open requests come first (oldest first), and
+        the closed ones after them, newest first: otherwise, once there are more
+        closed requests than fit in a page, a new one never shows up.
+        """
         statement = select(ConnectionRequest)
         if status:
             statement = statement.where(ConnectionRequest.status == status)
-        statement = statement.order_by(ConnectionRequest.created_at).limit(limit)
-        return self._session.execute(statement).scalars().all()
+            statement = statement.order_by(ConnectionRequest.created_at)
+        else:
+            open_first = case((ConnectionRequest.status.in_(OPEN_REQUEST_STATUSES), 0), else_=1)
+            oldest_if_open = case(
+                (
+                    ConnectionRequest.status.in_(OPEN_REQUEST_STATUSES),
+                    func.extract("epoch", ConnectionRequest.created_at),
+                ),
+                else_=-func.extract("epoch", ConnectionRequest.created_at),
+            )
+            statement = statement.order_by(open_first, oldest_if_open)
+        return self._session.execute(statement.limit(limit)).scalars().all()
 
     def get_request(self, request_id: uuid.UUID) -> ConnectionRequest:
         request = self._session.get(ConnectionRequest, request_id)
