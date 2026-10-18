@@ -56,6 +56,14 @@ export const AlertIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const KanbanIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="5" height="16" rx="1.5" />
+    <rect x="10" y="4" width="5" height="10" rx="1.5" />
+    <rect x="17" y="4" width="4" height="7" rx="1.5" />
+  </Svg>
+);
+
 export const InfoIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

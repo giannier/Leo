@@ -375,6 +375,12 @@ class LeadService:
         by: uuid.UUID | None,
         detail: dict[str, Any] | None = None,
     ) -> LeadEvent:
+        # The wall clock, not the transaction's now(): several moves in one turn keep their order.
         return self.events.add(
-            lead_id=lead.id, actor=actor, actor_user_id=by, cause=cause, detail=detail or {}
+            lead_id=lead.id,
+            actor=actor,
+            actor_user_id=by,
+            cause=cause,
+            detail=detail or {},
+            created_at=datetime.now(UTC),
         )

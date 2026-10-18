@@ -423,6 +423,26 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+// CRM (Feature 012).
+export type Pipeline = Ok<Ops["/api/v1/tenant/pipeline"]["get"]>;
+export type PipelineStage = Pipeline["stages"][number];
+export type LostReason = Pipeline["lost_reasons"][number];
+export type LeadBoard = Ok<Ops["/api/v1/tenant/leads/board"]["get"]>;
+export type LeadCard = LeadBoard["columns"][number]["items"][number];
+export type LeadPage = Ok<Ops["/api/v1/tenant/leads"]["get"]>;
+export type LeadDetail = Ok<Ops["/api/v1/tenant/leads/{lead_id}"]["get"]>;
+export interface CrmMetrics {
+  activos_por_etapa: Record<string, number>;
+  nuevos: number;
+  ganados: number;
+  perdidos: number;
+  perdidos_por_motivo: Record<string, number>;
+  llegaron_a: Record<string, number>;
+  conversion: number | null;
+  dias_promedio_para_ganar: number | null;
+  valor_pipeline?: Record<string, string>;
+  vendido?: Record<string, string>;
+}
 export type Valoracion = JsonBody<
   Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages/{message_id}/feedback"]["put"]["requestBody"]
 >;
@@ -677,6 +697,30 @@ export const api = {
         throw caught;
       }
     },
+  },
+
+  crm: {
+    pipeline: () => request<Pipeline>("/tenant/pipeline"),
+    saveStages: (body: { key?: string | null; label: string; is_active?: boolean }[]) =>
+      request<Pipeline>("/tenant/pipeline/stages", { method: "PUT", body }),
+    saveReasons: (body: { key?: string | null; label: string; is_active?: boolean }[]) =>
+      request<Pipeline>("/tenant/pipeline/lost-reasons", { method: "PUT", body }),
+    board: (query?: { asignado?: string; search?: string }) =>
+      request<LeadBoard>("/tenant/leads/board", { query }),
+    today: (dias = 3) => request<LeadPage>("/tenant/leads/today", { query: { dias } }),
+    detail: (id: string) => request<LeadDetail>(`/tenant/leads/${id}`),
+    move: (id: string, stageId: string, lostReason?: string) =>
+      request<LeadDetail>(`/tenant/leads/${id}/move`, {
+        method: "POST",
+        body: { stage_id: stageId, lost_reason: lostReason ?? null },
+      }),
+    assign: (id: string, userId: string | null) =>
+      request<LeadDetail>(`/tenant/leads/${id}/assign`, { method: "POST", body: { user_id: userId } }),
+    discard: (id: string) => request<void>(`/tenant/leads/${id}/discard`, { method: "POST" }),
+    note: (id: string, content: string) =>
+      request<unknown>(`/tenant/leads/${id}/notes`, { method: "POST", body: { content } }),
+    metrics: () => request<CrmMetrics>("/tenant/leads/metrics"),
+    exportCsv: () => requestBlob("/tenant/leads/export.csv"),
   },
 
   team: {

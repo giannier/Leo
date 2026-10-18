@@ -53,6 +53,11 @@ export default function BandejaPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<string | null>(null);
+  // `?c=<id>` opens that conversation (the CRM's "Abrir conversación", Feature 012).
+  useEffect(() => {
+    const wanted = new URLSearchParams(window.location.search).get("c");
+    if (wanted) setSelected(wanted);
+  }, []);
   const [detail, setDetail] = useState<InboxDetail | null>(null);
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [earlier, setEarlier] = useState<string | null>(null);

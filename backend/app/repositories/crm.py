@@ -99,7 +99,9 @@ class LeadRepository(BaseRepository[Lead]):
         statement = (
             self._scoped()
             .where(Lead.contact_id == contact_id)
-            .order_by(Lead.created_at.desc())
+            # Two leads of one transaction share created_at: the newer one is still open or
+            # was closed later.
+            .order_by(Lead.created_at.desc(), Lead.closed_at.desc().nulls_first())
             .limit(1)
         )
         return self._session.execute(statement).scalar_one_or_none()

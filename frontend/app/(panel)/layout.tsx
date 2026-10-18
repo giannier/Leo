@@ -26,6 +26,7 @@ import {
   ChatIcon,
   HomeIcon,
   InboxIcon,
+  KanbanIcon,
   LogOutIcon,
   PhoneIcon,
   ReceiptIcon,
@@ -53,6 +54,8 @@ const NAV: NavItem[] = [
   { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
   // Every role: answering customers is the operator's job (Feature 007).
   { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
+  // Every role (Feature 012): working leads is the operator's job too; no money for them.
+  { href: "/crm", label: "CRM", icon: KanbanIcon },
   // Every role (Feature 010); an operator sees it without money.
   { href: "/resultados", label: "Resultados", icon: ChartIcon },
   { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
@@ -243,7 +246,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             id="contenido"
             // Bottom padding clears the fixed nav bar on phones, so the last
             // row of content is never hidden underneath it.
-            className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-4 sm:px-6 lg:pb-10 lg:pt-6"
+            className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pb-24 pt-4 sm:px-6 lg:pb-10 lg:pt-6"
           >
             {tenantError ? (
               <div className="mb-4">
