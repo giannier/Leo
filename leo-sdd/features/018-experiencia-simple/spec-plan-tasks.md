@@ -66,7 +66,7 @@ personales), dependencias nuevas. Quedan como Fase B, más abajo.
 Commits: `feat(...): ... [TASK-18XX]`
 - [x] **TASK-1801: Etiquetas de producto, orden de fotos y búsqueda por etiqueta** (migración, API, importación, `buscar_productos`).
 - [x] **TASK-1802: Página Catálogo** (lista, búsqueda, filtros, editor con fotos y etiquetas, duplicar, importar). Depends: 1801.
-- [ ] **TASK-1803: Asistente en un solo lugar** (menú lateral con Productos y Conocimiento; objetivo y derivación en Comportamiento).
+- [x] **TASK-1803: Asistente en un solo lugar** (menú lateral con Productos y Conocimiento; objetivo y derivación en Comportamiento).
 - [ ] **TASK-1804: ¿Respondió bien? en el simulador** (valoración guardada, panel "por qué", atajos). Depends: 1801 (migración).
 - [ ] **TASK-1805: e2e y milestone** (Playwright de catálogo, asistente y simulador; evidencia en `milestones/`).
 

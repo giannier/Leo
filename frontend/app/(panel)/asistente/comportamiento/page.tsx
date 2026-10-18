@@ -6,7 +6,8 @@
  * How the assistant talks: tone, pace, detail, tú or usted, emojis and the
  * greeting; the intelligence level; follow-ups and the pause after handing a
  * conversation to a person; and the messages the system sends by itself.
- * The business's own rules are not here: they are situations.
+ * The objective and when to hand over are here too (Feature 018, HU-05), not
+ * only in the setup wizard. The business's own rules are not here: they are situations.
  */
 
 import { useEffect, useState } from "react";
@@ -30,6 +31,17 @@ const DETAILS = [
   { value: "breve", label: "Breve (1 a 3 líneas)" },
   { value: "moderado", label: "Moderado (hasta 700 caracteres)" },
   { value: "extenso", label: "Extenso (cuando pide detalles)" },
+] as const;
+const OBJECTIVES = [
+  { value: "ambos", label: "Atender y vender" },
+  { value: "vender", label: "Vender: cerrar pedidos" },
+  { value: "atender", label: "Atender: responder consultas" },
+] as const;
+/** Mirrors `DEFAULT_ESCALATION_RULES` in `app/models/business.py`. */
+const ESCALATIONS = [
+  { value: "cliente_molesto", label: "El cliente está molesto" },
+  { value: "pide_humano", label: "Pide hablar con una persona" },
+  { value: "fuera_de_catalogo", label: "Pregunta por algo que no vendes" },
 ] as const;
 const LEVELS: Record<string, string> = { economico: "Económico", medio: "Medio", mejor: "El mejor" };
 const MESSAGES: Record<string, string> = {
@@ -89,6 +101,8 @@ export default function BehaviorPage() {
       seguimiento: draft.seguimiento,
       derivacion_pausa_horas: draft.derivacion_pausa_horas,
       max_situaciones: draft.max_situaciones,
+      objective: draft.objective as BehaviorBody["objective"],
+      escalation_rules: draft.escalation_rules as BehaviorBody["escalation_rules"],
       ...(Object.keys(messages).length ? { mensajes_sistema: messages } : {}),
     };
     try {
@@ -154,6 +168,34 @@ export default function BehaviorPage() {
               onChange={(e) => set({ saludo: e.target.value })}
             />
           </div>
+        </Card>
+
+        <Card title="Objetivo y cuándo pasa a una persona">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select
+              label="Objetivo del asistente"
+              options={OBJECTIVES}
+              value={draft.objective}
+              onChange={(e) => set({ objective: e.target.value })}
+            />
+          </div>
+          <fieldset className="mt-4 space-y-3">
+            <legend className="text-sm font-medium text-ink">Pasa la conversación a una persona cuando…</legend>
+            {ESCALATIONS.map((rule) => (
+              <Checkbox
+                key={rule.value}
+                label={rule.label}
+                checked={draft.escalation_rules.includes(rule.value)}
+                onChange={(e) =>
+                  set({
+                    escalation_rules: e.target.checked
+                      ? [...draft.escalation_rules, rule.value]
+                      : draft.escalation_rules.filter((r) => r !== rule.value),
+                  })
+                }
+              />
+            ))}
+          </fieldset>
         </Card>
 
         <Card title="Inteligencia y seguimiento">
