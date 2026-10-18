@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertIcon, BookIcon, ChatIcon, SparkIcon, SpinnerIcon } from "@/components/icons";
 import { Alert, Button, Skeleton, cx } from "@/components/ui";
+import { ReplyFeedback } from "@/components/sandbox/reply-feedback";
 import { WhatsAppText } from "@/components/whatsapp-text";
 import {
   api,
@@ -51,6 +52,9 @@ type Entry =
       saliente: Saliente;
       trace?: SandboxTrace;
       degraded?: boolean;
+      // For "¿Respondió bien?" (Feature 018): the turn's debug and the customer's words.
+      debug?: SandboxDebug;
+      question?: string;
     };
 
 const SUGGESTIONS = [
@@ -159,20 +163,26 @@ export default function SandboxPage() {
   const showAnswer = useCallback(
     (localId: string, turn: Awaited<ReturnType<typeof api.sandbox.send>>) => {
       const last = turn.salientes.length - 1;
-      setEntries((previous) => [
-        ...previous.map((entry) =>
-          entry.id === localId ? { ...entry, id: turn.message_id } : entry,
-        ),
-        ...turn.salientes.map(
-          (saliente, index): Entry => ({
-            id: saliente.message_id,
-            role: "agent",
-            saliente,
-            trace: index === last ? (turn.trace ?? undefined) : undefined,
-            degraded: index === last ? turn.trace?.degraded : undefined,
-          }),
-        ),
-      ]);
+      setEntries((previous) => {
+        const asked = previous.find((entry) => entry.id === localId);
+        const question = asked?.role === "customer" ? asked.content : undefined;
+        return [
+          ...previous.map((entry) =>
+            entry.id === localId ? { ...entry, id: turn.message_id } : entry,
+          ),
+          ...turn.salientes.map(
+            (saliente, index): Entry => ({
+              id: saliente.message_id,
+              role: "agent",
+              saliente,
+              trace: index === last ? (turn.trace ?? undefined) : undefined,
+              degraded: index === last ? turn.trace?.degraded : undefined,
+              debug: index === last ? (turn.debug ?? undefined) : undefined,
+              question: index === last ? question : undefined,
+            }),
+          ),
+        ];
+      });
       if (last >= 0) lastAgentId.current = turn.salientes[last].message_id;
       if (turn.debug) setDebug(turn.debug);
     },
@@ -213,11 +223,11 @@ export default function SandboxPage() {
       if (!content) return;
       setDraft("");
       await deliver({ content }, (id) =>
-        api.sandbox.send(id, { content, situaciones_prueba: drafts }, debugOn),
+        api.sandbox.send(id, { content, situaciones_prueba: drafts }, true),
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deliver, debugOn, trying],
+    [deliver, trying],
   );
 
   /** A tap sends the id the agent gave the option; the customer's bubble shows its title. */
@@ -228,20 +238,20 @@ export default function SandboxPage() {
         title: option.title,
         situaciones_prueba: drafts,
       };
-      await deliver({ content: option.title }, (id) => api.sandbox.send(id, body, debugOn));
+      await deliver({ content: option.title }, (id) => api.sandbox.send(id, body, true));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deliver, debugOn, trying],
+    [deliver, trying],
   );
 
   const sendImage = useCallback(
     async (file: File) => {
       await deliver({ content: "Imagen enviada", imageUrl: URL.createObjectURL(file) }, (id) =>
-        api.sandbox.sendImage(id, file, debugOn, drafts),
+        api.sandbox.sendImage(id, file, true, drafts),
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [deliver, debugOn, trying],
+    [deliver, trying],
   );
 
   /** Forget everything - state, messages, sandbox orders - and greet again. */
@@ -327,7 +337,13 @@ export default function SandboxPage() {
               <Empty onPick={(text) => void send(text)} />
             ) : (
               entries.map((entry) => (
-                <Message key={entry.id} entry={entry} busy={sending} onTap={(o) => void tap(o)} />
+                <Message
+                  key={entry.id}
+                  entry={entry}
+                  busy={sending}
+                  conversationId={conversationId}
+                  onTap={(o) => void tap(o)}
+                />
               ))
             )}
 
@@ -492,10 +508,12 @@ const BUBBLE =
 function Message({
   entry,
   busy,
+  conversationId,
   onTap,
 }: {
   entry: Entry;
   busy: boolean;
+  conversationId: string | null;
   onTap: (option: { id: string; title: string }) => void;
 }) {
   if (entry.role === "customer") {
@@ -532,6 +550,15 @@ function Message({
         ) : null}
 
         {entry.trace ? <Trace trace={entry.trace} /> : null}
+        {entry.trace && conversationId && !entry.degraded ? (
+          <ReplyFeedback
+            conversationId={conversationId}
+            messageId={entry.id}
+            question={entry.question}
+            trace={entry.trace}
+            debug={entry.debug}
+          />
+        ) : null}
       </div>
     </div>
   );

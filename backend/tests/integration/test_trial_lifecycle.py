@@ -478,7 +478,9 @@ class TestTheWizardReminder:
         later = datetime.now(UTC) + timedelta(hours=WIZARD_IDLE_HOURS + 1)
 
         await run_wizard_reminder(db, email_provider=mail, now=later)
-        body = mail.last.text
+        # The job walks every business; other rows (an e2e run on the same
+        # database) may get their own reminder, so pick this business's one.
+        body = next(m.text for m in reversed(mail.sent) if tenant.name in m.text)
         assert "Completar los datos de tu negocio" in body
         assert _notifications(db, tenant.id) == {"wizard_reminder"}
 

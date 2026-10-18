@@ -22,3 +22,17 @@ porcentaje, NxM, precio por cantidad), que el motor de precios ya aplica sin acu
 `media_assets.product_id` ya existe y `buscar_productos`/`ver_producto` ya ofrecen esos recursos al modelo. No
 se crea otra tabla; se agrega el orden. La columna `products.image_key` (sin uso) se deja como está.
 **Registrado por:** Claude — por ratificar
+
+## C-05: La valoración del simulador sobrevive a "Reiniciar chat" (lectura conservadora)
+Reiniciar el simulador borra sus mensajes. Una valoración es la materia prima de las sugerencias de la 017
+(Fase 3), así que guarda una copia de lo que preguntó el cliente y de lo que respondió el asistente, y su
+enlace al mensaje queda en NULL en vez de borrarse (migración 0039). Son textos de prueba que escribe el
+propio negocio, no datos de clientes reales.
+**Registrado por:** Claude — por ratificar
+
+## C-06: "¿Respondió bien?" sin diagnóstico con IA
+El panel explica la respuesta con la traza que ya existe (etapa, situaciones, herramientas, conocimiento)
+y ofrece atajos: situación nueva prellenada con las palabras del cliente y el motivo como ejemplo, pregunta
+frecuente prellenada, productos y datos del negocio. El simulador pide siempre el detalle del turno (no
+llama al modelo de más); el interruptor "depurar" solo muestra u oculta el panel lateral.
+**Registrado por:** Claude — por ratificar
