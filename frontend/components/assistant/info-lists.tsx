@@ -182,9 +182,9 @@ export function PaymentMethods() {
 
 /* --------------------------------------------------------------------- FAQ */
 
-export function Faqs() {
+export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
   const [items, setItems] = useState<Faq[] | null>(null);
-  const [question, setQuestion] = useState("");
+  const [question, setQuestion] = useState(seedQuestion);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
 

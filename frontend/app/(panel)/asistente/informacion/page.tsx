@@ -7,7 +7,7 @@
  * has to read as a rule. One card per block; each saves on its own.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Faqs, PaymentMethods, Promotions } from "@/components/assistant/info-lists";
 import {
@@ -25,7 +25,7 @@ const BLOCKS = [
   { key: "pagos", title: "Métodos de pago", body: <PaymentMethods /> },
   { key: "entregas", title: "Entregas", body: <DeliveryForm /> },
   { key: "locales", title: "Locales y horarios", body: <LocationsForm /> },
-  { key: "faqs", title: "Preguntas frecuentes", body: <Faqs /> },
+  { key: "faqs", title: "Preguntas frecuentes", body: null },
   { key: "promociones", title: "Promociones", body: <Promotions /> },
   { key: "descuentos", title: "Política de descuentos", body: <DiscountPolicyForm /> },
   { key: "tipos", title: "Tipos de cliente", body: <CustomerTypesForm /> },
@@ -35,6 +35,15 @@ const BLOCKS = [
 
 export default function BusinessInfoPage() {
   const [open, setOpen] = useState<string>("pagos");
+  const [question, setQuestion] = useState("");
+
+  // From the simulator: "Agregar una pregunta frecuente" (Feature 018, HU-06).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const block = params.get("bloque");
+    if (block && BLOCKS.some((b) => b.key === block)) setOpen(block);
+    setQuestion(params.get("pregunta")?.trim() ?? "");
+  }, []);
   return (
     <div className="space-y-5">
       <AssistantHeader
@@ -62,7 +71,11 @@ export default function BusinessInfoPage() {
                   </span>
                 </button>
               </h2>
-              {expanded ? <div className="border-t border-line p-5">{block.body}</div> : null}
+              {expanded ? (
+                <div className="border-t border-line p-5">
+                  {block.key === "faqs" ? <Faqs key={question} seedQuestion={question} /> : block.body}
+                </div>
+              ) : null}
             </section>
           );
         })}

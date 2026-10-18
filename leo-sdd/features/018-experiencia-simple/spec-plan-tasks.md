@@ -52,7 +52,7 @@ personales), dependencias nuevas. Quedan como Fase B, más abajo.
 - [RF-005] Ninguna pantalla nueva llama al modelo: no hay costo de LLM nuevo.
 
 ## Plan técnico (delta)
-- Migración 0038: `products.tags text[] NOT NULL DEFAULT '{}'` (+ índice GIN), `media_assets.orden int`,
+- Migraciones 0038 y 0039: `products.tags text[]` (+ índice GIN), `media_assets.orden int`,
   tabla `sandbox_feedback` (tenant_id, conversation_id, message_id único, rating, motivo, created_by, timestamps).
 - API: `tags` en `ProductRequest/Patch/Response`; `GET /tenant/products?tag=`; `POST /tenant/products/{id}/duplicate`;
   `PUT /tenant/sandbox/messages/{id}/feedback`, `DELETE` igual; el historial del simulador trae la valoración.
@@ -67,7 +67,7 @@ Commits: `feat(...): ... [TASK-18XX]`
 - [x] **TASK-1801: Etiquetas de producto, orden de fotos y búsqueda por etiqueta** (migración, API, importación, `buscar_productos`).
 - [x] **TASK-1802: Página Catálogo** (lista, búsqueda, filtros, editor con fotos y etiquetas, duplicar, importar). Depends: 1801.
 - [x] **TASK-1803: Asistente en un solo lugar** (menú lateral con Productos y Conocimiento; objetivo y derivación en Comportamiento).
-- [ ] **TASK-1804: ¿Respondió bien? en el simulador** (valoración guardada, panel "por qué", atajos). Depends: 1801 (migración).
+- [x] **TASK-1804: ¿Respondió bien? en el simulador** (valoración guardada, panel "por qué", atajos). Depends: 1801 (migración).
 - [ ] **TASK-1805: e2e y milestone** (Playwright de catálogo, asistente y simulador; evidencia en `milestones/`).
 
 ## Fase B (no se construye ahora; cada punto necesita decisión de Giannier)

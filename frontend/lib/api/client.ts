@@ -423,6 +423,9 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+export type Valoracion = JsonBody<
+  Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages/{message_id}/feedback"]["put"]["requestBody"]
+>;
 export type InfoSection = "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
 export type SectionData = Ok<Ops["/api/v1/assistant/business-info/{section}"]["get"]>;
 export type Faq = Ok<Ops["/api/v1/assistant/faqs"]["get"]>["items"][number];
@@ -720,6 +723,16 @@ export const api = {
       }),
     reset: (conversationId: string) =>
       request<void>(`/tenant/sandbox/conversations/${conversationId}/reset`, { method: "POST" }),
+    /** ¿Respondió bien? (Feature 018): thumbs up or down on a reply, with the reason. */
+    rate: (conversationId: string, messageId: string, body: Valoracion) =>
+      request<Valoracion>(
+        `/tenant/sandbox/conversations/${conversationId}/messages/${messageId}/feedback`,
+        { method: "PUT", body },
+      ),
+    unrate: (conversationId: string, messageId: string) =>
+      request<void>(`/tenant/sandbox/conversations/${conversationId}/messages/${messageId}/feedback`, {
+        method: "DELETE",
+      }),
   },
 
   payments: {

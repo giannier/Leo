@@ -2239,6 +2239,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/sandbox/conversations/{conversation_id}/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate a reply of the assistant: thumbs up or down, with the reason
+         * @description Nothing here calls the model: the rating is stored for the business and for
+         *     the learning suggestions to come (017, Phase 3).
+         */
+        put: operations["rate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_put"];
+        post?: never;
+        /** Take back a rating */
+        delete: operations["unrate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant": {
         parameters: {
             query?: never;
@@ -3727,6 +3749,7 @@ export interface components {
              */
             created_at: string;
             saliente?: components["schemas"]["Saliente"] | null;
+            valoracion?: components["schemas"]["Valoracion"] | null;
         };
         /** MetricsSettings */
         MetricsSettings: {
@@ -5168,6 +5191,19 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Valoracion
+         * @description What the business said of a reply (Feature 018, HU-06).
+         */
+        Valoracion: {
+            /**
+             * Rating
+             * @enum {integer}
+             */
+            rating: -1 | 1;
+            /** Motivo */
+            motivo?: string | null;
         };
         /** VerifyEmailRequest */
         VerifyEmailRequest: {
@@ -11955,6 +11991,108 @@ export interface operations {
             header?: never;
             path: {
                 conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Valoracion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Valoracion"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unrate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
             };
             cookie?: never;
         };
