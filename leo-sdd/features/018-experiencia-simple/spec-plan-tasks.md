@@ -1,6 +1,6 @@
 # Spec + Plan — Experiencia simple (lo que Ventor tiene, a la manera de Leo)
 
-**Feature ID:** 018 · **Estado:** En construcción (desde 2026-10-15)
+**Feature ID:** 018 · **Estado:** Construida (2026-10-18). Evidencia en [milestones/experiencia-simple.md](milestones/experiencia-simple.md)
 **Depende de:** 001, 004, 006, 017
 **Origen:** el recorrido de Ventor (38 capturas, 2026-10-15) y el análisis de brechas con Giannier.
 Decisiones en [clarifications.md](clarifications.md).
@@ -68,7 +68,7 @@ Commits: `feat(...): ... [TASK-18XX]`
 - [x] **TASK-1802: Página Catálogo** (lista, búsqueda, filtros, editor con fotos y etiquetas, duplicar, importar). Depends: 1801.
 - [x] **TASK-1803: Asistente en un solo lugar** (menú lateral con Productos y Conocimiento; objetivo y derivación en Comportamiento).
 - [x] **TASK-1804: ¿Respondió bien? en el simulador** (valoración guardada, panel "por qué", atajos). Depends: 1801 (migración).
-- [ ] **TASK-1805: e2e y milestone** (Playwright de catálogo, asistente y simulador; evidencia en `milestones/`).
+- [x] **TASK-1805: e2e y milestone** (Playwright de catálogo, asistente y simulador; evidencia en `milestones/`).
 
 ## Fase B (no se construye ahora; cada punto necesita decisión de Giannier)
 - **Copiloto de configuración** que conversa y escribe en los mismos formularios y tarjetas (nunca en texto
