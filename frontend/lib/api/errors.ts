@@ -115,7 +115,17 @@ const MESSAGES: Record<string, string> = {
 
 // The server words these for the person, with what to correct (a coupon's reason,
 // what does not fit in the smaller plan).
-const SERVER_WORDED = new Set(["invalid_url", "coupon_invalid", "downgrade_blocked"]);
+const SERVER_WORDED = new Set([
+  "invalid_url",
+  "coupon_invalid",
+  "downgrade_blocked",
+  // Files: the server says which limit (type, size, how many photos).
+  "unsupported_file",
+  "file_too_large",
+  "empty_file",
+  "too_many_photos",
+  "not_an_image",
+]);
 
 /**
  * What to show the user. Falls back to something honest rather than to the

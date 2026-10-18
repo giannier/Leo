@@ -258,10 +258,13 @@ export type Product = ProductPage["items"][number];
 type ProductCreate = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
 /** Fields the server fills in when omitted (TASK-406); the generated type lists
  * them as required because the schema is read from the response side. */
-type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado";
+type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado" | "tags";
 export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
   Partial<Pick<ProductCreate, ProductServerDefaults>>;
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
+export type ProductPatch = JsonBody<Ops["/api/v1/tenant/products/{product_id}"]["put"]["requestBody"]>;
+export type PhotoList = Ok<Ops["/api/v1/tenant/products/{product_id}/photos"]["get"]>;
+export type Photo = PhotoList["items"][number];
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
 // Dashboard (Feature 010). The report is a free-form dict on the server; typed here.
@@ -508,11 +511,31 @@ export const api = {
   },
 
   products: {
-    list: (query?: { limit?: number; offset?: number; search?: string }) =>
-      request<ProductPage>("/tenant/products", { query }),
+    list: (query?: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+      category?: string;
+      is_active?: boolean;
+      tag?: string;
+    }) => request<ProductPage>("/tenant/products", { query }),
     create: (body: ProductBody) =>
       request<Product>("/tenant/products", { method: "POST", body }),
+    update: (id: string, body: ProductPatch) =>
+      request<Product>(`/tenant/products/${id}`, { method: "PUT", body }),
+    duplicate: (id: string) =>
+      request<Product>(`/tenant/products/${id}/duplicate`, { method: "POST" }),
     remove: (id: string) => request<void>(`/tenant/products/${id}`, { method: "DELETE" }),
+    photos: (id: string) => request<PhotoList>(`/tenant/products/${id}/photos`),
+    addPhoto: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<PhotoList>(`/tenant/products/${id}/photos`, { method: "POST", body: form });
+    },
+    orderPhotos: (id: string, ids: string[]) =>
+      request<PhotoList>(`/tenant/products/${id}/photos/order`, { method: "PUT", body: { ids } }),
+    removePhoto: (id: string, photoId: string) =>
+      request<void>(`/tenant/products/${id}/photos/${photoId}`, { method: "DELETE" }),
 
     /** Upload a CSV or XLSX and get back what *would* be created. */
     preview: (file: File) => {
