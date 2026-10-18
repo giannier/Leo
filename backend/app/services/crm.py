@@ -9,6 +9,8 @@ confirmed order), never backwards.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,6 +55,17 @@ class CrmError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         self.code = code
+
+
+def free_key(label: str, taken: set[str], *, fallback: str) -> str:
+    """ "Cotización enviada" -> "cotizacion_enviada", with a number if it is taken."""
+    plain = unicodedata.normalize("NFKD", label.casefold())
+    plain = "".join(c for c in plain if not unicodedata.combining(c))
+    base = re.sub(r"[^a-z0-9]+", "_", plain).strip("_")[:30] or fallback
+    key, n = base, 2
+    while key in taken:
+        key, n = f"{base}_{n}", n + 1
+    return key
 
 
 def semantic_for(stage_key: str, facts: dict[str, Any], order: Order | None) -> str | None:
@@ -294,16 +307,7 @@ class LeadService:
 
     @staticmethod
     def _new_key(label: str, taken: dict[str, PipelineStage]) -> str:
-        import re
-        import unicodedata
-
-        plain = unicodedata.normalize("NFKD", label.casefold())
-        plain = "".join(c for c in plain if not unicodedata.combining(c))
-        base = re.sub(r"[^a-z0-9]+", "_", plain).strip("_")[:30] or "etapa"
-        key, n = base, 2
-        while key in taken or key in SEMANTIC_STAGES:
-            key, n = f"{base}_{n}", n + 1
-        return key
+        return free_key(label, set(taken) | set(SEMANTIC_STAGES), fallback="etapa")
 
     # --------------------------------------------------------------- helpers
 
