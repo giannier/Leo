@@ -1,6 +1,6 @@
 # Spec + Plan + Tasks — Mini-CRM de Leads
 
-**Feature ID:** 012 · **Módulo:** 12-crm · **Estado:** Draft para ratificación
+**Feature ID:** 012 · **Módulo:** 12-crm · **Estado:** Ratificada y en construcción (2026-10-18). Adaptaciones en [clarifications.md](clarifications.md)
 **Depende de:** 003 (agente), 007 (bandeja), 011 (etiquetas; follow-ups conectados)
 
 ## Resumen
@@ -153,8 +153,8 @@ Unit: matriz de transiciones completa por actor (tabla de verdad), unique de lea
 
 ## Tasks
 Commits: `feat(crm): ... [TASK-12XX]`
-- [ ] **TASK-1201: Migraciones + seed de etapas/motivos por tenant existente.**
-- [ ] **TASK-1202: LeadService + matriz de transiciones + lead_events.** Depends: 1201.
+- [x] **TASK-1201: Migraciones + seed de etapas/motivos por tenant existente.**
+- [x] **TASK-1202: LeadService + matriz de transiciones + lead_events.** Depends: 1201.
 - [ ] **TASK-1203: Tool actualizar_lead + listeners de F004/F011.** Depends: 1202; toca `agent/` → evals.
 - [ ] **TASK-1204: API de leads/pipeline + WS + export + anonimización.** Depends: 1202.
 - [ ] **TASK-1205: UI kanban (dnd-kit — aprobar dependencia) + lista "hoy" + config de etapas.** Depends: 1204.

@@ -13,6 +13,7 @@ twice writes no second event.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -42,6 +43,8 @@ INITIAL_FUNNEL = FunnelCode.NUEVO
 
 # What the event snapshot leaves out: personal data (C-20).
 _SNAPSHOT_EXCLUDE: dict[str, Any] = {"nombre_cliente": True, "derivado": {"resumen"}}
+
+logger = logging.getLogger(__name__)
 
 
 class StateConflict(RuntimeError):
@@ -185,6 +188,7 @@ class StateRepo:
             )
             if written is not None:
                 state, event = written
+                self._follow_lead(state, reason)
                 return SaveResult(state=state, event=event, retried=attempt == 2)
             if not retry:
                 break
@@ -195,6 +199,23 @@ class StateRepo:
         )
 
     # --------------------------------------------------------------- helpers
+
+    def _follow_lead(self, state: ConversationState, reason: str) -> None:
+        """Move the contact's lead with the process (Feature 012, C-102).
+
+        In a savepoint, and never raising: a CRM problem must not cost the
+        customer the reply. A failure is logged and the lead catches up on the
+        next save.
+        """
+        from app.services.crm import LeadService
+
+        try:
+            with self._session.begin_nested():
+                LeadService(self._session, self._tenant_id).follow(state, reason)
+        except Exception:
+            logger.exception(
+                "lead not updated", extra={"conversation_id": str(state.conversation_id)}
+            )
 
     def _read_fresh(self, conversation_id: uuid.UUID) -> ConversationState:
         """The row as it is in the database now, ignoring what the session cached."""
