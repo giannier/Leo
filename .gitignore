@@ -52,3 +52,4 @@ Thumbs.db
 # --- Redundant archives -----------------------------------------------------
 # Duplicates the tracked contents of leo-sdd/; would go stale immediately.
 leo-sdd-completo.zip
+deploy/.env.prod
