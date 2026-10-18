@@ -2520,6 +2520,10 @@ export interface components {
             descuento_maximo_pct?: number | string | null;
             /** Max Situaciones */
             max_situaciones?: number | null;
+            /** Objective */
+            objective?: ("vender" | "atender" | "ambos") | null;
+            /** Escalation Rules */
+            escalation_rules?: ("cliente_molesto" | "pide_humano" | "fuera_de_catalogo")[] | null;
         };
         /** BehaviorResponse */
         BehaviorResponse: {
@@ -2556,6 +2560,10 @@ export interface components {
             descuento_maximo_pct: string | null;
             /** Max Situaciones */
             max_situaciones: number;
+            /** Objective */
+            objective: string;
+            /** Escalation Rules */
+            escalation_rules: string[];
         };
         /** BillingOut */
         BillingOut: {
