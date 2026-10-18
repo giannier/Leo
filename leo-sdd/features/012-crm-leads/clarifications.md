@@ -52,3 +52,18 @@ descartar lo puede hacer cualquier miembro.
 ## C-107: Las conversaciones del simulador no crean leads
 Igual que el resto de los datos de prueba (`is_sandbox`), quedan fuera del CRM.
 **Registrado por:** Claude — informativa
+
+## C-108: Métricas en vivo, sin copia en metrics_daily
+Las métricas del CRM (activos por etapa, nuevos, ganados, perdidos por motivo, cuántos llegaron a cada
+etapa, conversión, días promedio para ganar y valor del embudo) se calculan al pedirlas desde `leads` y
+`lead_events`, que tienen índices por tenant. Copiarlas en `metrics_daily` exigiría una migración y otro
+cálculo nocturno sin ganancia con los volúmenes del piloto. Si Resultados (010) o la 013 las necesitan por
+día, se agregan columnas al rollup entonces.
+**Registrado por:** Claude — informativa
+
+## C-109: Anonimización (RF-008)
+El lead no guarda nombre ni teléfono: los lee del contacto. Al anonimizar un contacto, sus tarjetas, el CSV
+y el historial dejan de mostrar sus datos, y montos y eventos quedan para métricas. Hoy Leo no tiene un
+"borrar datos de un contacto" por pedido del titular (F007 no lo trae); cuando exista, debe borrar también
+las notas de sus conversaciones y el `product_interest` del lead.
+**Registrado por:** Claude — por ratificar

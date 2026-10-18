@@ -215,7 +215,8 @@ class TestThePersonWins:
         _order(db, tenant, conversation, "60.00")
         _save(states, conversation, Stage.COBRO)
         leads = _leads(db, tenant)
-        assert len(leads) == 2 and leads[1].previous_lead_id == lead.id
+        assert len(leads) == 2
+        assert [other.previous_lead_id for other in leads if other.id != lead.id] == [lead.id]
 
     def test_losing_needs_a_known_reason(self, db: Session) -> None:
         tenant, conversation, states = _setup(db)

@@ -160,7 +160,7 @@ export function ProductEditor({
         aria-modal="true"
         aria-label={title}
         onClick={(event) => event.stopPropagation()}
-        className="flex h-full w-full flex-col bg-surface shadow-xl outline-none sm:max-w-xl"
+        className="flex h-full w-full min-w-0 max-w-full flex-col bg-surface shadow-xl outline-none sm:max-w-xl"
       >
         <header className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="font-heading text-lg font-semibold text-ink">{title}</h2>
