@@ -24,6 +24,15 @@ from app.models.business import (
     Product,
     ProductCategory,
 )
+from app.models.campaigns import (
+    Campaign,
+    CampaignRecipient,
+    ContactOptin,
+    ContactTag,
+    MessageTemplate,
+    MetaRate,
+    OptinImport,
+)
 from app.models.catalog import (
     CatalogEmbedding,
     CatalogFaq,
@@ -59,6 +68,13 @@ from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
+    "Campaign",
+    "CampaignRecipient",
+    "ContactOptin",
+    "ContactTag",
+    "MessageTemplate",
+    "MetaRate",
+    "OptinImport",
     "ConversationNote",
     "SandboxFeedback",
     "Lead",

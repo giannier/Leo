@@ -61,6 +61,9 @@ MESSAGE_TYPES = (
     # Feature 007: takeover, return, close and payment decisions as items of the
     # thread (`author='system'`, the details in `payload`).
     "event",
+    # Feature 011: an approved WhatsApp template (campaigns, follow-ups outside the
+    # 24-hour window). The name, language and values are in `payload`.
+    "template",
 )
 
 # Where an outbound message got to. Null for anything inbound - a message the
@@ -111,6 +114,10 @@ class Conversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Customer messages nobody has opened yet.
     unread_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # The campaign whose template opened this thread (Feature 011, C-109).
+    origin_campaign_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):

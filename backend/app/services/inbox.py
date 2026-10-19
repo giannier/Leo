@@ -40,6 +40,7 @@ from app.process.recompute import recompute_stage
 from app.repositories.audit import AuditLogRepository
 from app.repositories.channel import ContactRepository, session_window_is_open
 from app.repositories.conversation import EVENT, ConversationRepository, MessageRepository
+from app.services.campaigns.optins import OptinService
 
 EVENT_TEXTS = {
     "tomada": "{nombre} tomó la conversación",
@@ -316,6 +317,8 @@ class Inbox:
         if contact.opted_out_at is None:
             contact.opted_out_at = self._clock()
             self._session.flush()
+            # No more promotions either (Feature 011, C-103).
+            OptinService(self._session, self._tenant_id).revoke(contact, at=contact.opted_out_at)
             AuditLogRepository(self._session, self._tenant_id).record(
                 actor_id=user.id,
                 action="contact.opt_out",

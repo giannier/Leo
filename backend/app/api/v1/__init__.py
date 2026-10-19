@@ -9,6 +9,7 @@ from app.api.v1 import (
     assistant_media,
     auth,
     billing,
+    campaigns,
     connection,
     conversations,
     crm,
@@ -37,6 +38,7 @@ router.include_router(assistant_info.router)
 router.include_router(assistant_media.router)
 router.include_router(auth.router)
 router.include_router(billing.router)
+router.include_router(campaigns.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
 router.include_router(crm.router)

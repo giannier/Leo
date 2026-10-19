@@ -270,10 +270,44 @@ class QualityUpdate:
     quality_rating: str
 
 
+@dataclass(frozen=True)
+class TemplateSpec:
+    """A template as Meta reviews it (Feature 011): positional variables, examples."""
+
+    name: str
+    language: str
+    category: Literal["utility", "marketing"]
+    # With {{1}}, {{2}}... in the order of `examples`.
+    body: str
+    examples: tuple[str, ...] = ()
+    footer: str | None = None
+    # A public link to an example image when the template has an image header.
+    header_image_link: str | None = None
+
+
+@dataclass(frozen=True)
+class TemplateSubmitted:
+    provider_template_id: str | None
+    # Ours: pending, approved, rejected, paused or disabled.
+    status: str
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class TemplateStatusUpdate:
+    """Meta's verdict on a template (approved, rejected with a reason, paused...)."""
+
+    waba_id: str
+    name: str
+    language: str
+    status: str
+    reason: str | None = None
+    provider_template_id: str | None = None
+
+
 # What `parse_event` can return. `None` means "a valid event this version has
-# no use for" - a template status, a payment notice - which is not an error
-# and must not be retried.
-ParsedEvent = InboundMessage | StatusUpdate | QualityUpdate | None
+# no use for" - a payment notice - which is not an error and must not be retried.
+ParsedEvent = InboundMessage | StatusUpdate | QualityUpdate | TemplateStatusUpdate | None
 
 
 @runtime_checkable
@@ -337,6 +371,26 @@ class WhatsAppProvider(Protocol):
         sections: list[ListSection],
     ) -> SendResult:
         """Send a message with a list of up to 10 selectable rows."""
+        ...
+
+    async def send_template(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        to: Recipient,
+        name: str,
+        language: str,
+        values: list[str],
+        header_image_link: str | None = None,
+    ) -> SendResult:
+        """Send an approved template; the only message allowed outside the 24 hours."""
+        ...
+
+    async def submit_template(
+        self, credentials: NumberCredentials, template: TemplateSpec
+    ) -> TemplateSubmitted:
+        """Hand a template to Meta for review."""
         ...
 
     async def upload_media(
