@@ -379,10 +379,12 @@ class TestNothingIsEverDiscarded:
         assert event.payload == payload
 
     def test_an_event_this_version_ignores_is_finished_not_retried(self, db: Session) -> None:
-        """A template status. Complete, valid, and no behaviour attached -
+        """A payment notice. Complete, valid, and no behaviour attached -
         attempting it again produces the same nothing."""
         outcome = process_event(
-            db, _store(db, load("ycloud/template_status.json")), provider=PROVIDER
+            db,
+            _store(db, {"id": "evt_pay", "type": "whatsapp.payment.updated", "payment": {}}),
+            provider=PROVIDER,
         )
 
         assert outcome.outcome == OUTCOME_IGNORED

@@ -10,6 +10,7 @@
  * the hunting to the user.
  */
 
+import { NpsCard } from "@/components/analytics/nps-card";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -92,6 +93,8 @@ export default function PanelHome() {
           messages have I got left" is the question somebody opens this page
           to answer, and the checklist below it is finished. */}
       <UsageMeter />
+
+      <NpsCard />
 
       {error ? (
         <Alert tone="danger" title="No pudimos cargar tu configuración">

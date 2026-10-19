@@ -33,6 +33,12 @@ Wire format, verified against YCloud's own documentation:
   ``whatsapp.message.updated``
 * signature: ``YCloud-Signature: t=<unix seconds>,s=<hex>`` over
   ``"<t>.<raw body>"``, HMAC-SHA256
+* templates (Feature 011): ``POST /v2/whatsapp/templates`` with ``wabaId``, ``name``,
+  ``language``, ``category`` and Meta's ``components``; sending is ``type: "template"``
+  with ``template: {name, language: {code}, components}``; the review arrives as
+  ``whatsapp.template.reviewed`` with a ``whatsappTemplate`` object. The image header's
+  example goes as ``example.header_url`` (YCloud uploads it); to verify with the real
+  number (TASK-459).
 """
 
 from __future__ import annotations
@@ -70,6 +76,9 @@ from app.providers.whatsapp.base import (
     Referral,
     SendResult,
     StatusUpdate,
+    TemplateSpec,
+    TemplateStatusUpdate,
+    TemplateSubmitted,
     UploadedMedia,
     WhatsAppAuthError,
     WhatsAppError,
@@ -82,6 +91,7 @@ logger = logging.getLogger(__name__)
 API_BASE_URL = "https://api.ycloud.com/v2"
 MESSAGES_PATH = "/whatsapp/messages"
 MEDIA_UPLOAD_PATH = "/whatsapp/media/{phone}/upload"
+TEMPLATES_PATH = "/whatsapp/templates"
 
 # Uploading a file is slower than posting a few hundred bytes of JSON.
 UPLOAD_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
@@ -107,6 +117,21 @@ MIN_CREDENTIAL_LENGTH = 6
 EVENT_INBOUND = "whatsapp.inbound_message.received"
 EVENT_MESSAGE_UPDATED = "whatsapp.message.updated"
 EVENT_QUALITY_UPDATED = "whatsapp.business_account.phone_number.quality.updated"
+# YCloud documents `reviewed`; recorded payloads also carry `updated`. Both say the same.
+EVENT_TEMPLATE = frozenset({"whatsapp.template.reviewed", "whatsapp.template.updated"})
+
+# Meta's template states, mapped onto ours. Anything else (a state Meta adds) is
+# left as `pending`, which shows "en revisión" rather than inventing a verdict.
+TEMPLATE_STATUSES: dict[str, str] = {
+    "APPROVED": "approved",
+    "REJECTED": "rejected",
+    "PAUSED": "paused",
+    "DISABLED": "disabled",
+    "PENDING_DELETION": "disabled",
+    "DELETED": "disabled",
+    "PENDING": "pending",
+    "IN_APPEAL": "pending",
+}
 
 # YCloud's message types, mapped onto ours. Everything absent from this table
 # - video, reaction, an order, something introduced next month (and an
@@ -281,6 +306,74 @@ class YCloudProvider:
         }
         return await self._send(
             credentials, sender, to, {"type": "interactive", "interactive": interactive}
+        )
+
+    async def send_template(
+        self,
+        credentials: NumberCredentials,
+        *,
+        sender: str,
+        to: Recipient,
+        name: str,
+        language: str,
+        values: list[str],
+        header_image_link: str | None = None,
+    ) -> SendResult:
+        components: list[dict[str, Any]] = []
+        if header_image_link:
+            components.append(
+                {
+                    "type": "header",
+                    "parameters": [{"type": "image", "image": {"link": header_image_link}}],
+                }
+            )
+        if values:
+            components.append(
+                {
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": value} for value in values],
+                }
+            )
+        template: dict[str, Any] = {"name": name, "language": {"code": language}}
+        if components:
+            template["components"] = components
+        return await self._send(credentials, sender, to, {"type": "template", "template": template})
+
+    async def submit_template(
+        self, credentials: NumberCredentials, template: TemplateSpec
+    ) -> TemplateSubmitted:
+        self.validate(credentials)
+        body: dict[str, Any] = {"type": "BODY", "text": template.body}
+        if template.examples:
+            body["example"] = {"body_text": [list(template.examples)]}
+        components: list[dict[str, Any]] = []
+        if template.header_image_link:
+            components.append(
+                {
+                    "type": "HEADER",
+                    "format": "IMAGE",
+                    "example": {"header_url": [template.header_image_link]},
+                }
+            )
+        components.append(body)
+        if template.footer:
+            components.append({"type": "FOOTER", "text": template.footer})
+        answer = await self._post(
+            TEMPLATES_PATH,
+            {
+                "wabaId": credentials.values["waba_id"],
+                "name": template.name,
+                "language": template.language,
+                "category": template.category.upper(),
+                "components": components,
+            },
+            api_key=credentials.values["api_key"],
+        )
+        return TemplateSubmitted(
+            provider_template_id=str(answer.get("officialTemplateId") or answer.get("id") or "")
+            or None,
+            status=TEMPLATE_STATUSES.get(str(answer.get("status") or "").upper(), "pending"),
+            reason=str(answer.get("reason") or "") or None,
         )
 
     async def upload_media(
@@ -466,7 +559,9 @@ class YCloudProvider:
             return self._parse_status(_as_dict(payload.get("whatsappMessage")))
         if event_type == EVENT_QUALITY_UPDATED:
             return self._parse_quality(payload)
-        # Templates, payments, whatever YCloud adds next. Not an error, and
+        if event_type in EVENT_TEMPLATE:
+            return _parse_template(_as_dict(payload.get("whatsappTemplate")))
+        # Payments, whatever YCloud adds next. Not an error, and
         # explicitly not a retry: the event is complete, it is simply not
         # addressed to any behaviour this version has.
         logger.debug("ignoring YCloud event", extra={"event_type": event_type})
@@ -552,6 +647,26 @@ class YCloudProvider:
         if not phone or not rating:
             return None
         return QualityUpdate(phone_e164=phone, quality_rating=rating.upper())
+
+
+def _parse_template(template: dict[str, Any]) -> TemplateStatusUpdate | None:
+    waba_id = str(template.get("wabaId") or "")
+    name = str(template.get("name") or "")
+    language = str(template.get("language") or "")
+    raw = str(template.get("status") or "").upper()
+    # Meta says "NONE" when there is nothing to say.
+    reason = str(template.get("reason") or "")
+    if not (waba_id and name and language and raw):
+        logger.warning("unusable YCloud template review", extra={"status": raw})
+        return None
+    return TemplateStatusUpdate(
+        waba_id=waba_id,
+        name=name,
+        language=language,
+        status=TEMPLATE_STATUSES.get(raw, "pending"),
+        reason=reason if reason not in ("", "NONE") else None,
+        provider_template_id=str(template.get("officialTemplateId") or "") or None,
+    )
 
 
 def _address(to: Recipient) -> dict[str, str]:

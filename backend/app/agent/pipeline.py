@@ -64,6 +64,7 @@ from app.models.conversation_state import FunnelCode
 from app.models.tenant import Tenant
 from app.orders.notices import OrderNotices
 from app.orders.proofs import ImageReader, InboundImage, ProofOutcome, ProofPipeline
+from app.process.bundle_request import Bundle, requested_bundle
 from app.process.engine import compute_stage, funnel_for
 from app.process.facts import EntradaAnuncio, Facts, FactsLoader
 from app.process.interactive import InteractiveReply, apply_interactive
@@ -75,6 +76,7 @@ from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import Referral
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.repositories.product import ProductRepository
 from app.services.trial import agent_may_reply
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,8 @@ REASON_PROOF = "comprobante"
 
 # What the model is told when a receipt photo could not be opened.
 IMAGE_UNREADABLE_LINE = "no se pudo abrir la imagen; pídele que la envíe de nuevo"
+# Packages read to recognize one the customer names; a catalogue rarely has more.
+_BUNDLES_READ = 50
 
 
 @dataclass(frozen=True)
@@ -405,11 +409,23 @@ class TurnPipeline:
         The ad becomes a stored fact (`entrada_anuncio`). A tapped option is read
         from the event, not from the text: the text is only the title the customer
         saw. A path is stored even if the model never calls `elegir_camino`; any
-        other option becomes one line of context for this turn.
+        other option becomes one line of context for this turn. A package the
+        customer names before there is an order is kept (`paquete_pedido`), so the
+        agent builds that one when the topics come, whatever it remembers.
         """
         patch: dict[str, Any] = {}
         if inbound.referral is not None:
             patch["entrada_anuncio"] = _entry_from(inbound.referral, now)
+        if inbound.text and facts.pedido is None:
+            named = self._named_bundle(inbound.text)
+            if named is not None and named != facts.paquete_pedido:
+                patch["paquete_pedido"] = named
+            if named is not None and facts.camino is None and "camino" not in patch:
+                # Asking for a package is choosing to buy: with one sales path,
+                # that is the path, as a tapped one is (C-25).
+                selling = [c for c in config.options.caminos if c.tipo == "venta"]
+                if config.options.calificacion_activa and len(selling) == 1:
+                    patch["camino"] = selling[0].clave
 
         lines: list[str] = []
         view = facts
@@ -426,6 +442,15 @@ class TurnPipeline:
             imagen_recibida=inbound.image,
         )
         return patch, turn
+
+    def _named_bundle(self, text: str) -> str | None:
+        """The live package the customer's words name, if exactly one."""
+        products = ProductRepository(self._session, self._tenant_id).search_active(
+            solo_paquetes=True, limit=_BUNDLES_READ
+        )
+        bundles = [Bundle(p.name, p.bundle_size) for p in products if p.bundle_size]
+        found = requested_bundle(text, bundles)
+        return found.name if found else None
 
     @staticmethod
     def _expects_proof(stage_previa: Stage, facts: Facts) -> bool:

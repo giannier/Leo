@@ -28,7 +28,10 @@ UUID = postgresql.UUID(as_uuid=True)
 JSONB = postgresql.JSONB(astext_type=sa.Text())
 
 
-def _count(name: str, kind: sa.types.TypeEngine = sa.Integer()) -> sa.Column:
+INTEGER = sa.Integer()
+
+
+def _count(name: str, kind: sa.types.TypeEngine = INTEGER) -> sa.Column:
     return sa.Column(name, kind, nullable=False, server_default="0")
 
 

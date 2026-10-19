@@ -40,12 +40,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from app.agent.core import AgentCore, usable_answer
 from app.agent.prompts.stage import build_stage_prompt
 from app.models.business import AgentConfig, BusinessProfile
+from app.models.campaigns import MessageTemplate
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
 from app.models.conversation_state import ConversationState, FunnelCode
@@ -61,6 +62,7 @@ from app.process.templates.base import Stage
 from app.providers.llm.base import ChatMessage, LLMError, LLMProvider
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.services.campaigns.sender import Filled, fill
 from app.services.trial import agent_may_reply, record_ai_message
 
 logger = logging.getLogger(__name__)
@@ -73,6 +75,10 @@ DEFAULT_ZONE = "America/Lima"
 STALE_DRAFT = timedelta(days=7)
 REASON_FOLLOW_UP = "seguimiento"
 REASON_DISCARDED = "pedido_descartado"
+# Template follow-ups (Feature 011, C-110): hard caps of the platform.
+TEMPLATE_PER_CONVERSATION = 1
+TEMPLATE_PER_MONTH = 2
+TEMPLATE_MONTH = timedelta(days=30)
 _BATCH = 500
 
 # The reasons `why_not` gives, for the logs and the tests.
@@ -85,6 +91,25 @@ class FollowUpPlan:
 
     attempt: int
     last: bool
+    # Outside Meta's window, the business's approved utility template (Feature 011, C-110).
+    template: bool = False
+
+
+@dataclass(frozen=True)
+class TemplateRoom:
+    """Whether a template follow-up may go: the template, and the caps of C-110."""
+
+    available: bool
+    in_conversation: int = 0
+    in_month: int = 0
+
+    @property
+    def allowed(self) -> bool:
+        return (
+            self.available
+            and self.in_conversation < TEMPLATE_PER_CONVERSATION
+            and self.in_month < TEMPLATE_PER_MONTH
+        )
 
 
 def local_time(now: datetime, zone: str | None) -> time:
@@ -107,6 +132,7 @@ def why_not(
     last_message: Message | None,
     zone: str | None,
     taken: bool = False,
+    template: TemplateRoom | None = None,
 ) -> Skip | FollowUpPlan:
     """The first condition of C-13 that fails, or the follow-up that is due."""
     if config is None or not config.seguimiento_activo:
@@ -136,12 +162,15 @@ def why_not(
     done = facts.seguimiento.intentos if facts.seguimiento is not None else 0
     if done >= config.seguimiento_max:
         return "intentos"
-    if contact.last_inbound_at is None or now + WINDOW_MARGIN >= contact.last_inbound_at + WINDOW:
+    closed = (
+        contact.last_inbound_at is None or now + WINDOW_MARGIN >= contact.last_inbound_at + WINDOW
+    )
+    if closed and (template is None or not template.allowed):
         return "ventana"
     start, end = SENDING_HOURS
     if not start <= local_time(now, zone) < end:
         return "horario"
-    return FollowUpPlan(attempt=done + 1, last=done + 1 >= config.seguimiento_max)
+    return FollowUpPlan(attempt=done + 1, last=done + 1 >= config.seguimiento_max, template=closed)
 
 
 def due_candidates(session: Session, *, limit: int = _BATCH) -> list[tuple[uuid.UUID, uuid.UUID]]:
@@ -164,6 +193,11 @@ def due_candidates(session: Session, *, limit: int = _BATCH) -> list[tuple[uuid.
 class FollowUpResult:
     outcome: str
     message: Message | None = None
+    # A template to send (C-110): the worker sends it with `TemplateSender`.
+    template: MessageTemplate | None = None
+    filled: Filled | None = None
+    contact: Contact | None = None
+    conversation: Conversation | None = None
 
 
 class FollowUps:
@@ -215,9 +249,18 @@ class FollowUps:
             ),
             zone=profile.timezone if profile is not None else None,
             taken=conversation.takeover_user_id is not None,
+            template=self._template_room(config, contact, conversation_id, moment),
         )
         if not isinstance(plan, FollowUpPlan):
             return FollowUpResult(plan)
+        template = self._template(config) if plan.template else None
+        filled = (
+            fill(session, tenant_id, template, contact)
+            if template is not None and contact is not None
+            else None
+        )
+        if plan.template and (filled is None or filled.skip):
+            return FollowUpResult("plantilla_sin_datos")
 
         promotion = self._promotion(moment) if plan.last else None
         patch: dict[str, object] = {
@@ -242,6 +285,15 @@ class FollowUps:
         except StateConflict:
             return FollowUpResult("ocupado")
 
+        if template is not None and filled is not None:
+            # No model: the business's own approved words (C-110).
+            return FollowUpResult(
+                "plantilla",
+                template=template,
+                filled=filled,
+                contact=contact,
+                conversation=conversation,
+            )
         text = await self._write(conversation, process, facts, stage, plan, promotion, moment)
         if text is None:
             return FollowUpResult("sin_texto")
@@ -255,6 +307,49 @@ class FollowUps:
         )
         record_ai_message(session, tenant_id, channel="whatsapp")
         return FollowUpResult("enviado", message)
+
+    def _template(self, config: AgentConfig | None) -> MessageTemplate | None:
+        if config is None or config.seguimiento_plantilla_id is None:
+            return None
+        template = self._session.get(MessageTemplate, config.seguimiento_plantilla_id)
+        if (
+            template is None
+            or template.tenant_id != self._tenant_id
+            or template.status != "approved"
+            or template.category != "utility"
+        ):
+            return None
+        return template
+
+    def _template_room(
+        self,
+        config: AgentConfig | None,
+        contact: Contact | None,
+        conversation_id: uuid.UUID,
+        now: datetime,
+    ) -> TemplateRoom:
+        if contact is None or self._template(config) is None:
+            return TemplateRoom(available=False)
+        follow_up = Message.payload["motivo"].astext == "seguimiento"
+        base = (
+            select(func.count())
+            .select_from(Message)
+            .where(
+                Message.tenant_id == self._tenant_id,
+                Message.msg_type == "template",
+                follow_up,
+            )
+        )
+        in_conversation = self._session.execute(
+            base.where(Message.conversation_id == conversation_id)
+        ).scalar_one()
+        in_month = self._session.execute(
+            base.join(Conversation, Conversation.id == Message.conversation_id).where(
+                Conversation.contact_id == contact.id,
+                Message.created_at >= now - TEMPLATE_MONTH,
+            )
+        ).scalar_one()
+        return TemplateRoom(True, int(in_conversation), int(in_month))
 
     def _promotion(self, now: datetime) -> Promotion | None:
         statement = (

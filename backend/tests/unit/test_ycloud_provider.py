@@ -368,11 +368,16 @@ class TestReadingAQualityChange:
 
 
 class TestEventsThisVersionIgnores:
-    def test_a_template_update_is_not_an_error(self) -> None:
-        """Templates arrive with Feature 011. Until then this is a complete,
-        valid event with no behaviour attached - which must not be retried,
-        and must not become a dead letter."""
-        assert YCloudProvider().parse_event(load("ycloud/template_status.json")) is None
+    def test_a_template_update_is_read_since_feature_011(self) -> None:
+        parsed = YCloudProvider().parse_event(load("ycloud/template_status.json"))
+        assert parsed is not None and getattr(parsed, "status", None) == "approved"
+
+    def test_an_event_with_no_behaviour_is_not_an_error(self) -> None:
+        """Complete and valid, with nothing attached: not retried, not a dead letter."""
+        assert (
+            YCloudProvider().parse_event({"id": "evt_x", "type": "whatsapp.payment.updated"})
+            is None
+        )
 
     def test_the_event_id_is_read_for_idempotency(self) -> None:
         payload = load("ycloud/inbound_text.json")

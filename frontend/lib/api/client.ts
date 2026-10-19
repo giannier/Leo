@@ -258,10 +258,13 @@ export type Product = ProductPage["items"][number];
 type ProductCreate = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
 /** Fields the server fills in when omitted (TASK-406); the generated type lists
  * them as required because the schema is read from the response side. */
-type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado";
+type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado" | "tags";
 export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
   Partial<Pick<ProductCreate, ProductServerDefaults>>;
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
+export type ProductPatch = JsonBody<Ops["/api/v1/tenant/products/{product_id}"]["put"]["requestBody"]>;
+export type PhotoList = Ok<Ops["/api/v1/tenant/products/{product_id}/photos"]["get"]>;
+export type Photo = PhotoList["items"][number];
 
 export type KnowledgeList = Ok<Ops["/api/v1/tenant/knowledge"]["get"]>;
 // Dashboard (Feature 010). The report is a free-form dict on the server; typed here.
@@ -296,6 +299,15 @@ export interface MetricsReport {
   anterior: MetricsSummary;
   por_dia: MetricsDay[];
   mas_vendidos?: { producto: string; cantidad: number }[];
+  // What Meta will bill this month (Feature 011, C-111); owners and admins only.
+  whatsapp_mes?: {
+    desde: string;
+    mensajes_servicio: number;
+    gratis_restantes: number;
+    plantillas_utilidad: number;
+    plantillas_marketing: number;
+    costo_estimado_usd: string | null;
+  };
 }
 export interface PlatformMetrics {
   desde: string;
@@ -420,6 +432,127 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+export interface ChannelHealth {
+  secreto_configurado: boolean;
+  numeros_conectados: number;
+  ultimo_webhook: string | null;
+  recibidos_24h: number;
+  con_error_24h: number;
+}
+// Analytics (Feature 013).
+export interface FunnelStep {
+  conversaciones: number;
+  con_intencion: number;
+  por_pagar: number;
+  ganados: number;
+  tasa_intencion: number | null;
+  tasa_por_pagar: number | null;
+  tasa_cierre: number | null;
+  conversion: number | null;
+}
+export interface FunnelReport {
+  desde: string;
+  hasta: string;
+  actual: FunnelStep;
+  anterior: FunnelStep;
+  por_origen: Record<string, { conversaciones: number; ganados: number }>;
+  por_dia_semana: Record<string, { conversaciones: number; ganados: number }>;
+  por_hora: Record<string, { conversaciones: number; ganados: number }>;
+}
+export interface ProductsReport {
+  vendidos: { producto: string; unidades: number; monto?: Record<string, string> }[];
+  pedidos: number;
+  consultados_sin_venta: { producto: string; consultas: number }[];
+  agotados_pedidos: { producto: string; consultas: number }[];
+  ticket_promedio?: Record<string, string>;
+}
+export interface CsatReport {
+  enviadas: number;
+  respondidas: number;
+  con_nota: number;
+  promedio: number | null;
+  distribucion: Record<string, number>;
+  comentarios: { fecha: string | null; nota: number | null; comentario: string | null }[];
+  asistente: { respuestas: number; promedio: number | null };
+  por_persona?: { nombre: string; respuestas: number; promedio: number | null }[];
+}
+export interface AnalyticsSettings {
+  csat_activo: boolean;
+  reporte_mensual: boolean;
+}
+export interface NpsSummary {
+  nps: number | null;
+  respuestas: number;
+  descartadas: number;
+  segmentos: Record<string, Record<string, { nps: number | null; respuestas: number }>>;
+  comentarios: { negocio: string; nota: number; comentario: string; fecha: string }[];
+}
+// Campaigns (Feature 011).
+export type MessageTemplate = Ok<Ops["/api/v1/tenant/templates"]["post"]>;
+export type LibraryTemplate = Ok<Ops["/api/v1/tenant/templates/library"]["get"]>[number];
+export type ContactPage = Ok<Ops["/api/v1/tenant/contacts"]["get"]>;
+export type ContactRow = ContactPage["items"][number];
+export type TagCount = Ok<Ops["/api/v1/tenant/contacts/tags"]["get"]>[number];
+export type ImportInfo = Ok<Ops["/api/v1/tenant/contacts/import"]["get"]>;
+export type ImportResult = Ok<Ops["/api/v1/tenant/contacts/import"]["post"]>;
+export type CampaignSettings = Ok<Ops["/api/v1/tenant/campaigns/settings"]["get"]>;
+export type Campaign = Ok<Ops["/api/v1/tenant/campaigns"]["post"]>;
+export type CampaignEstimate = Ok<Ops["/api/v1/tenant/campaigns/estimate"]["post"]>;
+export type CampaignBody = JsonBody<Ops["/api/v1/tenant/campaigns"]["post"]["requestBody"]>;
+export type Segment = NonNullable<CampaignBody["segment"]>;
+export type TemplateBody = JsonBody<Ops["/api/v1/tenant/templates"]["post"]["requestBody"]>;
+export type MetaRate = Ok<Ops["/api/v1/platform-admin/meta-rates"]["get"]>[number];
+export interface CampaignReport {
+  destinatarios: number;
+  pendientes: number;
+  enviados: number;
+  entregados: number;
+  leidos: number;
+  respondieron: number;
+  fallidos: number;
+  omitidos: number;
+  motivos_omision: Record<string, number>;
+  bajas: number;
+  ventas_atribuidas: number;
+  // A/B (Feature 013).
+  variantes?: Record<
+    "A" | "B",
+    {
+      destinatarios: number;
+      enviados: number;
+      respondieron: number;
+      ventas: number;
+      tasa_respuesta: number | null;
+      tasa_venta: number | null;
+      muestra_pequena: boolean;
+    }
+  >;
+  monto_vendido?: Record<string, string>;
+  costo_estimado_usd?: string | null;
+}
+// CRM (Feature 012).
+export type Pipeline = Ok<Ops["/api/v1/tenant/pipeline"]["get"]>;
+export type PipelineStage = Pipeline["stages"][number];
+export type LostReason = Pipeline["lost_reasons"][number];
+export type LeadBoard = Ok<Ops["/api/v1/tenant/leads/board"]["get"]>;
+export type LeadCard = LeadBoard["columns"][number]["items"][number];
+export type LeadPage = Ok<Ops["/api/v1/tenant/leads"]["get"]>;
+export type LeadDetail = Ok<Ops["/api/v1/tenant/leads/{lead_id}"]["get"]>;
+export interface CrmMetrics {
+  activos_por_etapa: Record<string, number>;
+  nuevos: number;
+  ganados: number;
+  perdidos: number;
+  perdidos_por_motivo: Record<string, number>;
+  llegaron_a: Record<string, number>;
+  conversion: number | null;
+  dias_promedio_para_ganar: number | null;
+  valor_pipeline?: Record<string, string>;
+  vendido?: Record<string, string>;
+}
+export type Valoracion = JsonBody<
+  Ops["/api/v1/tenant/sandbox/conversations/{conversation_id}/messages/{message_id}/feedback"]["put"]["requestBody"]
+>;
 export type InfoSection = "locales" | "entregas" | "tipos_cliente" | "devoluciones" | "contacto";
 export type SectionData = Ok<Ops["/api/v1/assistant/business-info/{section}"]["get"]>;
 export type Faq = Ok<Ops["/api/v1/assistant/faqs"]["get"]>["items"][number];
@@ -508,11 +641,31 @@ export const api = {
   },
 
   products: {
-    list: (query?: { limit?: number; offset?: number; search?: string }) =>
-      request<ProductPage>("/tenant/products", { query }),
+    list: (query?: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+      category?: string;
+      is_active?: boolean;
+      tag?: string;
+    }) => request<ProductPage>("/tenant/products", { query }),
     create: (body: ProductBody) =>
       request<Product>("/tenant/products", { method: "POST", body }),
+    update: (id: string, body: ProductPatch) =>
+      request<Product>(`/tenant/products/${id}`, { method: "PUT", body }),
+    duplicate: (id: string) =>
+      request<Product>(`/tenant/products/${id}/duplicate`, { method: "POST" }),
     remove: (id: string) => request<void>(`/tenant/products/${id}`, { method: "DELETE" }),
+    photos: (id: string) => request<PhotoList>(`/tenant/products/${id}/photos`),
+    addPhoto: (id: string, file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return request<PhotoList>(`/tenant/products/${id}/photos`, { method: "POST", body: form });
+    },
+    orderPhotos: (id: string, ids: string[]) =>
+      request<PhotoList>(`/tenant/products/${id}/photos/order`, { method: "PUT", body: { ids } }),
+    removePhoto: (id: string, photoId: string) =>
+      request<void>(`/tenant/products/${id}/photos/${photoId}`, { method: "DELETE" }),
 
     /** Upload a CSV or XLSX and get back what *would* be created. */
     preview: (file: File) => {
@@ -592,6 +745,10 @@ export const api = {
   },
 
   admin: {
+    channelHealth: () => request<ChannelHealth>("/platform-admin/channel-health"),
+    metaRates: () => request<MetaRate[]>("/platform-admin/meta-rates"),
+    saveMetaRate: (body: { country: string; category: "marketing" | "utility" | "service"; valid_from: string; rate_usd: string }) =>
+      request<MetaRate[]>("/platform-admin/meta-rates", { method: "PUT", body }),
     billing: {
       subscriptions: () => request<AdminSubscription[]>("/platform-admin/billing/subscriptions"),
       recordPayment: (body: {
@@ -653,6 +810,98 @@ export const api = {
     },
   },
 
+  analytics: {
+    funnel: (query: { desde?: string; hasta?: string }) =>
+      request<FunnelReport>("/tenant/analytics/funnel", { query }),
+    products: (query: { desde?: string; hasta?: string }) =>
+      request<ProductsReport>("/tenant/analytics/products", { query }),
+    csat: (query: { desde?: string; hasta?: string }) =>
+      request<CsatReport>("/tenant/analytics/csat", { query }),
+    settings: () => request<AnalyticsSettings>("/tenant/analytics/settings"),
+    saveSettings: (body: AnalyticsSettings) =>
+      request<AnalyticsSettings>("/tenant/analytics/settings", { method: "PUT", body }),
+    nps: () => request<{ preguntar: boolean; ciclo: string | null }>("/tenant/nps"),
+    answerNps: (body: { score: number | null; comment?: string | null }) =>
+      request<void>("/tenant/nps", { method: "POST", body }),
+    platformNps: () => request<NpsSummary>("/platform-admin/nps"),
+    monthlyPreview: async (month: string) => (await requestBlob(`/tenant/reports/monthly/${month}`)).text(),
+  },
+
+  templates: {
+    list: () => request<MessageTemplate[]>("/tenant/templates"),
+    library: () => request<LibraryTemplate[]>("/tenant/templates/library"),
+    clone: (key: string) =>
+      request<MessageTemplate>(`/tenant/templates/library/${key}/clone`, { method: "POST" }),
+    create: (body: TemplateBody) =>
+      request<MessageTemplate>("/tenant/templates", { method: "POST", body }),
+    update: (id: string, body: TemplateBody) =>
+      request<MessageTemplate>(`/tenant/templates/${id}`, { method: "PUT", body }),
+    duplicate: (id: string) =>
+      request<MessageTemplate>(`/tenant/templates/${id}/duplicate`, { method: "POST" }),
+    remove: (id: string) => request<void>(`/tenant/templates/${id}`, { method: "DELETE" }),
+    submit: (id: string) =>
+      request<MessageTemplate>(`/tenant/templates/${id}/submit`, { method: "POST" }),
+  },
+
+  contacts: {
+    list: (query: { q?: string; tag?: string; permiso?: string; page?: number }) =>
+      request<ContactPage>("/tenant/contacts", { query }),
+    tags: () => request<TagCount[]>("/tenant/contacts/tags"),
+    setTags: (id: string, tags: string[]) =>
+      request<string[]>(`/tenant/contacts/${id}/tags`, { method: "PUT", body: { tags } }),
+    importInfo: () => request<ImportInfo>("/tenant/contacts/import"),
+    importCsv: (file: File, accepted: boolean, tags: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("acepto", accepted ? "true" : "false");
+      form.append("etiquetas", tags);
+      return request<ImportResult>("/tenant/contacts/import", { method: "POST", body: form });
+    },
+  },
+
+  campaigns: {
+    list: () => request<Campaign[]>("/tenant/campaigns"),
+    get: (id: string) => request<Campaign>(`/tenant/campaigns/${id}`),
+    estimate: (templateId: string, segment: Segment) =>
+      request<CampaignEstimate>("/tenant/campaigns/estimate", {
+        method: "POST",
+        body: { template_id: templateId, segment },
+      }),
+    create: (body: CampaignBody) => request<Campaign>("/tenant/campaigns", { method: "POST", body }),
+    update: (id: string, body: CampaignBody) =>
+      request<Campaign>(`/tenant/campaigns/${id}`, { method: "PUT", body }),
+    remove: (id: string) => request<void>(`/tenant/campaigns/${id}`, { method: "DELETE" }),
+    act: (id: string, action: "schedule" | "pause" | "resume" | "cancel") =>
+      request<Campaign>(`/tenant/campaigns/${id}/${action}`, { method: "POST" }),
+    settings: () => request<CampaignSettings>("/tenant/campaigns/settings"),
+    saveSettings: (body: { optin_preguntar: boolean; seguimiento_plantilla_id: string | null }) =>
+      request<CampaignSettings>("/tenant/campaigns/settings", { method: "PUT", body }),
+  },
+
+  crm: {
+    pipeline: () => request<Pipeline>("/tenant/pipeline"),
+    saveStages: (body: { key?: string | null; label: string; is_active?: boolean }[]) =>
+      request<Pipeline>("/tenant/pipeline/stages", { method: "PUT", body }),
+    saveReasons: (body: { key?: string | null; label: string; is_active?: boolean }[]) =>
+      request<Pipeline>("/tenant/pipeline/lost-reasons", { method: "PUT", body }),
+    board: (query?: { asignado?: string; search?: string }) =>
+      request<LeadBoard>("/tenant/leads/board", { query }),
+    today: (dias = 3) => request<LeadPage>("/tenant/leads/today", { query: { dias } }),
+    detail: (id: string) => request<LeadDetail>(`/tenant/leads/${id}`),
+    move: (id: string, stageId: string, lostReason?: string) =>
+      request<LeadDetail>(`/tenant/leads/${id}/move`, {
+        method: "POST",
+        body: { stage_id: stageId, lost_reason: lostReason ?? null },
+      }),
+    assign: (id: string, userId: string | null) =>
+      request<LeadDetail>(`/tenant/leads/${id}/assign`, { method: "POST", body: { user_id: userId } }),
+    discard: (id: string) => request<void>(`/tenant/leads/${id}/discard`, { method: "POST" }),
+    note: (id: string, content: string) =>
+      request<unknown>(`/tenant/leads/${id}/notes`, { method: "POST", body: { content } }),
+    metrics: () => request<CrmMetrics>("/tenant/leads/metrics"),
+    exportCsv: () => requestBlob("/tenant/leads/export.csv"),
+  },
+
   team: {
     get: () => request<Team>("/tenant/team"),
     invite: (body: InviteBody) =>
@@ -697,6 +946,16 @@ export const api = {
       }),
     reset: (conversationId: string) =>
       request<void>(`/tenant/sandbox/conversations/${conversationId}/reset`, { method: "POST" }),
+    /** ¿Respondió bien? (Feature 018): thumbs up or down on a reply, with the reason. */
+    rate: (conversationId: string, messageId: string, body: Valoracion) =>
+      request<Valoracion>(
+        `/tenant/sandbox/conversations/${conversationId}/messages/${messageId}/feedback`,
+        { method: "PUT", body },
+      ),
+    unrate: (conversationId: string, messageId: string) =>
+      request<void>(`/tenant/sandbox/conversations/${conversationId}/messages/${messageId}/feedback`, {
+        method: "DELETE",
+      }),
   },
 
   payments: {

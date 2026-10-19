@@ -5,8 +5,8 @@
 # context=../frontend, dockerfile=Dockerfile), so all COPY paths below are
 # relative to this directory.
 #
-# NOTE: this "dev" stage installs dependencies fresh via `npm ci` at build
-# time. A pinned, multi-stage production image is introduced in TASK-026.
+# The "dev" stage is the default for docker-compose.dev.yml (target: dev); the
+# "prod" stage below is the production image (TASK-026).
 
 FROM node:24-slim AS dev
 
@@ -35,3 +35,31 @@ EXPOSE 3000
 # can read the change, and the page keeps serving the old version until
 # somebody restarts it.
 CMD ["npm", "run", "dev:docker", "--", "-H", "0.0.0.0", "-p", "3000"]
+
+
+# ----------------------------------------------------------------------- prod
+# Production image (TASK-026). `NEXT_PUBLIC_API_URL` is read at build time:
+# Next.js inlines it into the browser bundle, so it is a build argument, not
+# a runtime variable. With Caddy serving `/api` on the same domain, it is the
+# site's own address and the browser never makes a cross-origin call.
+
+FROM node:24-slim AS prod-build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build && npm prune --omit=dev
+
+FROM node:24-slim AS prod
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+WORKDIR /app
+COPY --from=prod-build --chown=node:node /app/package.json /app/package-lock.json ./
+COPY --from=prod-build --chown=node:node /app/node_modules ./node_modules
+COPY --from=prod-build --chown=node:node /app/.next ./.next
+USER node
+EXPOSE 3000
+CMD ["npx", "next", "start", "-H", "0.0.0.0", "-p", "3000"]

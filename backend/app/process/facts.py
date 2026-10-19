@@ -52,6 +52,7 @@ STORED_KEYS = frozenset(
         "saludo_enviado",
         "entrada_anuncio",
         "camino",
+        "paquete_pedido",
         "vio_productos",
         "recursos_enviados",
         "opciones_mostradas",
@@ -153,6 +154,9 @@ class Facts(_Model):
     saludo_enviado: bool = False
     entrada_anuncio: EntradaAnuncio | None = None
     camino: str | None = None
+    # The package the customer named before there was an order to put it in
+    # ("quiero el paquete de 5"), read from their words (`bundle_request`).
+    paquete_pedido: str | None = None
     # Set when a product search returned results or a product list was sent.
     vio_productos: bool = False
     recursos_enviados: list[str] = Field(default_factory=list)
@@ -213,6 +217,7 @@ class Facts(_Model):
                 "saludo_enviado",
                 "entrada_anuncio",
                 "camino",
+                "paquete_pedido",
                 "vio_productos",
                 "recursos_enviados",
                 "opciones_mostradas",

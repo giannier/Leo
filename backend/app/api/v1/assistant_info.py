@@ -469,6 +469,11 @@ class BehaviorRequest(BaseModel):
     politica_descuentos: Literal["no_ofrece", "solo_promociones", "negociable"] | None = None
     descuento_maximo_pct: Decimal | None = Field(default=None, ge=0, le=100, decimal_places=2)
     max_situaciones: int | None = Field(default=None, ge=1, le=10)
+    # Editable here too, not only in the setup wizard (Feature 018, HU-05).
+    objective: Literal["vender", "atender", "ambos"] | None = None
+    escalation_rules: (
+        list[Literal["cliente_molesto", "pide_humano", "fuera_de_catalogo"]] | None
+    ) = Field(default=None, max_length=3)
 
 
 class BehaviorResponse(BaseModel):
@@ -488,6 +493,8 @@ class BehaviorResponse(BaseModel):
     politica_descuentos: str
     descuento_maximo_pct: Decimal | None
     max_situaciones: int
+    objective: str
+    escalation_rules: list[str]
 
 
 def _allowed_levels(session: SessionDep, tenant_id: uuid.UUID) -> list[str]:
@@ -524,6 +531,8 @@ def _behavior(session: SessionDep, tenant_id: uuid.UUID) -> BehaviorResponse:
         politica_descuentos=agent.politica_descuentos,
         descuento_maximo_pct=agent.descuento_maximo_pct,
         max_situaciones=agent.max_situaciones,
+        objective=agent.objective,
+        escalation_rules=list(agent.escalation_rules or []),
     )
 
 
@@ -584,6 +593,8 @@ def put_behavior(
         values["descuento_maximo_pct"] = None
     if "saludo" in values and not values["saludo"]:
         values["saludo"] = None
+    if "escalation_rules" in values:
+        values["escalation_rules"] = list(dict.fromkeys(values["escalation_rules"]))
     repository.upsert(**values)
     session.commit()
     _changed(principal.tenant_id)

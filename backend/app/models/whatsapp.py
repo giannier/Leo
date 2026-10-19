@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, LargeBinary, Text, func, text
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, LargeBinary, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +46,9 @@ class WhatsAppNumber(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="connected")
     # Populated by Feature 002 from provider webhooks.
     quality_rating: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Templates per 24 hours this number may send (Feature 011, C-106). NULL is
+    # Meta's lowest tier, `DEFAULT_DAILY_LIMIT`.
+    limite_diario: Mapped[int | None] = mapped_column(Integer, nullable=True)
     connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

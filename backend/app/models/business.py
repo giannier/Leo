@@ -25,7 +25,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -182,6 +182,15 @@ class AgentConfig(Base):
     descuento_maximo_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     # Most situations a turn may carry (017, C-10).
     max_situaciones: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    # Feature 011: ask once, after a confirmed sale, whether the customer wants promotions
+    # (C-102); and the approved utility template for a follow-up after the 24-hour
+    # window closed (C-110).
+    optin_preguntar: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    seguimiento_plantilla_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("message_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # Edited system messages (plantillas.md section 7), by key.
     system_messages: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default="{}"
@@ -237,6 +246,8 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "products"
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_products_products_price_non_negative"),
+        CheckConstraint("cardinality(tags) <= 10", name="products_tags_count"),
+        Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
         # out of the index keeps it small and the catalog query fast.
         Index(
@@ -280,6 +291,11 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The assistant pushes a highlighted product first.
     destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Labels the business writes ("oferta", "SIAF"): the agent also finds the
+    # product by them, and the catalogue filters by them (Feature 018).
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
 
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

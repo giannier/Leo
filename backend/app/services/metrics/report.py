@@ -180,6 +180,10 @@ def tenant_report(
     }
     if money:
         report["mas_vendidos"] = top_products(session, tenant_id, days[0].day, days[-1].day)
+        # What Meta will bill this month (Feature 011, C-111); an estimate, not the invoice.
+        from app.services.campaigns.spend import whatsapp_spend
+
+        report["whatsapp_mes"] = whatsapp_spend(session, tenant_id, now=now)
     return report
 
 

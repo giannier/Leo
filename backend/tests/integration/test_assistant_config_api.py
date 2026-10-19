@@ -231,6 +231,32 @@ class TestBehavior:
 
         assert DEFAULT_CACHE.get(tenant_id) is None
 
+    async def test_objective_and_handover_rules_are_editable_here(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        """Feature 018, HU-05: no need to go back to the setup wizard."""
+        _, headers = await _account(api, mail)
+        before = (await api.get(f"{A}/behavior", headers=headers)).json()
+        assert before["objective"] == "ambos"
+        assert set(before["escalation_rules"]) == {
+            "cliente_molesto",
+            "pide_humano",
+            "fuera_de_catalogo",
+        }
+
+        saved = await api.put(
+            f"{A}/behavior",
+            headers=headers,
+            json={"objective": "vender", "escalation_rules": ["pide_humano", "pide_humano"]},
+        )
+        assert saved.status_code == 200
+        assert saved.json()["objective"] == "vender"
+        assert saved.json()["escalation_rules"] == ["pide_humano"]
+        unknown = await api.put(
+            f"{A}/behavior", headers=headers, json={"escalation_rules": ["inventado"]}
+        )
+        assert unknown.status_code == 400
+
 
 class TestPaymentHolder:
     async def test_the_holder_is_what_a_receipt_is_compared_with(

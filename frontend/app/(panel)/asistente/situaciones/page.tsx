@@ -53,11 +53,14 @@ const EMPTY: SituationBody = {
 
 function SituationForm({
   initial,
+  seed,
   media,
   onSaved,
   onCancel,
 }: {
   initial: Situation | null;
+  /** A new situation started from the simulator's "¿Respondió bien?" (Feature 018). */
+  seed?: Partial<SituationBody> | null;
   media: MediaAsset[];
   onSaved: () => void;
   onCancel: () => void;
@@ -74,7 +77,7 @@ function SituationForm({
           etapas: initial.etapas,
           siempre: initial.siempre,
         }
-      : EMPTY,
+      : { ...EMPTY, ...(seed ?? {}) },
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -225,6 +228,7 @@ export default function SituationsPage() {
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<Situation | "new" | null>(null);
   const [suggested, setSuggested] = useState<string | null>(null);
+  const [seed, setSeed] = useState<Partial<SituationBody> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -245,8 +249,18 @@ export default function SituationsPage() {
 
   useEffect(() => {
     void load();
-    const id = new URLSearchParams(window.location.search).get("sugerida");
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("sugerida");
     if (id) setSuggested(id);
+    // From the simulator: "Crear una situación para este caso" (Feature 018, HU-06).
+    if (params.get("nueva")) {
+      const cuando = params.get("cuando")?.trim();
+      setSeed({
+        cuando_aplica: cuando ? `Cuando el cliente diga algo como: "${cuando}"` : "",
+        ejemplo_respuesta: params.get("ejemplo")?.trim() || null,
+      });
+      setEditing("new");
+    }
   }, [load]);
 
   const shown = (items ?? []).filter((s) => !filter || s.estado === filter || s.origen === filter);
@@ -275,10 +289,15 @@ export default function SituationsPage() {
         <Card title={editing === "new" ? "Nueva situación" : "Editar situación"}>
           <SituationForm
             initial={editing === "new" ? null : editing}
+            seed={editing === "new" ? seed : null}
             media={media}
-            onCancel={() => setEditing(null)}
+            onCancel={() => {
+              setEditing(null);
+              setSeed(null);
+            }}
             onSaved={() => {
               setEditing(null);
+              setSeed(null);
               void load();
             }}
           />

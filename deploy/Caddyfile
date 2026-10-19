@@ -1,0 +1,35 @@
+# Leo in production (TASK-026). Caddy obtains and renews the certificates.
+{
+	email {$ACME_EMAIL}
+}
+
+{$LEO_DOMAIN} {
+	encode zstd gzip
+
+	# The API (with its websocket, /api/v1/ws) and the WhatsApp provider's webhooks.
+	@backend path /api/* /webhooks/*
+	handle @backend {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# Short-lived links to photos, documents and receipts (presigned by the API).
+files.{$LEO_DOMAIN} {
+	reverse_proxy minio:9000 {
+		header_up Host {upstream_hostport}
+	}
+}
+
+# Only answers when the monitoring profile is up.
+status.{$LEO_DOMAIN} {
+	reverse_proxy uptime-kuma:3001
+}

@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { ChannelHealthCard } from "@/components/admin/channel-health";
 import { AlertIcon, CheckIcon, ClockIcon, PhoneIcon } from "@/components/icons";
 import { Alert, Button, Card, Field, Skeleton, TextArea, cx } from "@/components/ui";
 import { api, type AdminRequest } from "@/lib/api/client";
@@ -71,6 +72,8 @@ export default function AdminQueuePage() {
           Cada una es un negocio esperando. Las más viejas van primero.
         </p>
       </header>
+
+      <ChannelHealthCard />
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((option) => (

@@ -4,13 +4,16 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agent,
+    analytics,
     assistant,
     assistant_info,
     assistant_media,
     auth,
     billing,
+    campaigns,
     connection,
     conversations,
+    crm,
     health,
     inbox,
     knowledge,
@@ -31,13 +34,16 @@ router = APIRouter()
 router.include_router(health.router)
 router.include_router(inbox.router)
 router.include_router(agent.router)
+router.include_router(analytics.router)
 router.include_router(assistant.router)
 router.include_router(assistant_info.router)
 router.include_router(assistant_media.router)
 router.include_router(auth.router)
 router.include_router(billing.router)
+router.include_router(campaigns.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
+router.include_router(crm.router)
 router.include_router(knowledge.router)
 router.include_router(metrics.router)
 router.include_router(orders.router)

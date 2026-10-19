@@ -23,6 +23,33 @@ test.describe("Asistente por capas", () => {
     await readyToTest(page);
   });
 
+  test("el menú reúne todo el asistente y el objetivo y la derivación se editan aquí", async ({
+    page,
+  }) => {
+    // Feature 018, HU-04 and HU-05.
+    await page.goto("/asistente/comportamiento");
+    const menu = page.getByRole("navigation", { name: "Secciones del asistente" });
+    await menu.getByRole("link", { name: /Productos/ }).click();
+    await expect(page).toHaveURL(/\/catalog/);
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await expect(menu.getByRole("link", { name: /Productos/ })).toHaveAttribute("aria-current", "page");
+    await menu.getByRole("link", { name: /Conocimiento/ }).click();
+    await expect(page).toHaveURL(/\/knowledge/);
+    await menu.getByRole("link", { name: /Comportamiento/ }).click();
+
+    await page.getByLabel("Objetivo del asistente").selectOption("vender");
+    await page.getByLabel("Pregunta por algo que no vendes").uncheck();
+    await page.getByRole("button", { name: "Guardar" }).click();
+    await expect(page.getByText("Guardado", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await page.reload();
+    await expect(page.getByLabel("Objetivo del asistente")).toHaveValue("vender");
+    await expect(page.getByLabel("Pregunta por algo que no vendes")).not.toBeChecked();
+    await expect(page.getByLabel("Pide hablar con una persona")).toBeChecked();
+    if (process.env.E2E_SHOTS) {
+      await page.screenshot({ path: `${process.env.E2E_SHOTS}/asistente-${test.info().project.name}.png` });
+    }
+  });
+
   test("una zona de entrega guardada llega al prompt del asistente", async ({ page }) => {
     await page.goto("/asistente/informacion");
     await page.getByRole("button", { name: "Entregas" }).click();

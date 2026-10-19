@@ -240,7 +240,7 @@ function AddProduct({ onAdded }: { onAdded: () => Promise<void> }) {
 
 /* --------------------------------------------------------------- import */
 
-function ImportProducts({ onImported }: { onImported: () => Promise<void> }) {
+export function ImportProducts({ onImported }: { onImported: () => Promise<void> }) {
   const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -296,8 +296,8 @@ function ImportProducts({ onImported }: { onImported: () => Promise<void> }) {
           Sube el archivo y te mostramos qué se va a crear antes de crear nada. Acepta .csv y
           .xlsx con columnas <span className="font-mono">nombre</span>,{" "}
           <span className="font-mono">precio</span> y, si quieres,{" "}
-          <span className="font-mono">descripcion</span>, <span className="font-mono">stock</span>{" "}
-          y <span className="font-mono">categoria</span>.
+          <span className="font-mono">descripcion</span>, <span className="font-mono">stock</span>,{" "}
+          <span className="font-mono">categoria</span> y <span className="font-mono">etiquetas</span>.
         </p>
       </div>
 

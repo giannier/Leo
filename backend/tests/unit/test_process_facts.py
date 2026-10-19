@@ -196,6 +196,7 @@ class TestTheModel:
             "saludo_enviado",
             "entrada_anuncio",
             "camino",
+            "paquete_pedido",
             "vio_productos",
             "recursos_enviados",
             "opciones_mostradas",

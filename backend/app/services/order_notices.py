@@ -36,6 +36,7 @@ from app.providers.whatsapp.base import WhatsAppProvider
 from app.repositories.business import AgentConfigRepository
 from app.repositories.channel import ContactRepository, session_window_is_open
 from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.services.campaigns.optins import OptinService
 from app.services.channel import NoConnectedNumber, ReplySender, SessionWindowClosed
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ class PreparedNotice:
     outcome: CustomerNotice
     # The `queued` row to send; None when there is nothing to send now.
     message: Message | None = None
+    # After a confirmed payment, the promotions question (Feature 011, C-102).
+    extra: Message | None = None
 
 
 class CustomerNotifier:
@@ -146,7 +149,14 @@ class CustomerNotifier:
             content=text,
             delivery_status="queued",
         )
-        return PreparedNotice(order, "enviado", message)
+        extra = (
+            OptinService(self._session, self._tenant_id).prepare_question(
+                conversation, contact, now=datetime.now(UTC)
+            )
+            if kind == "pago_confirmado"
+            else None
+        )
+        return PreparedNotice(order, "enviado", message, extra)
 
     async def deliver(self, prepared: PreparedNotice) -> CustomerNotice:
         """Hand a prepared notice to the provider, after the decision committed.
@@ -177,8 +187,18 @@ class CustomerNotifier:
             return "no_enviado"
         self._session.commit()
         if sent.delivery_status == "failed":
+            if prepared.extra is not None:
+                # Not a question on its own, after a notice that did not arrive.
+                self._messages.set_delivery_status(prepared.extra, status="failed")
             self._tell_business(order, "envio_fallido")
             return "no_enviado"
+        if prepared.extra is not None:
+            # The question is a courtesy: a failure here is logged, not the decision's.
+            try:
+                await sender.send(prepared.extra)
+                self._session.commit()
+            except Exception:  # noqa: BLE001 - the decision already went out; this is extra
+                logger.warning("the promotions question was not sent", exc_info=True)
         return "enviado"
 
     async def notify(

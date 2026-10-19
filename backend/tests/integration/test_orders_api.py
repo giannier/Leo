@@ -554,9 +554,10 @@ class TestTheNoticeIsPartOfTheDecision:
         stranded = stranded_replies(
             db, now=datetime.now(UTC) + timedelta(minutes=10), older_than_seconds=60
         )
-        assert [m.conversation_id for m in stranded if m.author == "system"] == [
-            order.conversation_id
-        ]
+        # The notice, and the promotions question that follows a confirmed payment (011).
+        left = [m for m in stranded if m.author == "system"]
+        assert {m.conversation_id for m in left} == {order.conversation_id}
+        assert [m.msg_type for m in left] == ["text", "interactive"]
 
 
 class TestConfirm:
@@ -605,8 +606,11 @@ class TestConfirm:
                 "Te enviamos tu acceso hoy",
             )
         ]
-        [message] = outbound(db, order.conversation_id)
+        # The notice, then the promotions question (Feature 011, C-102); the fake has no
+        # buttons, so the question stays `queued` for the sweep and the decision is untouched.
+        message, question = outbound(db, order.conversation_id)
         assert message.author == "system" and message.delivery_status == "sent"
+        assert question.msg_type == "interactive" and question.payload["motivo"] == "optin"
 
     async def test_a_double_confirmation_is_a_409_and_tells_the_customer_once(
         self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
@@ -700,8 +704,10 @@ class TestConfirm:
         assert response.json() == {"estado": "confirmado", "aviso_cliente": "no_enviado"}
         db.refresh(order)
         assert order.estado == "confirmado"
-        [message] = outbound(db, order.conversation_id)
+        message, question = outbound(db, order.conversation_id)
         assert message.delivery_status == "failed"
+        # No question after a notice that did not arrive.
+        assert question.delivery_status == "failed"
         [notice] = TenantNotificationRepository(db, uuid.UUID(account["tenant_id"])).recent(
             CUSTOMER_UNREACHED
         )
