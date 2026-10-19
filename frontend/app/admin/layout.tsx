@@ -38,6 +38,7 @@ const NAV = [
   { href: "/admin/tenants", label: "Negocios", icon: UsersIcon },
   { href: "/admin/cobros", label: "Cobros", icon: ReceiptIcon },
   { href: "/admin/metricas", label: "Métricas", icon: ChartIcon },
+  { href: "/admin/tarifas", label: "Tarifas Meta", icon: ReceiptIcon },
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
   { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },

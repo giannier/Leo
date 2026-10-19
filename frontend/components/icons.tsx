@@ -64,6 +64,13 @@ export const KanbanIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const MegaphoneIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1Z" />
+    <path d="M15 9a3 3 0 0 1 0 6M18 6a7 7 0 0 1 0 12" />
+  </Svg>
+);
+
 export const InfoIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="9" />

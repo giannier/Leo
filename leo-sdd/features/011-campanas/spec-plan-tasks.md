@@ -1,6 +1,6 @@
 # Spec + Plan + Tasks — Campañas, Plantillas y Follow-ups
 
-**Feature ID:** 011 · **Módulo:** 11-campaigns · **Estado:** Draft para ratificación
+**Feature ID:** 011 · **Módulo:** 11-campaigns · **Estado:** Ratificada y construida (ver `clarifications.md`, C-101..C-110)
 **Depende de:** 002 (canal, contactos, opt-out), 007 (bandeja), 009 (límites por plan)
 
 ## Resumen
@@ -195,14 +195,14 @@ Unit: segmentación declarativa, ventana de envío con TZ, topes de follow-up, o
 
 ## Tasks
 Commits: `feat(campaigns): ... [TASK-11XX]`
-- [ ] **TASK-1101: Migraciones + tarifas Meta + límites en plans.**
-- [ ] **TASK-1102: Provider de plantillas** (submit/send_template/sync estados) + contract tests. Depends: 1101.
-- [ ] **TASK-1103: TemplateService + biblioteca por rubro + UI de plantillas.** Depends: 1102.
-- [ ] **TASK-1104: Opt-in/etiquetas** (tool registrar_optin del agente, import con declaración y límite semanal, UI). Depends: 1101.
-- [ ] **TASK-1105: CampaignService + BatchSender** (snapshot, lotes por tier, re-chequeo opt-out, idempotencia, pausa/reanudar, prioridad de colas). Depends: 1102, 1104.
-- [ ] **TASK-1106: QualityGuard + estimación de costos + reportes de campaña.** Depends: 1105.
-- [ ] **TASK-1107: FollowUpEngine** (señal de interés en agent-core, topes, ventana, exclusiones) + evals. Depends: 1102; toca `agent/` → evals obligatorios.
-- [ ] **TASK-1108: UI de campañas** (builder de segmento, programación, reporte) + atribución de ventas. Depends: 1105–1107.
+- [x] **TASK-1101: Migraciones + tarifas Meta + límites en plans.**
+- [x] **TASK-1102: Provider de plantillas** (submit/send_template/sync estados) + contract tests. Depends: 1101.
+- [x] **TASK-1103: TemplateService + biblioteca por rubro + UI de plantillas.** Depends: 1102.
+- [x] **TASK-1104: Opt-in/etiquetas** (~~tool registrar_optin del agente~~ → botón tras venta confirmada, C-102; import con declaración y límite semanal, UI). Depends: 1101.
+- [x] **TASK-1105: CampaignService + BatchSender** (snapshot, lotes por tier, re-chequeo opt-out, idempotencia, pausa/reanudar, prioridad de colas). Depends: 1102, 1104.
+- [x] **TASK-1106: QualityGuard + estimación de costos + reportes de campaña.** Depends: 1105.
+- [x] **TASK-1107: FollowUpEngine** (~~señal de interés en agent-core~~ → etapas del proceso, C-104/C-110, sin tocar `agent/` ni evals; topes, ventana, exclusiones) + evals. Depends: 1102; toca `agent/` → evals obligatorios.
+- [x] **TASK-1108: UI de campañas** (builder de segmento, programación, reporte) + atribución de ventas. Depends: 1105–1107.
 - [ ] **TASK-1109: Prueba de carga + endurecimiento.** Milestone humano: primera campaña real con un tenant piloto de ≤100 contactos, supervisada por Giannier de punta a punta.
 
 Dependencias: 1101 → 1102 → 1103/1105; 1101 → 1104 → 1105 → 1106 → 1108; 1102 → 1107 → 1108 → 1109.
