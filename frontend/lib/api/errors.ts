@@ -159,6 +159,7 @@ const SERVER_WORDED = new Set([
   "no_pausada",
   "no_cancelable",
   "no_borrable",
+  "ab_misma_plantilla",
 ]);
 
 /**

@@ -275,6 +275,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/analytics/funnel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Funnel */
+        get: operations["analytics_funnel_api_v1_tenant_analytics_funnel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Products */
+        get: operations["analytics_products_api_v1_tenant_analytics_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/csat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Csat */
+        get: operations["analytics_csat_api_v1_tenant_analytics_csat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analytics Settings */
+        get: operations["get_analytics_settings_api_v1_tenant_analytics_settings_get"];
+        /** Put Analytics Settings */
+        put: operations["put_analytics_settings_api_v1_tenant_analytics_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/reports/monthly/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly Preview */
+        get: operations["monthly_preview_api_v1_tenant_reports_monthly__month__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/nps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nps State */
+        get: operations["nps_state_api_v1_tenant_nps_get"];
+        put?: never;
+        /**
+         * Nps Answer
+         * @description An answer (score) or closing the card (no score); both settle this cycle.
+         */
+        post: operations["nps_answer_api_v1_tenant_nps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/nps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform Nps */
+        get: operations["platform_nps_api_v1_platform_admin_nps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assistant/situations": {
         parameters: {
             query?: never;
@@ -3042,6 +3166,13 @@ export interface components {
              */
             overwrote_newer: boolean;
         };
+        /** AnalyticsSettings */
+        AnalyticsSettings: {
+            /** Csat Activo */
+            csat_activo: boolean;
+            /** Reporte Mensual */
+            reporte_mensual: boolean;
+        };
         /** AssignIn */
         AssignIn: {
             /** User Id */
@@ -3269,6 +3400,8 @@ export interface components {
              * Format: uuid
              */
             template_id: string;
+            /** Template B Id */
+            template_b_id?: string | null;
             segment?: components["schemas"]["SegmentIn"];
             /**
              * Window From
@@ -3299,6 +3432,10 @@ export interface components {
             template_id: string;
             /** Template Label */
             template_label: string | null;
+            /** Template B Id */
+            template_b_id?: string | null;
+            /** Template B Label */
+            template_b_label?: string | null;
             /** Segment */
             segment: {
                 [key: string]: unknown;
@@ -4641,6 +4778,20 @@ export interface components {
         NoteList: {
             /** Items */
             items: components["schemas"]["app__api__v1__inbox__NoteOut"][];
+        };
+        /** NpsIn */
+        NpsIn: {
+            /** Score */
+            score?: number | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** NpsState */
+        NpsState: {
+            /** Preguntar */
+            preguntar: boolean;
+            /** Ciclo */
+            ciclo?: string | null;
         };
         /** ObjectionIn */
         ObjectionIn: {
@@ -7237,6 +7388,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_funnel_api_v1_tenant_analytics_funnel_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_products_api_v1_tenant_analytics_products_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_csat_api_v1_tenant_analytics_csat_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analytics_settings_api_v1_tenant_analytics_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSettings"];
+                };
+            };
+        };
+    };
+    put_analytics_settings_api_v1_tenant_analytics_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyticsSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSettings"];
+                };
+            };
+        };
+    };
+    monthly_preview_api_v1_tenant_reports_monthly__month__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description `bad_month` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    nps_state_api_v1_tenant_nps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NpsState"];
+                };
+            };
+        };
+    };
+    nps_answer_api_v1_tenant_nps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NpsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    platform_nps_api_v1_platform_admin_nps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

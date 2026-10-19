@@ -71,6 +71,7 @@ function Builder({
   const start = (initial?.segment ?? {}) as Segment;
   const [name, setName] = useState(initial?.name ?? "");
   const [templateId, setTemplateId] = useState(initial?.template_id ?? approved[0]?.id ?? "");
+  const [templateB, setTemplateB] = useState(initial?.template_b_id ?? "");
   const [tags, setTags] = useState<string[]>(start.etiquetas ?? []);
   const [stages, setStages] = useState<string[]>(start.etapas ?? []);
   const [bought, setBought] = useState(start.compro === true ? "si" : start.compro === false ? "no" : "");
@@ -125,6 +126,7 @@ function Builder({
     const body = {
       name,
       template_id: templateId,
+      template_b_id: templateB || null,
       segment,
       window_from: from,
       window_to: to,
@@ -172,6 +174,18 @@ function Builder({
             onChange={(e) => setTemplateId(e.target.value)}
             options={approved.map((t) => ({ value: t.id, label: t.label }))}
           />
+          {approved.length > 1 ? (
+            <Select
+              label="Probar con una segunda plantilla (A/B, opcional)"
+              value={templateB}
+              onChange={(e) => setTemplateB(e.target.value)}
+              options={[
+                { value: "", label: "No, una sola plantilla" },
+                ...approved.filter((t) => t.id !== templateId).map((t) => ({ value: t.id, label: t.label })),
+              ]}
+              hint="La mitad de las personas recibe cada una y el resultado te dice cuál funcionó mejor."
+            />
+          ) : null}
 
           <fieldset className="space-y-3 rounded-lg border border-line p-4">
             <legend className="px-1 text-sm font-semibold text-ink">¿A quién?</legend>
@@ -316,6 +330,37 @@ function Report({ report }: { report: CampaignReport }) {
         ))}
       </dl>
       {sold ? <p className="text-sm text-ink">Vendido: <strong>{sold}</strong></p> : null}
+      {report.variantes ? (
+        <table className="w-full text-left text-sm" data-testid="ab-result">
+          <thead className="text-xs text-ink-faint">
+            <tr>
+              <th className="py-1">Plantilla</th>
+              <th>Enviados</th>
+              <th>Respondieron</th>
+              <th>Ventas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(["A", "B"] as const).map((variant) => {
+              const side = report.variantes?.[variant];
+              if (!side) return null;
+              return (
+                <tr key={variant}>
+                  <td className="py-1 font-semibold">{variant}</td>
+                  <td>{side.enviados}</td>
+                  <td>
+                    {side.respondieron} {side.tasa_respuesta !== null ? `(${Math.round(side.tasa_respuesta * 100)} %)` : ""}
+                  </td>
+                  <td>{side.ventas}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : null}
+      {report.variantes && (report.variantes.A?.muestra_pequena || report.variantes.B?.muestra_pequena) ? (
+        <p className="text-xs text-warning">Pocas personas por lado (menos de 30): tómalo como una pista, no como prueba.</p>
+      ) : null}
       {Object.keys(report.motivos_omision).length ? (
         <div className="text-xs text-ink-soft">
           <p className="font-medium text-ink">No se enviaron</p>
@@ -414,6 +459,7 @@ export function CampaignsPanel({ canEdit }: { canEdit: boolean }) {
                   <h3 className="truncate font-semibold text-ink">{campaign.name}</h3>
                   <p className="text-xs text-ink-faint">
                     {campaign.template_label}
+                    {campaign.template_b_label ? ` vs ${campaign.template_b_label}` : ""}
                     {campaign.scheduled_at ? ` · ${new Date(campaign.scheduled_at).toLocaleString("es-PE")}` : ""}
                     {campaign.estimated_cost_usd ? ` · aprox. US$ ${Number(campaign.estimated_cost_usd).toFixed(2)}` : ""}
                   </p>

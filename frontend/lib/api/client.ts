@@ -432,6 +432,54 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+// Analytics (Feature 013).
+export interface FunnelStep {
+  conversaciones: number;
+  con_intencion: number;
+  por_pagar: number;
+  ganados: number;
+  tasa_intencion: number | null;
+  tasa_por_pagar: number | null;
+  tasa_cierre: number | null;
+  conversion: number | null;
+}
+export interface FunnelReport {
+  desde: string;
+  hasta: string;
+  actual: FunnelStep;
+  anterior: FunnelStep;
+  por_origen: Record<string, { conversaciones: number; ganados: number }>;
+  por_dia_semana: Record<string, { conversaciones: number; ganados: number }>;
+  por_hora: Record<string, { conversaciones: number; ganados: number }>;
+}
+export interface ProductsReport {
+  vendidos: { producto: string; unidades: number; monto?: Record<string, string> }[];
+  pedidos: number;
+  consultados_sin_venta: { producto: string; consultas: number }[];
+  agotados_pedidos: { producto: string; consultas: number }[];
+  ticket_promedio?: Record<string, string>;
+}
+export interface CsatReport {
+  enviadas: number;
+  respondidas: number;
+  con_nota: number;
+  promedio: number | null;
+  distribucion: Record<string, number>;
+  comentarios: { fecha: string | null; nota: number | null; comentario: string | null }[];
+  asistente: { respuestas: number; promedio: number | null };
+  por_persona?: { nombre: string; respuestas: number; promedio: number | null }[];
+}
+export interface AnalyticsSettings {
+  csat_activo: boolean;
+  reporte_mensual: boolean;
+}
+export interface NpsSummary {
+  nps: number | null;
+  respuestas: number;
+  descartadas: number;
+  segmentos: Record<string, Record<string, { nps: number | null; respuestas: number }>>;
+  comentarios: { negocio: string; nota: number; comentario: string; fecha: string }[];
+}
 // Campaigns (Feature 011).
 export type MessageTemplate = Ok<Ops["/api/v1/tenant/templates"]["post"]>;
 export type LibraryTemplate = Ok<Ops["/api/v1/tenant/templates/library"]["get"]>[number];
@@ -459,6 +507,19 @@ export interface CampaignReport {
   motivos_omision: Record<string, number>;
   bajas: number;
   ventas_atribuidas: number;
+  // A/B (Feature 013).
+  variantes?: Record<
+    "A" | "B",
+    {
+      destinatarios: number;
+      enviados: number;
+      respondieron: number;
+      ventas: number;
+      tasa_respuesta: number | null;
+      tasa_venta: number | null;
+      muestra_pequena: boolean;
+    }
+  >;
   monto_vendido?: Record<string, string>;
   costo_estimado_usd?: string | null;
 }
@@ -739,6 +800,23 @@ export const api = {
         throw caught;
       }
     },
+  },
+
+  analytics: {
+    funnel: (query: { desde?: string; hasta?: string }) =>
+      request<FunnelReport>("/tenant/analytics/funnel", { query }),
+    products: (query: { desde?: string; hasta?: string }) =>
+      request<ProductsReport>("/tenant/analytics/products", { query }),
+    csat: (query: { desde?: string; hasta?: string }) =>
+      request<CsatReport>("/tenant/analytics/csat", { query }),
+    settings: () => request<AnalyticsSettings>("/tenant/analytics/settings"),
+    saveSettings: (body: AnalyticsSettings) =>
+      request<AnalyticsSettings>("/tenant/analytics/settings", { method: "PUT", body }),
+    nps: () => request<{ preguntar: boolean; ciclo: string | null }>("/tenant/nps"),
+    answerNps: (body: { score: number | null; comment?: string | null }) =>
+      request<void>("/tenant/nps", { method: "POST", body }),
+    platformNps: () => request<NpsSummary>("/platform-admin/nps"),
+    monthlyPreview: async (month: string) => (await requestBlob(`/tenant/reports/monthly/${month}`)).text(),
   },
 
   templates: {
