@@ -432,6 +432,13 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+export interface ChannelHealth {
+  secreto_configurado: boolean;
+  numeros_conectados: number;
+  ultimo_webhook: string | null;
+  recibidos_24h: number;
+  con_error_24h: number;
+}
 // Analytics (Feature 013).
 export interface FunnelStep {
   conversaciones: number;
@@ -738,6 +745,7 @@ export const api = {
   },
 
   admin: {
+    channelHealth: () => request<ChannelHealth>("/platform-admin/channel-health"),
     metaRates: () => request<MetaRate[]>("/platform-admin/meta-rates"),
     saveMetaRate: (body: { country: string; category: "marketing" | "utility" | "service"; valid_from: string; rate_usd: string }) =>
       request<MetaRate[]>("/platform-admin/meta-rates", { method: "PUT", body }),
