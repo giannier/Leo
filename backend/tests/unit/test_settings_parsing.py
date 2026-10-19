@@ -95,6 +95,10 @@ class TestProxyHeadersMustBeDecided:
     def _deployed(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("ENVIRONMENT", "production")
         monkeypatch.setenv("SECRET_KEY", "x" * 64)
+        # A deployed Settings refuses the committed development key.
+        monkeypatch.setenv(
+            "CREDENTIALS_ENCRYPTION_KEY", "bGVvLXRlc3QtZmVybmV0LWtleS1ub3QtYS1zZWNyZXQ="
+        )
 
     def test_it_refuses_to_start_when_nobody_decided(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._deployed(monkeypatch)

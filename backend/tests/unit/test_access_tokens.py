@@ -22,6 +22,10 @@ from app.core.tokens import (
     issue_access_token,
 )
 
+# A valid Fernet key that is not the committed development default: a deployed
+# Settings refuses to build with the default, and these cases are not about it.
+REAL_CREDENTIALS_KEY = "bGVvLXRlc3QtZmVybmV0LWtleS1ub3QtYS1zZWNyZXQ="
+
 
 @pytest.fixture
 def settings() -> Settings:
@@ -219,6 +223,7 @@ class TestDeploymentSafety:
             Settings(
                 environment="staging",
                 secret_key="s3cr3t-but-far-too-short",
+                credentials_encryption_key=REAL_CREDENTIALS_KEY,
                 trust_proxy_headers=False,
             )
 
@@ -245,6 +250,7 @@ class TestDeploymentSafety:
         settings = Settings(
             environment="production",
             secret_key="a-real-generated-secret-of-ample-length",
+            credentials_encryption_key=REAL_CREDENTIALS_KEY,
             trust_proxy_headers=False,
         )
         assert settings.is_deployed is True
@@ -264,6 +270,7 @@ class TestDeploymentSafety:
         settings = Settings(
             environment=environment,  # type: ignore[arg-type]
             secret_key="a-real-generated-secret-of-ample-length",
+            credentials_encryption_key=REAL_CREDENTIALS_KEY,
             # Stated because a deployed Settings refuses to build without it.
             # This case is about the cookie flag, not about proxies.
             trust_proxy_headers=False,

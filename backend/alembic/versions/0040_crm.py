@@ -75,9 +75,7 @@ def upgrade() -> None:
         sa.Column("product_interest", sa.Text(), nullable=True),
         sa.Column("origen", sa.Text(), nullable=True),
         sa.Column("lost_reason", sa.Text(), nullable=True),
-        sa.Column(
-            "order_id", UUID, sa.ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
-        ),
+        sa.Column("order_id", UUID, sa.ForeignKey("orders.id", ondelete="SET NULL"), nullable=True),
         sa.Column("previous_lead_id", UUID, sa.ForeignKey("leads.id"), nullable=True),
         sa.Column("status", sa.Text(), nullable=False, server_default="active"),
         sa.Column("moved_by_person", sa.Boolean(), nullable=False, server_default="false"),

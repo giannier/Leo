@@ -46,6 +46,7 @@ class TestFactory:
                     resend_api_key=None,
                     environment=environment,  # type: ignore[arg-type]
                     secret_key="a-real-secret-key-of-sufficient-length",
+                    credentials_encryption_key="bGVvLXRlc3QtZmVybmV0LWtleS1ub3QtYS1zZWNyZXQ=",
                     trust_proxy_headers=False,
                 )
             )
