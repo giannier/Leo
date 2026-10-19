@@ -236,3 +236,43 @@ class TestSettingsAndCampaigns:
         assert (
             await api.get("/api/v1/platform-admin/meta-rates", headers=owner)
         ).status_code == 404  # 404-shaped, like every platform-admin route
+
+
+class TestPlatform:
+    async def test_the_operator_keeps_rates_and_daily_limits(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        from tests.integration.test_platform_admin import _admin
+
+        headers, _ = await _admin(api, mail, db)
+        rates = (await api.get("/api/v1/platform-admin/meta-rates", headers=headers)).json()
+        assert {
+            "country": "PE",
+            "category": "utility",
+            "valid_from": "2025-07-01",
+            "rate_usd": "0.02000",
+        } in rates
+        updated = await api.put(
+            "/api/v1/platform-admin/meta-rates",
+            headers=headers,
+            json={
+                "country": "PE",
+                "category": "marketing",
+                "valid_from": "2026-11-01",
+                "rate_usd": "0.08000",
+            },
+        )
+        assert updated.status_code == 200
+        assert any(r["valid_from"] == "2026-11-01" for r in updated.json())
+
+        tenant_id, _, _ = await _setup(api, mail, db)
+        _number(db, tenant_id)
+        number = db.query(WhatsAppNumber).filter(WhatsAppNumber.tenant_id == tenant_id).one()
+        response = await api.put(
+            f"/api/v1/platform-admin/numbers/{number.id}/daily-limit",
+            headers=headers,
+            json={"limite_diario": 1000},
+        )
+        assert response.status_code == 204
+        db.refresh(number)
+        assert number.limite_diario == 1000

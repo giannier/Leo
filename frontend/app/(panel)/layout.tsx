@@ -27,6 +27,7 @@ import {
   HomeIcon,
   InboxIcon,
   KanbanIcon,
+  MegaphoneIcon,
   LogOutIcon,
   PhoneIcon,
   ReceiptIcon,
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
   // Every role (Feature 012): working leads is the operator's job too; no money for them.
   { href: "/crm", label: "CRM", icon: KanbanIcon },
+  { href: "/campanas", label: "Campañas", icon: MegaphoneIcon },
   // Every role (Feature 010); an operator sees it without money.
   { href: "/resultados", label: "Resultados", icon: ChartIcon },
   { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },

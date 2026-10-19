@@ -423,6 +423,36 @@ export type OperatorState = JsonBody<
 >["estado"];
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
+// Campaigns (Feature 011).
+export type MessageTemplate = Ok<Ops["/api/v1/tenant/templates"]["post"]>;
+export type LibraryTemplate = Ok<Ops["/api/v1/tenant/templates/library"]["get"]>[number];
+export type ContactPage = Ok<Ops["/api/v1/tenant/contacts"]["get"]>;
+export type ContactRow = ContactPage["items"][number];
+export type TagCount = Ok<Ops["/api/v1/tenant/contacts/tags"]["get"]>[number];
+export type ImportInfo = Ok<Ops["/api/v1/tenant/contacts/import"]["get"]>;
+export type ImportResult = Ok<Ops["/api/v1/tenant/contacts/import"]["post"]>;
+export type CampaignSettings = Ok<Ops["/api/v1/tenant/campaigns/settings"]["get"]>;
+export type Campaign = Ok<Ops["/api/v1/tenant/campaigns"]["post"]>;
+export type CampaignEstimate = Ok<Ops["/api/v1/tenant/campaigns/estimate"]["post"]>;
+export type CampaignBody = JsonBody<Ops["/api/v1/tenant/campaigns"]["post"]["requestBody"]>;
+export type Segment = NonNullable<CampaignBody["segment"]>;
+export type TemplateBody = JsonBody<Ops["/api/v1/tenant/templates"]["post"]["requestBody"]>;
+export type MetaRate = Ok<Ops["/api/v1/platform-admin/meta-rates"]["get"]>[number];
+export interface CampaignReport {
+  destinatarios: number;
+  pendientes: number;
+  enviados: number;
+  entregados: number;
+  leidos: number;
+  respondieron: number;
+  fallidos: number;
+  omitidos: number;
+  motivos_omision: Record<string, number>;
+  bajas: number;
+  ventas_atribuidas: number;
+  monto_vendido?: Record<string, string>;
+  costo_estimado_usd?: string | null;
+}
 // CRM (Feature 012).
 export type Pipeline = Ok<Ops["/api/v1/tenant/pipeline"]["get"]>;
 export type PipelineStage = Pipeline["stages"][number];
@@ -638,6 +668,9 @@ export const api = {
   },
 
   admin: {
+    metaRates: () => request<MetaRate[]>("/platform-admin/meta-rates"),
+    saveMetaRate: (body: { country: string; category: "marketing" | "utility"; valid_from: string; rate_usd: string }) =>
+      request<MetaRate[]>("/platform-admin/meta-rates", { method: "PUT", body }),
     billing: {
       subscriptions: () => request<AdminSubscription[]>("/platform-admin/billing/subscriptions"),
       recordPayment: (body: {
@@ -697,6 +730,57 @@ export const api = {
         throw caught;
       }
     },
+  },
+
+  templates: {
+    list: () => request<MessageTemplate[]>("/tenant/templates"),
+    library: () => request<LibraryTemplate[]>("/tenant/templates/library"),
+    clone: (key: string) =>
+      request<MessageTemplate>(`/tenant/templates/library/${key}/clone`, { method: "POST" }),
+    create: (body: TemplateBody) =>
+      request<MessageTemplate>("/tenant/templates", { method: "POST", body }),
+    update: (id: string, body: TemplateBody) =>
+      request<MessageTemplate>(`/tenant/templates/${id}`, { method: "PUT", body }),
+    duplicate: (id: string) =>
+      request<MessageTemplate>(`/tenant/templates/${id}/duplicate`, { method: "POST" }),
+    remove: (id: string) => request<void>(`/tenant/templates/${id}`, { method: "DELETE" }),
+    submit: (id: string) =>
+      request<MessageTemplate>(`/tenant/templates/${id}/submit`, { method: "POST" }),
+  },
+
+  contacts: {
+    list: (query: { q?: string; tag?: string; permiso?: string; page?: number }) =>
+      request<ContactPage>("/tenant/contacts", { query }),
+    tags: () => request<TagCount[]>("/tenant/contacts/tags"),
+    setTags: (id: string, tags: string[]) =>
+      request<string[]>(`/tenant/contacts/${id}/tags`, { method: "PUT", body: { tags } }),
+    importInfo: () => request<ImportInfo>("/tenant/contacts/import"),
+    importCsv: (file: File, accepted: boolean, tags: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("acepto", accepted ? "true" : "false");
+      form.append("etiquetas", tags);
+      return request<ImportResult>("/tenant/contacts/import", { method: "POST", body: form });
+    },
+  },
+
+  campaigns: {
+    list: () => request<Campaign[]>("/tenant/campaigns"),
+    get: (id: string) => request<Campaign>(`/tenant/campaigns/${id}`),
+    estimate: (templateId: string, segment: Segment) =>
+      request<CampaignEstimate>("/tenant/campaigns/estimate", {
+        method: "POST",
+        body: { template_id: templateId, segment },
+      }),
+    create: (body: CampaignBody) => request<Campaign>("/tenant/campaigns", { method: "POST", body }),
+    update: (id: string, body: CampaignBody) =>
+      request<Campaign>(`/tenant/campaigns/${id}`, { method: "PUT", body }),
+    remove: (id: string) => request<void>(`/tenant/campaigns/${id}`, { method: "DELETE" }),
+    act: (id: string, action: "schedule" | "pause" | "resume" | "cancel") =>
+      request<Campaign>(`/tenant/campaigns/${id}/${action}`, { method: "POST" }),
+    settings: () => request<CampaignSettings>("/tenant/campaigns/settings"),
+    saveSettings: (body: { optin_preguntar: boolean; seguimiento_plantilla_id: string | null }) =>
+      request<CampaignSettings>("/tenant/campaigns/settings", { method: "PUT", body }),
   },
 
   crm: {
