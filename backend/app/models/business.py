@@ -182,6 +182,15 @@ class AgentConfig(Base):
     descuento_maximo_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     # Most situations a turn may carry (017, C-10).
     max_situaciones: Mapped[int] = mapped_column(Integer, nullable=False, server_default="5")
+    # Feature 011: ask once, after a confirmed sale, whether the customer wants promotions
+    # (C-102); and the approved utility template for a follow-up after the 24-hour
+    # window closed (C-110).
+    optin_preguntar: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    seguimiento_plantilla_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True),
+        ForeignKey("message_templates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # Edited system messages (plantillas.md section 7), by key.
     system_messages: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default="{}"

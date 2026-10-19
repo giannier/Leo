@@ -42,10 +42,12 @@ from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageProvider
 from app.providers.whatsapp.base import (
+    Button,
     InboundMessage,
     NumberCredentials,
     QualityUpdate,
     Recipient,
+    SendResult,
     StatusUpdate,
     WhatsAppError,
     WhatsAppProvider,
@@ -59,6 +61,14 @@ from app.repositories.channel import (
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
 from app.services.activation import owner_of
+from app.services.campaigns.hooks import (
+    answer_to_question,
+    keeps_template_thread,
+    pause_for_quality,
+    revoke_on_opt_out,
+    track_delivery,
+    track_reply,
+)
 from app.services.connection import read_credentials
 from app.services.emails import build_quality_alert_email, build_quota_warning_email
 from app.services.inbound_media import InboundImageReader
@@ -151,6 +161,9 @@ class InboundResult:
     # redelivery. The caller uses it to avoid answering the same question
     # twice.
     is_new: bool
+    # A fixed answer written instead of a turn (the tap on the promotions
+    # question, Feature 011): sent by the caller, and the assistant is not called.
+    system_reply_id: uuid.UUID | None = None
 
 
 class ChannelEventProcessor:
@@ -163,6 +176,7 @@ class ChannelEventProcessor:
 
     def __init__(self, session: Session) -> None:
         self._session = session
+        self.session = session
         # Messages to send *after* the transaction commits. Mailing a customer
         # about a state that then rolls back is worse than not mailing them:
         # they act on it, and there is nothing to act on.
@@ -242,12 +256,25 @@ class ChannelEventProcessor:
                 is_new=False,
             )
 
+        reply = answer_to_question(
+            self._session,
+            tenant_id,
+            contact=contact,
+            conversation=conversation,
+            tap=message.interactive,
+            message_id=stored.id,
+            at=message.sent_at,
+        )
+        track_reply(
+            self._session, tenant_id, contact=contact, conversation=conversation, at=message.sent_at
+        )
         return InboundResult(
             tenant_id=tenant_id,
             contact_id=contact.id,
             conversation_id=conversation.id,
             message_id=stored.id,
             is_new=True,
+            system_reply_id=reply.id if reply is not None else None,
         )
 
     def _apply_opt_out(
@@ -269,6 +296,7 @@ class ChannelEventProcessor:
             if contact.opted_out_at is None:
                 logger.info("contact opted out", extra={"tenant_id": str(tenant_id)})
             contacts.set_opted_out(contact, at=message.sent_at)
+            revoke_on_opt_out(self._session, tenant_id, contact, message.sent_at)
             return
 
         if contact.opted_out_at is not None:
@@ -301,7 +329,7 @@ class ChannelEventProcessor:
             gone_quiet = previous_inbound_at is None or (at - previous_inbound_at) >= timedelta(
                 hours=SESSION_WINDOW_HOURS
             )
-            if not gone_quiet:
+            if not gone_quiet or keeps_template_thread(self._session, thread, previous_inbound_at):
                 return thread
             # Close it, so the inbox does not show a thread nobody is in any
             # more and the agent does not read it as context.
@@ -335,6 +363,7 @@ class ChannelEventProcessor:
         MessageStatusEventRepository(self._session, tenant_id).append(
             message.id, status=update.status, provider_ts=update.occurred_at
         )
+        track_delivery(self._session, tenant_id, message, update.status)
         if update.status == "failed":
             logger.warning(
                 "a reply did not reach the customer",
@@ -360,6 +389,8 @@ class ChannelEventProcessor:
         previous = number.quality_rating
         numbers = WhatsAppNumberRepository(self._session, number.tenant_id)
         numbers.update(number.id, quality_rating=update.quality_rating)
+        # Campaigns stop at YELLOW already, on every report (Feature 011, C-002).
+        pause_for_quality(self._session, number.tenant_id, update.quality_rating)
 
         # On the *transition*, not on the level. Quality drops, recovers and
         # drops again; alerting on the level would mail the customer every
@@ -726,12 +757,7 @@ class ReplySender:
         last_error: WhatsAppError | None = None
         for attempt in range(1, self._max_attempts + 1):
             try:
-                result = await self._provider.send_text(
-                    credentials,
-                    sender=number.phone_e164,
-                    to=recipient,
-                    body=message.content,
-                )
+                result = await self._deliver(credentials, number.phone_e164, recipient, message)
             except WhatsAppError as exc:
                 last_error = exc
                 if not exc.retryable:
@@ -764,6 +790,30 @@ class ReplySender:
             },
         )
         return message
+
+    async def _deliver(
+        self,
+        credentials: NumberCredentials,
+        sender: str,
+        recipient: Recipient,
+        message: Message,
+    ) -> SendResult:
+        """Text, or the reply buttons a system message carries (Feature 011's question)."""
+        payload = message.payload or {}
+        if message.msg_type == "interactive" and payload.get("tipo") == "botones":
+            return await self._provider.send_buttons(
+                credentials,
+                sender=sender,
+                to=recipient,
+                body=message.content,
+                buttons=[
+                    Button(id=str(b["id"]), title=str(b["title"]))
+                    for b in payload.get("botones", [])
+                ],
+            )
+        return await self._provider.send_text(
+            credentials, sender=sender, to=recipient, body=message.content
+        )
 
     def _sender(self) -> tuple[WhatsAppNumber, NumberCredentials]:
         numbers = WhatsAppNumberRepository(self._session, self._tenant_id).list_connected()

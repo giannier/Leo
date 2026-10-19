@@ -39,6 +39,11 @@ class Plan(Base, TimestampMixin):
     max_ai_messages: Mapped[int] = mapped_column(Integer, nullable=False)
     max_rag_chars: Mapped[int] = mapped_column(BigInteger, nullable=False)
     max_knowledge_files: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Campaigns (Feature 011, C-108): how many a month and how many people each.
+    max_campaigns_month: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    max_recipients_per_campaign: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
 
     # Model tiers a tenant on this plan may pick (Feature 004).
     allowed_intelligence: Mapped[list[str]] = mapped_column(

@@ -15,6 +15,7 @@ from typing import Any
 
 from app.agent.model_policy import chat_provider_for
 from app.core.locks import acquire_lock
+from app.services.campaigns.sender import TemplateSender
 from app.services.channel import NoConnectedNumber, ReplySender, lock_key
 from app.services.followups import FollowUps, discard_stale_drafts, due_candidates
 
@@ -44,6 +45,22 @@ async def run_followups(ctx: dict[str, Any]) -> dict[str, int]:
                 llm, _level = chat_provider_for(session, tenant_id, settings)
                 result = await FollowUps(session, tenant_id, llm=llm).run(conversation_id)
                 session.commit()
+                if result.template is not None and result.filled is not None:
+                    # Outside the window: the business's approved template (Feature 011).
+                    assert result.contact is not None and result.conversation is not None
+                    await TemplateSender(
+                        session,
+                        tenant_id,
+                        provider=ctx["whatsapp"],
+                        storage=ctx.get("storage"),
+                    ).send(
+                        result.contact,
+                        result.template,
+                        result.filled,
+                        kind="seguimiento",
+                        conversation=result.conversation,
+                    )
+                    session.commit()
                 if result.message is not None:
                     sender = ReplySender(
                         session,
@@ -67,7 +84,7 @@ async def run_followups(ctx: dict[str, Any]) -> dict[str, int]:
                 outcomes["error"] = outcomes.get("error", 0) + 1
             finally:
                 await lock.release()
-    if outcomes.get("enviado"):
+    if outcomes.get("enviado") or outcomes.get("plantilla"):
         logger.info("follow-ups", extra={"outcomes": outcomes})
     return outcomes
 

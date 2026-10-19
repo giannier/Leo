@@ -30,6 +30,7 @@ from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
 from app.workers.billing import CALENDAR_JOB, billing_calendar
+from app.workers.campaigns import SEND_JOB, send_campaigns
 from app.workers.catalog_evals import run_catalog_evals
 from app.workers.catalog_indexer import index_catalog_knowledge
 from app.workers.channel import (
@@ -202,6 +203,8 @@ class WorkerSettings:
         ),
         # C-13: every 15 minutes, off the quarter hours.
         cron(run_followups, name=f"cron:{FOLLOW_UP_JOB}", minute={4, 19, 34, 49}),
+        # Feature 011: one batch per due campaign, every minute.
+        cron(send_campaigns, name=f"cron:{SEND_JOB}", minute=set(range(60))),
         # 08:10 UTC is 03:10 in Lima (`contracts/api.md` section 9).
         cron(discard_stale_orders, name=f"cron:{DISCARD_JOB}", hour=8, minute=10),
         cron(
