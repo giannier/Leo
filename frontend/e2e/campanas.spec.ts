@@ -163,16 +163,16 @@ test.describe("Campañas", () => {
       await dialog.getByRole("button", { name: "Confirmar" }).click();
       await expect(page.getByText("«VIP de octubre» está programada.")).toBeVisible();
       const card = page.getByTestId("campaign-list").getByRole("listitem").filter({ hasText: "VIP de octubre" });
-      await expect(card.getByText("Programada")).toBeVisible();
+      await expect(card.getByText("Programada", { exact: true })).toBeVisible();
       await card.getByRole("button", { name: "Pausar" }).click();
-      await expect(card.getByText("En pausa")).toBeVisible();
+      await expect(card.getByText("En pausa", { exact: true })).toBeVisible();
       await expect(card.getByText("La pausaste tú")).toBeVisible();
       if (shots) await page.screenshot({ path: `${shots}/campanas-lista-${project}.png`, fullPage: true });
       await card.getByRole("button", { name: "Reanudar" }).click();
-      await expect(card.getByText("Programada")).toBeVisible();
+      await expect(card.getByText("Programada", { exact: true })).toBeVisible();
       page.once("dialog", (prompt) => void prompt.accept());
       await card.getByRole("button", { name: "Cancelar" }).click();
-      await expect(card.getByText("Cancelada")).toBeVisible();
+      await expect(card.getByText("Cancelada", { exact: true })).toBeVisible();
     }
 
     // Settings: stop asking for permission after a sale.

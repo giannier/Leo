@@ -1,6 +1,6 @@
 # Spec + Plan + Tasks — Analytics Avanzado + CSAT
 
-**Feature ID:** 013 · **Módulo:** 13-analytics · **Estado:** Draft para ratificación
+**Feature ID:** 013 · **Módulo:** 13-analytics · **Estado:** Ratificada y construida (ver `clarifications.md`, C-101..C-108)
 **Depende de:** 010 (metrics_daily, rollup), 011 (plantillas para encuestas), 012 (leads)
 
 ## Resumen
@@ -132,11 +132,11 @@ Unit: parser de scores (fixtures reales: números, palabras, emojis, ruido), ele
 
 ## Tasks
 Commits: `feat(analytics): ... [TASK-13XX]`
-- [ ] **TASK-1301: Migraciones + extensión de metrics_rollup (embudo/csat/productos) + reconciliación.**
-- [ ] **TASK-1302: CsatFlow + parser + listener + settings + topes.** Depends: 1301, F011 plantillas.
-- [ ] **TASK-1303: NPS widget + panel admin de NPS.** Depends: 1301.
-- [ ] **TASK-1304: APIs y UI de analytics (embudo, productos, CSAT con vista por operador C-003).** Depends: 1301, 1302.
-- [ ] **TASK-1305: Reporte mensual por email.** Depends: 1304.
-- [ ] **TASK-1306: A/B de campañas (split + reporte comparado con advertencia de muestra).** Depends: F011, 1301. Milestone humano: revisar con el tenant piloto que el CSAT no genere quejas y que el reporte mensual "se entienda en 30 segundos".
+- [x] **TASK-1301: Migraciones (0043, 0044) + analítica en vivo (~~extensión de metrics_rollup~~, C-104).**
+- [x] **TASK-1302: CsatFlow + parser + listener + settings + topes.** Depends: 1301, F011 plantillas.
+- [x] **TASK-1303: NPS widget + panel admin de NPS.** Depends: 1301.
+- [x] **TASK-1304: APIs y UI de analytics (embudo, productos, CSAT con vista por operador C-003).** Depends: 1301, 1302.
+- [x] **TASK-1305: Reporte mensual por email.** Depends: 1304.
+- [x] **TASK-1306: A/B de campañas (split + reporte comparado con advertencia de muestra).** Depends: F011, 1301. Milestone humano: revisar con el tenant piloto que el CSAT no genere quejas y que el reporte mensual "se entienda en 30 segundos".
 
 Dependencias: 1301 → 1302/1303 → 1304 → 1305; 1301 → 1306.
