@@ -73,7 +73,10 @@ class CatalogVersion(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
 
 class _VersionChild(UUIDPrimaryKeyMixin):
     version_id: Mapped[uuid.UUID] = mapped_column(
-        PgUUID(as_uuid=True), ForeignKey("catalog_versions.id", ondelete="CASCADE"), nullable=False
+        PgUUID(as_uuid=True),
+        ForeignKey("catalog_versions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     orden: Mapped[int] = mapped_column(Integer, nullable=False)
 

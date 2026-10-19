@@ -18,9 +18,10 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_job_queue, get_storage_provider
+from app.api.deps import get_job_queue, get_platform_llm, get_storage_provider
 from app.models.business import Product
 from app.models.conversation import Conversation
+from app.providers.llm import MockLLMProvider
 from app.providers.storage.mock import MockStorageProvider
 from tests.integration.conftest import encryption_key  # noqa: F401 - autouse: orders seed a number
 from tests.integration.test_knowledge_ingestion import RecordingQueue
@@ -37,6 +38,9 @@ def _doubles(app: FastAPI) -> None:
     queue, store = RecordingQueue(), MockStorageProvider()
     app.dependency_overrides[get_job_queue] = lambda: queue
     app.dependency_overrides[get_storage_provider] = lambda: store
+    # The sandbox endpoints resolve the platform model before they look the
+    # conversation up, so without a key (CI) they fail before reaching the 404.
+    app.dependency_overrides[get_platform_llm] = MockLLMProvider
 
 
 async def _tenant_id(api: AsyncClient, headers: dict[str, str]) -> uuid.UUID:
