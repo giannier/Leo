@@ -142,15 +142,25 @@ class CampaignRepository(BaseRepository[Campaign]):
 class CampaignRecipientRepository(BaseRepository[CampaignRecipient]):
     model = CampaignRecipient
 
-    def snapshot(self, campaign_id: uuid.UUID, contact_ids: Sequence[uuid.UUID]) -> int:
-        """Freeze who gets the campaign. A contact is in it at most once (RF-004)."""
+    def snapshot(
+        self, campaign_id: uuid.UUID, contact_ids: Sequence[uuid.UUID], *, ab: bool = False
+    ) -> int:
+        """Freeze who gets the campaign. A contact is in it at most once (RF-004).
+
+        In an A/B campaign each contact falls in A or B by its id: stable, and about half each.
+        """
         if not contact_ids:
             return 0
         result = self._session.execute(
             insert(CampaignRecipient)
             .values(
                 [
-                    {"campaign_id": campaign_id, "contact_id": c, "tenant_id": self._tenant_id}
+                    {
+                        "campaign_id": campaign_id,
+                        "contact_id": c,
+                        "tenant_id": self._tenant_id,
+                        "variant": "B" if ab and c.int % 2 else "A",
+                    }
                     for c in contact_ids
                 ]
             )

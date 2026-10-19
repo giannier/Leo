@@ -9,7 +9,7 @@ is YCloud's, so this is an estimate and says so.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -26,10 +26,17 @@ SENT = ("sent", "delivered", "read")
 
 
 def whatsapp_spend(
-    session: Session, tenant_id: uuid.UUID, *, now: datetime | None = None
+    session: Session,
+    tenant_id: uuid.UUID,
+    *,
+    now: datetime | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
 ) -> dict[str, Any]:
+    """This month so far, or [start, end) for a month that ended (the monthly report)."""
     moment = now or datetime.now(UTC)
-    start = month_start(moment)
+    start = start or month_start(moment)
+    end = end or moment + timedelta(days=1)
     base = (
         select(func.count())
         .select_from(Message)
@@ -40,6 +47,7 @@ def whatsapp_spend(
             Message.direction == "outbound",
             Message.delivery_status.in_(SENT),
             Message.created_at >= start,
+            Message.created_at < end,
         )
     )
     service = int(
@@ -61,6 +69,7 @@ def whatsapp_spend(
             Message.msg_type == "template",
             Message.delivery_status.in_(SENT),
             Message.created_at >= start,
+            Message.created_at < end,
         )
         .group_by(MessageTemplate.category)
     ).all()
@@ -69,7 +78,7 @@ def whatsapp_spend(
 
     tenant = session.get(Tenant, tenant_id)
     country = tenant.pais if tenant is not None else "PE"
-    today = moment.date()
+    today = min(moment, end).date()
     billable = max(0, service - FREE_SERVICE_MESSAGES)
     cost = Decimal("0")
     known = True
