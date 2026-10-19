@@ -62,7 +62,11 @@ SKIP_REASONS = {
     "sin_telefono": "Sin número de WhatsApp",
     "envio_fallido": "WhatsApp no aceptó el mensaje",
     "cancelada": "Se canceló la campaña",
+    # Meta's cap: about two marketing templates per person a day, across businesses (131049).
+    "tope_meta": "WhatsApp limitó los mensajes de marketing a esta persona hoy",
 }
+# The error Meta returns when that cap is hit.
+META_MARKETING_CAP = "131049"
 
 
 def connected_number(
@@ -186,6 +190,8 @@ class TemplateSender:
         self._messages = MessageRepository(session, tenant_id)
         self._conversations = ConversationRepository(session, tenant_id)
         self._number: tuple[WhatsAppNumber, NumberCredentials] | None = None
+        # Why the last send failed, for the campaign's report.
+        self.last_error: str | None = None
 
     def thread_for(self, contact: Contact, campaign_id: uuid.UUID | None) -> Conversation:
         open_thread = self._conversations.open_for_contact(contact.id)
@@ -247,6 +253,7 @@ class TemplateSender:
                 header_image_link=link,
             )
         except WhatsAppError as exc:
+            self.last_error = str(exc)
             logger.warning(
                 "a template could not be sent",
                 extra={"tenant_id": str(self._tenant_id), "reason": str(exc)[:200]},

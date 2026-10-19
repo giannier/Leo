@@ -299,6 +299,15 @@ export interface MetricsReport {
   anterior: MetricsSummary;
   por_dia: MetricsDay[];
   mas_vendidos?: { producto: string; cantidad: number }[];
+  // What Meta will bill this month (Feature 011, C-111); owners and admins only.
+  whatsapp_mes?: {
+    desde: string;
+    mensajes_servicio: number;
+    gratis_restantes: number;
+    plantillas_utilidad: number;
+    plantillas_marketing: number;
+    costo_estimado_usd: string | null;
+  };
 }
 export interface PlatformMetrics {
   desde: string;
@@ -669,7 +678,7 @@ export const api = {
 
   admin: {
     metaRates: () => request<MetaRate[]>("/platform-admin/meta-rates"),
-    saveMetaRate: (body: { country: string; category: "marketing" | "utility"; valid_from: string; rate_usd: string }) =>
+    saveMetaRate: (body: { country: string; category: "marketing" | "utility" | "service"; valid_from: string; rate_usd: string }) =>
       request<MetaRate[]>("/platform-admin/meta-rates", { method: "PUT", body }),
     billing: {
       subscriptions: () => request<AdminSubscription[]>("/platform-admin/billing/subscriptions"),

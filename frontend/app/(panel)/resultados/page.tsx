@@ -222,6 +222,34 @@ export default function ResultadosPage() {
                 )}
               </section>
             ) : null}
+            {report.whatsapp_mes ? (
+              <section className="rounded-xl border border-line bg-surface p-4" aria-label="WhatsApp este mes" data-testid="whatsapp-spend">
+                <h2 className="font-semibold text-ink">WhatsApp este mes</h2>
+                <p className="mt-1 font-heading text-2xl font-semibold text-ink">
+                  {report.whatsapp_mes.costo_estimado_usd !== null ? `US$ ${report.whatsapp_mes.costo_estimado_usd}` : "—"}
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Respuestas enviadas</span>
+                    <span className="font-semibold text-ink">{report.whatsapp_mes.mensajes_servicio}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Gratis que quedan</span>
+                    <span className="font-semibold text-ink">{report.whatsapp_mes.gratis_restantes}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Plantillas (utilidad / marketing)</span>
+                    <span className="font-semibold text-ink">
+                      {report.whatsapp_mes.plantillas_utilidad} / {report.whatsapp_mes.plantillas_marketing}
+                    </span>
+                  </li>
+                </ul>
+                <p className="mt-2 text-xs text-ink-faint">
+                  Aproximado. Desde octubre de 2026 Meta cobra cada respuesta pasadas las 1,000 gratis del mes por número. Lo
+                  factura YCloud, no Leo.
+                </p>
+              </section>
+            ) : null}
           </div>
 
           {canConfigure ? (

@@ -15,7 +15,7 @@ import { humanMessage } from "@/lib/api/errors";
 export default function TarifasPage() {
   const [rates, setRates] = useState<MetaRate[] | null>(null);
   const [country, setCountry] = useState("PE");
-  const [category, setCategory] = useState<"marketing" | "utility">("marketing");
+  const [category, setCategory] = useState<"marketing" | "utility" | "service">("marketing");
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));
   const [rate, setRate] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -68,10 +68,11 @@ export default function TarifasPage() {
           <Select
             label="Categoría"
             value={category}
-            onChange={(e) => setCategory(e.target.value as "marketing" | "utility")}
+            onChange={(e) => setCategory(e.target.value as "marketing" | "utility" | "service")}
             options={[
               { value: "marketing", label: "Marketing" },
               { value: "utility", label: "Utilidad" },
+              { value: "service", label: "Servicio (respuestas en 24 h)" },
             ]}
           />
           <Field label="Vigente desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -99,7 +100,7 @@ export default function TarifasPage() {
             {rates.map((r) => (
               <tr key={`${r.country}-${r.category}-${r.valid_from}`}>
                 <td className="py-2">{r.country}</td>
-                <td>{r.category === "marketing" ? "Marketing" : "Utilidad"}</td>
+                <td>{{ marketing: "Marketing", utility: "Utilidad", service: "Servicio" }[r.category] ?? r.category}</td>
                 <td>{r.valid_from}</td>
                 <td>{r.rate_usd}</td>
               </tr>

@@ -192,7 +192,7 @@ class TestSettingsAndCampaigns:
             headers=owner,
             json={"template_id": marketing["id"], "segment": {"etiquetas": ["vip"]}},
         )
-        assert estimate.json()["destinatarios"] == 1 and estimate.json()["tarifa_usd"] == "0.07030"
+        assert estimate.json()["destinatarios"] == 1 and estimate.json()["tarifa_usd"] == "0.08085"
 
         created = await api.post(
             K,
@@ -210,7 +210,7 @@ class TestSettingsAndCampaigns:
         scheduled = await api.post(f"{K}/{campaign['id']}/schedule", headers=owner)
         assert scheduled.status_code == 200, scheduled.text
         assert scheduled.json()["status"] == "scheduled"
-        assert scheduled.json()["estimated_cost_usd"] == "0.0700"
+        assert scheduled.json()["estimated_cost_usd"] == "0.0800"
         assert (await api.post(f"{K}/{campaign['id']}/schedule", headers=owner)).status_code == 409
 
         paused = await api.post(f"{K}/{campaign['id']}/pause", headers=owner)

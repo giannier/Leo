@@ -109,6 +109,7 @@ class EventOutcome:
     emails: tuple[EmailMessage, ...] = ()
     # A fixed answer to send instead of a turn (the promotions question, Feature 011).
     system_reply_id: uuid.UUID | None = None
+    assistant_too: bool = False
 
     def __str__(self) -> str:
         return self.outcome
@@ -198,6 +199,7 @@ def _apply(processor: ChannelEventProcessor, parsed: object, event_id: uuid.UUID
             tenant_id=result.tenant_id,
             conversation_id=result.conversation_id,
             system_reply_id=result.system_reply_id if result.is_new else None,
+            assistant_too=result.assistant_too,
         )
     if isinstance(parsed, StatusUpdate):
         processor.apply_status(parsed)
@@ -366,7 +368,8 @@ async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
                 max_attempts=settings.channel_send_max_attempts,
             )
             publish(outcome.tenant_id, "message.new", conversation_id=outcome.conversation_id)
-            return str(outcome)
+            if not outcome.assistant_too:
+                return str(outcome)
         await schedule_answer(
             ArqJobQueue(ctx["redis"]),
             ctx["redis"],
