@@ -22,6 +22,7 @@ from sqlalchemy import (
     SmallInteger,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
@@ -80,6 +81,8 @@ class Conversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         enum_check("status", CONVERSATION_STATUSES, "conversations_status"),
         # The inbox always filters by tenant and channel together.
         Index("ix_conversations_tenant_id_channel", "tenant_id", "channel"),
+        # The inbox orders a business's threads by their latest message (migration 0034).
+        Index("ix_conversations_tenant_id_last_message_at", "tenant_id", "last_message_at"),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -131,6 +134,12 @@ class Message(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
         enum_check("delivery_status", DELIVERY_STATUSES, "messages_delivery_status"),
         # Transcripts are always read in chronological order for one thread.
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
+        # Inbox search reads message text through this Spanish full-text index (migration 0034).
+        Index(
+            "ix_messages_content_search",
+            text("to_tsvector('spanish', content)"),
+            postgresql_using="gin",
+        ),
     )
 
     # `clock_timestamp()`, not `now()`. Postgres freezes `now()` at the start
