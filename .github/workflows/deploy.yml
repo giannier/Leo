@@ -1,0 +1,60 @@
+name: Deploy
+
+# Production deploy to the VPS (TASK-026). By hand only - "Run workflow" on
+# GitHub - never on push: a deploy is a decision. It needs these repository
+# secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST     the VPS address
+#   DEPLOY_USER     the SSH user on the VPS (a non-root user in the docker group)
+#   DEPLOY_SSH_KEY  that user's private key (the public half in ~/.ssh/authorized_keys)
+#   DEPLOY_PATH     the clone on the VPS, e.g. /opt/leo
+# and deploy/.env.prod already on the VPS (deploy/RUNBOOK.md).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or commit to deploy"
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Pull, build, migrate and restart
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' REF='$REF' bash -s" <<'SCRIPT'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          git fetch --prune origin
+          git checkout --detach "origin/$REF" 2>/dev/null || git checkout --detach "$REF"
+          compose="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod"
+          $compose build
+          $compose up -d --remove-orphans
+          for i in $(seq 1 60); do
+            if $compose exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')" 2>/dev/null; then
+              echo "healthy at $(git rev-parse --short HEAD)"; docker image prune -f >/dev/null; exit 0
+            fi
+            sleep 5
+          done
+          $compose logs --tail 80 backend migrate
+          exit 1
+          SCRIPT

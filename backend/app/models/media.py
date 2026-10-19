@@ -88,3 +88,5 @@ class MediaAsset(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # The order of a product's photos; the first is the main one (Feature 018).
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

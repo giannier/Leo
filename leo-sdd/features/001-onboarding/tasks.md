@@ -215,6 +215,7 @@
   - **Depends on:** TASK-025
   - **Verification:** smoke test en producción del flujo registro→sandbox; restore de backup ejecutado una vez con éxito
   - **Nota (2026-10-13):** el cobro de la plataforma está apagado (`BILLING_ENFORCED=false`) mientras Giannier prueba con sus negocios. El runbook debe decir que se enciende con `BILLING_ENFORCED=true` solo cuando Leo empiece a vender, con su confirmación.
+  - **Avance (2026-10-18, Claude):** listo todo lo que no necesita el servidor: `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, imágenes de producción (`deploy/Dockerfile` y `frontend/Dockerfile`, etapa `prod`), `deploy/env.prod.example`, `deploy/backup.sh` y `deploy/restore.sh` (cifrado AES-256; el ciclo dump → cifrar → descifrar → restaurar se probó contra Postgres local con los mismos conteos), `.github/workflows/deploy.yml` (manual) y `deploy/RUNBOOK.md`. El backend arranca en `ENVIRONMENT=production` con 2 procesos y el frontend compila y sirve en modo producción. **Pendiente (Giannier, en el VPS, después de TASK-459):** prueba de humo en producción y un restore real. **Fuera por ahora:** Sentry (dependencia nueva, por aprobar); Uptime Kuma va como perfil opcional `monitoring`.
 
 ---
 

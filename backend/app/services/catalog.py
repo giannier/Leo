@@ -23,10 +23,11 @@ from decimal import Decimal
 from typing import Any
 
 from redis.asyncio import Redis
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.business import Product
-from app.repositories.product import ProductRepository
+from app.repositories.product import ProductRepository, tag_equals, tag_matches
 from app.services.csv_import import InvalidRow, parse_catalogue
 
 PREVIEW_TTL_SECONDS = 3600
@@ -63,6 +64,7 @@ class CatalogService:
         search: str | None = None,
         category: str | None = None,
         is_active: bool | None = None,
+        tag: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Product], int]:
@@ -73,7 +75,11 @@ class CatalogService:
         """
         criteria: list[Any] = [Product.deleted_at.is_(None)]
         if search:
-            criteria.append(Product.name.ilike(f"%{search}%"))
+            criteria.append(
+                or_(Product.name.ilike(f"%{search}%"), tag_matches(Product.tags, search))
+            )
+        if tag:
+            criteria.append(tag_equals(Product.tags, tag))
         if category:
             criteria.append(Product.category == category)
         if is_active is not None:
@@ -101,6 +107,29 @@ class CatalogService:
         product = self._products.update(product_id, **values)
         self._session.commit()
         return product
+
+    def duplicate(self, product_id: uuid.UUID) -> Product | None:
+        """A copy to start from, inactive until the business reviews it.
+
+        Photos stay with the original.
+        """
+        source = self.get(product_id)
+        if source is None:
+            return None
+        return self.create(
+            name=f"{source.name} (copia)"[:200],
+            description=source.description,
+            price=source.price,
+            stock=source.stock,
+            category=source.category,
+            is_active=False,
+            modo_venta=source.modo_venta,
+            es_digital=source.es_digital,
+            bundle_size=source.bundle_size,
+            bundle_permite_libres=source.bundle_permite_libres,
+            destacado=False,
+            tags=list(source.tags),
+        )
 
     def soft_delete(self, product_id: uuid.UUID) -> bool:
         removed = self._products.soft_delete(product_id)
@@ -172,6 +201,7 @@ class CatalogService:
                 bundle_size=row.get("bundle_size"),
                 bundle_permite_libres=row.get("bundle_permite_libres", False),
                 destacado=row.get("destacado", False),
+                tags=row.get("tags", []),
             )
         self._session.commit()
         return len(rows)

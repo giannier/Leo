@@ -10,8 +10,9 @@
  * business confirmed, never estimates (C-001).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { FunnelPanel, ProductsPanel, SatisfactionPanel } from "@/components/analytics/panels";
 import { ConversationsChart } from "@/components/metrics/conversations-chart";
 import { Alert, Button, Field, Skeleton, cx } from "@/components/ui";
 import { api, type MetricsReport, type MetricsSummary } from "@/lib/api/client";
@@ -59,7 +60,7 @@ function Tile({
   );
 }
 
-export default function ResultadosPage() {
+function Resumen() {
   const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
   const [days, setDays] = useState(30);
   const [report, setReport] = useState<MetricsReport | null>(null);
@@ -96,8 +97,7 @@ export default function ResultadosPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink">Resultados</h1>
-          <p className="text-sm text-ink-soft">Lo que tu asistente hizo por tu negocio en WhatsApp.</p>
+          <h2 className="font-heading text-lg font-semibold text-ink">Resumen</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex gap-1" role="group" aria-label="Período">
@@ -222,6 +222,34 @@ export default function ResultadosPage() {
                 )}
               </section>
             ) : null}
+            {report.whatsapp_mes ? (
+              <section className="rounded-xl border border-line bg-surface p-4" aria-label="WhatsApp este mes" data-testid="whatsapp-spend">
+                <h2 className="font-semibold text-ink">WhatsApp este mes</h2>
+                <p className="mt-1 font-heading text-2xl font-semibold text-ink">
+                  {report.whatsapp_mes.costo_estimado_usd !== null ? `US$ ${report.whatsapp_mes.costo_estimado_usd}` : "—"}
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Respuestas enviadas</span>
+                    <span className="font-semibold text-ink">{report.whatsapp_mes.mensajes_servicio}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Gratis que quedan</span>
+                    <span className="font-semibold text-ink">{report.whatsapp_mes.gratis_restantes}</span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-ink-soft">Plantillas (utilidad / marketing)</span>
+                    <span className="font-semibold text-ink">
+                      {report.whatsapp_mes.plantillas_utilidad} / {report.whatsapp_mes.plantillas_marketing}
+                    </span>
+                  </li>
+                </ul>
+                <p className="mt-2 text-xs text-ink-faint">
+                  Aproximado. Desde octubre de 2026 Meta cobra cada respuesta pasadas las 1,000 gratis del mes por número. Lo
+                  factura YCloud, no Leo.
+                </p>
+              </section>
+            ) : null}
           </div>
 
           {canConfigure ? (
@@ -252,6 +280,75 @@ export default function ResultadosPage() {
               </Button>
             </form>
           ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+const VIEWS = [
+  ["resumen", "Resumen"],
+  ["embudo", "Embudo"],
+  ["productos", "Productos"],
+  ["satisfaccion", "Satisfacción"],
+] as const;
+type View = (typeof VIEWS)[number][0];
+
+export default function ResultadosPage() {
+  const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
+  const [view, setView] = useState<View>("resumen");
+  const [days, setDays] = useState(30);
+  const range = useMemo(() => {
+    const end = new Date();
+    const start = new Date(end.getTime() - (days - 1) * 86_400_000);
+    return { desde: iso(start), hasta: iso(end) };
+  }, [days]);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-heading text-2xl font-semibold text-ink">Resultados</h1>
+        <p className="text-sm text-ink-soft">Lo que tu asistente hizo por tu negocio en WhatsApp.</p>
+      </div>
+      <nav aria-label="Vistas de resultados" className="flex gap-2 overflow-x-auto pb-1">
+        {VIEWS.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-current={view === key ? "page" : undefined}
+            onClick={() => setView(key)}
+            className={cx(
+              "min-h-11 shrink-0 cursor-pointer rounded-full px-4 text-sm font-semibold",
+              view === key ? "bg-brand text-brand-fg" : "border border-line bg-surface text-ink-soft hover:bg-surface-muted",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {view === "resumen" ? (
+        <Resumen />
+      ) : (
+        <>
+          <div className="flex gap-1" role="group" aria-label="Período">
+            {PERIODS.map((p) => (
+              <button
+                key={p.days}
+                type="button"
+                aria-pressed={days === p.days}
+                onClick={() => setDays(p.days)}
+                className={cx(
+                  "min-h-9 rounded-full border px-3 text-xs font-medium",
+                  days === p.days ? "border-brand bg-brand text-brand-fg" : "border-line bg-surface text-ink-soft",
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {view === "embudo" ? <FunnelPanel range={range} /> : null}
+          {view === "productos" ? <ProductsPanel range={range} /> : null}
+          {view === "satisfaccion" ? <SatisfactionPanel range={range} canConfigure={canConfigure} /> : null}
         </>
       )}
     </div>

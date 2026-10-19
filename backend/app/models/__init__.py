@@ -5,6 +5,7 @@ Importing every model here is what populates `Base.metadata`. Alembic's
 is invisible to autogenerate and would silently never get a migration.
 """
 
+from app.models.analytics import CsatSurvey, NpsResponse
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.billing import (
@@ -24,6 +25,15 @@ from app.models.business import (
     Product,
     ProductCategory,
 )
+from app.models.campaigns import (
+    Campaign,
+    CampaignRecipient,
+    ContactOptin,
+    ContactTag,
+    MessageTemplate,
+    MetaRate,
+    OptinImport,
+)
 from app.models.catalog import (
     CatalogEmbedding,
     CatalogFaq,
@@ -38,6 +48,8 @@ from app.models.catalog import (
 from app.models.channel import Contact, MessageStatusEvent, WebhookEvent
 from app.models.conversation import AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent, ConversationState
+from app.models.crm import Lead, LeadEvent, LostReason, PipelineStage
+from app.models.feedback import SandboxFeedback
 from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.llm_settings import TenantLLMSettings
@@ -57,7 +69,21 @@ from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
+    "CsatSurvey",
+    "NpsResponse",
+    "Campaign",
+    "CampaignRecipient",
+    "ContactOptin",
+    "ContactTag",
+    "MessageTemplate",
+    "MetaRate",
+    "OptinImport",
     "ConversationNote",
+    "SandboxFeedback",
+    "Lead",
+    "LeadEvent",
+    "LostReason",
+    "PipelineStage",
     "NotificationSettings",
     "AgentConfig",
     "AgentTrace",

@@ -7,7 +7,7 @@ from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, exists, func, literal, or_, select
 
 from app.models.business import Product, ProductCategory
 from app.repositories.base import BaseRepository
@@ -17,6 +17,43 @@ def _contains(text: str) -> str:
     """A LIKE pattern that matches `text` anywhere, taking its wildcards literally."""
     escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+# A tag shorter than this never matches by being inside the customer's words: "tv" would
+# match "tvs" and "petvet" alike.
+_MIN_TAG_INSIDE = 3
+
+
+def tag_matches(tags: Any, text: str) -> ColumnElement[bool]:
+    """Some tag contains `text`, or a tag of 3+ characters appears inside `text`.
+
+    "SIAF" finds the product tagged "siaf", and so does "certificado de siaf". Compared
+    without case; `position` instead of LIKE, so `%` and `_` in either side are literal.
+    """
+    tag = func.unnest(tags).table_valued("value").render_derived(name="product_tag")
+    lowered = func.lower(tag.c.value)
+    said = func.lower(literal(text))
+    return exists(
+        select(literal(1))
+        .select_from(tag)
+        .where(
+            or_(
+                func.strpos(lowered, said) > 0,
+                (func.strpos(said, lowered) > 0)
+                & (func.char_length(tag.c.value) >= _MIN_TAG_INSIDE),
+            )
+        )
+    )
+
+
+def tag_equals(tags: Any, text: str) -> ColumnElement[bool]:
+    """Some tag is `text`, without regard to case."""
+    tag = func.unnest(tags).table_valued("value").render_derived(name="product_tag")
+    return exists(
+        select(literal(1))
+        .select_from(tag)
+        .where(func.lower(tag.c.value) == func.lower(literal(text)))
+    )
 
 
 class ProductCategoryRepository(BaseRepository[ProductCategory]):
@@ -115,7 +152,12 @@ class ProductRepository(BaseRepository[Product]):
         """
         statement = self._scoped().where(Product.deleted_at.is_(None), Product.is_active.is_(True))
         if query:
-            statement = statement.where(Product.name.ilike(_contains(query), escape="\\"))
+            statement = statement.where(
+                or_(
+                    Product.name.ilike(_contains(query), escape="\\"),
+                    tag_matches(Product.tags, query),
+                )
+            )
         if categoria:
             statement = statement.where(Product.category.ilike(_contains(categoria), escape="\\"))
         if solo_paquetes:

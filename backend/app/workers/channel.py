@@ -39,14 +39,18 @@ from app.providers.whatsapp.base import (
     InboundMessage,
     QualityUpdate,
     StatusUpdate,
+    TemplateStatusUpdate,
     WhatsAppProvider,
 )
 from app.repositories.channel import WebhookEventRepository
+from app.repositories.conversation import MessageRepository
+from app.services.campaigns.templates import apply_review
 from app.services.channel import (
     ChannelEventProcessor,
     ConversationResponder,
     NoConnectedNumber,
     ReplySender,
+    SessionWindowClosed,
     UnknownNumberError,
     debounce_key,
     lock_key,
@@ -103,6 +107,9 @@ class EventOutcome:
     # Mailing a customer about a state that then rolls back is worse than not
     # mailing them: they act on it, and there is nothing to act on.
     emails: tuple[EmailMessage, ...] = ()
+    # A fixed answer to send instead of a turn (the promotions question, Feature 011).
+    system_reply_id: uuid.UUID | None = None
+    assistant_too: bool = False
 
     def __str__(self) -> str:
         return self.outcome
@@ -191,6 +198,8 @@ def _apply(processor: ChannelEventProcessor, parsed: object, event_id: uuid.UUID
             inbound_message_id=result.message_id if result.is_new else None,
             tenant_id=result.tenant_id,
             conversation_id=result.conversation_id,
+            system_reply_id=result.system_reply_id if result.is_new else None,
+            assistant_too=result.assistant_too,
         )
     if isinstance(parsed, StatusUpdate):
         processor.apply_status(parsed)
@@ -198,7 +207,11 @@ def _apply(processor: ChannelEventProcessor, parsed: object, event_id: uuid.UUID
     if isinstance(parsed, QualityUpdate):
         processor.apply_quality(parsed)
         return EventOutcome(event_id, OUTCOME_APPLIED)
-    # Unreachable through `parse_event`, which returns exactly these three or
+    if isinstance(parsed, TemplateStatusUpdate):
+        # Meta's verdict on a template (Feature 011).
+        apply_review(processor.session, parsed)
+        return EventOutcome(event_id, OUTCOME_APPLIED)
+    # Unreachable through `parse_event`, which returns exactly these four or
     # None. Here so that adding a fourth kind fails loudly rather than being
     # silently dropped.
     raise TypeError(f"no handler for parsed event of type {type(parsed).__name__}")
@@ -309,6 +322,28 @@ async def retry_stranded_replies(ctx: dict[str, Any]) -> str:
     return f"sent={sent} skipped={failed}"
 
 
+async def send_system_reply(
+    session_factory: Any,
+    tenant_id: uuid.UUID,
+    message_id: uuid.UUID,
+    *,
+    provider: WhatsAppProvider,
+    max_attempts: int,
+) -> None:
+    """Send a `queued` fixed answer; left `queued` for the sweep if it cannot go now."""
+    with session_factory() as session:
+        message = MessageRepository(session, tenant_id).get(message_id)
+        if message is None:
+            return
+        try:
+            await ReplySender(
+                session, tenant_id, provider=provider, max_attempts=max_attempts
+            ).send(message)
+        except (NoConnectedNumber, SessionWindowClosed):
+            logger.info("a fixed answer could not be sent", extra={"tenant_id": str(tenant_id)})
+        session.commit()
+
+
 async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     """ARQ entry point. Registered in `app/workers/settings.py`."""
     session_factory = ctx["session_factory"]
@@ -323,6 +358,18 @@ async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     ):
         publish(outcome.tenant_id, "message.new", conversation_id=outcome.conversation_id)
         settings = ctx["settings"]
+        if outcome.system_reply_id is not None:
+            # The tap was answered with a fixed text; the assistant is not called.
+            await send_system_reply(
+                session_factory,
+                outcome.tenant_id,
+                outcome.system_reply_id,
+                provider=ctx["whatsapp"],
+                max_attempts=settings.channel_send_max_attempts,
+            )
+            publish(outcome.tenant_id, "message.new", conversation_id=outcome.conversation_id)
+            if not outcome.assistant_too:
+                return str(outcome)
         await schedule_answer(
             ArqJobQueue(ctx["redis"]),
             ctx["redis"],

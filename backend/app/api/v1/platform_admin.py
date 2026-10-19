@@ -24,6 +24,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field, StringConstraints
+from sqlalchemy import func, select
 
 from app.api.deps import (
     EmailProviderDep,
@@ -34,6 +35,8 @@ from app.api.deps import (
 )
 from app.api.errors import ApiError, error_responses
 from app.core.config import get_settings
+from app.models.channel import WebhookEvent
+from app.models.whatsapp import WhatsAppNumber
 from app.providers.email.base import EmailProvider
 from app.providers.whatsapp.base import NumberCredentials
 from app.services.admin import (
@@ -481,4 +484,42 @@ async def extend_trial(
         products=usage.products,
         knowledge_chars=usage.knowledge_chars,
         has_number=usage.has_number,
+    )
+
+
+class ChannelHealth(BaseModel):
+    """Whether WhatsApp deliveries can reach Leo (TASK-459): the first thing to check when a
+    connected number "receives nothing"."""
+
+    secreto_configurado: bool
+    numeros_conectados: int
+    ultimo_webhook: datetime | None
+    recibidos_24h: int
+    con_error_24h: int
+
+
+@router.get(
+    "/channel-health",
+    response_model=ChannelHealth,
+    summary="Whether YCloud's deliveries are arriving",
+    responses=error_responses(*ADMIN_RESPONSES),
+)
+def channel_health(admin: PlatformAdminDep, session: SessionDep) -> ChannelHealth:
+    since = datetime.now(UTC) - timedelta(hours=24)
+    last = session.execute(select(func.max(WebhookEvent.created_at))).scalar_one()
+    recent = session.execute(
+        select(WebhookEvent.status, func.count())
+        .where(WebhookEvent.created_at >= since)
+        .group_by(WebhookEvent.status)
+    ).all()
+    counts = {status_: int(total) for status_, total in recent}
+    connected = session.execute(
+        select(func.count()).select_from(WhatsAppNumber).where(WhatsAppNumber.status == "connected")
+    ).scalar_one()
+    return ChannelHealth(
+        secreto_configurado=bool(get_settings().ycloud_webhook_secret),
+        numeros_conectados=int(connected),
+        ultimo_webhook=last,
+        recibidos_24h=sum(counts.values()),
+        con_error_24h=counts.get("failed", 0) + counts.get("dead_letter", 0),
     )

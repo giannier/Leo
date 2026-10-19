@@ -30,7 +30,7 @@ class MediaAssetRepository(BaseRepository[MediaAsset]):
         statement = (
             self._scoped()
             .where(MediaAsset.product_id == product_id, MediaAsset.is_active.is_(True))
-            .order_by(MediaAsset.clave)
+            .order_by(MediaAsset.orden, MediaAsset.clave)
         )
         return self._session.execute(statement).scalars().all()
 
@@ -44,7 +44,7 @@ class MediaAssetRepository(BaseRepository[MediaAsset]):
         statement = (
             self._scoped()
             .where(MediaAsset.product_id.in_(product_ids), MediaAsset.is_active.is_(True))
-            .order_by(MediaAsset.clave)
+            .order_by(MediaAsset.orden, MediaAsset.clave)
         )
         grouped: dict[uuid.UUID, list[MediaAsset]] = {}
         for asset in self._session.execute(statement).scalars():
@@ -57,7 +57,7 @@ class MediaAssetRepository(BaseRepository[MediaAsset]):
         statement = (
             self._scoped()
             .where(MediaAsset.promotion_id == promotion_id, MediaAsset.is_active.is_(True))
-            .order_by(MediaAsset.clave)
+            .order_by(MediaAsset.orden, MediaAsset.clave)
         )
         return self._session.execute(statement).scalars().all()
 

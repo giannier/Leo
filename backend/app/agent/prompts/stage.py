@@ -595,6 +595,12 @@ def _state_lines(
         label = f" ({_one_line(path.titulo, 40)})" if path else ""
         lines.append(f"- Camino: {facts.camino}{label}")
 
+    if facts.paquete_pedido and facts.pedido is None:
+        lines.append(
+            f'- Paquete que ya pidió: "{_one_line(facts.paquete_pedido, 80)}" (cuando diga sus '
+            "temas, agrégalo con ellos con gestionar_pedido; no le muestres los paquetes otra vez)"
+        )
+
     lines.append(_order_line(facts, limits))
 
     if facts.datos_faltantes:

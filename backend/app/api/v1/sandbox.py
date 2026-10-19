@@ -36,13 +36,19 @@ from app.api.deps import (
 )
 from app.api.errors import ApiError, error_responses
 from app.models.conversation import Message
+from app.models.feedback import MOTIVO_MAX
 from app.orders.proofs import ReceivedImage
 from app.process.state import facts_snapshot
 from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
 from app.repositories.layers import TenantRuleSwitchRepository
 from app.repositories.media import MediaAssetRepository
-from app.services.sandbox import ConversationNotFound, SandboxNotReady, SandboxService
+from app.services.sandbox import (
+    ConversationNotFound,
+    NotARating,
+    SandboxNotReady,
+    SandboxService,
+)
 
 router = APIRouter(prefix="/tenant/sandbox", tags=["sandbox"])
 
@@ -201,6 +207,15 @@ class SendMessageResponse(BaseModel):
     debug: DebugResponse | None = None
 
 
+class Valoracion(BaseModel):
+    """What the business said of a reply (Feature 018, HU-06)."""
+
+    rating: Literal[-1, 1]
+    motivo: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=MOTIVO_MAX)] | None
+    ) = None
+
+
 class MessageResponse(BaseModel):
     id: uuid.UUID
     direction: str
@@ -209,6 +224,8 @@ class MessageResponse(BaseModel):
     created_at: datetime
     # The typed form of an outbound message; null for what the customer said.
     saliente: Saliente | None = None
+    # The thumbs up or down on a reply of the assistant, if it has one.
+    valoracion: Valoracion | None = None
 
 
 class HistoryResponse(BaseModel):
@@ -536,6 +553,7 @@ async def get_history(
             storage,
         )
     }
+    rated = service.ratings([m.id for m in messages if m.author == "agent"])
     return HistoryResponse(
         items=[
             MessageResponse(
@@ -545,6 +563,11 @@ async def get_history(
                 content=message.content,
                 created_at=message.created_at,
                 saliente=typed.get(message.id),
+                valoracion=(
+                    Valoracion(rating=1 if r.rating > 0 else -1, motivo=r.motivo)
+                    if (r := rated.get(message.id)) is not None
+                    else None
+                ),
             )
             for message in messages
         ],
@@ -573,4 +596,64 @@ async def reset_conversation(
         service.reset(conversation_id)
     except ConversationNotFound as exc:
         raise _not_found() from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put(
+    "/conversations/{conversation_id}/messages/{message_id}/feedback",
+    summary="Rate a reply of the assistant: thumbs up or down, with the reason",
+    responses=error_responses(
+        (404, "`not_found`"), (422, "`not_a_reply`: only the assistant's replies"), *AUTH_RESPONSES
+    ),
+)
+async def rate_reply(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    body: Valoracion,
+    principal: MemberDep,
+    session: SessionDep,
+    llm: PlatformLLMDep,
+) -> Valoracion:
+    """Nothing here calls the model: the rating is stored for the business and for
+    the learning suggestions to come (017, Phase 3)."""
+    service = SandboxService(session, principal.tenant_id, llm=llm)
+    try:
+        row = service.rate(
+            conversation_id,
+            message_id,
+            rating=body.rating,
+            motivo=body.motivo,
+            by=principal.user_id,
+        )
+    except ConversationNotFound as exc:
+        raise _not_found() from exc
+    except NotARating as exc:
+        raise ApiError(
+            status_code=422,
+            error="not_a_reply",
+            message="Solo se califican respuestas del asistente.",
+        ) from exc
+    return Valoracion(rating=1 if row.rating > 0 else -1, motivo=row.motivo)
+
+
+@router.delete(
+    "/conversations/{conversation_id}/messages/{message_id}/feedback",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Take back a rating",
+    responses=error_responses((404, "`not_found`"), *AUTH_RESPONSES),
+)
+async def unrate_reply(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    principal: MemberDep,
+    session: SessionDep,
+    llm: PlatformLLMDep,
+) -> Response:
+    service = SandboxService(session, principal.tenant_id, llm=llm)
+    try:
+        removed = service.unrate(conversation_id, message_id)
+    except ConversationNotFound as exc:
+        raise _not_found() from exc
+    if not removed:
+        raise _not_found()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

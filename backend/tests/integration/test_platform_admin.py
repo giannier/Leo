@@ -215,6 +215,33 @@ class TestTheQueue:
         mine = [row["id"] for row in body if row["id"] in {str(first), str(second)}]
         assert mine == [str(first), str(second)], "oldest first"
 
+    async def test_closed_requests_never_push_an_open_one_off_the_page(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        """Without a filter the open ones come first: with more closed requests
+        than fit in a page, a new request was not listed (found by e2e, 018)."""
+        tenant_headers, _ = await _register(api, mail, db)
+        closed, _ = await _file_request(api, tenant_headers)
+        waiting, _ = await _file_request(api, tenant_headers)
+        admin_headers, _ = await _admin(api, mail, db)
+        row = db.get(ConnectionRequest, closed)
+        assert row is not None
+        row.status = "rejected"
+        row.rejection_reason = "Número de prueba"
+        row.created_at = datetime(2020, 1, 1, tzinfo=UTC)
+        db.commit()
+
+        body = (await api.get(f"{ADMIN}/connection-requests", headers=admin_headers)).json()
+        statuses = [r["status"] for r in body]
+        first_closed = next(
+            (i for i, s in enumerate(statuses) if s not in ("requested", "in_progress")),
+            len(statuses),
+        )
+        assert all(s in ("requested", "in_progress") for s in statuses[:first_closed])
+        assert all(s not in ("requested", "in_progress") for s in statuses[first_closed:])
+        ids = [r["id"] for r in body]
+        assert str(waiting) in ids[:first_closed]
+
     async def test_the_queue_crosses_tenants(
         self, api: AsyncClient, mail: Any, db: Session
     ) -> None:
@@ -751,3 +778,38 @@ class TestExtendTrial:
             json={"days": 7},
         )
         assert response.status_code == 400
+
+
+class TestChannelHealth:
+    """TASK-459: whether YCloud's deliveries arrive, without reading logs."""
+
+    async def test_says_whether_the_secret_is_set_and_counts_deliveries(
+        self, api: AsyncClient, mail: Any, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.core.config import get_settings
+        from app.models.channel import WebhookEvent
+
+        headers, _ = await _admin(api, mail, db)
+        monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", "")
+        before = (await api.get(f"{ADMIN}/channel-health", headers=headers)).json()
+        assert before["secreto_configurado"] is False
+
+        for status_ in ("processed", "dead_letter"):
+            db.add(
+                WebhookEvent(
+                    provider_event_id=f"evt-{uuid.uuid4()}",
+                    payload={},
+                    status=status_,
+                )
+            )
+        db.commit()
+        monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", "whsec_x")
+        body = (await api.get(f"{ADMIN}/channel-health", headers=headers)).json()
+        assert body["secreto_configurado"] is True
+        assert body["recibidos_24h"] == before["recibidos_24h"] + 2
+        assert body["con_error_24h"] == before["con_error_24h"] + 1
+        assert body["ultimo_webhook"] is not None
+
+    async def test_is_gated(self, api: AsyncClient, mail: Any, db: Session) -> None:
+        headers, _ = await _register(api, mail, db)
+        assert (await api.get(f"{ADMIN}/channel-health", headers=headers)).status_code == 404

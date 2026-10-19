@@ -275,6 +275,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/analytics/funnel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Funnel */
+        get: operations["analytics_funnel_api_v1_tenant_analytics_funnel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Products */
+        get: operations["analytics_products_api_v1_tenant_analytics_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/csat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Analytics Csat */
+        get: operations["analytics_csat_api_v1_tenant_analytics_csat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/analytics/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Analytics Settings */
+        get: operations["get_analytics_settings_api_v1_tenant_analytics_settings_get"];
+        /** Put Analytics Settings */
+        put: operations["put_analytics_settings_api_v1_tenant_analytics_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/reports/monthly/{month}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly Preview */
+        get: operations["monthly_preview_api_v1_tenant_reports_monthly__month__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/nps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nps State */
+        get: operations["nps_state_api_v1_tenant_nps_get"];
+        put?: never;
+        /**
+         * Nps Answer
+         * @description An answer (score) or closing the card (no score); both settle this cycle.
+         */
+        post: operations["nps_answer_api_v1_tenant_nps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/nps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform Nps */
+        get: operations["platform_nps_api_v1_platform_admin_nps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assistant/situations": {
         parameters: {
             query?: never;
@@ -1067,6 +1191,303 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_tenant_templates_get"];
+        put?: never;
+        /** Create Template */
+        post: operations["create_template_api_v1_tenant_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/templates/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Template Library */
+        get: operations["template_library_api_v1_tenant_templates_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/templates/library/{key}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clone Template */
+        post: operations["clone_template_api_v1_tenant_templates_library__key__clone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Template */
+        put: operations["update_template_api_v1_tenant_templates__template_id__put"];
+        post?: never;
+        /** Delete Template */
+        delete: operations["delete_template_api_v1_tenant_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/templates/{template_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Template */
+        post: operations["duplicate_template_api_v1_tenant_templates__template_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/templates/{template_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Template */
+        post: operations["submit_template_api_v1_tenant_templates__template_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Contacts */
+        get: operations["list_contacts_api_v1_tenant_contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/contacts/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tags */
+        get: operations["list_tags_api_v1_tenant_contacts_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/contacts/{contact_id}/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Tags */
+        put: operations["set_tags_api_v1_tenant_contacts__contact_id__tags_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/contacts/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Import Info */
+        get: operations["import_info_api_v1_tenant_contacts_import_get"];
+        put?: never;
+        /** Import Contacts */
+        post: operations["import_contacts_api_v1_tenant_contacts_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/campaigns/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Campaign Settings */
+        get: operations["campaign_settings_api_v1_tenant_campaigns_settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenant_campaigns_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Campaigns */
+        get: operations["list_campaigns_api_v1_tenant_campaigns_get"];
+        put?: never;
+        /** Create Campaign */
+        post: operations["create_campaign_api_v1_tenant_campaigns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/campaigns/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Campaign */
+        post: operations["estimate_campaign_api_v1_tenant_campaigns_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/campaigns/{campaign_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Campaign */
+        get: operations["get_campaign_api_v1_tenant_campaigns__campaign_id__get"];
+        /** Update Campaign */
+        put: operations["update_campaign_api_v1_tenant_campaigns__campaign_id__put"];
+        post?: never;
+        /** Delete Campaign */
+        delete: operations["delete_campaign_api_v1_tenant_campaigns__campaign_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/campaigns/{campaign_id}/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Campaign Action */
+        post: operations["campaign_action_api_v1_tenant_campaigns__campaign_id___action__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/meta-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Meta Rates */
+        get: operations["list_meta_rates_api_v1_platform_admin_meta_rates_get"];
+        /** Put Meta Rate */
+        put: operations["put_meta_rate_api_v1_platform_admin_meta_rates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/numbers/{number_id}/daily-limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Daily Limit */
+        put: operations["put_daily_limit_api_v1_platform_admin_numbers__number_id__daily_limit_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/connection-requests": {
         parameters: {
             query?: never;
@@ -1141,6 +1562,240 @@ export interface paths {
         put?: never;
         /** Give the conversation back to the assistant before the pause ends */
         post: operations["resume_conversation_bot_api_v1_tenant_conversations__conversation_id__resume_bot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pipeline */
+        get: operations["get_pipeline_api_v1_tenant_pipeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/pipeline/stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Stages */
+        put: operations["put_stages_api_v1_tenant_pipeline_stages_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/pipeline/lost-reasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Reasons
+         * @description Rename, switch or add reasons. Removing is switching off: past leads keep theirs.
+         */
+        put: operations["put_reasons_api_v1_tenant_pipeline_lost_reasons_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Leads */
+        get: operations["list_leads_api_v1_tenant_leads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Board
+         * @description The kanban: every active stage with its first 50 cards. Won and lost show the last 30 days
+         *     (C-005: a working tool, not an archive).
+         */
+        get: operations["board_api_v1_tenant_leads_board_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Today
+         * @description The day's list (HU-04): active leads with no activity for `dias` days, oldest first.
+         */
+        get: operations["today_api_v1_tenant_leads_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metrics */
+        get: operations["metrics_api_v1_tenant_leads_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export */
+        get: operations["export_api_v1_tenant_leads_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/{lead_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detail */
+        get: operations["detail_api_v1_tenant_leads__lead_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/{lead_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move */
+        post: operations["move_api_v1_tenant_leads__lead_id__move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/{lead_id}/assign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign */
+        post: operations["assign_api_v1_tenant_leads__lead_id__assign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/{lead_id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discard */
+        post: operations["discard_api_v1_tenant_leads__lead_id__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/leads/{lead_id}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Note
+         * @description A note on the lead's conversation: the same notes the inbox shows (F007).
+         */
+        post: operations["note_api_v1_tenant_leads__lead_id__notes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1688,6 +2343,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-admin/channel-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether YCloud's deliveries are arriving */
+        get: operations["channel_health_api_v1_platform_admin_channel_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-admin/billing/subscriptions": {
         parameters: {
             query?: never;
@@ -1997,7 +2669,7 @@ export interface paths {
         };
         /**
          * List products
-         * @description Soft-deleted products are never listed.
+         * @description Soft-deleted products are never listed. `search` matches the name or a tag.
          */
         get: operations["list_products_api_v1_tenant_products_get"];
         put?: never;
@@ -2098,6 +2770,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/products/{product_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy a product, inactive, without its photos */
+        post: operations["duplicate_product_api_v1_tenant_products__product_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The product's photos, in order */
+        get: operations["list_photos_api_v1_tenant_products__product_id__photos_get"];
+        put?: never;
+        /** Add a photo (at most 10) */
+        post: operations["add_photo_api_v1_tenant_products__product_id__photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of the photos; the first is the main one */
+        put: operations["order_photos_api_v1_tenant_products__product_id__photos_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/products/{product_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a photo */
+        delete: operations["delete_photo_api_v1_tenant_products__product_id__photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/sandbox/conversations": {
         parameters: {
             query?: never;
@@ -2165,6 +2906,28 @@ export interface paths {
          */
         post: operations["reset_conversation_api_v1_tenant_sandbox_conversations__conversation_id__reset_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/sandbox/conversations/{conversation_id}/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate a reply of the assistant: thumbs up or down, with the reason
+         * @description Nothing here calls the model: the rating is stored for the business and for
+         *     the learning suggestions to come (017, Phase 3).
+         */
+        put: operations["rate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_put"];
+        post?: never;
+        /** Take back a rating */
+        delete: operations["unrate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2420,6 +3183,18 @@ export interface components {
              */
             overwrote_newer: boolean;
         };
+        /** AnalyticsSettings */
+        AnalyticsSettings: {
+            /** Csat Activo */
+            csat_activo: boolean;
+            /** Reporte Mensual */
+            reporte_mensual: boolean;
+        };
+        /** AssignIn */
+        AssignIn: {
+            /** User Id */
+            user_id?: string | null;
+        };
         /** BehaviorRequest */
         BehaviorRequest: {
             /** Agent Name */
@@ -2451,6 +3226,10 @@ export interface components {
             descuento_maximo_pct?: number | string | null;
             /** Max Situaciones */
             max_situaciones?: number | null;
+            /** Objective */
+            objective?: ("vender" | "atender" | "ambos") | null;
+            /** Escalation Rules */
+            escalation_rules?: ("cliente_molesto" | "pide_humano" | "fuera_de_catalogo")[] | null;
         };
         /** BehaviorResponse */
         BehaviorResponse: {
@@ -2487,6 +3266,10 @@ export interface components {
             descuento_maximo_pct: string | null;
             /** Max Situaciones */
             max_situaciones: number;
+            /** Objective */
+            objective: string;
+            /** Escalation Rules */
+            escalation_rules: string[];
         };
         /** BillingOut */
         BillingOut: {
@@ -2502,6 +3285,39 @@ export interface components {
             pagos: components["schemas"]["PaymentOut"][];
             /** Cobro Activo */
             cobro_activo: boolean;
+        };
+        /** BoardColumn */
+        BoardColumn: {
+            stage: components["schemas"]["StageOut"];
+            /** Items */
+            items: components["schemas"]["LeadOut"][];
+            /** Total */
+            total: number;
+        };
+        /** BoardOut */
+        BoardOut: {
+            /** Columns */
+            columns: components["schemas"]["BoardColumn"][];
+        };
+        /** Body_add_photo_api_v1_tenant_products__product_id__photos_post */
+        Body_add_photo_api_v1_tenant_products__product_id__photos_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_import_contacts_api_v1_tenant_contacts_import_post */
+        Body_import_contacts_api_v1_tenant_contacts_import_post: {
+            /** File */
+            file: string;
+            /**
+             * Acepto
+             * @default false
+             */
+            acepto: boolean;
+            /**
+             * Etiquetas
+             * @default
+             */
+            etiquetas: string;
         };
         /** Body_import_preview_api_v1_tenant_products_import_post */
         Body_import_preview_api_v1_tenant_products_import_post: {
@@ -2592,6 +3408,81 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** CampaignIn */
+        CampaignIn: {
+            /** Name */
+            name: string;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /** Template B Id */
+            template_b_id?: string | null;
+            segment?: components["schemas"]["SegmentIn"];
+            /**
+             * Window From
+             * @default 09:00
+             */
+            window_from: string;
+            /**
+             * Window To
+             * @default 20:00
+             */
+            window_to: string;
+            /** Scheduled At */
+            scheduled_at?: string | null;
+        };
+        /** CampaignOut */
+        CampaignOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            /** Template Label */
+            template_label: string | null;
+            /** Template B Id */
+            template_b_id?: string | null;
+            /** Template B Label */
+            template_b_label?: string | null;
+            /** Segment */
+            segment: {
+                [key: string]: unknown;
+            };
+            /** Window From */
+            window_from: string;
+            /** Window To */
+            window_to: string;
+            /** Scheduled At */
+            scheduled_at: string | null;
+            /** Status */
+            status: string;
+            /** Pause Reason */
+            pause_reason: string | null;
+            /** Estimated Cost Usd */
+            estimated_cost_usd: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** Catalog */
         Catalog: {
             /** Planes */
@@ -2678,6 +3569,23 @@ export interface components {
         ChangeResult: {
             cobro?: components["schemas"]["ChargeOut"] | null;
             programado?: components["schemas"]["SubscriptionOut"] | null;
+        };
+        /**
+         * ChannelHealth
+         * @description Whether WhatsApp deliveries can reach Leo (TASK-459): the first thing to check when a
+         *     connected number "receives nothing".
+         */
+        ChannelHealth: {
+            /** Secreto Configurado */
+            secreto_configurado: boolean;
+            /** Numeros Conectados */
+            numeros_conectados: number;
+            /** Ultimo Webhook */
+            ultimo_webhook: string | null;
+            /** Recibidos 24H */
+            recibidos_24h: number;
+            /** Con Error 24H */
+            con_error_24h: number;
         };
         /** ChannelMetricsResponse */
         ChannelMetricsResponse: {
@@ -2843,18 +3751,14 @@ export interface components {
              */
             updated_at: string;
         };
-        /** ContactOut */
-        ContactOut: {
-            /** Id */
-            id: string | null;
-            /** Nombre */
-            nombre: string | null;
-            /** Telefono */
-            telefono: string | null;
-            /** Opt Out */
-            opt_out: boolean;
-            /** Posible Duplicado */
-            posible_duplicado: boolean;
+        /** ContactPage */
+        ContactPage: {
+            /** Items */
+            items: components["schemas"]["app__api__v1__campaigns__ContactOut"][];
+            /** Total */
+            total: number;
+            /** Con Permiso */
+            con_permiso: number;
         };
         /** ConversationDetail */
         ConversationDetail: {
@@ -2867,7 +3771,7 @@ export interface components {
             canal: string;
             /** Estado */
             estado: string;
-            contacto: components["schemas"]["ContactOut"];
+            contacto: components["schemas"]["app__api__v1__inbox__ContactOut"];
             tomada_por: components["schemas"]["Holder"] | null;
             /** Tomada Desde */
             tomada_desde: string | null;
@@ -2968,6 +3872,11 @@ export interface components {
             nombre: string | null;
             /** Telefono */
             telefono: string | null;
+        };
+        /** DailyLimitIn */
+        DailyLimitIn: {
+            /** Limite Diario */
+            limite_diario?: number | null;
         };
         /**
          * DeadLetterResponse
@@ -3091,6 +4000,54 @@ export interface components {
             fields?: {
                 [key: string]: string;
             } | null;
+        };
+        /** EstimateIn */
+        EstimateIn: {
+            /**
+             * Template Id
+             * Format: uuid
+             */
+            template_id: string;
+            segment?: components["schemas"]["SegmentIn"];
+        };
+        /** EstimateOut */
+        EstimateOut: {
+            /** Destinatarios */
+            destinatarios: number;
+            /** Tarifa Usd */
+            tarifa_usd: string | null;
+            /** Costo Estimado Usd */
+            costo_estimado_usd: string | null;
+            /** Pais */
+            pais: string;
+            /** Categoria */
+            categoria: string;
+            /** Avisos */
+            avisos: string[];
+            /** Limites Aplicados */
+            limites_aplicados: boolean;
+        };
+        /** EventOut */
+        EventOut: {
+            /** Actor */
+            actor: string;
+            /** Actor Name */
+            actor_name: string | null;
+            /** From Stage */
+            from_stage: string | null;
+            /** To Stage */
+            to_stage: string | null;
+            /** Cause */
+            cause: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ExtendBody */
         ExtendBody: {
@@ -3282,6 +4239,28 @@ export interface components {
             /** Created */
             created: number;
         };
+        /** ImportInfo */
+        ImportInfo: {
+            /** Declaracion */
+            declaracion: string;
+            /** Limite Semanal */
+            limite_semanal: number;
+            /** Disponibles */
+            disponibles: number;
+        };
+        /** ImportOut */
+        ImportOut: {
+            /** Importados */
+            importados: number;
+            /** Ya Tenian Permiso */
+            ya_tenian_permiso: number;
+            /** Rechazados */
+            rechazados: number;
+            /** Invalidos */
+            invalidos: {
+                [key: string]: unknown;
+            }[];
+        };
         /** ImportPreviewResponse */
         ImportPreviewResponse: {
             /**
@@ -3422,6 +4401,98 @@ export interface components {
             /** Files Limit */
             files_limit: number;
         };
+        /** LeadDetail */
+        LeadDetail: {
+            lead: components["schemas"]["LeadOut"];
+            /** History */
+            history: components["schemas"]["EventOut"][];
+            /** Notes */
+            notes: components["schemas"]["app__api__v1__crm__NoteOut"][];
+        };
+        /** LeadOut */
+        LeadOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Stage Id
+             * Format: uuid
+             */
+            stage_id: string;
+            /** Stage Key */
+            stage_key: string;
+            /** Status */
+            status: string;
+            /**
+             * Contact Id
+             * Format: uuid
+             */
+            contact_id: string;
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Assigned To */
+            assigned_to: string | null;
+            /** Assigned Name */
+            assigned_name: string | null;
+            /** Product Interest */
+            product_interest: string | null;
+            /** Origen */
+            origen: string | null;
+            /** Lost Reason */
+            lost_reason: string | null;
+            /** Moneda */
+            moneda: string | null;
+            /** Amount Estimated */
+            amount_estimated: string | null;
+            /** Amount Real */
+            amount_real: string | null;
+            /** Days In Stage */
+            days_in_stage: number;
+            /** Days Idle */
+            days_idle: number;
+            /** Moved By Person */
+            moved_by_person: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Last Activity At
+             * Format: date-time
+             */
+            last_activity_at: string;
+            /** Closed At */
+            closed_at: string | null;
+        };
+        /** LeadPage */
+        LeadPage: {
+            /** Items */
+            items: components["schemas"]["LeadOut"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** LibraryOut */
+        LibraryOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Category */
+            category: string;
+            /** Body */
+            body: string;
+        };
         /** LineOut */
         LineOut: {
             /** Producto Id */
@@ -3450,7 +4521,7 @@ export interface components {
             canal: string;
             /** Estado */
             estado: string;
-            contacto: components["schemas"]["ContactOut"];
+            contacto: components["schemas"]["app__api__v1__inbox__ContactOut"];
             /** Ultimo Mensaje */
             ultimo_mensaje: string | null;
             /** Ultimo Autor */
@@ -3645,6 +4716,38 @@ export interface components {
              */
             created_at: string;
             saliente?: components["schemas"]["Saliente"] | null;
+            valoracion?: components["schemas"]["Valoracion"] | null;
+        };
+        /** MetaRateIn */
+        MetaRateIn: {
+            /** Country */
+            country: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "utility" | "marketing" | "service";
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Rate Usd */
+            rate_usd: number | string;
+        };
+        /** MetaRateOut */
+        MetaRateOut: {
+            /** Country */
+            country: string;
+            /** Category */
+            category: string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /** Rate Usd */
+            rate_usd: string;
         };
         /** MetricsSettings */
         MetricsSettings: {
@@ -3676,6 +4779,16 @@ export interface components {
              */
             desde: string;
         };
+        /** MoveIn */
+        MoveIn: {
+            /**
+             * Stage Id
+             * Format: uuid
+             */
+            stage_id: string;
+            /** Lost Reason */
+            lost_reason?: string | null;
+        };
         /** NewsView */
         NewsView: {
             /** Version */
@@ -3690,27 +4803,29 @@ export interface components {
             /** Texto */
             texto: string;
         };
+        /** NoteIn */
+        NoteIn: {
+            /** Content */
+            content: string;
+        };
         /** NoteList */
         NoteList: {
             /** Items */
-            items: components["schemas"]["NoteOut"][];
+            items: components["schemas"]["app__api__v1__inbox__NoteOut"][];
         };
-        /** NoteOut */
-        NoteOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Autor */
-            autor: string | null;
-            /** Texto */
-            texto: string;
-            /**
-             * En
-             * Format: date-time
-             */
-            en: string;
+        /** NpsIn */
+        NpsIn: {
+            /** Score */
+            score?: number | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** NpsState */
+        NpsState: {
+            /** Preguntar */
+            preguntar: boolean;
+            /** Ciclo */
+            ciclo?: string | null;
         };
         /** ObjectionIn */
         ObjectionIn: {
@@ -4003,6 +5118,42 @@ export interface components {
              */
             repetido: boolean;
         };
+        /** PhotoList */
+        PhotoList: {
+            /** Items */
+            items: components["schemas"]["PhotoResponse"][];
+        };
+        /** PhotoOrder */
+        PhotoOrder: {
+            /** Ids */
+            ids: string[];
+        };
+        /** PhotoResponse */
+        PhotoResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Url */
+            url: string | null;
+            /** Filename */
+            filename: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** PipelineOut */
+        PipelineOut: {
+            /** Stages */
+            stages: components["schemas"]["StageOut"][];
+            /** Lost Reasons */
+            lost_reasons: components["schemas"]["ReasonOut"][];
+            /**
+             * Max Stages
+             * @default 8
+             */
+            max_stages: number;
+        };
         /** PlanOut */
         PlanOut: {
             /** Id */
@@ -4082,6 +5233,8 @@ export interface components {
             bundle_permite_libres?: boolean | null;
             /** Destacado */
             destacado?: boolean | null;
+            /** Tags */
+            tags?: string[] | null;
         };
         /** ProductRequest */
         ProductRequest: {
@@ -4123,6 +5276,8 @@ export interface components {
              * @default false
              */
             destacado: boolean;
+            /** Tags */
+            tags?: string[];
         };
         /** ProductResponse */
         ProductResponse: {
@@ -4156,6 +5311,10 @@ export interface components {
             bundle_permite_libres: boolean;
             /** Destacado */
             destacado: boolean;
+            /** Tags */
+            tags: string[];
+            /** Foto Url */
+            foto_url?: string | null;
         };
         /** PromotionList */
         PromotionList: {
@@ -4333,6 +5492,27 @@ export interface components {
             creado: string;
             /** Revisado */
             revisado: string | null;
+        };
+        /** ReasonIn */
+        ReasonIn: {
+            /** Key */
+            key?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ReasonOut */
+        ReasonOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Is Active */
+            is_active: boolean;
         };
         /**
          * RefreshRequest
@@ -4523,6 +5703,21 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** SegmentIn */
+        SegmentIn: {
+            /** Etiquetas */
+            etiquetas?: string[];
+            /** Etapas */
+            etapas?: ("nuevo" | "interesado" | "por_pagar" | "ganado" | "perdido")[];
+            /** Compro */
+            compro?: boolean | null;
+            /** Producto */
+            producto?: string | null;
+            /** Dias Sin Escribir Min */
+            dias_sin_escribir_min?: number | null;
+            /** Dias Sin Escribir Max */
+            dias_sin_escribir_max?: number | null;
+        };
         /** SendBody */
         SendBody: {
             /** Texto */
@@ -4583,12 +5778,12 @@ export interface components {
             /** Auto Return Minutes */
             auto_return_minutes?: number | null;
         };
-        /** SettingsOut */
-        SettingsOut: {
-            /** Unattended Queue Minutes */
-            unattended_queue_minutes: number;
-            /** Auto Return Minutes */
-            auto_return_minutes?: number | null;
+        /** SettingsIn */
+        SettingsIn: {
+            /** Optin Preguntar */
+            optin_preguntar: boolean;
+            /** Seguimiento Plantilla Id */
+            seguimiento_plantilla_id?: string | null;
         };
         /** SituationList */
         SituationList: {
@@ -4687,6 +5882,36 @@ export interface components {
              * Format: date-time
              */
             en: string;
+        };
+        /** StageIn */
+        StageIn: {
+            /** Key */
+            key?: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** StageOut */
+        StageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Semantic */
+            semantic: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** Leads */
+            leads: number;
         };
         /** StageView */
         StageView: {
@@ -4812,6 +6037,18 @@ export interface components {
             /** Apagada */
             apagada: boolean;
         };
+        /** TagCount */
+        TagCount: {
+            /** Tag */
+            tag: string;
+            /** Total */
+            total: number;
+        };
+        /** TagsIn */
+        TagsIn: {
+            /** Tags */
+            tags?: string[];
+        };
         /** TeamResponse */
         TeamResponse: {
             /** Members */
@@ -4820,10 +6057,67 @@ export interface components {
             invitations: components["schemas"]["InvitationResponse"][];
             seats: components["schemas"]["SeatsResponse"];
         };
+        /** TemplateIn */
+        TemplateIn: {
+            /** Label */
+            label: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "utility" | "marketing";
+            /** Body */
+            body: string;
+            /** Footer */
+            footer?: string | null;
+            /** Header Media Asset Id */
+            header_media_asset_id?: string | null;
+        };
         /** TemplateList */
         TemplateList: {
             /** Items */
             items: components["schemas"]["TemplateView"][];
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Category */
+            category: string;
+            /** Language */
+            language: string;
+            /** Body */
+            body: string;
+            /** Footer */
+            footer: string | null;
+            /** Header Media Asset Id */
+            header_media_asset_id: string | null;
+            /** Variables */
+            variables: string[];
+            /** Status */
+            status: string;
+            /** Rejection Reason */
+            rejection_reason: string | null;
+            /** Rejection Hint */
+            rejection_hint: string | null;
+            /** Library Key */
+            library_key: string | null;
+            /** Submitted At */
+            submitted_at: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** TemplateView */
         TemplateView: {
@@ -5055,6 +6349,19 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * Valoracion
+         * @description What the business said of a reply (Feature 018, HU-06).
+         */
+        Valoracion: {
+            /**
+             * Rating
+             * @enum {integer}
+             */
+            rating: -1 | 1;
+            /** Motivo */
+            motivo?: string | null;
+        };
         /** VerifyEmailRequest */
         VerifyEmailRequest: {
             /** Token */
@@ -5156,6 +6463,91 @@ export interface components {
             cierra_en: string | null;
             /** Por Cerrar */
             por_cerrar: boolean;
+        };
+        /** ContactOut */
+        app__api__v1__campaigns__ContactOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Permiso */
+            permiso: string | null;
+            /** Permiso Origen */
+            permiso_origen: string | null;
+            /** Baja */
+            baja: boolean;
+            /** Etiquetas */
+            etiquetas: string[];
+            /** Ultimo Mensaje */
+            ultimo_mensaje: string | null;
+        };
+        /** SettingsOut */
+        app__api__v1__campaigns__SettingsOut: {
+            /** Optin Preguntar */
+            optin_preguntar: boolean;
+            /** Seguimiento Plantilla Id */
+            seguimiento_plantilla_id: string | null;
+            /** Seguimiento Activo */
+            seguimiento_activo: boolean;
+        };
+        /** NoteOut */
+        app__api__v1__crm__NoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Author */
+            author: string | null;
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ContactOut */
+        app__api__v1__inbox__ContactOut: {
+            /** Id */
+            id: string | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Opt Out */
+            opt_out: boolean;
+            /** Posible Duplicado */
+            posible_duplicado: boolean;
+        };
+        /** NoteOut */
+        app__api__v1__inbox__NoteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Autor */
+            autor: string | null;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
+        /** SettingsOut */
+        app__api__v1__inbox__SettingsOut: {
+            /** Unattended Queue Minutes */
+            unattended_queue_minutes: number;
+            /** Auto Return Minutes */
+            auto_return_minutes?: number | null;
         };
     };
     responses: never;
@@ -5685,7 +7077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NoteOut"];
+                    "application/json": components["schemas"]["app__api__v1__inbox__NoteOut"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */
@@ -5888,7 +7280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SettingsOut"];
+                    "application/json": components["schemas"]["app__api__v1__inbox__SettingsOut"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */
@@ -5930,7 +7322,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SettingsOut"];
+                    "application/json": components["schemas"]["app__api__v1__inbox__SettingsOut"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */
@@ -6030,6 +7422,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_funnel_api_v1_tenant_analytics_funnel_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_products_api_v1_tenant_analytics_products_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    analytics_csat_api_v1_tenant_analytics_csat_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_analytics_settings_api_v1_tenant_analytics_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSettings"];
+                };
+            };
+        };
+    };
+    put_analytics_settings_api_v1_tenant_analytics_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyticsSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSettings"];
+                };
+            };
+        };
+    };
+    monthly_preview_api_v1_tenant_reports_monthly__month__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description `bad_month` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    nps_state_api_v1_tenant_nps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NpsState"];
+                };
+            };
+        };
+    };
+    nps_answer_api_v1_tenant_nps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NpsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    platform_nps_api_v1_platform_admin_nps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -8511,6 +10189,1019 @@ export interface operations {
             };
         };
     };
+    list_templates_api_v1_tenant_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"][];
+                };
+            };
+        };
+    };
+    create_template_api_v1_tenant_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    template_library_api_v1_tenant_templates_library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryOut"][];
+                };
+            };
+        };
+    };
+    clone_template_api_v1_tenant_templates_library__key__clone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_template_api_v1_tenant_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_template_api_v1_tenant_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    duplicate_template_api_v1_tenant_templates__template_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    submit_template_api_v1_tenant_templates__template_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `meta_rechazo`: WhatsApp did not take the template */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_contacts_api_v1_tenant_contacts_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                tag?: string | null;
+                permiso?: ("granted" | "asked" | "declined" | "revoked" | "none") | null;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactPage"];
+                };
+            };
+        };
+    };
+    list_tags_api_v1_tenant_contacts_tags_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagCount"][];
+                };
+            };
+        };
+    };
+    set_tags_api_v1_tenant_contacts__contact_id__tags_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    import_info_api_v1_tenant_contacts_import_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportInfo"];
+                };
+            };
+        };
+    };
+    import_contacts_api_v1_tenant_contacts_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_contacts_api_v1_tenant_contacts_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    campaign_settings_api_v1_tenant_campaigns_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__v1__campaigns__SettingsOut"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenant_campaigns_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__v1__campaigns__SettingsOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_campaigns_api_v1_tenant_campaigns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"][];
+                };
+            };
+        };
+    };
+    create_campaign_api_v1_tenant_campaigns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    estimate_campaign_api_v1_tenant_campaigns_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EstimateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstimateOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_campaign_api_v1_tenant_campaigns__campaign_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_campaign_api_v1_tenant_campaigns__campaign_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_campaign_api_v1_tenant_campaigns__campaign_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    campaign_action_api_v1_tenant_campaigns__campaign_id___action__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+                action: "schedule" | "pause" | "resume" | "cancel";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `no_editable`, `en_uso`, `ya_enviada`, `plantilla_no_aprobada`, `calidad_baja`, `limite_plan`, ... */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_meta_rates_api_v1_platform_admin_meta_rates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaRateOut"][];
+                };
+            };
+        };
+    };
+    put_meta_rate_api_v1_platform_admin_meta_rates_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetaRateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetaRateOut"][];
+                };
+            };
+        };
+    };
+    put_daily_limit_api_v1_platform_admin_numbers__number_id__daily_limit_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailyLimitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not allowed in this business. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_requests_api_v1_tenant_connection_requests_get: {
         parameters: {
             query?: never;
@@ -8744,6 +11435,573 @@ export interface operations {
                 };
             };
             /** @description `not_found`: the conversation does not exist or is another business's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_pipeline_api_v1_tenant_pipeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_stages_api_v1_tenant_pipeline_stages_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StageIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_reasons_api_v1_tenant_pipeline_lost_reasons_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonIn"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_leads_api_v1_tenant_leads_get: {
+        parameters: {
+            query?: {
+                stage_id?: string | null;
+                estado?: ("active" | "won" | "lost" | "discarded")[] | null;
+                asignado?: string | null;
+                search?: string | null;
+                sin_actividad_dias?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    board_api_v1_tenant_leads_board_get: {
+        parameters: {
+            query?: {
+                asignado?: string | null;
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    today_api_v1_tenant_leads_today_get: {
+        parameters: {
+            query?: {
+                dias?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    metrics_api_v1_tenant_leads_metrics_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    export_api_v1_tenant_leads_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+        };
+    };
+    detail_api_v1_tenant_leads__lead_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    move_api_v1_tenant_leads__lead_id__move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    assign_api_v1_tenant_leads__lead_id__assign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    discard_api_v1_tenant_leads__lead_id__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    note_api_v1_tenant_leads__lead_id__notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__v1__crm__NoteOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -10203,6 +13461,44 @@ export interface operations {
             };
         };
     };
+    channel_health_api_v1_platform_admin_channel_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelHealth"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` - including for a caller who is not a platform admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     subscriptions_api_v1_platform_admin_billing_subscriptions_get: {
         parameters: {
             query?: never;
@@ -10984,6 +14280,7 @@ export interface operations {
                 search?: string | null;
                 category?: string | null;
                 is_active?: boolean | null;
+                tag?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11376,6 +14673,267 @@ export interface operations {
             };
         };
     };
+    duplicate_product_api_v1_tenant_products__product_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_photos_api_v1_tenant_products__product_id__photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    add_photo_api_v1_tenant_products__product_id__photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_add_photo_api_v1_tenant_products__product_id__photos_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `storage_unavailable` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    order_photos_api_v1_tenant_products__product_id__photos_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_photo_api_v1_tenant_products__product_id__photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     start_conversation_api_v1_tenant_sandbox_conversations_post: {
         parameters: {
             query?: never;
@@ -11579,6 +15137,108 @@ export interface operations {
             header?: never;
             path: {
                 conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Valoracion"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Valoracion"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    unrate_reply_api_v1_tenant_sandbox_conversations__conversation_id__messages__message_id__feedback_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+                message_id: string;
             };
             cookie?: never;
         };

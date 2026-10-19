@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
+from app.models.feedback import MOTIVO_MAX, SandboxFeedback
 from app.orders.proofs import InboundImage, ProofPipeline, ReceivedImage
 from app.process.inbound import interactive_of, stored_image_of
 from app.providers.llm.base import LLMProvider
@@ -42,6 +43,7 @@ from app.providers.storage.base import StorageError, StorageProvider
 from app.providers.whatsapp.base import InteractiveReply
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository, MessageRepository
+from app.repositories.feedback import SandboxFeedbackRepository
 from app.repositories.sandbox_reset import SandboxResetRepository
 from app.services.activation import build_checklist
 from app.services.inbound_media import InboundImageReader
@@ -62,6 +64,14 @@ class SandboxNotReady(RuntimeError):
 
 class ConversationNotFound(LookupError):
     """No such sandbox conversation for this tenant."""
+
+
+class NotARating(ValueError):
+    """Only a reply of the assistant can be rated."""
+
+
+# The copy of the question and the answer kept with a rating.
+FEEDBACK_TEXT_MAX = 4000
 
 
 @dataclass(frozen=True)
@@ -150,6 +160,64 @@ class SandboxService:
         if self.get(conversation_id) is None:
             raise ConversationNotFound(str(conversation_id))
         return list(self._messages.outbound_after(conversation_id, after_id))
+
+    def rate(
+        self,
+        conversation_id: uuid.UUID,
+        message_id: uuid.UUID,
+        *,
+        rating: int,
+        motivo: str | None,
+        by: uuid.UUID | None,
+    ) -> SandboxFeedback:
+        """Thumbs up or down on one reply of the assistant (Feature 018, HU-06).
+
+        Rating again replaces the earlier one. The customer's message the reply
+        answered and the reply itself are copied, so the rating survives
+        "Reiniciar chat".
+        """
+        if self.get(conversation_id) is None:
+            raise ConversationNotFound(str(conversation_id))
+        transcript = list(self._messages.list_for_conversation(conversation_id))
+        index = next((i for i, m in enumerate(transcript) if m.id == message_id), None)
+        if index is None:
+            raise ConversationNotFound(str(message_id))
+        reply = transcript[index]
+        if reply.direction != "outbound" or reply.author != "agent":
+            raise NotARating(str(message_id))
+        question = next(
+            (m.content for m in reversed(transcript[:index]) if m.direction == "inbound"), None
+        )
+        repository = SandboxFeedbackRepository(self._session, self._tenant_id)
+        row = repository.by_message(message_id)
+        if row is None:
+            row = repository.add(
+                conversation_id=conversation_id,
+                message_id=message_id,
+                rating=rating,
+                created_by=by,
+                respuesta="",
+            )
+        row.rating = rating
+        row.motivo = (motivo or "").strip()[:MOTIVO_MAX] or None
+        row.pregunta = (question or "")[:FEEDBACK_TEXT_MAX] or None
+        row.respuesta = (reply.content or "")[:FEEDBACK_TEXT_MAX]
+        self._session.commit()
+        return row
+
+    def unrate(self, conversation_id: uuid.UUID, message_id: uuid.UUID) -> bool:
+        if self.get(conversation_id) is None:
+            raise ConversationNotFound(str(conversation_id))
+        repository = SandboxFeedbackRepository(self._session, self._tenant_id)
+        row = repository.by_message(message_id)
+        if row is None or row.conversation_id != conversation_id:
+            return False
+        self._session.delete(row)
+        self._session.commit()
+        return True
+
+    def ratings(self, message_ids: list[uuid.UUID]) -> dict[uuid.UUID, SandboxFeedback]:
+        return SandboxFeedbackRepository(self._session, self._tenant_id).for_messages(message_ids)
 
     def reset(self, conversation_id: uuid.UUID) -> None:
         """Forget everything: the state, the messages and the sandbox orders."""
