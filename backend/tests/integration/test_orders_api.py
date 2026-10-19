@@ -20,7 +20,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_storage_provider, get_whatsapp_provider
+from app.api.deps import get_platform_llm, get_storage_provider, get_whatsapp_provider
 from app.core.crypto import encrypt_secret
 from app.models.audit import AuditLog
 from app.models.business import AgentConfig, Product
@@ -36,6 +36,7 @@ from app.process.recompute import recompute_stage
 from app.process.state import StateRepo
 from app.process.templates import TEMPLATES
 from app.process.templates.base import Stage
+from app.providers.llm import MockLLMProvider
 from app.providers.storage.mock import MockStorageProvider
 from app.providers.whatsapp.base import (
     NumberCredentials,
@@ -674,8 +675,11 @@ class TestConfirm:
         assert "tu pago fue confirmado" in message.content
 
     async def test_the_simulator_reads_the_notice_as_an_asynchronous_outbound(
-        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp
+        self, api: AsyncClient, mail: Any, db: Session, whatsapp: FakeWhatsApp, app: Any
     ) -> None:
+        # The simulator endpoints resolve the platform model before they answer;
+        # without a key (CI) that fails, and this test never calls the model.
+        app.dependency_overrides[get_platform_llm] = MockLLMProvider
         account, headers = await _owner(api, mail)
         order, _ = seed_order(db, account["tenant_id"], sandbox=True)
 
