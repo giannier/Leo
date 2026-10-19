@@ -29,6 +29,7 @@ from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.s3_provider import S3StorageProvider
 from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
+from app.workers.analytics import CSAT_JOB, REPORT_JOB, run_csat, send_monthly_reports
 from app.workers.billing import CALENDAR_JOB, billing_calendar
 from app.workers.campaigns import SEND_JOB, send_campaigns
 from app.workers.catalog_evals import run_catalog_evals
@@ -203,6 +204,10 @@ class WorkerSettings:
         ),
         # C-13: every 15 minutes, off the quarter hours.
         cron(run_followups, name=f"cron:{FOLLOW_UP_JOB}", minute={4, 19, 34, 49}),
+        # Feature 013: satisfaction surveys due, and the expired ones.
+        cron(run_csat, name=f"cron:{CSAT_JOB}", minute={9, 24, 39, 54}),
+        # 13:20 UTC is 08:20 in Lima; it only sends on the 1st.
+        cron(send_monthly_reports, name=f"cron:{REPORT_JOB}", hour=13, minute=20),
         # Feature 011: one batch per due campaign, every minute.
         cron(send_campaigns, name=f"cron:{SEND_JOB}", minute=set(range(60))),
         # 08:10 UTC is 03:10 in Lima (`contracts/api.md` section 9).

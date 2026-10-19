@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agent,
+    analytics,
     assistant,
     assistant_info,
     assistant_media,
@@ -33,6 +34,7 @@ router = APIRouter()
 router.include_router(health.router)
 router.include_router(inbox.router)
 router.include_router(agent.router)
+router.include_router(analytics.router)
 router.include_router(assistant.router)
 router.include_router(assistant_info.router)
 router.include_router(assistant_media.router)

@@ -27,6 +27,7 @@ from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
 from app.models.crm import Lead
 from app.models.metrics import DashboardSettings
+from app.models.user import User
 from app.repositories.conversation import MessageRepository
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,8 @@ _OPINIONS = (
     (re.compile(r"\b(mal[oa]?)\b"), 2),
     (re.compile(r"\b(buen[oa]|bien)\b"), 4),
 )
-_DIGIT = re.compile(r"(?<![\d.,])([1-5])(?![\d.,])")
+# A lone 1-5, not part of a bigger number or a decimal ("4.5", "10").
+_DIGIT = re.compile(r"(?<!\d)(?<!\d[.,])([1-5])(?!\d)(?![.,]\d)")
 
 
 def _plain(text: str) -> str:
@@ -114,9 +116,11 @@ def last_operator(
     ).scalar_one_or_none()
     raw = (payload or {}).get("operador_id") if isinstance(payload, dict) else None
     try:
-        return uuid.UUID(str(raw)) if raw else None
+        user_id = uuid.UUID(str(raw)) if raw else None
     except ValueError:
         return None
+    # A person since removed from the platform is not attributed.
+    return user_id if user_id is not None and session.get(User, user_id) is not None else None
 
 
 @dataclass(frozen=True)

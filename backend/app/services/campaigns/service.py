@@ -121,9 +121,19 @@ class CampaignService:
                 "horario_invalido", "El horario de envío debe estar entre 08:00 y 21:00."
             )
         scheduled_at = values.get("scheduled_at")
+        template_b_id = None
+        if values.get("template_b_id"):
+            # A/B (Feature 013, C-106): a second template for half of the recipients.
+            template_b = self.template(values.get("template_b_id"))
+            if template_b.id == template.id:
+                raise CampaignError(
+                    "ab_misma_plantilla", "Para comparar elige dos plantillas distintas."
+                )
+            template_b_id = template_b.id
         return {
             "name": name,
             "template_id": template.id,
+            "template_b_id": template_b_id,
             "segment": Segment.parse(values.get("segment")).as_dict(),
             "window_from": start.strftime("%H:%M"),
             "window_to": end.strftime("%H:%M"),
@@ -195,7 +205,10 @@ class CampaignService:
         if campaign.status != "draft":
             raise CampaignError("no_programable", "Esta campaña ya se programó.", status=409)
         template = self.template(campaign.template_id)
-        if template.status != "approved":
+        templates = [template]
+        if campaign.template_b_id is not None:
+            templates.append(self.template(campaign.template_b_id))
+        if any(t.status != "approved" for t in templates):
             raise CampaignError(
                 "plantilla_no_aprobada", "La plantilla aún no está aprobada por Meta.", status=409
             )
@@ -322,7 +335,9 @@ class CampaignRunner:
             now=self._now,
             limit=cap,
         )
-        CampaignRecipientRepository(self._session, campaign.tenant_id).snapshot(campaign.id, ids)
+        CampaignRecipientRepository(self._session, campaign.tenant_id).snapshot(
+            campaign.id, ids, ab=campaign.template_b_id is not None
+        )
         campaign.status = "sending"
         campaign.started_at = self._now
         self._session.flush()
@@ -356,8 +371,11 @@ class CampaignRunner:
         number, _ = connected_number(self._session, tenant_id)
         if (number.quality_rating or "").upper() in STOP_QUALITY:
             raise CampaignError("calidad", "quality")
-        template = MessageTemplateRepository(self._session, tenant_id).get(campaign.template_id)
-        if template is None or template.status != "approved":
+        repository = MessageTemplateRepository(self._session, tenant_id)
+        variants = {"A": repository.get(campaign.template_id)}
+        if campaign.template_b_id is not None:
+            variants["B"] = repository.get(campaign.template_b_id)
+        if any(t is None or t.status != "approved" for t in variants.values()):
             raise CampaignError("plantilla", "template")
         budget = min(BATCH, self._budget(campaign, number.limite_diario))
         if budget == 0:
@@ -378,6 +396,8 @@ class CampaignRunner:
                 reason = "sin_permiso"
             elif not (contact.phone_e164 or contact.external_user_id):
                 reason = "sin_telefono"
+            template = variants.get(recipient.variant) or variants["A"]
+            assert template is not None
             filled = fill(self._session, tenant_id, template, contact) if contact else None
             if reason is None and filled is not None and filled.skip:
                 reason = filled.skip

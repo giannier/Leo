@@ -21,6 +21,8 @@ from app.process.facts import CONFIRMED_ORDER_STATES
 from app.services.campaigns.sender import SKIP_REASONS
 
 REACHED = ("sent", "delivered", "read", "replied")
+# Below this, an A/B side says little (spec C-004).
+SMALL_SAMPLE = 30
 
 
 def campaign_report(session: Session, campaign: Campaign, *, money: bool) -> dict[str, Any]:
@@ -57,6 +59,7 @@ def campaign_report(session: Session, campaign: Campaign, *, money: bool) -> dic
 
     sales = 0
     amounts: dict[str, Decimal] = defaultdict(Decimal)
+    counted: set[uuid.UUID] = set()
     if reached:
         window = {row.contact_id: row.sent_at for row in reached}
         orders = session.execute(
@@ -68,7 +71,6 @@ def campaign_report(session: Session, campaign: Campaign, *, money: bool) -> dic
                 Order.confirmed_at.is_not(None),
             )
         ).scalars()
-        counted: set[uuid.UUID] = set()
         for order in orders:
             sent_at = window.get(order.contact_id)
             if sent_at is None or order.confirmed_at is None or order.contact_id in counted:
@@ -93,6 +95,24 @@ def campaign_report(session: Session, campaign: Campaign, *, money: bool) -> dic
         "bajas": opted_out,
         "ventas_atribuidas": sales,
     }
+    if campaign.template_b_id is not None:
+        # A/B (Feature 013, C-106): the same numbers per template, and a warning when a side
+        # is too small to say anything.
+        report["variantes"] = {}
+        for variant in ("A", "B"):
+            mine = [row for row in rows if row.variant == variant]
+            sent = [row for row in mine if row.status in REACHED and row.sent_at is not None]
+            replied = sum(1 for row in mine if row.status == "replied")
+            sold = sum(1 for row in sent if row.contact_id in counted)
+            report["variantes"][variant] = {
+                "destinatarios": len(mine),
+                "enviados": len(sent),
+                "respondieron": replied,
+                "ventas": sold,
+                "tasa_respuesta": round(replied / len(sent), 4) if sent else None,
+                "tasa_venta": round(sold / len(sent), 4) if sent else None,
+                "muestra_pequena": len(sent) < SMALL_SAMPLE,
+            }
     if money:
         report["monto_vendido"] = {currency: str(total) for currency, total in amounts.items()}
         report["costo_estimado_usd"] = (

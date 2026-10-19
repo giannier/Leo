@@ -106,6 +106,8 @@ class DashboardSettings(Base):
     # to the owner (on by default, C-108).
     csat_activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     reporte_mensual: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # The first day of the last month whose report went out (idempotency).
+    reporte_ultimo_mes: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     def as_dict(self) -> dict[str, Any]:  # pragma: no cover - convenience
         return {"minutos_por_conversacion": self.minutes_per_conversation}

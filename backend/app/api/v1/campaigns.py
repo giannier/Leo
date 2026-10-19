@@ -572,6 +572,8 @@ class SegmentIn(BaseModel):
 class CampaignIn(BaseModel):
     name: str = Field(max_length=80)
     template_id: uuid.UUID
+    # A/B (Feature 013, C-106): half of the recipients get this one.
+    template_b_id: uuid.UUID | None = None
     segment: SegmentIn = Field(default_factory=SegmentIn)
     window_from: str = Field(default="09:00", pattern=r"^\d{2}:\d{2}$")
     window_to: str = Field(default="20:00", pattern=r"^\d{2}:\d{2}$")
@@ -598,6 +600,8 @@ class CampaignOut(BaseModel):
     name: str
     template_id: uuid.UUID
     template_label: str | None
+    template_b_id: uuid.UUID | None = None
+    template_b_label: str | None = None
     segment: dict[str, Any]
     window_from: str
     window_to: str
@@ -625,6 +629,13 @@ def _campaign_out(
         name=campaign.name,
         template_id=campaign.template_id,
         template_label=template.label if template is not None else None,
+        template_b_id=campaign.template_b_id,
+        template_b_label=(
+            b.label
+            if campaign.template_b_id
+            and (b := session.get(MessageTemplate, campaign.template_b_id))
+            else None
+        ),
         segment=campaign.segment,
         window_from=campaign.window_from,
         window_to=campaign.window_to,
