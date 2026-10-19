@@ -778,3 +778,38 @@ class TestExtendTrial:
             json={"days": 7},
         )
         assert response.status_code == 400
+
+
+class TestChannelHealth:
+    """TASK-459: whether YCloud's deliveries arrive, without reading logs."""
+
+    async def test_says_whether_the_secret_is_set_and_counts_deliveries(
+        self, api: AsyncClient, mail: Any, db: Session, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.core.config import get_settings
+        from app.models.channel import WebhookEvent
+
+        headers, _ = await _admin(api, mail, db)
+        monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", "")
+        before = (await api.get(f"{ADMIN}/channel-health", headers=headers)).json()
+        assert before["secreto_configurado"] is False
+
+        for status_ in ("processed", "dead_letter"):
+            db.add(
+                WebhookEvent(
+                    provider_event_id=f"evt-{uuid.uuid4()}",
+                    payload={},
+                    status=status_,
+                )
+            )
+        db.commit()
+        monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", "whsec_x")
+        body = (await api.get(f"{ADMIN}/channel-health", headers=headers)).json()
+        assert body["secreto_configurado"] is True
+        assert body["recibidos_24h"] == before["recibidos_24h"] + 2
+        assert body["con_error_24h"] == before["con_error_24h"] + 1
+        assert body["ultimo_webhook"] is not None
+
+    async def test_is_gated(self, api: AsyncClient, mail: Any, db: Session) -> None:
+        headers, _ = await _register(api, mail, db)
+        assert (await api.get(f"{ADMIN}/channel-health", headers=headers)).status_code == 404
