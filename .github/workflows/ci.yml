@@ -244,6 +244,12 @@ jobs:
       # obviously-fake one the development compose file uses; `Settings`
       # refuses it in staging and production.
       CREDENTIALS_ENCRYPTION_KEY: bGVvLWRldi1rZXktTk9ULWZvci1wcm9kdWN0aW9uISE=
+      # Some specs seed rows with `psql`. Locally they exec into the Postgres
+      # container; here Postgres is a service on localhost, so point `psql` at it.
+      E2E_DATABASE_URL: postgresql://leo:leo@localhost:5432/leo
+      # What the plan page shows as the way to pay. `plan.spec.ts` asserts this
+      # exact text, and the setting has no default. A made-up number, CI only.
+      BILLING_PAYMENT_INSTRUCTIONS: Yape al 999 000 111
 
     steps:
       - uses: actions/checkout@v7
@@ -274,6 +280,25 @@ jobs:
       - name: Apply migrations
         run: make migrate
 
+      - name: Start object storage
+        # Photos and library files go to S3-compatible storage; without it the
+        # upload specs (catalogue, assistant library) have nowhere to write. The
+        # credentials are `Settings`' development defaults, and the backend creates
+        # the bucket on first use. Same pinned image as `deploy/`.
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=leo-minio -e MINIO_ROOT_PASSWORD=leo-minio-secret \
+            minio/minio:RELEASE.2024-10-13T13-34-11Z server /data
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:9000/minio/health/live > /dev/null; then
+              echo "Object storage up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Object storage never became healthy."
+          docker logs minio
+          exit 1
+
       - name: Start the API
         run: |
           mkdir -p backend/.tmp
@@ -287,6 +312,19 @@ jobs:
           echo "::error::The API never became healthy."
           cat "${{ github.workspace }}/api.log"
           exit 1
+
+      - name: Start the worker
+        # Indexing a knowledge source is a queued job: without a worker it sits
+        # at "En cola" forever and the knowledge spec never sees "Listo".
+        run: |
+          uv run --directory backend arq app.workers.settings.WorkerSettings \
+            > "${{ github.workspace }}/worker.log" 2>&1 &
+          sleep 3
+          if ! pgrep -f "arq app.workers.settings.WorkerSettings" > /dev/null; then
+            echo "::error::The worker did not start."
+            cat "${{ github.workspace }}/worker.log"
+            exit 1
+          fi
 
       - name: Build and start the panel
         working-directory: frontend
@@ -325,6 +363,7 @@ jobs:
             frontend/playwright-report
             frontend/test-results
             api.log
+            worker.log
             web.log
           retention-days: 7
 

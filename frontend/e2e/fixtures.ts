@@ -22,6 +22,34 @@ import { test as base } from "@playwright/test";
 const run = promisify(execFile);
 
 const REDIS_CONTAINER = process.env.E2E_REDIS_CONTAINER ?? "leo-dev-redis-1";
+const POSTGRES_CONTAINER = process.env.E2E_POSTGRES_CONTAINER ?? "leo-dev-postgres-1";
+
+/**
+ * How a spec reaches Postgres, as the arguments for `execFile`.
+ *
+ * Locally the stack runs in Docker, so the spec execs into the Postgres container. In CI
+ * Postgres is a service on localhost with no container of that name: `E2E_DATABASE_URL`
+ * (a plain `postgresql://` URL) points `psql` straight at it.
+ */
+export function psqlCommand(args: string[]): [string, string[]] {
+  const url = process.env.E2E_DATABASE_URL;
+  if (url) {
+    return ["psql", [url, ...args]];
+  }
+  return [
+    "docker",
+    [
+      "exec",
+      POSTGRES_CONTAINER,
+      "psql",
+      "-U",
+      process.env.E2E_POSTGRES_USER ?? "leo",
+      "-d",
+      process.env.E2E_POSTGRES_DB ?? "leo",
+      ...args,
+    ],
+  ];
+}
 /** Matches `RedisRateLimiter`'s default namespace in `app/core/rate_limit.py`. */
 const KEY_PATTERN = "ratelimit:*";
 

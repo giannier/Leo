@@ -2,7 +2,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { expect, test } from "./fixtures";
+import { expect, psqlCommand, test } from "./fixtures";
 import { freshIdentity, verificationPath, waitForEmail } from "./outbox";
 
 /**
@@ -28,23 +28,17 @@ import { freshIdentity, verificationPath, waitForEmail } from "./outbox";
  */
 
 const run = promisify(execFile);
-const POSTGRES_CONTAINER = process.env.E2E_POSTGRES_CONTAINER ?? "leo-dev-postgres-1";
 
 async function psql(sql: string): Promise<string> {
-  const { stdout } = await run("docker", [
-    "exec",
-    POSTGRES_CONTAINER,
-    "psql",
-    "-U",
-    process.env.E2E_POSTGRES_USER ?? "leo",
-    "-d",
-    process.env.E2E_POSTGRES_DB ?? "leo",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "-At",
-    "-c",
-    sql,
-  ]);
+  const { stdout } = await run(
+    ...psqlCommand([
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-At",
+      "-c",
+      sql,
+    ]),
+  );
   return stdout.trim();
 }
 
