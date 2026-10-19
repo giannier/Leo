@@ -259,6 +259,9 @@ class TestTypedOutbounds:
             ("empty.png", b"", "image/png"),
             ("huge.png", b"0" * (5 * 1024 * 1024 + 1), "image/png"),
         ],
+        # Explicit, because the default id embeds the bytes: the 5 MB case made a
+        # test id longer than Windows allows for an environment variable (32767).
+        ids=["not-an-image", "empty", "too-large"],
     )
     async def test_a_bad_image_is_rejected(
         self,
