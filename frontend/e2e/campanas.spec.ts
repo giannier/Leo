@@ -145,7 +145,7 @@ test.describe("Campañas", () => {
     await expect(estimate).toContainText("2");
     await page.locator("label").filter({ hasText: /^vip$/ }).click();
     await expect(estimate).toContainText("1");
-    await expect(estimate).toContainText("US$ 0.07");
+    await expect(estimate).toContainText("US$ 0.08");
     if (shots) await page.screenshot({ path: `${shots}/campanas-nueva-${project}.png`, fullPage: true });
 
     const sealed = await sealedCredentials();

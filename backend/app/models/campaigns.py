@@ -38,6 +38,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.models.base import Base, CreatedAtMixin, TimestampMixin, UUIDPrimaryKeyMixin, enum_check
 
 TEMPLATE_CATEGORIES = ("utility", "marketing")
+# What Meta charges for: templates by category, and since 2026-10-01 free-form replies.
+RATE_CATEGORIES = (*TEMPLATE_CATEGORIES, "service")
+# Service messages free a month per number (C-111).
+FREE_SERVICE_MESSAGES = 1000
 TEMPLATE_STATUSES = ("draft", "pending", "approved", "rejected", "paused", "disabled")
 # The variables a template may use (C-105), in the order the editor offers them.
 TEMPLATE_VARIABLES = ("nombre", "negocio", "producto")
@@ -166,6 +170,10 @@ class Campaign(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The declarative filter (`app.services.campaigns.segments.Segment`).
     segment: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    # A/B (Feature 013, C-106): half of the recipients get this template instead.
+    template_b_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("message_templates.id"), nullable=True
+    )
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Local hours of the business, within 08:00-21:00 (C-003).
     window_from: Mapped[str] = mapped_column(Text, nullable=False, server_default="09:00")
@@ -185,6 +193,7 @@ class CampaignRecipient(Base):
     __tablename__ = "campaign_recipients"
     __table_args__ = (
         enum_check("status", RECIPIENT_STATUSES, "campaign_recipients_status"),
+        enum_check("variant", ("A", "B"), "campaign_recipients_variant"),
         Index("ix_campaign_recipients_tenant_id_sent_at", "tenant_id", "sent_at"),
         Index("ix_campaign_recipients_contact_id", "contact_id"),
         Index("ix_campaign_recipients_message_id", "message_id"),
@@ -200,6 +209,8 @@ class CampaignRecipient(Base):
         PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    # Which template of an A/B campaign this person gets (C-106 of Feature 013).
+    variant: Mapped[str] = mapped_column(Text, nullable=False, server_default="A")
     skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     message_id: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
@@ -216,7 +227,7 @@ class CampaignRecipient(Base):
 
 class MetaRate(Base):
     __tablename__ = "meta_rates"
-    __table_args__ = (enum_check("category", TEMPLATE_CATEGORIES, "meta_rates_category"),)
+    __table_args__ = (enum_check("category", RATE_CATEGORIES, "meta_rates_category"),)
 
     country: Mapped[str] = mapped_column(Text, primary_key=True)
     category: Mapped[str] = mapped_column(Text, primary_key=True)

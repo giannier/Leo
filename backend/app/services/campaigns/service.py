@@ -44,7 +44,12 @@ from app.repositories.campaigns import (
 from app.services.campaigns import CampaignError
 from app.services.campaigns.hooks import STOP_QUALITY
 from app.services.campaigns.segments import Segment, contact_ids, count
-from app.services.campaigns.sender import TemplateSender, connected_number, fill
+from app.services.campaigns.sender import (
+    META_MARKETING_CAP,
+    TemplateSender,
+    connected_number,
+    fill,
+)
 from app.services.followups import local_time
 from app.services.trial import billing_enforced
 
@@ -387,7 +392,8 @@ class CampaignRunner:
             recipient.conversation_id = message.conversation_id
             if message.delivery_status == "failed":
                 recipient.status = "failed"
-                recipient.skip_reason = "envio_fallido"
+                capped = META_MARKETING_CAP in (sender.last_error or "")
+                recipient.skip_reason = "tope_meta" if capped else "envio_fallido"
             else:
                 recipient.status = "sent"
                 recipient.sent_at = self._now

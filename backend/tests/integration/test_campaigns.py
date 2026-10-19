@@ -181,10 +181,10 @@ class TestScheduling:
         service = CampaignService(db, tenant.id)
         estimate = service.estimate(Segment(), service.template(campaign.template_id), now=NOON)
         assert estimate["destinatarios"] == 3
-        assert estimate["tarifa_usd"] == "0.07030"
-        assert estimate["costo_estimado_usd"] == "0.21"
+        assert estimate["tarifa_usd"] == "0.08085"  # Peru since 2026-10-01 (C-111)
+        assert estimate["costo_estimado_usd"] == "0.24"
         service.schedule(campaign, now=NOON)
-        assert campaign.status == "scheduled" and campaign.estimated_cost_usd == Decimal("0.2100")
+        assert campaign.status == "scheduled" and campaign.estimated_cost_usd == Decimal("0.2400")
 
     def test_the_plan_caps_warn_and_with_billing_on_they_stop(self, db: Session) -> None:
         tenant, _ = business(db, plan="trial")  # 1 campaign x 100 people
@@ -445,3 +445,61 @@ class TestLifecycle:
             service.update(campaign, {"name": "x", "template_id": campaign.template_id})
         with pytest.raises(CampaignError):
             service.delete(campaign)
+
+
+class TestMetaRules2026:
+    """Meta's rules since 2026-10-01 (`leo-sdd/meta-reglas-2026-10.md`)."""
+
+    async def test_metas_marketing_cap_is_told_apart(self, db: Session) -> None:
+        from app.providers.whatsapp.base import WhatsAppError
+
+        tenant, _ = business(db)
+        capped = customer(db, tenant)
+        campaign = _campaign(db, tenant)
+        CampaignService(db, tenant.id).schedule(campaign, now=NOON)
+
+        class Capped(FakeWhatsApp):
+            async def send_template(self, *args: Any, **kwargs: Any) -> Any:
+                raise WhatsAppError("YCloud refused the message (HTTP 400): code 131049")
+
+        await _run(db, Capped())
+        row = _recipients(db, campaign)[capped.id]
+        assert row.status == "failed" and row.skip_reason == "tope_meta"
+        assert "WhatsApp limitó" in str(
+            campaign_report(db, campaign, money=False)["motivos_omision"]
+        )
+
+    async def test_the_months_whatsapp_spend_counts_service_over_the_free_1000(
+        self, db: Session
+    ) -> None:
+        from app.services.campaigns.spend import whatsapp_spend
+
+        tenant, _ = business(db)
+        contact = customer(db, tenant)
+        thread = Conversation(
+            tenant_id=tenant.id, channel="whatsapp", contact_id=contact.id, status="open"
+        )
+        db.add(thread)
+        db.flush()
+        for _ in range(3):
+            db.add(
+                Message(
+                    tenant_id=tenant.id,
+                    conversation_id=thread.id,
+                    direction="outbound",
+                    author="agent",
+                    content="Hola",
+                    delivery_status="delivered",
+                )
+            )
+        campaign = _campaign(db, tenant)
+        CampaignService(db, tenant.id).schedule(campaign, now=NOON)
+        await _run(db, FakeWhatsApp())
+        db.flush()
+
+        spend = whatsapp_spend(db, tenant.id)
+        assert spend["mensajes_servicio"] == 3
+        assert spend["gratis_restantes"] == 997
+        assert spend["plantillas_marketing"] == 1
+        # 3 service messages are within the free 1,000; one marketing template at 0.08085.
+        assert spend["costo_estimado_usd"] == "0.08"

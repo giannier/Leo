@@ -799,7 +799,7 @@ class MetaRateOut(BaseModel):
 
 class MetaRateIn(BaseModel):
     country: str = Field(pattern=r"^[A-Z]{2}$")
-    category: Literal["utility", "marketing"]
+    category: Literal["utility", "marketing", "service"]
     valid_from: date
     rate_usd: Decimal = Field(gt=0, lt=1, decimal_places=5)
 

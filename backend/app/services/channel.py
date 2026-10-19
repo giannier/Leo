@@ -61,6 +61,7 @@ from app.repositories.channel import (
 from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.repositories.whatsapp import WhatsAppNumberRepository, number_by_phone
 from app.services.activation import owner_of
+from app.services.analytics import csat
 from app.services.campaigns.hooks import (
     answer_to_question,
     keeps_template_thread,
@@ -164,6 +165,9 @@ class InboundResult:
     # A fixed answer written instead of a turn (the tap on the promotions
     # question, Feature 011): sent by the caller, and the assistant is not called.
     system_reply_id: uuid.UUID | None = None
+    # With a fixed answer, whether the assistant still answers the message too (a
+    # survey reply that also asks something, Feature 013).
+    assistant_too: bool = False
 
 
 class ChannelEventProcessor:
@@ -268,6 +272,20 @@ class ChannelEventProcessor:
         track_reply(
             self._session, tenant_id, contact=contact, conversation=conversation, at=message.sent_at
         )
+        assistant_too = False
+        if reply is None and message.text:
+            # A pending satisfaction survey (Feature 013, C-103).
+            answered = csat.answer(
+                self._session,
+                tenant_id,
+                contact=contact,
+                conversation=conversation,
+                text=message.text,
+                at=message.sent_at,
+            )
+            if answered is not None:
+                reply = answered.thanks
+                assistant_too = answered.assistant
         return InboundResult(
             tenant_id=tenant_id,
             contact_id=contact.id,
@@ -275,6 +293,7 @@ class ChannelEventProcessor:
             message_id=stored.id,
             is_new=True,
             system_reply_id=reply.id if reply is not None else None,
+            assistant_too=assistant_too,
         )
 
     def _apply_opt_out(

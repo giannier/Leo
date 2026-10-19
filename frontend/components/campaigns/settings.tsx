@@ -58,7 +58,7 @@ export function SettingsPanel({ canEdit }: { canEdit: boolean }) {
       {saved ? <Alert tone="success">Guardado.</Alert> : null}
       <Card
         title="Pedir permiso para promociones"
-        description="Después de que confirmas un pago, Leo le pregunta una sola vez al cliente si quiere recibir promociones. Sin IA, sin costo."
+        description="Después de que confirmas un pago, Leo le pregunta una sola vez al cliente si quiere recibir promociones. Sin IA; cuenta como un mensaje de WhatsApp más."
       >
         <div className="grid gap-4 md:grid-cols-[1fr_16rem]">
           <Checkbox

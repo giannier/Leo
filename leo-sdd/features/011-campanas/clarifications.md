@@ -71,3 +71,14 @@ Se suma a los seguimientos de la 004: si la ventana de 24 h ya cerró (o cierra 
 negocio eligió una plantilla **utility aprobada**, el último seguimiento va como esa plantilla, sin el
 modelo. Topes duros: 1 por conversación y 2 por contacto al mes. Respeta derivación, baja y horario.
 **Registrado por:** Claude — informativa
+
+## C-111: Reglas de Meta desde el 1 de octubre de 2026
+Giannier pidió revisar los cambios de Meta (2026-10-19). Resumen en `leo-sdd/meta-reglas-2026-10.md`:
+las respuestas dentro de las 24 h (mensajes de servicio) se cobran pasadas las 1,000 gratis al mes por
+número, y las plantillas de utilidad dentro de la ventana también. En Leo: categoría `service` en
+`meta_rates` y tarifas de Perú desde el 2026-10-01 con la cifra más alta de las fuentes (marketing 0.08085,
+utilidad 0.0345, servicio 0.030; migración 0042), el gasto estimado del mes en Resultados, y el error
+131049 (tope de ~2 marketing por persona al día) como motivo propio en el reporte. La pregunta de permiso y
+la encuesta ya no son "sin costo": cuentan como un mensaje de servicio. Pendiente para Giannier: agrupar
+las respuestas del asistente en menos burbujas (cada burbuja es un mensaje cobrado).
+**Registrado por:** Claude — por ratificar

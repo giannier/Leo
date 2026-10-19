@@ -4555,7 +4555,7 @@ export interface components {
              * Category
              * @enum {string}
              */
-            category: "utility" | "marketing";
+            category: "utility" | "marketing" | "service";
             /**
              * Valid From
              * Format: date

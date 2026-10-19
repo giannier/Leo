@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -101,6 +102,10 @@ class DashboardSettings(Base):
     minutes_per_conversation: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=str(DEFAULT_MINUTES_PER_CONVERSATION)
     )
+    # Feature 013: the satisfaction survey (off by default, C-102) and the monthly email
+    # to the owner (on by default, C-108).
+    csat_activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    reporte_mensual: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     def as_dict(self) -> dict[str, Any]:  # pragma: no cover - convenience
         return {"minutos_por_conversacion": self.minutes_per_conversation}

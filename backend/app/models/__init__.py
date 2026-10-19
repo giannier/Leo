@@ -5,6 +5,7 @@ Importing every model here is what populates `Base.metadata`. Alembic's
 is invisible to autogenerate and would silently never get a migration.
 """
 
+from app.models.analytics import CsatSurvey, NpsResponse
 from app.models.audit import AuditLog
 from app.models.base import Base
 from app.models.billing import (
@@ -68,6 +69,8 @@ from app.models.user import EmailToken, OtpCode, RefreshToken, User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
+    "CsatSurvey",
+    "NpsResponse",
     "Campaign",
     "CampaignRecipient",
     "ContactOptin",
