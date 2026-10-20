@@ -14,6 +14,7 @@ from app.api.v1 import (
     connection,
     conversations,
     crm,
+    files,
     health,
     inbox,
     knowledge,
@@ -44,6 +45,7 @@ router.include_router(campaigns.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
 router.include_router(crm.router)
+router.include_router(files.router)
 router.include_router(knowledge.router)
 router.include_router(metrics.router)
 router.include_router(orders.router)

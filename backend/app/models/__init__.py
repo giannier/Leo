@@ -59,6 +59,7 @@ from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
 from app.models.sales_config import BusinessInfo, Faq, Promotion
 from app.models.situation import Situation
+from app.models.storage import StoredObject, StoredObjectChunk
 from app.models.tenant import (
     Invitation,
     Tenant,
@@ -135,6 +136,8 @@ __all__ = [
     "TenantCatalogSeen",
     "TenantRuleSwitch",
     "RefreshToken",
+    "StoredObject",
+    "StoredObjectChunk",
     "Tenant",
     "TenantLLMSettings",
     "TenantNotification",

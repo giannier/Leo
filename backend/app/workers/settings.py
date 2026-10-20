@@ -26,7 +26,7 @@ from app.core.queue import redis_settings
 from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
-from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.storage.factory import build_storage_provider
 from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
 from app.workers.analytics import CSAT_JOB, REPORT_JOB, run_csat, send_monthly_reports
@@ -66,25 +66,12 @@ from app.workers.trial_lifecycle import (
 logger = logging.getLogger(__name__)
 
 
-def build_storage_provider() -> S3StorageProvider:
-    """The configured object store."""
-    settings = get_settings()
-    return S3StorageProvider(
-        bucket=settings.s3_bucket,
-        endpoint_url=settings.s3_endpoint_url,
-        public_endpoint_url=settings.s3_public_endpoint_url,
-        access_key=settings.s3_access_key,
-        secret_key=settings.s3_secret_key,
-        region=settings.s3_region,
-    )
-
-
 async def startup(ctx: dict[str, Any]) -> None:
     """Build the shared resources every job uses."""
     settings = get_settings()
     ctx["settings"] = settings
     ctx["session_factory"] = get_session_factory()
-    ctx["storage"] = build_storage_provider()
+    ctx["storage"] = build_storage_provider(settings)
     ctx["pdf_extractor"] = PypdfTextExtractor()
     ctx["web_fetcher"] = HttpxWebFetcher(
         timeout_seconds=settings.knowledge_web_timeout_seconds,

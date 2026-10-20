@@ -18,6 +18,14 @@ class ObjectNotFoundError(StorageError):
     """No object exists at that key."""
 
 
+class ObjectTooLargeError(StorageError):
+    """The file is larger than the store accepts for one object."""
+
+
+class QuotaExceededError(StorageError):
+    """Storing the file would take its owner past their storage quota."""
+
+
 @runtime_checkable
 class StorageProvider(Protocol):
     def put(self, key: str, data: bytes, *, content_type: str) -> str:

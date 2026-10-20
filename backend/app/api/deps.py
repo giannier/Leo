@@ -70,7 +70,7 @@ from app.providers.llm.factory import platform_provider
 from app.providers.otp.base import OtpSender
 from app.providers.otp.console import ConsoleOtpSender
 from app.providers.storage.base import StorageProvider
-from app.providers.storage.s3_provider import S3StorageProvider
+from app.providers.storage.factory import build_storage_provider
 from app.providers.whatsapp.base import WhatsAppProvider
 from app.providers.whatsapp.ycloud import YCloudProvider
 from app.repositories.tenant import (
@@ -152,16 +152,8 @@ def get_redis() -> Redis:
 
 
 def get_storage_provider() -> StorageProvider:
-    """The configured object store, for PDF uploads."""
-    settings = get_settings()
-    return S3StorageProvider(
-        bucket=settings.s3_bucket,
-        endpoint_url=settings.s3_endpoint_url,
-        public_endpoint_url=settings.s3_public_endpoint_url,
-        access_key=settings.s3_access_key,
-        secret_key=settings.s3_secret_key,
-        region=settings.s3_region,
-    )
+    """The configured file store (`STORAGE_BACKEND`): uploads, photos and receipts."""
+    return build_storage_provider(get_settings())
 
 
 async def get_job_queue() -> AsyncIterator[JobQueue]:
