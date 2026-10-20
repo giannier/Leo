@@ -20,11 +20,14 @@
 
 import type { paths } from "./schema";
 import { ApiError, type ApiErrorBody, NetworkError } from "./errors";
+import { forgetKey, keyFor, writeFingerprint } from "./idempotency";
 
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 const PREFIX = "/api/v1";
 
 /** Paths that must never trigger the refresh dance. */
+const inFlight = new Map<string, Promise<unknown>>();
+
 const NO_REFRESH = new Set(["/auth/refresh", "/auth/login", "/auth/logout", "/auth/register"]);
 
 type Session = paths["/api/v1/auth/refresh"]["post"]["responses"][200]["content"]["application/json"];
@@ -66,6 +69,8 @@ interface RequestOptions {
   /** Set for the calls that must not attempt a refresh on 401. */
   skipRefresh?: boolean;
   signal?: AbortSignal;
+  /** Set by `request` for a POST, so a retry of the same press cannot create a second copy. */
+  idempotencyKey?: string;
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -106,6 +111,9 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   }
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (options.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
   }
 
   try {
@@ -172,8 +180,49 @@ export async function refreshSession(): Promise<Session | null> {
   return refreshing;
 }
 
+/* ------------------------------------------------------------------ *
+ * Writes that cannot be doubled (the helpers live in `./idempotency`).
+ *
+ * On a poor connection people press "Guardar" again and again, or the answer to the
+ * first press never arrives and the screen retries. Two defences, both here so every
+ * form has them without knowing:
+ *
+ *  1. The same write (method, path and body) already in flight is not sent again: the
+ *     second press receives the first one's answer.
+ *  2. A POST carries an `Idempotency-Key`. A retry of the same payload after a failure
+ *     reuses the key, so if the first attempt did reach the server the server answers
+ *     with what it already did instead of creating another row. A success forgets the
+ *     key, so creating the same thing on purpose later still works.
+ * ------------------------------------------------------------------ */
+
 /** One typed request, with the 401 retry built in. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const method = options.method ?? "GET";
+  // Reads and uploads are left alone: a read can be repeated freely, and a file is not
+  // something to fingerprint.
+  if (method === "GET" || options.body instanceof FormData) return perform<T>(path, options);
+
+  const fingerprint = writeFingerprint(method, path, options.body);
+  const running = inFlight.get(fingerprint);
+  if (running) return running as Promise<T>;
+
+  // A POST without a body ("duplicate this product") still gets an empty JSON one, so the
+  // server can tell it apart and protect it the same way.
+  const withKey =
+    method === "POST" && !path.startsWith("/auth/")
+      ? { ...options, body: options.body ?? {}, idempotencyKey: keyFor(fingerprint) }
+      : options;
+  const attempt = perform<T>(path, withKey)
+    .then((result) => {
+      forgetKey(fingerprint);
+      return result;
+    })
+    .finally(() => inFlight.delete(fingerprint));
+  inFlight.set(fingerprint, attempt);
+  return attempt;
+}
+
+async function perform<T>(path: string, options: RequestOptions): Promise<T> {
   let response = await send(path, options);
 
   const mayRetry = !options.skipRefresh && !NO_REFRESH.has(path);
