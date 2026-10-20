@@ -33,6 +33,9 @@ def _order(estado: str) -> Any:
         # A confirmed order wins whatever the stage says.
         ("DERIVADO", {}, _order("completado"), "ganado"),
         ("DERIVADO", {}, None, None),
+        # Handed to an advisor for a quote: interested. Handed over for any other reason: no lead.
+        ("DERIVADO", {"asesoria_derivada_en": "2026-10-20T20:00:00+00:00"}, None, "interesado"),
+        ("DERIVADO", {"derivado": {"motivo": "queja"}}, None, None),
     ],
 )
 def test_the_map(stage: str, facts: dict[str, Any], order: Any, expected: str | None) -> None:

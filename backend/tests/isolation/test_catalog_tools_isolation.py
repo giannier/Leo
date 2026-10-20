@@ -400,3 +400,42 @@ class TestKnowledge:
         assert result.status == "hecho"
         assert result.data["fragmentos"] >= 1
         assert "Abrimos de 9 a 6." in _text(result)
+
+
+class TestACategoryTheModelGuessedDoesNotCancelTheName:
+    """A business with no categories loaded: "hosting" as a name AND as a category matched
+    nothing, so the customer was shown "no match" and the CRM never heard of the lead."""
+
+    async def test_the_name_still_matches_when_the_category_does_not(
+        self, db: Session, tenant_a: TenantFixture
+    ) -> None:
+        _add(db, tenant_a, "Hosting web - Básico")
+        _add(db, tenant_a, "Página web profesional")
+
+        result = await buscar_productos(
+            _context(db, tenant_a), {"consulta": "hosting", "categoria": "hosting"}
+        )
+
+        assert result.data["coincidencia"] is True
+        assert [p["nombre"] for p in result.data["productos"]] == ["Hosting web - Básico"]
+
+    async def test_a_category_word_alone_is_tried_against_the_names(
+        self, db: Session, tenant_a: TenantFixture
+    ) -> None:
+        _add(db, tenant_a, "Hosting web - Básico")
+
+        result = await buscar_productos(_context(db, tenant_a), {"categoria": "hosting"})
+
+        assert result.data["coincidencia"] is True
+
+    async def test_a_real_category_still_narrows(
+        self, db: Session, tenant_a: TenantFixture
+    ) -> None:
+        _add(db, tenant_a, "Hosting web - Básico", category="Hosting")
+        _add(db, tenant_a, "Hosting avanzado", category="Servidores")
+
+        result = await buscar_productos(
+            _context(db, tenant_a), {"consulta": "hosting", "categoria": "Servidores"}
+        )
+
+        assert [p["nombre"] for p in result.data["productos"]] == ["Hosting avanzado"]
