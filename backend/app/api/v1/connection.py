@@ -185,7 +185,7 @@ async def get_number(principal: MemberDep, session: SessionDep) -> WhatsAppNumbe
     summary="Connect your WhatsApp number with your own YCloud account",
     responses=error_responses(
         (400, "`invalid_api_key`, `number_not_in_account` or `webhook_not_created`"),
-        (403, "`phone_not_verified` or `insufficient_role`"),
+        (403, "`insufficient_role`"),
         (409, "`phone_already_connected`"),
         (502, "`provider_unavailable`"),
         *AUTH_RESPONSES,
@@ -208,12 +208,6 @@ async def connect_number(
             display_name=payload.display_name,
             provider=provider,
         )
-    except PhoneNotVerified as exc:
-        raise ApiError(
-            status_code=status.HTTP_403_FORBIDDEN,
-            error="phone_not_verified",
-            message="Verify your contact phone before connecting a number.",
-        ) from exc
     except PhoneAlreadyConnected as exc:
         raise ApiError(
             status_code=status.HTTP_409_CONFLICT,

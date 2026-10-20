@@ -185,7 +185,7 @@ export default function RegisterPage() {
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          hint="Opcional ahora. Lo vas a necesitar para conectar tu número de WhatsApp."
+          hint="Opcional. Es solo un dato de contacto: no te pedimos verificarlo."
           value={form.phone_e164}
           error={errors.phone_e164}
           onChange={(e) => set("phone_e164", e.target.value)}
