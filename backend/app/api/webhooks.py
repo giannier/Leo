@@ -23,16 +23,29 @@ import logging
 
 from fastapi import APIRouter, Header, Request, Response, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.api.deps import JobQueueDep, SessionDep, WhatsAppProviderDep
 from app.api.errors import ApiError
-from app.core.config import get_settings
+from app.repositories.whatsapp import number_by_webhook_token
 from app.services.channel import WebhookIntake
+from app.services.connection import read_credentials
 from app.workers.channel import PROCESS_EVENT_JOB
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+
+
+def _secret_for(session: Session, token: str) -> str | None:
+    """The signing secret of the number this URL belongs to, if there is one."""
+    number = number_by_webhook_token(session, token)
+    if number is None or number.status != "connected":
+        return None
+    credentials = read_credentials(number)
+    if credentials is None:
+        return None
+    return credentials.values.get("webhook_secret") or None
 
 
 class WebhookAck(BaseModel):
@@ -47,13 +60,14 @@ class WebhookAck(BaseModel):
 
 
 @router.post(
-    "/ycloud",
+    "/ycloud/{token}",
     response_model=WebhookAck,
     status_code=status.HTTP_200_OK,
-    summary="Receive one YCloud delivery",
+    summary="Receive one YCloud delivery for one number",
     include_in_schema=False,
 )
 async def receive_ycloud(
+    token: str,
     request: Request,
     response: Response,
     session: SessionDep,
@@ -61,17 +75,22 @@ async def receive_ycloud(
     queue: JobQueueDep,
     ycloud_signature: str | None = Header(default=None, alias="YCloud-Signature"),
 ) -> WebhookAck:
-    """Accept a delivery, store it, and hand it to a worker."""
+    """Accept a delivery, store it, and hand it to a worker.
+
+    Every business has its own YCloud account and so its own signing secret. The
+    token in the URL says whose; the signature is then checked against that
+    number's secret, never a platform-wide one.
+    """
     # The raw bytes, before any parsing. The signature is over exactly these:
     # re-serialising the parsed object changes key order and whitespace, and a
     # check written against that rejects every genuine delivery - which then
     # gets "fixed" by deleting the check.
     raw_body = await request.body()
 
-    intake = WebhookIntake(session, provider=provider, secret=get_settings().ycloud_webhook_secret)
+    intake = WebhookIntake(session, provider=provider, secret=_secret_for(session, token))
     if not intake.is_signed(raw_body=raw_body, header=ycloud_signature):
-        # Logged at warning because it is either a misconfiguration or
-        # somebody probing, and both deserve to be visible (HU-01).
+        # An unknown token and a bad signature answer the same, so the response
+        # cannot be used to find out which tokens exist.
         logger.warning(
             "refused an unsigned webhook delivery",
             extra={"had_header": ycloud_signature is not None, "bytes": len(raw_body)},

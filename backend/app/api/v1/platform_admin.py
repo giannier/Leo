@@ -491,7 +491,6 @@ class ChannelHealth(BaseModel):
     """Whether WhatsApp deliveries can reach Leo (TASK-459): the first thing to check when a
     connected number "receives nothing"."""
 
-    secreto_configurado: bool
     numeros_conectados: int
     ultimo_webhook: datetime | None
     recibidos_24h: int
@@ -517,7 +516,6 @@ def channel_health(admin: PlatformAdminDep, session: SessionDep) -> ChannelHealt
         select(func.count()).select_from(WhatsAppNumber).where(WhatsAppNumber.status == "connected")
     ).scalar_one()
     return ChannelHealth(
-        secreto_configurado=bool(get_settings().ycloud_webhook_secret),
         numeros_conectados=int(connected),
         ultimo_webhook=last,
         recibidos_24h=sum(counts.values()),

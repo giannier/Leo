@@ -1,0 +1,19 @@
+# Override para esta VPS (ya hay nginx-proxy-manager en 80/443):
+#   docker compose -f deploy/docker-compose.prod.yml -f deploy/docker-compose.vps.yml \
+#     --env-file deploy/.env.prod up -d --build
+# El proxy host de NPM apunta a leo-gateway:80 (red public_network).
+services:
+  caddy:
+    container_name: leo-gateway
+    ports: !reset []
+    volumes: !override
+      - ./Caddyfile.vps:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - public_network
+
+networks:
+  public_network:
+    external: true

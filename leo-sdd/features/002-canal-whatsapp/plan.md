@@ -80,3 +80,23 @@ Unit: parser de payloads YCloud (fixtures reales anonimizados), cálculo ventana
 
 ## Estimación
 1.5–2 semanas. Complejidad: Alta (confiabilidad y concurrencia).
+
+
+## Decisiones posteriores
+
+### Webhook y secreto por número (Giannier, 2026-10-20)
+Cada negocio trae su propia cuenta de YCloud (el plan gratuito limita los números por cuenta, y es como ya
+operan sus empresas). Cada cuenta firma con su propio secreto, así que el secreto único de la plataforma
+(`YCLOUD_WEBHOOK_SECRET`) se eliminó, junto con la ruta `POST /webhooks/ycloud`.
+- **Ruta:** `POST /webhooks/ycloud/{token}`. `whatsapp_numbers.webhook_token` (64 hex, único, migración
+  `0046`) dice de quién es la entrega; la firma se verifica con el `webhook_secret` de ese número, guardado
+  cifrado junto a sus credenciales. Token desconocido, número desconectado o sin secreto y firma mala
+  responden igual (401).
+- **Conexión sin humanos:** `POST /tenant/whatsapp-number` con la clave API y el número. Leo lista los números
+  de esa cuenta (la clave prueba la propiedad), crea el webhook con `POST /v2/webhookEndpoints` y guarda el
+  secreto que devuelve. Si algo falla después de crear el webhook, lo borra. Nadie en la plataforma es un
+  caso especial.
+- **Eventos suscritos:** entrantes, estados, plantillas y, si YCloud acepta el nombre, calidad del número. Si
+  rechaza el nombre de un evento opcional se reintenta con los imprescindibles.
+- **Cola de solicitudes (`/admin`):** sigue existiendo para solicitudes previas, pero un número conectado por
+  ahí no tiene secreto de webhook y no recibe mensajes hasta reconectarlo desde el panel del negocio.

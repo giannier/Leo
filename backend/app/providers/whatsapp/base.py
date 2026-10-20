@@ -53,6 +53,10 @@ class InvalidCredentials(WhatsAppError):
     """The credentials supplied do not describe a usable number."""
 
 
+class NumberNotInAccount(WhatsAppError):
+    """The key is valid but its account does not hold the number asked for."""
+
+
 class WhatsAppAuthError(WhatsAppError):
     """The provider rejected the credential. Retrying will not help."""
 
@@ -80,6 +84,23 @@ class NumberCredentials:
 
     provider: str
     values: dict[str, str]
+
+
+@dataclass(frozen=True)
+class DiscoveredNumber:
+    """A number as the provider's own account lists it."""
+
+    phone_e164: str
+    waba_id: str
+    phone_number_id: str
+
+
+@dataclass(frozen=True)
+class WebhookRegistration:
+    """A webhook the provider now delivers to, and the secret it signs with."""
+
+    endpoint_id: str
+    secret: str
 
 
 @dataclass(frozen=True)
@@ -417,6 +438,23 @@ class WhatsAppProvider(Protocol):
         Refuses a link that does not belong to the provider (the credential must
         never be sent anywhere else) and a file larger than `max_bytes`.
         """
+        ...
+
+    async def discover_number(self, *, api_key: str, phone_e164: str) -> DiscoveredNumber:
+        """Find a number in the account this key belongs to.
+
+        Proves the caller controls the number: only the account that owns it can
+        list it. Raises `WhatsAppAuthError` for a key the provider refuses and
+        `NumberNotInAccount` when the account does not hold that number.
+        """
+        ...
+
+    async def register_webhook(self, *, api_key: str, url: str) -> WebhookRegistration:
+        """Make the provider deliver this account's events to `url`."""
+        ...
+
+    async def remove_webhook(self, *, api_key: str, endpoint_id: str) -> None:
+        """Undo `register_webhook`. Best effort: callers use it to clean up."""
         ...
 
     def verify_signature(self, *, raw_body: bytes, header: str | None, secret: str) -> bool:

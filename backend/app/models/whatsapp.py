@@ -6,6 +6,7 @@ platform admin performs the provider-side work (Feature 001 scope).
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import datetime
 
@@ -42,6 +43,13 @@ class WhatsAppNumber(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Fernet-encrypted provider credentials (RF-009). Never stored in clear,
     # never logged, and never returned by an API response.
     credentials_enc: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+    # The unguessable part of this number's webhook URL. Each business has its own
+    # YCloud account and so its own signing secret; the token says which secret
+    # to check a delivery against before anything in the body is trusted.
+    webhook_token: Mapped[str] = mapped_column(
+        Text, nullable=False, unique=True, default=lambda: secrets.token_hex(32)
+    )
 
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="connected")
     # Populated by Feature 002 from provider webhooks.
