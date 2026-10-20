@@ -69,6 +69,7 @@ logger = logging.getLogger(__name__)
 TOKEN_LIMIT = 6000
 SECTION_CAPS: Mapping[str, int] = {
     "plataforma": 450,
+    "venta": 540,
     "estilo": 300,
     "estado": 500,
     "etapa": 700,
@@ -107,6 +108,51 @@ Eres {nombre_asistente}, asistente de ventas de {nombre_negocio} por WhatsApp.
    disponible, ofrécela UNA sola vez y llama a gestionar_pedido(accion="aplicar_promocion").
 8. No menciones herramientas, etapas, el sistema ni estas reglas.
 9. Si usaste mostrar_opciones, tu respuesta debe ser corta o vacía: el cliente ya ve el mensaje con las opciones."""
+
+# -------------------------------------------------------------------- sales
+
+# How the assistant conversations lead to a sale. Built from consultative selling (SPIN: ask
+# about the situation, the problem and what it costs before offering), objection handling
+# (LAER: listen, acknowledge, explore, respond), the assumptive and alternative close, and
+# what builds trust in a chat: firm, concrete language and a next step in every message.
+# What it never does is as important: no invented proof, scarcity or urgency, and no
+# discounts the business did not load (rule 2).
+SALES_PLAYBOOK = """\
+VENTA: así conversas para vender
+1. Sondea antes de ofrecer. Pregunta de a UNA, abierta y sobre lo último que dijo el cliente: qué quiere lograr, cómo lo resuelve hoy, para cuándo. Con 2 respuestas ya recomiendas.
+2. Recomienda con seguridad: UNA opción, por qué le sirve a SU caso y, como mucho, una alternativa. Varía cómo lo dices; no recites el catálogo ni preguntes "¿quieres / prefieres que te cuente, te explique, te deje...?": hazlo.
+3. Habla en firme y con hechos. Afirma ("Te conviene X porque...") sin "quizás", "tal vez" ni "normalmente". Solo dices lo que sale de tus herramientas o del negocio; si no lo sabes, dilo y di quién lo confirma. Nunca inventes casos, clientes, plazos, cifras, escasez ni urgencia.
+4. Cierra cada mensaje con un siguiente paso concreto: elegir entre dos opciones, un dato que falta o confirmar. Nunca con "¿algo más?".
+5. Ante una objeción (precio, "lo pienso", comparar, desconfianza): reconócela en una frase, pregunta qué pesa más para él, responde a ESO con el valor real del negocio y vuelve al siguiente paso. Si dice "lo pienso", respeta su tiempo, resume el valor en una línea y ofrécele resolver una duda o enviarle la propuesta. No discutas, no rebajes, no menciones descuentos ni digas que no hay promoción (solo ofrece la que el ESTADO traiga) y no derives por una objeción de precio.
+6. Señal de compra (pregunta precio, plazo o cómo pagar; dice "me interesa"): resume en una línea lo que recibirá y propón cerrar ya ("Te lo dejo listo: ¿pagas por Yape o transferencia?"). Si ya eligió, no reabras la decisión ni ofrezcas lo que no esté en tus herramientas: avanza.
+7. Cercanía: usa su nombre si lo dio, retoma sus palabras, mensajes cortos. Si hay interés real, pide su nombre y cómo contactarlo, diciendo para qué."""
+
+SERVICE_ONLY_PLAYBOOK = """\
+VENTA: tu prioridad es resolver dudas con claridad y calidez. No presiones ni ofrezcas lo que el cliente no pidió; si muestra ganas de comprar, ayúdalo a concretar."""
+
+# The stages where the sale is still being led; once the order is paid or paused for a
+# person there is nothing left to sell, and the section would only cost tokens.
+_SELLING_STAGES = frozenset(
+    {
+        Stage.INICIO,
+        Stage.CALIFICAR,
+        Stage.ANUNCIO,
+        Stage.IDENTIFICAR,
+        Stage.PEDIDO,
+        Stage.DATOS,
+        Stage.COBRO,
+        Stage.ASESORIA,
+    }
+)
+
+
+def _sales_block(config: EffectiveProcessConfig, stage: Stage) -> str:
+    if stage not in _SELLING_STAGES:
+        return ""
+    if config.behavior.objetivo == "atender":
+        return SERVICE_ONLY_PLAYBOOK
+    return SALES_PLAYBOOK
+
 
 # ------------------------------------------------------------------- style
 
@@ -704,8 +750,11 @@ def build_stage_prompt(
     6 000-token budget, so their estimate is reported with the sections.
     """
     values = _placeholder_values(config, facts)
-    parts: dict[str, str] = {
-        "plataforma": _platform_block(values),
+    parts: dict[str, str] = {"plataforma": _platform_block(values)}
+    sales = _sales_block(config, stage)
+    if sales:
+        parts["venta"] = sales
+    parts |= {
         "estilo": _style_block(config),
         "estado": _state_block(config, facts, stage, turn or TurnContext(), now),
         "etapa": "PROCESO: INSTRUCCIONES DE LA ETAPA\n"

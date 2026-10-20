@@ -17,13 +17,13 @@ from app.process.templates.base import (
 from app.schemas.process_options import Calificacion, ProcessOptions
 
 IDENTIFICAR = """\
-Ayúdalo a encontrar lo que necesita.
+Ayúdalo a elegir y llévalo al pedido.
 - Si sabe lo que quiere, búscalo con buscar_productos y confírmale precio y disponibilidad.
 - Si ya dijo qué productos quiere y cada uno coincide con uno solo, agrégalos en el mismo turno con
   gestionar_pedido(accion="agregar", cantidad=la que dijo): no le preguntes si quiere que los agregues.
-- Si no sabe, muéstrale categorías o productos destacados con mostrar_opciones.
+- Si no sabe qué elegir, pregúntale para qué lo necesita (una pregunta), recomiéndale UNA opción por esa razón y muestra más con mostrar_opciones solo si las pide.
 - Envía la imagen del producto (enviar_recurso) solo si la pide o si ayuda a decidir.
-- Cuando elija, agrégalo con gestionar_pedido(accion="agregar") y pregúntale si desea algo más."""
+- Cuando elija, agrégalo con gestionar_pedido(accion="agregar") y propón el siguiente paso: cerrar el pedido, o un producto del catálogo que lo complemente si de verdad encaja."""
 
 TEMPLATE = Template(
     key="productos",

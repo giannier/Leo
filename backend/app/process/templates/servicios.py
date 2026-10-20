@@ -22,11 +22,10 @@ MAX_SERVICE_LINES = 3
 
 IDENTIFICAR = """\
 Entiende qué necesita antes de ofrecer.
-- Haz máximo 2 preguntas para entender su necesidad (qué quiere lograr, para cuándo, tamaño).
-- Busca con buscar_productos el servicio que corresponda.
-- Si el servicio es de precio fijo y el cliente dice que lo quiere o lo contrata, agrégalo en el mismo turno con gestionar_pedido: no le preguntes si quieres agregarlo. Si solo pregunta, explícalo.
-- Si es de cotización, pide los datos clave para cotizar y llama a derivar_a_humano con un resumen claro
-  (qué necesita, plazos, presupuesto si lo dijo). Dile que un asesor le enviará la cotización."""
+- Pregunta de a una, abierta y sobre lo último que dijo (qué quiere lograr, cómo lo resuelve hoy, para cuándo). Con 2 respuestas ya recomiendas; no hagas más de 3 preguntas en total.
+- Con lo que contó, busca con buscar_productos y recomienda UNA opción explicando por qué le sirve a su caso.
+- Si el servicio es de precio fijo y el cliente dice que lo quiere, lo contrata o muestra interés claro ("me interesa", "¿cómo seguimos?", "¿cómo pago?"), agrégalo en el mismo turno con gestionar_pedido: no le preguntes si quieres agregarlo. Si solo pregunta, explícalo y propón el siguiente paso.
+- Si es de cotización, o lo que necesita es a medida o junta varios servicios: resume en dos líneas lo que entendiste (qué necesita, plazo, presupuesto si lo dijo) y pídele su nombre y correo, explicando que es para que el asesor le envíe la propuesta, y espera su respuesta. Con su nombre y correo (o si prefiere no darlos) no pidas más datos ni uses registrar_datos_cliente: llama a derivar_a_humano(motivo="asesoria") con ese resumen, incluyendo esos datos, y dile que un asesor le escribirá pronto."""
 
 TEMPLATE = Template(
     key="servicios",

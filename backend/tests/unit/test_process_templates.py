@@ -240,7 +240,7 @@ class TestWhatDiffersBetweenTemplates:
         assert len(set(texts.values())) == 3
         assert "SIEMPRE SÍ" in texts["certificaciones"]
         assert "cotización" in texts["servicios"]
-        assert "categorías o productos destacados" in texts["productos"]
+        assert "para qué lo necesita" in texts["productos"]
 
     def test_certificaciones_overrides_inicio_pedido_and_asesoria_only(self) -> None:
         base = TEMPLATES["productos"]
