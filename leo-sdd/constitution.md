@@ -47,7 +47,10 @@ bandeja, ve sus métricas), sus **operadores** (empleados que atienden la bandej
   con reintentos y dead-letter; el webhook responde 200 de inmediato)
 - **LLM:** Adaptador multi-proveedor; modelo configurable por tenant/tarea/plan.
   Inicial: modelo económico con visión y tool use; modelo superior para planes premium
-- **Storage de archivos:** S3-compatible (MinIO en el VPS) para PDFs, imágenes, comprobantes
+- **Storage de archivos:** PostgreSQL (tablas de trozos, detrás del puerto `StorageProvider`) para
+  PDFs, imágenes, comprobantes; S3-compatible sigue soportado por configuración
+  (`STORAGE_BACKEND=s3`). Decisión de Giannier, 2026-10-19: MinIO ya no publica imágenes oficiales
+  descargables (ver `features/001-onboarding/plan.md`, "Decisiones Posteriores")
 - **Frontend:** Next.js 15 + React + Tailwind CSS
 - **Pagos del SaaS:** Adaptador `PaymentProvider` (inicial: Mercado Pago/Culqi; Stripe después)
 - **Testing:** pytest + pytest-asyncio; evals de agente con dataset propio
