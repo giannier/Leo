@@ -15,6 +15,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { CheckIcon } from "@/components/icons";
 import { cx } from "@/components/ui";
 import { api } from "@/lib/api/client";
 
@@ -147,10 +148,14 @@ export function AssistantHeader({ title, description }: { title: string; descrip
   );
 }
 
-/** "Guardado" next to a save button, for a moment. */
+/** "Guardado" next to a save button, for a moment, as a green pill. */
 export function Saved({ show }: { show: boolean }) {
   return show ? (
-    <span role="status" className="text-sm text-success">
+    <span
+      role="status"
+      className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-sm font-semibold text-success"
+    >
+      <CheckIcon className="size-4" />
       Guardado
     </span>
   ) : null;

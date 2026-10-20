@@ -8,16 +8,28 @@
 
 import { useEffect, useState } from "react";
 
+import { useBlock } from "@/components/assistant/block-context";
 import { Saved } from "@/components/assistant/section-nav";
 import { PhoneField, isCompletePhone } from "@/components/phone-field";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Checkbox, Field, Select, TextArea } from "@/components/ui";
 import { api, type Behavior, type BehaviorBody, type InfoSection } from "@/lib/api/client";
 import { ApiError, humanMessage } from "@/lib/api/errors";
 
 type Data = Record<string, unknown>;
 
-/** Load one section, and save it with a status line. */
+const SECTION_NAMES: Record<string, string> = {
+  entregas: "Entregas",
+  locales: "Locales y horarios",
+  tipos_cliente: "Tipos de cliente",
+  devoluciones: "Cambios y devoluciones",
+  contacto: "Contacto",
+};
+
+/** Load one section, and save it: a toast says so and the card closes. */
 function useSection(section: InfoSection) {
+  const toast = useToast();
+  const block = useBlock();
   const [data, setData] = useState<Data | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +53,8 @@ function useSection(section: InfoSection) {
       setData(response.data as Data);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
+      toast.success("Guardado", SECTION_NAMES[section] ?? "Tus cambios están guardados.");
+      block?.saved();
     } catch (caught) {
       // "Revisa los datos marcados" alone is useless when the form marks nothing:
       // say which field the server rejected.
@@ -473,6 +487,8 @@ export function DiscountPolicyForm() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
+  const block = useBlock();
 
   useEffect(() => {
     api.assistant
@@ -500,6 +516,8 @@ export function DiscountPolicyForm() {
           });
           setSaved(true);
           window.setTimeout(() => setSaved(false), 2500);
+          toast.success("Guardado", "Política de descuentos");
+          block?.saved();
         } catch (caught) {
           setError(humanMessage(caught));
         } finally {

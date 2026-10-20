@@ -105,3 +105,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* A toast slides up from the bottom edge; reduced motion gets it without the slide. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.toast-in {
+  animation: toast-in 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-in {
+    animation: none;
+  }
+}

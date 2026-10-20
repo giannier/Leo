@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CloseIcon } from "@/components/icons";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Checkbox, Field, Select, TextArea, cx } from "@/components/ui";
 import { api, type Photo, type Product, type ProductBody } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -111,6 +112,7 @@ export function ProductEditor({
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
 
@@ -141,6 +143,7 @@ export function ProductEditor({
         : await api.products.create(body);
       setCurrent(result);
       setSaved(true);
+      toast.success("Guardado", result.name);
       onSaved(result);
     } catch (caught) {
       setFailure(humanMessage(caught));

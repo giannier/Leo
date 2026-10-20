@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Saved } from "@/components/assistant/section-nav";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Checkbox, Field, Select, TextArea } from "@/components/ui";
 import {
   api,
@@ -48,6 +49,7 @@ function MethodRow({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   const label = METHOD_LABEL.get(method.method) ?? method.method;
   const photo = images.find((m) => m.id === method.media_asset_id);
@@ -68,6 +70,7 @@ function MethodRow({
       setEditing(false);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
+      toast.success("Guardado", `Método de pago: ${label}`);
     } catch (caught) {
       setError(humanMessage(caught));
     } finally {
@@ -89,6 +92,7 @@ function MethodRow({
     try {
       await api.payments.remove(method.id);
       onChanged();
+      toast.success("Quitado", `Método de pago: ${label}`);
     } catch (caught) {
       setError(humanMessage(caught));
     }
@@ -166,6 +170,7 @@ export function PaymentMethods() {
   const [error, setError] = useState<string | null>(null);
   const [newMethod, setNewMethod] = useState("");
   const [newInstructions, setNewInstructions] = useState("");
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -204,6 +209,7 @@ export function PaymentMethods() {
               setNewMethod("");
               setNewInstructions("");
               await load();
+              toast.success("Agregado", `Método de pago: ${METHOD_LABEL.get(newMethod) ?? newMethod}`);
             } catch (caught) {
               setError(humanMessage(caught));
             }
@@ -242,6 +248,7 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
   const [question, setQuestion] = useState(seedQuestion);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -274,6 +281,7 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
               onClick={async () => {
                 await api.assistant.removeFaq(faq.id);
                 await load();
+                toast.success("Borrada", "Pregunta frecuente");
               }}
             >
               Borrar
@@ -292,6 +300,7 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
             setQuestion("");
             setAnswer("");
             await load();
+            toast.success("Guardado", "Pregunta frecuente agregada");
           } catch (caught) {
             setError(humanMessage(caught));
           }
@@ -334,6 +343,7 @@ function describe(p: Promotion): string {
 export function Promotions() {
   const [items, setItems] = useState<Promotion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
   const [form, setForm] = useState({
     nombre: "",
     tipo: "porcentaje",
@@ -375,6 +385,7 @@ export function Promotions() {
       await api.assistant.createPromotion(body as PromotionBody);
       set({ nombre: "", valor: "" });
       await load();
+      toast.success("Guardado", "Promoción agregada");
     } catch (caught) {
       setError(humanMessage(caught));
     }
@@ -400,6 +411,7 @@ export function Promotions() {
               onClick={async () => {
                 await api.assistant.removePromotion(promo.id);
                 await load();
+                toast.success("Quitada", "Promoción");
               }}
             >
               Quitar
