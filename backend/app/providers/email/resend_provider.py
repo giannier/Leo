@@ -29,11 +29,15 @@ class ResendEmailProvider:
         *,
         api_key: str,
         sender: str,
+        reply_to: str | None = None,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._api_key = api_key
         self._sender = sender
+        # Where answers go when a message names no address of its own: the sender is
+        # usually a no-reply that has no mailbox.
+        self._reply_to = reply_to
         self._timeout = timeout
         # `None` is httpx's own default, so nothing changes in production.
         # The suite passes a `MockTransport`, which is the only way to check
@@ -49,8 +53,9 @@ class ResendEmailProvider:
         }
         if message.text:
             payload["text"] = message.text
-        if message.reply_to:
-            payload["reply_to"] = message.reply_to
+        reply_to = message.reply_to or self._reply_to
+        if reply_to:
+            payload["reply_to"] = reply_to
 
         try:
             async with httpx.AsyncClient(
