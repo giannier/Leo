@@ -6,52 +6,80 @@
  * starts the "own rules" layer with an empty screen.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { CheckIcon } from "@/components/icons";
 import { Alert, Button, Field } from "@/components/ui";
-import { api, type RubroView } from "@/lib/api/client";
+import { api, type RubroView, type Situation } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 
 type Suggestion = RubroView["situaciones_sugeridas"][number];
 
-function Row({ suggestion }: { suggestion: Suggestion }) {
+/** `situations.titulo` keeps the first 80 characters of the suggestion's title. */
+const titleOf = (suggestion: Suggestion) => suggestion.titulo.slice(0, 80);
+
+function Row({
+  suggestion,
+  existing,
+  onChanged,
+}: {
+  suggestion: Suggestion;
+  /** The business's own copy of this suggestion, if it already made one. */
+  existing: Situation | undefined;
+  onChanged: () => Promise<void>;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fields = Object.entries(suggestion.campos);
   const ready = fields.every(([key]) => values[key]?.trim());
+  const active = existing?.estado === "activa";
+
+  async function activate() {
+    setBusy(true);
+    setError(null);
+    try {
+      // A copy that already exists is switched on, never duplicated.
+      const target = existing ?? (await api.assistant.fromSuggested(suggestion.id, values));
+      await api.assistant.setSituation(target.id, true);
+      await onChanged();
+    } catch (caught) {
+      setError(humanMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <li className="space-y-2 rounded-lg border border-line p-3" data-testid="suggested-situation">
       <p className="text-sm font-semibold text-ink">{suggestion.titulo}</p>
       <p className="text-sm text-ink-soft">{suggestion.que_hace}</p>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {done ? (
-        <p className="text-sm text-success">Activada.</p>
+      {active ? (
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-sm font-semibold text-success">
+          <CheckIcon className="size-4" />
+          Activada
+        </p>
       ) : (
         <>
-          {fields.map(([key, label]) => (
-            <Field key={key} label={label} value={values[key] ?? ""} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />
-          ))}
+          {existing ? (
+            <p className="text-xs text-ink-faint">Ya la tienes guardada, pero está apagada.</p>
+          ) : (
+            fields.map(([key, label]) => (
+              <Field
+                key={key}
+                label={label}
+                value={values[key] ?? ""}
+                onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+              />
+            ))
+          )}
           <Button
             type="button"
             variant="secondary"
             loading={busy}
-            disabled={!ready}
-            onClick={async () => {
-              setBusy(true);
-              setError(null);
-              try {
-                const created = await api.assistant.fromSuggested(suggestion.id, values);
-                await api.assistant.setSituation(created.id, true);
-                setDone(true);
-              } catch (caught) {
-                setError(humanMessage(caught));
-              } finally {
-                setBusy(false);
-              }
-            }}
+            disabled={!existing && !ready}
+            onClick={() => void activate()}
           >
             Activar
           </Button>
@@ -63,12 +91,25 @@ function Row({ suggestion }: { suggestion: Suggestion }) {
 
 export function SuggestedSituations() {
   const [rubro, setRubro] = useState<RubroView | null>(null);
+  const [mine, setMine] = useState<Situation[]>([]);
+
+  // What the business already made from these suggestions: read again on every visit, so
+  // an activated one still says "Activada" after a refresh.
+  const loadMine = useCallback(async () => {
+    try {
+      setMine((await api.assistant.situations({ origen: "sugerida_rubro" })).items);
+    } catch {
+      setMine([]);
+    }
+  }, []);
+
   useEffect(() => {
     api.assistant
       .rubro()
       .then(setRubro)
       .catch(() => setRubro(null));
-  }, []);
+    void loadMine();
+  }, [loadMine]);
   const suggestions = rubro?.situaciones_sugeridas.slice(0, 5) ?? [];
   if (!suggestions.length) return null;
   return (
@@ -82,7 +123,16 @@ export function SuggestedSituations() {
       </div>
       <ul className="space-y-2">
         {suggestions.map((s) => (
-          <Row key={s.id} suggestion={s} />
+          <Row
+            key={s.id}
+            suggestion={s}
+            // An active copy wins over an older switched-off one with the same title.
+            existing={
+              mine.find((m) => m.titulo === titleOf(s) && m.estado === "activa") ??
+              mine.find((m) => m.titulo === titleOf(s))
+            }
+            onChanged={loadMine}
+          />
         ))}
       </ul>
     </section>
