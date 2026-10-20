@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { Saved } from "@/components/assistant/section-nav";
 import { Alert, Button, Checkbox, Field, Select, TextArea } from "@/components/ui";
 import {
   api,
@@ -45,10 +46,12 @@ function MethodRow({
   const [qr, setQr] = useState(method.media_asset_id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function save() {
     setBusy(true);
     setError(null);
+    setSaved(false);
     try {
       await api.payments.update(method.id, {
         instructions,
@@ -56,6 +59,9 @@ function MethodRow({
         media_asset_id: qr || null,
       });
       onChanged();
+      // The button stops spinning in a blink; without this nothing says it worked.
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
     } catch (caught) {
       setError(humanMessage(caught));
     } finally {
@@ -86,7 +92,7 @@ function MethodRow({
         onChange={(e) => setQr(e.target.value)}
         hint="Súbela antes en Multimedia."
       />
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <Button type="button" loading={busy} onClick={() => void save()}>
           Guardar
         </Button>
@@ -94,12 +100,18 @@ function MethodRow({
           type="button"
           variant="ghost"
           onClick={async () => {
-            await api.payments.remove(method.id);
-            onChanged();
+            setError(null);
+            try {
+              await api.payments.remove(method.id);
+              onChanged();
+            } catch (caught) {
+              setError(humanMessage(caught));
+            }
           }}
         >
           Quitar
         </Button>
+        <Saved show={saved} />
       </div>
     </div>
   );
