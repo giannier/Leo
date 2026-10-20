@@ -17,7 +17,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { AlertIcon, CheckIcon, ClockIcon, PhoneIcon } from "@/components/icons";
-import { Alert, Button, Card, Field, Skeleton, TextArea, cx } from "@/components/ui";
+import { PhoneField, isCompletePhone } from "@/components/phone-field";
+import { Alert, Button, Card, Field, Skeleton, cx } from "@/components/ui";
 import {
   api,
   type ConnectionRequest,
@@ -29,7 +30,6 @@ import { MANAGES_CONFIGURATION, useHasRole } from "@/lib/session";
 
 /** WhatsApp caps the display name at 25 characters. */
 const MAX_DISPLAY_NAME = 25;
-const E164 = /^\+[1-9]\d{7,14}$/;
 
 const STAGES = [
   { key: "requested", label: "Recibida", what: "Tenemos tu solicitud en la cola." },
@@ -307,7 +307,7 @@ function ConnectForm({
   onConnected: () => Promise<void>;
 }) {
   const [apiKey, setApiKey] = useState("");
-  const [phone, setPhone] = useState("+51");
+  const [phone, setPhone] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [errors, setErrors] = useState<{ apiKey?: string; phone?: string; displayName?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -327,7 +327,7 @@ function ConnectForm({
 
     const found: typeof errors = {};
     if (apiKey.trim().length < 10) found.apiKey = "Pega la clave API completa de YCloud.";
-    if (!E164.test(phone.trim())) found.phone = "Usa el formato +51987654321.";
+    if (!isCompletePhone(phone)) found.phone = "Elige el país y escribe el número completo.";
     if (!displayName.trim()) found.displayName = "Escribe el nombre que verán tus clientes.";
     if (displayName.trim().length > MAX_DISPLAY_NAME) {
       found.displayName = `WhatsApp permite hasta ${MAX_DISPLAY_NAME} caracteres.`;
@@ -342,7 +342,7 @@ function ConnectForm({
     try {
       await api.connection.connect({
         api_key: apiKey.trim(),
-        phone_e164: phone.trim(),
+        phone_e164: phone,
         display_name: displayName.trim(),
       });
       setApiKey("");
@@ -388,16 +388,14 @@ function ConnectForm({
           onChange={(e) => setApiKey(e.target.value)}
         />
 
-        <Field
+        <PhoneField
           label="Número de WhatsApp"
           name="phone_e164"
-          type="tel"
-          inputMode="tel"
           required
-          hint="Con código de país, tal como aparece en tu cuenta de YCloud."
+          hint="El número tal como aparece en tu cuenta de YCloud."
           value={phone}
           error={errors.phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={setPhone}
         />
 
         <Field

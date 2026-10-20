@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { Saved } from "@/components/assistant/section-nav";
+import { PhoneField, isCompletePhone } from "@/components/phone-field";
 import { Alert, Button, Checkbox, Field, Select, TextArea } from "@/components/ui";
 import { api, type Behavior, type BehaviorBody, type InfoSection } from "@/lib/api/client";
 import { ApiError, humanMessage } from "@/lib/api/errors";
@@ -426,17 +427,13 @@ export function ContactForm() {
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
-        // "51974667498", "+51 974 667 498" and "(51) 974-667-498" are the same number.
-        const digits = phone.replace(/[\s\-().]/g, "");
-        const normalized = digits && !digits.startsWith("+") ? `+${digits}` : digits;
-        if (normalized && !/^\+[1-9]\d{7,14}$/.test(normalized)) {
-          setPhoneError("Usa el formato +51987654321: el signo +, el código de país y el número.");
+        if (phone && !isCompletePhone(phone)) {
+          setPhoneError("El número parece incompleto. Revisa que tenga todos sus dígitos.");
           return;
         }
         setPhoneError(null);
-        setPhone(normalized);
         void save({
-          telefono_humano: normalized || null,
+          telefono_humano: phone || null,
           correo: email.trim() || null,
           web: web.trim() || null,
           redes: (data?.redes as Record<string, string> | undefined) ?? {},
@@ -444,13 +441,15 @@ export function ContactForm() {
       }}
     >
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <Field
+      <PhoneField
         label="Teléfono de una persona"
-        placeholder="+51987654321"
-        hint="Con código de país. El asistente lo da cuando alguien pide hablar con una persona."
+        hint="Elige el país y escribe el número. El asistente lo da cuando alguien pide hablar con una persona."
         value={phone}
         error={phoneError ?? undefined}
-        onChange={(e) => setPhone(e.target.value)}
+        onChange={(value) => {
+          setPhone(value);
+          setPhoneError(null);
+        }}
       />
       <Field label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Field label="Web" placeholder="https://..." value={web} onChange={(e) => setWeb(e.target.value)} />
