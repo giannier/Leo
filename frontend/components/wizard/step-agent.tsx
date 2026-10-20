@@ -251,7 +251,7 @@ export function StepAgent({ onSaved }: StepProps) {
       <Field
         label="Saludo (opcional)"
         name="saludo"
-        maxLength={120}
+        maxLength={400}
         placeholder="¡Hola! Bienvenido a Escuela Capacita"
         value={form.saludo}
         onChange={(e) => set({ saludo: e.target.value })}
