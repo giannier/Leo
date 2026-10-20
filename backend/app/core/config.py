@@ -257,6 +257,8 @@ class Settings(BaseSettings):
     # Transactional email (Resend)
     resend_api_key: str | None = None
     email_from: str = "Leo <onboarding@example.com>"
+    # A real mailbox for answers when `email_from` is a no-reply address.
+    email_reply_to: str | None = None
 
     # Which provider to build. `auto` picks Resend when a key is present and
     # falls back to the console in development.
