@@ -170,6 +170,7 @@ export function PaymentMethods() {
   const [error, setError] = useState<string | null>(null);
   const [newMethod, setNewMethod] = useState("");
   const [newInstructions, setNewInstructions] = useState("");
+  const [adding, setAdding] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -198,6 +199,8 @@ export function PaymentMethods() {
           className="grid gap-2 rounded-lg border border-dashed border-line-strong p-3"
           onSubmit={async (event) => {
             event.preventDefault();
+            if (adding) return;
+            setAdding(true);
             setError(null);
             try {
               await api.payments.create({
@@ -212,6 +215,8 @@ export function PaymentMethods() {
               toast.success("Agregado", `Método de pago: ${METHOD_LABEL.get(newMethod) ?? newMethod}`);
             } catch (caught) {
               setError(humanMessage(caught));
+            } finally {
+              setAdding(false);
             }
           }}
         >
@@ -230,7 +235,7 @@ export function PaymentMethods() {
                 value={newInstructions}
                 onChange={(e) => setNewInstructions(e.target.value)}
               />
-              <Button type="submit" disabled={!newInstructions.trim()}>
+              <Button type="submit" loading={adding} disabled={!newInstructions.trim()}>
                 Agregar
               </Button>
             </>
@@ -248,6 +253,7 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
   const [question, setQuestion] = useState(seedQuestion);
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -294,6 +300,8 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
         className="grid gap-2"
         onSubmit={async (event) => {
           event.preventDefault();
+          if (adding) return;
+          setAdding(true);
           setError(null);
           try {
             await api.assistant.createFaq({ pregunta: question, respuesta: answer });
@@ -303,13 +311,15 @@ export function Faqs({ seedQuestion = "" }: { seedQuestion?: string }) {
             toast.success("Guardado", "Pregunta frecuente agregada");
           } catch (caught) {
             setError(humanMessage(caught));
+          } finally {
+            setAdding(false);
           }
         }}
       >
         <Field label="Pregunta" value={question} onChange={(e) => setQuestion(e.target.value)} />
         <TextArea label="Respuesta" rows={2} value={answer} onChange={(e) => setAnswer(e.target.value)} />
         <div>
-          <Button type="submit" disabled={question.trim().length < 3 || !answer.trim()}>
+          <Button type="submit" loading={adding} disabled={question.trim().length < 3 || !answer.trim()}>
             Agregar pregunta
           </Button>
         </div>
@@ -343,6 +353,7 @@ function describe(p: Promotion): string {
 export function Promotions() {
   const [items, setItems] = useState<Promotion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const toast = useToast();
   const [form, setForm] = useState({
     nombre: "",
@@ -370,6 +381,8 @@ export function Promotions() {
   const set = (patch: Partial<typeof form>) => setForm({ ...form, ...patch });
 
   async function create() {
+    if (adding) return;
+    setAdding(true);
     setError(null);
     const body: Record<string, unknown> = { nombre: form.nombre, tipo: form.tipo, uso: form.uso };
     if (form.tipo === "nxm") {
@@ -388,6 +401,8 @@ export function Promotions() {
       toast.success("Guardado", "Promoción agregada");
     } catch (caught) {
       setError(humanMessage(caught));
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -461,7 +476,7 @@ export function Promotions() {
         ) : null}
         <Field label="Termina (opcional)" type="datetime-local" value={form.termina_en} onChange={(e) => set({ termina_en: e.target.value })} />
         <div className="sm:col-span-2">
-          <Button type="submit" disabled={!form.nombre.trim()}>
+          <Button type="submit" loading={adding} disabled={!form.nombre.trim()}>
             Agregar promoción
           </Button>
         </div>

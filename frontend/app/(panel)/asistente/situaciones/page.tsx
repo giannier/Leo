@@ -196,18 +196,23 @@ function FromSuggestion({
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
     <Card title={`Usar «${suggestion.titulo}»`} description={suggestion.que_hace}>
       <form
         className="space-y-3"
         onSubmit={async (event) => {
           event.preventDefault();
+          if (busy) return;
+          setBusy(true);
           setError(null);
           try {
             await api.assistant.fromSuggested(suggestion.id, values);
             onDone();
           } catch (caught) {
             setError(humanMessage(caught));
+          } finally {
+            setBusy(false);
           }
         }}
       >
@@ -215,7 +220,9 @@ function FromSuggestion({
         {Object.entries(suggestion.campos).map(([key, label]) => (
           <Field key={key} label={label} value={values[key] ?? ""} onChange={(e) => setValues({ ...values, [key]: e.target.value })} />
         ))}
-        <Button type="submit">Crear como borrador</Button>
+        <Button type="submit" loading={busy}>
+          Crear como borrador
+        </Button>
       </form>
     </Card>
   );

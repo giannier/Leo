@@ -109,6 +109,8 @@ const MESSAGES: Record<string, string> = {
 
   // Generic
   validation_error: "Revisa los datos marcados.",
+  request_in_progress: "Tu solicitud anterior sigue en curso. Espera un momento y revisa antes de volver a intentarlo.",
+  idempotency_key_reuse: "No pudimos repetir esa acción. Recarga la página e inténtalo de nuevo.",
   rate_limited: "Demasiados intentos. Espera un momento.",
   internal_error: "Algo falló de nuestro lado. Intenta de nuevo.",
 };

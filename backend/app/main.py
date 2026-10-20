@@ -8,6 +8,7 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.v1 import router as v1_router
 from app.api.webhooks import router as webhooks_router
 from app.core.config import get_settings
+from app.core.idempotency import IdempotencyMiddleware
 from app.core.logging import configure_logging
 
 DOCS_URL = "/docs"
@@ -25,6 +26,9 @@ def create_app() -> FastAPI:
         docs_url=DOCS_URL,
         redoc_url=REDOC_URL,
     )
+
+    # Inside CORS, so a replayed response still gets its CORS headers.
+    app.add_middleware(IdempotencyMiddleware)
 
     app.add_middleware(
         CORSMiddleware,
