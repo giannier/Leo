@@ -161,6 +161,31 @@ class TestTheApi:
             await api.post(f"{API}/desde-sugerida/{foreign.id}", headers=headers, json={})
         ).json()["error"] == "unknown_suggestion"
 
+    async def test_the_same_suggestion_is_not_copied_twice(
+        self, api: AsyncClient, mail: Any, db: Session, queue: RecordingQueue
+    ) -> None:
+        """A double click, or a screen that forgot the suggestion was already made, used
+        to leave the business with two identical cards."""
+        _, headers = await _account(api, mail)
+        await api.put(
+            f"{TENANT}/business-profile",
+            headers=headers,
+            json={"business_name": "Capacita", "industry": "instituto"},
+        )
+        catalog = CatalogRepository(db)
+        version = catalog.published("rubro", "instituto")
+        assert version is not None
+        plain = next(s for s in catalog.suggested_situations(version.id) if not s.campos)
+        url = f"{API}/desde-sugerida/{plain.id}"
+
+        first = await api.post(url, headers=headers, json={"valores": {}})
+        second = await api.post(url, headers=headers, json={"valores": {}})
+        mine = (await api.get(API, headers=headers, params={"origen": "sugerida_rubro"})).json()
+
+        assert first.status_code == second.status_code == 201
+        assert first.json()["id"] == second.json()["id"]
+        assert len([s for s in mine["items"] if s["titulo"] == first.json()["titulo"]]) == 1
+
     async def test_the_wizard_free_text_becomes_the_migrated_situation(
         self, api: AsyncClient, mail: Any, queue: RecordingQueue
     ) -> None:

@@ -155,6 +155,18 @@ class SituationService:
         )
         if suggestion is None:
             raise SituationError("unknown_suggestion", "esa situación sugerida no es de tu rubro")
+        # The same suggestion twice is a double click or a screen that forgot it had been
+        # made: hand back the copy the business already has instead of a second one.
+        already = next(
+            (
+                existing
+                for existing in self._repo.listing(origen="sugerida_rubro")
+                if existing.titulo == suggestion.titulo[:80]
+            ),
+            None,
+        )
+        if already is not None:
+            return already
         missing = [label for key, label in suggestion.campos.items() if not valores.get(key)]
         if missing:
             raise SituationError("missing_fields", f"completa: {', '.join(missing)}")
