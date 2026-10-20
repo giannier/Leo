@@ -194,7 +194,7 @@ async def _notify(
     if target is None:
         return
 
-    panel_url = f"{get_settings().frontend_base_url.rstrip('/')}/canal"
+    panel_url = f"{get_settings().frontend_base_url.rstrip('/')}/channel"
     message = (
         build_number_connected_email(
             to=target.email,
