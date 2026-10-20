@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IN_FLIGHT, SourceCard } from "@/components/knowledge/source-card";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Card, Field, Select, Skeleton, TextArea } from "@/components/ui";
 import { api, type KnowledgeList } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -33,10 +34,23 @@ export default function KnowledgePage() {
   const [data, setData] = useState<KnowledgeList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listTop = useRef<HTMLDivElement>(null);
+  const lastStatus = useRef<Map<string, string>>(new Map());
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
       const next = await api.knowledge.list();
+      // Indexing happens in the background: say when a source that was being read is done,
+      // since the person has usually scrolled away from the list by then.
+      for (const source of next.sources) {
+        const before = lastStatus.current.get(source.id);
+        if (before && IN_FLIGHT.has(before) && !IN_FLIGHT.has(source.status)) {
+          if (source.status === "indexed") toast.success("Listo", `${source.title} ya está leído`);
+          else toast.error("No se pudo leer", `${source.title}: ${source.error_msg ?? "revisa la fuente"}`);
+        }
+        lastStatus.current.set(source.id, source.status);
+      }
       setData(next);
       setError(null);
       return next;
@@ -44,7 +58,7 @@ export default function KnowledgePage() {
       setError(humanMessage(caught));
       return null;
     }
-  }, []);
+  }, [toast]);
 
   const refresh = useCallback(async () => {
     if (timer.current) clearTimeout(timer.current);
@@ -53,6 +67,16 @@ export default function KnowledgePage() {
       timer.current = setTimeout(() => void refresh(), POLL_MS);
     }
   }, [load]);
+
+  /** After adding something: tell the person, and bring the list (where it appears) into view. */
+  const added = useCallback(
+    async (message: string) => {
+      toast.success("Recibido", message);
+      await refresh();
+      listTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [refresh, toast],
+  );
 
   useEffect(() => {
     void refresh();
@@ -81,6 +105,7 @@ export default function KnowledgePage() {
         </p>
       ) : null}
 
+      <div ref={listTop} className="scroll-mt-4" />
       {data === null ? (
         <Skeleton className="h-40 w-full" />
       ) : data.sources.length === 0 ? (
@@ -97,9 +122,9 @@ export default function KnowledgePage() {
 
       {canEdit ? (
         <div className="grid gap-4 lg:grid-cols-3">
-          <AddText onAdded={refresh} />
-          <AddPdf onAdded={refresh} />
-          <AddWeb onAdded={refresh} />
+          <AddText onAdded={() => added("Tu texto quedó guardado y se está indexando.")} />
+          <AddPdf onAdded={() => added("Subimos tu PDF. Lo estamos leyendo; te avisamos cuando esté listo.")} />
+          <AddWeb onAdded={() => added("Estamos leyendo tu web. Puede tardar un minuto; te avisamos cuando esté lista.")} />
         </div>
       ) : null}
     </div>
