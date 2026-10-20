@@ -269,7 +269,10 @@ SHOP_DATA = (
 SCHOOL_DATA = (
     "Me llamo Luis Pérez Rojas, DNI 45678912, correo luis.perez@mail.com, celular 976543210"
 )
-AGENCY_DATA = "Soy Carla Díaz, RUC 20123456789, correo carla@empresa.pe, celular 912345678"
+AGENCY_DATA = (
+    "Soy Carla Díaz, de la empresa Díaz Constructores SAC, RUC 20123456789, "
+    "correo carla@empresa.pe, celular 912345678"
+)
 
 FLOW_CASES: tuple[FlowCase, ...] = (
     # ---------------------------------------------------------------- productos
@@ -431,7 +434,14 @@ FLOW_CASES: tuple[FlowCase, ...] = (
     _case(
         "servicios",
         "una web se cotiza con una persona",
-        ["Hola", "Quiero una página web para mi restaurante, con carta y reservas"],
+        [
+            "Hola",
+            "Quiero una página web para mi restaurante, con carta y reservas",
+            # v3 asks for a name and an email before handing a quote to an advisor.
+            "Soy Carla Díaz, carla@empresa.pe",
+            # It may ask for the company before handing over; either way it ends handed over.
+            "Mi empresa es Restaurante Díaz SAC",
+        ],
         ["DERIVADO"],
         ["derivar_a_humano"],
     ),

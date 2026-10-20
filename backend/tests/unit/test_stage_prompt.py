@@ -356,8 +356,19 @@ def test_a_full_business_stays_under_6000_tokens_in_every_stage(
     config = make_config(template_key, full=True)
     prompt = build_stage_prompt(config, full_facts(), stage, now=NOW, situations=long_situations())
 
-    for name in ("plataforma", "estilo", "negocio", "estado", "etapa", "rubro", "situaciones"):
-        assert prompt.sections[name] <= SECTION_CAPS[name], f"{name}: {prompt.sections[name]}"
+    for name in (
+        "plataforma",
+        "venta",
+        "estilo",
+        "negocio",
+        "estado",
+        "etapa",
+        "rubro",
+        "situaciones",
+    ):
+        # "venta" is absent once the sale is over (paid or paused for a person).
+        used = prompt.sections.get(name, 0)
+        assert used <= SECTION_CAPS[name], f"{name}: {used}"
     # What the registry's tool definitions may add on top.
     assert prompt.tokens + TOOLS_ALLOWANCE <= TOKEN_LIMIT
 

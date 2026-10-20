@@ -36,7 +36,10 @@ from tests.integration.test_turn_pipeline import (
     _tenant,
 )
 
-DEFAULT_TEXT = "Te comunico con una persona de nuestro equipo. Te responde en breve."
+DEFAULT_TEXT = (
+    "Listo 🙌 Ya le pasé a nuestro equipo lo que necesitas, para que no tengas que repetirlo. "
+    "Una persona te escribe por aquí en breve."
+)
 
 
 class RecordingNotices:

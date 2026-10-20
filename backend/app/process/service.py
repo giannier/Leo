@@ -77,6 +77,8 @@ class Behavior:
     tratamiento: str = "tu"
     emojis: str = "pocos"
     saludo: str | None = None
+    # vender | atender | ambos: how hard the assistant leads toward the sale.
+    objetivo: str = "ambos"
     politica_descuentos: str = "solo_promociones"
     descuento_maximo_pct: Decimal | None = None
     max_situaciones: int = 5
@@ -301,6 +303,7 @@ def _behavior(agent: AgentConfig | None) -> Behavior:
         tratamiento=agent.tratamiento or "tu",
         emojis=agent.emojis or "pocos",
         saludo=agent.saludo or None,
+        objetivo=agent.objective or "ambos",
         politica_descuentos=agent.politica_descuentos or "solo_promociones",
         descuento_maximo_pct=agent.descuento_maximo_pct,
         max_situaciones=agent.max_situaciones or 5,

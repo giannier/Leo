@@ -293,6 +293,14 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
     rows = products.search_active(
         query, categoria=categoria, solo_paquetes=only_bundles, limit=MAX_CATALOG_RESULTS
     )
+    if not rows and query and categoria:
+        # The category is the model's guess and many businesses have none loaded: what the
+        # customer said (the name) must not be cancelled by a category that matches nothing.
+        rows = products.search_active(query, solo_paquetes=only_bundles, limit=MAX_CATALOG_RESULTS)
+    if not rows and categoria and not query:
+        rows = products.search_active(
+            categoria, solo_paquetes=only_bundles, limit=MAX_CATALOG_RESULTS
+        )
     narrowed = bool(query or categoria or only_bundles)
     missed = False
     if not rows and narrowed:

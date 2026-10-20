@@ -11,7 +11,7 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Alert, Button, Skeleton, TextArea, cx } from "@/components/ui";
 import { WhatsAppText } from "@/components/whatsapp-text";
@@ -136,6 +136,77 @@ export function Thread({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Scrolling, as in WhatsApp: at the bottom, new messages carry you with them; reading
+  // further up, nothing moves and a button says how many arrived.
+  const scroller = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const lastSeen = useRef<{ conversation: string | null; last: string | null; count: number }>({
+    conversation: null,
+    last: null,
+    count: 0,
+  });
+  const [away, setAway] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const box = scroller.current;
+    if (!box) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    box.scrollTo({ top: box.scrollHeight, behavior: smooth && !reduced ? "smooth" : "auto" });
+    atBottom.current = true;
+    setAway(false);
+    setUnread(0);
+  }, []);
+
+  const onScroll = useCallback(() => {
+    const box = scroller.current;
+    if (!box) return;
+    const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    atBottom.current = near;
+    setAway(!near);
+    if (near) setUnread(0);
+  }, []);
+
+  const conversationId = detail?.id ?? null;
+  const lastId = messages && messages.length > 0 ? messages[messages.length - 1].id : null;
+  const total = messages?.length ?? 0;
+
+  useLayoutEffect(() => {
+    const seen = lastSeen.current;
+    if (messages === null || conversationId === null) return;
+    if (seen.conversation !== conversationId) {
+      // Another conversation: start at the last message.
+      lastSeen.current = { conversation: conversationId, last: lastId, count: total };
+      scrollToBottom(false);
+      return;
+    }
+    if (lastId !== seen.last) {
+      // Older messages loaded at the top keep the same last one; a different last one is news.
+      const added = Math.max(1, total - seen.count);
+      const incoming = messages
+        .slice(-added)
+        .filter((m) => m.tipo !== "event" && m.autor === "customer").length;
+      lastSeen.current = { conversation: conversationId, last: lastId, count: total };
+      if (atBottom.current) scrollToBottom(true);
+      else if (incoming > 0) setUnread((n) => n + incoming);
+    } else {
+      lastSeen.current = { ...seen, count: total };
+    }
+  }, [conversationId, lastId, total, messages, scrollToBottom]);
+
+  // A bubble that loads late (a photo) grows the list: stay at the bottom if you were there.
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const list = box.firstElementChild;
+    if (!list) return;
+    const watcher = new ResizeObserver(() => {
+      if (atBottom.current) box.scrollTop = box.scrollHeight;
+    });
+    watcher.observe(list);
+    return () => watcher.disconnect();
+  }, [conversationId]);
+
   if (!detail || !messages) return <Skeleton className="h-96 w-full" />;
 
   const id = detail.id;
@@ -234,19 +305,45 @@ export function Thread({
         {error ? <Alert tone="danger">{error}</Alert> : null}
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-canvas p-3">
-        {earlier ? (
-          <div className="mb-3 flex justify-center">
-            <Button type="button" variant="ghost" onClick={onLoadEarlier}>
-              Ver anteriores
-            </Button>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={scroller}
+          onScroll={onScroll}
+          className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-canvas p-3"
+          data-testid="thread-scroll"
+        >
+          <div>
+            {earlier ? (
+              <div className="mb-3 flex justify-center">
+                <Button type="button" variant="ghost" onClick={onLoadEarlier}>
+                  Ver anteriores
+                </Button>
+              </div>
+            ) : null}
+            <ul className="space-y-2" data-testid="thread">
+              {messages.map((message) => (
+                <Bubble key={message.id} message={message} conversationId={id} />
+              ))}
+            </ul>
           </div>
+        </div>
+        {away ? (
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            data-testid="thread-jump"
+            className={cx(
+              "absolute bottom-3 right-4 flex min-h-11 cursor-pointer items-center gap-2 rounded-full",
+              "bg-accent px-4 text-sm font-semibold text-accent-fg shadow-lg hover:bg-accent-hover",
+            )}
+          >
+            <span aria-hidden="true">↓</span>
+            {unread > 0 ? `${unread} ${unread === 1 ? "mensaje nuevo" : "mensajes nuevos"}` : "Ir al último"}
+          </button>
         ) : null}
-        <ul className="space-y-2" data-testid="thread">
-          {messages.map((message) => (
-            <Bubble key={message.id} message={message} conversationId={id} />
-          ))}
-        </ul>
+        <span role="status" className="sr-only">
+          {unread > 0 ? `${unread} mensajes nuevos sin leer` : ""}
+        </span>
       </div>
 
       <form
@@ -258,6 +355,7 @@ export function Thread({
           void act(async () => {
             await api.conversations.send(id, body);
             setText("");
+            atBottom.current = true;
           });
         }}
       >
