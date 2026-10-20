@@ -382,6 +382,47 @@ class TestResend:
             )
 
 
+class TestResendDefaultReplyTo:
+    """A no-reply sender needs somewhere for answers to land."""
+
+    async def _sent(
+        self, provider_reply_to: str | None, message_reply_to: str | None
+    ) -> dict[str, Any]:
+        seen: list[dict[str, Any]] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(_json(request))
+            return httpx.Response(200, json={"id": "em_1"})
+
+        provider = ResendEmailProvider(
+            api_key="re_k",
+            sender="Leo <no-responder@mail.example.com>",
+            reply_to=provider_reply_to,
+            transport=httpx.MockTransport(handler),
+        )
+        await provider.send(
+            EmailMessage(
+                to=("ana@example.com",),
+                subject="Hola",
+                html="<p>Hola</p>",
+                reply_to=message_reply_to,
+            )
+        )
+        return seen[0]
+
+    async def test_the_configured_address_is_used_when_the_message_has_none(self) -> None:
+        body = await self._sent("soporte@example.com", None)
+        assert body["reply_to"] == "soporte@example.com"
+
+    async def test_a_message_s_own_address_wins(self) -> None:
+        body = await self._sent("soporte@example.com", "ventas@example.com")
+        assert body["reply_to"] == "ventas@example.com"
+
+    async def test_without_either_nothing_is_sent(self) -> None:
+        body = await self._sent(None, None)
+        assert "reply_to" not in body
+
+
 def _json(request: httpx.Request) -> dict[str, Any]:
     import json
 
