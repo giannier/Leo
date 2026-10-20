@@ -61,7 +61,6 @@ PENDING_LABELS = {
     "agent_config_complete": "Configurar la personalidad de tu agente",
     "has_active_product": "Cargar al menos un producto o servicio",
     "has_payment_method": "Indicar como te pueden pagar",
-    "phone_verified": "Verificar tu telefono de contacto",
 }
 
 

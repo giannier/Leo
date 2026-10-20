@@ -49,11 +49,6 @@ const ITEMS: Record<string, { label: string; href: string; help: string }> = {
     href: "/onboarding",
     help: "Yape, Plin, transferencia. El agente lo explica tal cual lo escribas.",
   },
-  phone_verified: {
-    label: "Verificar tu teléfono de contacto",
-    href: "/verify-phone",
-    help: "Lo pedimos antes de conectar tu número de WhatsApp.",
-  },
 };
 
 export default function PanelHome() {

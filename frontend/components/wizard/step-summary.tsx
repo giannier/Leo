@@ -45,11 +45,6 @@ const FIX: Record<string, { label: string; step?: number; href?: string; why: st
     step: 5,
     why: "Sin esto no puede cerrar una venta.",
   },
-  phone_verified: {
-    label: "Tu teléfono de contacto",
-    href: "/verify-phone",
-    why: "Lo pedimos antes de conectar tu número de WhatsApp.",
-  },
 };
 
 export function StepSummary({
