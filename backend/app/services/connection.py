@@ -110,16 +110,17 @@ class ConnectionService:
         """Connect a number with the business's own YCloud account, no human in between.
 
         The API key is the proof of ownership: only the account that holds the
-        number can list it. Leo then creates the webhook in that account and keeps
-        the secret YCloud returns, so the business never copies a URL or a secret
-        by hand.
+        number can list it, so the contact phone does not need verifying. Leo then
+        creates the webhook in that account and keeps the secret YCloud returns, so
+        the business never copies a URL or a secret by hand.
 
         Order matters. The webhook is created last among the remote calls and
         removed again if anything after it fails, so a refused connection does not
         leave a stray endpoint pointing at Leo in somebody's account.
         """
-        if user.phone_verified_at is None:
-            raise PhoneNotVerified("verify your contact phone before connecting a number")
+        # No OTP of the contact phone is asked for here: the API key is already the
+        # proof. Only the YCloud account that holds a number can list it, and the
+        # webhook Leo creates in that account can only be created by its owner.
         if self._global.is_connected(phone_e164):
             raise PhoneAlreadyConnected(phone_e164)
 

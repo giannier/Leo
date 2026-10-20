@@ -44,12 +44,10 @@ ChecklistKey = Literal[
     "agent_config_complete",
     "has_active_product",
     "has_payment_method",
-    "phone_verified",
 ]
 
-# Items 1-5. Item 6 (phone) gates the *connection request*, not the sandbox
-# (Clarification 005), so a customer can try their agent before proving a
-# phone number they may not even have chosen yet.
+# The contact phone is not on the list: connecting a number is proved by the
+# business's own YCloud API key, so no one-time code is asked for.
 SANDBOX_ITEMS: tuple[ChecklistKey, ...] = (
     "email_verified",
     "business_profile_complete",
@@ -150,7 +148,6 @@ def build_checklist(
             has_payment or not payment_required,
             required=payment_required,
         ),
-        ChecklistItem("phone_verified", user.phone_verified_at is not None),
     )
 
     by_key = {entry.key: entry for entry in items}

@@ -133,6 +133,21 @@ class TestConnecting:
         assert len(recorded) == 1
 
 
+class TestNoPhoneVerification:
+    async def test_the_contact_phone_does_not_need_a_one_time_code(
+        self, api: AsyncClient, app: FastAPI, mail: Any, db: Session
+    ) -> None:
+        """The API key is the proof of ownership, so nobody is asked to verify a
+        phone before connecting a number."""
+        headers, _ = await _owner(api, mail, db, phone_verified=False)
+        phone = _unique_number()
+        _use(app, YCloudStub(phone))
+
+        response = await api.post(f"{TENANT}/whatsapp-number", headers=headers, json=_body(phone))
+
+        assert response.status_code == 201
+
+
 class TestRefusals:
     async def test_a_key_youtube_rejects_is_400(
         self, api: AsyncClient, app: FastAPI, mail: Any, db: Session
@@ -158,18 +173,6 @@ class TestRefusals:
 
         assert response.status_code == 400
         assert response.json()["error"] == "number_not_in_account"
-
-    async def test_an_unverified_phone_cannot_connect(
-        self, api: AsyncClient, app: FastAPI, mail: Any, db: Session
-    ) -> None:
-        headers, _ = await _owner(api, mail, db, phone_verified=False)
-        phone = _unique_number()
-        _use(app, YCloudStub(phone))
-
-        response = await api.post(f"{TENANT}/whatsapp-number", headers=headers, json=_body(phone))
-
-        assert response.status_code == 403
-        assert response.json()["error"] == "phone_not_verified"
 
     async def test_a_number_already_connected_elsewhere_is_409_and_creates_nothing(
         self, api: AsyncClient, app: FastAPI, mail: Any, db: Session
