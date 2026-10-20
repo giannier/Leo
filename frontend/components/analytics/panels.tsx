@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 
 import { money } from "@/components/crm/lead-drawer";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Checkbox, Skeleton, cx } from "@/components/ui";
 import {
   api,
@@ -179,6 +180,7 @@ export function SatisfactionPanel({ range, canConfigure }: { range: Range; canCo
   const [settings, setSettings] = useState<AnalyticsSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     api.analytics.csat(range).then(setData).catch((caught) => setError(humanMessage(caught)));
@@ -192,6 +194,7 @@ export function SatisfactionPanel({ range, canConfigure }: { range: Range; canCo
     try {
       setSettings(await api.analytics.saveSettings(next));
       setSaved(true);
+      toast.success("Guardado", "Ajustes de resultados");
     } catch (caught) {
       setSettings(before);
       setError(humanMessage(caught));

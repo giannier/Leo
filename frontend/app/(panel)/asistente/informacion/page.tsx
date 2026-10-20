@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 
+import { BlockContext } from "@/components/assistant/block-context";
 import { Faqs, PaymentMethods, Promotions } from "@/components/assistant/info-lists";
 import {
   ContactForm,
@@ -19,6 +20,7 @@ import {
   ReturnsForm,
 } from "@/components/assistant/info-sections";
 import { AssistantHeader } from "@/components/assistant/section-nav";
+import { CheckIcon } from "@/components/icons";
 import { cx } from "@/components/ui";
 
 const BLOCKS = [
@@ -35,6 +37,8 @@ const BLOCKS = [
 
 export default function BusinessInfoPage() {
   const [open, setOpen] = useState<string>("pagos");
+  // Blocks saved in this visit: closed, with a green mark that stays in the header.
+  const [done, setDone] = useState<ReadonlySet<string>>(new Set());
   const [question, setQuestion] = useState("");
 
   // From the simulator: "Agregar una pregunta frecuente" (Feature 018, HU-06).
@@ -53,19 +57,32 @@ export default function BusinessInfoPage() {
       <div className="space-y-3">
         {BLOCKS.map((block) => {
           const expanded = open === block.key;
+          const justSaved = done.has(block.key) && !expanded;
           return (
             <section key={block.key} className="rounded-xl border border-line bg-surface">
               <h2>
                 <button
                   type="button"
                   aria-expanded={expanded}
-                  onClick={() => setOpen(expanded ? "" : block.key)}
+                  onClick={() => {
+                    setOpen(expanded ? "" : block.key);
+                    // Opening it again is editing again: the mark no longer holds.
+                    if (!expanded) setDone((d) => new Set([...d].filter((k) => k !== block.key)));
+                  }}
                   className={cx(
                     "flex min-h-12 w-full cursor-pointer items-center justify-between px-5 text-left",
                     "text-base font-semibold text-ink",
                   )}
                 >
-                  {block.title}
+                  <span className="flex flex-wrap items-center gap-2">
+                    {block.title}
+                    {justSaved ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
+                        <CheckIcon className="size-3.5" />
+                        Guardado
+                      </span>
+                    ) : null}
+                  </span>
                   <span aria-hidden="true" className="text-ink-faint">
                     {expanded ? "−" : "+"}
                   </span>
@@ -73,7 +90,16 @@ export default function BusinessInfoPage() {
               </h2>
               {expanded ? (
                 <div className="border-t border-line p-5">
-                  {block.key === "faqs" ? <Faqs key={question} seedQuestion={question} /> : block.body}
+                  <BlockContext.Provider
+                    value={{
+                      saved: () => {
+                        setOpen("");
+                        setDone((d) => new Set(d).add(block.key));
+                      },
+                    }}
+                  >
+                    {block.key === "faqs" ? <Faqs key={question} seedQuestion={question} /> : block.body}
+                  </BlockContext.Provider>
                 </div>
               ) : null}
             </section>
