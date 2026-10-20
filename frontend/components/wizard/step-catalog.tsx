@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertIcon, BoxIcon, CloseIcon } from "@/components/icons";
 import { Alert, Button, Field, Skeleton, TextArea, cx } from "@/components/ui";
+import { ProductEditor } from "@/components/catalog/product-editor";
 import { api, type ImportPreview, type Product } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { StepIntro, type StepProps } from "./shared";
@@ -27,6 +28,8 @@ const PREVIEW_ERRORS_SHOWN = 8;
 
 export function StepCatalog({ onSaved }: StepProps) {
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [editing, setEditing] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -36,6 +39,11 @@ export function StepCatalog({ onSaved }: StepProps) {
       setProducts(page.items);
     } catch (caught) {
       setError(humanMessage(caught));
+    }
+    try {
+      setCategories((await api.assistant.categories()).items.map((c) => c.nombre));
+    } catch {
+      // The editor still works by typing a category; the list is a convenience.
     }
   }, []);
 
@@ -68,9 +76,22 @@ export function StepCatalog({ onSaved }: StepProps) {
         </Alert>
       ) : null}
 
-      <ProductList products={products} onChanged={afterChange} />
+      <ProductList products={products} onChanged={afterChange} onEdit={setEditing} />
       <AddProduct onAdded={afterChange} />
       <ImportProducts onImported={afterChange} />
+
+      {editing ? (
+        <ProductEditor
+          product={editing}
+          categories={categories}
+          onClose={() => {
+            // Photos change without a save, so the list is read again on close.
+            setEditing(null);
+            void afterChange();
+          }}
+          onSaved={() => void afterChange()}
+        />
+      ) : null}
     </div>
   );
 }
@@ -80,9 +101,11 @@ export function StepCatalog({ onSaved }: StepProps) {
 function ProductList({
   products,
   onChanged,
+  onEdit,
 }: {
   products: Product[] | null;
   onChanged: () => Promise<void>;
+  onEdit: (product: Product) => void;
 }) {
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -132,6 +155,14 @@ function ProductList({
           <span className="tabular shrink-0 text-sm font-semibold text-ink">
             {Number(product.price).toFixed(2)}
           </span>
+          <button
+            type="button"
+            onClick={() => onEdit(product)}
+            className="min-h-11 shrink-0 cursor-pointer rounded-lg px-3 text-sm font-semibold text-accent hover:bg-surface-muted"
+            aria-label={`Editar ${product.name}`}
+          >
+            Editar
+          </button>
           <button
             type="button"
             onClick={() => void remove(product.id)}
