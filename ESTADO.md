@@ -31,9 +31,9 @@ Rama `task-025-hardening-and-coverage`, medido el 2026-10-07. Cada afirmación s
 
 ## 3. Arquitectura real
 
-- **Backend:** FastAPI + SQLAlchemy 2 (psycopg3), Alembic, ARQ (worker) y Redis. Postgres 16 con pgvector, MinIO para archivos.
+- **Backend:** FastAPI + SQLAlchemy 2 (psycopg3), Alembic, ARQ (worker) y Redis. Postgres 16 con pgvector; los archivos (fotos, comprobantes, documentos) también viven en Postgres y se sirven por enlaces firmados (`STORAGE_BACKEND`, ver `leo-sdd/features/001-onboarding/plan.md`).
 - **Frontend:** Next.js 15.5 con React 19, Tailwind 4 y Playwright (6 specs).
-- **Compose dev** (`deploy/docker-compose.dev.yml`): postgres, redis, minio, backend, worker, frontend. Los contenedores `leo-dev-*` estaban activos al medir.
+- **Compose dev** (`deploy/docker-compose.dev.yml`): postgres, redis, backend, worker, frontend. Los contenedores `leo-dev-*` estaban activos al medir.
 - **WhatsApp:** YCloud. Adaptador `providers/whatsapp/ycloud.py` (envío, parseo, firma HMAC) y webhook `POST /webhooks/ycloud`. Meta Cloud API directo y Tech Provider no existen aún.
 - **LLM:** perfil `openai` por defecto, chat `gpt-5.4-mini`, embeddings `text-embedding-3-small`. Alternativa: `offline` (solo desarrollo). El perfil `nvidia` se eliminó en el Milestone B de la 004 a pedido de Giannier. Los tenants pueden traer sus credenciales de chat (`provider_for_tenant`).
 - **Secretos:** credenciales cifradas con Fernet en BD. No se inspeccionó ningún `.env`.

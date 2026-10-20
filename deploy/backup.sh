@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Encrypted daily backup of Leo (TASK-026): the database and the files (MinIO).
+# Encrypted daily backup of Leo (TASK-026): the database, which includes the
+# files (photos, receipts, documents), so there is one thing to back up.
 #
 #   deploy/backup.sh                     # from the repo root on the VPS
 #   15 4 * * * cd /opt/leo && deploy/backup.sh >> /var/log/leo-backup.log 2>&1
 #
-# Each run writes two files to $BACKUP_DIR, encrypted with BACKUP_PASSPHRASE
+# Each run writes one file to $BACKUP_DIR, encrypted with BACKUP_PASSPHRASE
 # (AES-256, openssl pbkdf2), and deletes those older than $BACKUP_KEEP_DAYS:
 #   leo-db-<stamp>.dump.enc     pg_dump custom format (restore with restore.sh)
-#   leo-files-<stamp>.tar.gz.enc  the MinIO volume
 # Copy $BACKUP_DIR off the VPS as well (see RUNBOOK.md): a backup on the same
 # disk does not survive losing the disk.
 set -euo pipefail
@@ -33,16 +33,18 @@ encrypt() {
 }
 
 db_file="$BACKUP_DIR/leo-db-$STAMP.dump.enc"
-"${COMPOSE[@]}" exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner \
+# `-Z 1`: most of what is in the dump is photos, PDFs and video, which are already
+# compressed, so the default level spends minutes of CPU to save almost nothing.
+"${COMPOSE[@]}" exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc -Z 1 --no-owner \
   | encrypt > "$db_file.partial"
 mv "$db_file.partial" "$db_file"
 
-files_file="$BACKUP_DIR/leo-files-$STAMP.tar.gz.enc"
-docker run --rm -v leo_minio_data:/data:ro alpine:3.20 tar -C /data -czf - . \
-  | encrypt > "$files_file.partial"
-mv "$files_file.partial" "$files_file"
-
-chmod 600 "$db_file" "$files_file"
+chmod 600 "$db_file"
 find "$BACKUP_DIR" -name 'leo-*.enc' -mtime +"$BACKUP_KEEP_DAYS" -delete
 
-echo "$(date -u +%FT%TZ) backup ok: $(du -h "$db_file" | cut -f1) db, $(du -h "$files_file" | cut -f1) files"
+# How much of the database is files: the number to watch as the business grows.
+stored="$("${COMPOSE[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c \
+  "select count(*) || ' files, ' || pg_size_pretty(coalesce(sum(size_bytes), 0)) from stored_objects" \
+  2>/dev/null || echo "n/a")"
+
+echo "$(date -u +%FT%TZ) backup ok: $(du -h "$db_file" | cut -f1) (stored: $stored)"
