@@ -46,13 +46,13 @@ PAST_IDENTIFICAR = (
     "ASESORIA",
 )
 STEP_ACTIONS = {
-    "productos": "/productos",
+    "productos": "/catalog",
     "metodos_pago": "/asistente/informacion",
     "proceso_venta": "/asistente/proceso",
     "primera_situacion": "/asistente/situaciones",
-    "probar_simulador": "/asistente/simulador",
+    "probar_simulador": "/sandbox",
     "probar_situacion": "/asistente/situaciones",
-    "conectar_whatsapp": "/whatsapp",
+    "conectar_whatsapp": "/channel",
 }
 
 
