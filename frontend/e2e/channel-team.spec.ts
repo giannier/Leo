@@ -34,7 +34,7 @@ async function register(
   await page.getByLabel("Tu nombre").fill(user.fullName);
   await page.getByLabel("Nombre de tu negocio").fill(user.businessName);
   await page.getByLabel("Correo electrónico").fill(user.email);
-  await page.getByLabel("Teléfono de contacto").fill(user.phone);
+  await page.getByLabel("Teléfono de contacto", { exact: true }).fill(user.phone);
   await page.getByLabel("Contraseña", { exact: true }).fill(user.password);
   await page.getByRole("button", { name: "Crear mi cuenta" }).click();
   await expect(page.getByRole("heading", { name: "Revisa tu correo" })).toBeVisible();

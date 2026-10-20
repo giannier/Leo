@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { PhoneField, isCompletePhone } from "@/components/phone-field";
 import { Alert, AuthShell, Button, Field, Select } from "@/components/ui";
 import { api } from "@/lib/api/client";
 import { ApiError, humanMessage } from "@/lib/api/errors";
 
 /** Mirrors `MIN_PASSWORD_LENGTH` in `app/api/v1/auth.py`. */
 const MIN_PASSWORD = 10;
-
-/** E.164, the same shape the backend accepts. */
-const PHONE = /^\+[1-9]\d{7,14}$/;
 
 type Errors = Partial<Record<"full_name" | "email" | "password" | "business_name" | "phone_e164", string>>;
 
@@ -33,7 +31,7 @@ export default function RegisterPage() {
     full_name: "",
     business_name: "",
     email: "",
-    phone_e164: "+51",
+    phone_e164: "",
     password: "",
     country: "PE",
   });
@@ -59,7 +57,7 @@ export default function RegisterPage() {
     if (form.password.length < MIN_PASSWORD) {
       found.password = `Usa al menos ${MIN_PASSWORD} caracteres.`;
     }
-    if (form.phone_e164.trim() && form.phone_e164.trim() !== "+51" && !PHONE.test(form.phone_e164.trim())) {
+    if (form.phone_e164 && !isCompletePhone(form.phone_e164)) {
       found.phone_e164 = "Usa el formato +51987654321.";
     }
     return found;
@@ -86,7 +84,7 @@ export default function RegisterPage() {
         business_name: form.business_name.trim(),
         email: form.email.trim(),
         password: form.password,
-        phone_e164: phone && phone !== "+51" ? phone : null,
+        phone_e164: phone || null,
         country: form.country,
       });
       setDone(form.email.trim());
@@ -179,16 +177,14 @@ export default function RegisterPage() {
           onChange={(e) => set("country", e.target.value)}
         />
 
-        <Field
+        <PhoneField
           label="Teléfono de contacto"
           name="phone_e164"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
           hint="Opcional. Es solo un dato de contacto: no te pedimos verificarlo."
+          defaultCountry={form.country}
           value={form.phone_e164}
           error={errors.phone_e164}
-          onChange={(e) => set("phone_e164", e.target.value)}
+          onChange={(value) => set("phone_e164", value)}
         />
 
         <Field
