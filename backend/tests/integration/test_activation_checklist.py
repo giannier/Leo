@@ -86,20 +86,20 @@ class TestEverythingOff:
         assert checklist.activation_ready is False
         assert checklist.blocker == "checklist_incomplete"
 
-    def test_all_six_items_are_always_reported(
+    def test_all_five_items_are_always_reported(
         self, db: Session, tenant: Tenant, user: User
     ) -> None:
         """The list never changes length, so the panel is not re-rendered
         into a different shape as the customer edits."""
         checklist = build_checklist(db, tenant_id=tenant.id, user=user)
-        assert len(checklist.items) == 6
+        assert len(checklist.items) == 5
 
 
 class TestSandboxThreshold:
     def test_items_one_to_five_open_the_sandbox(
         self, db: Session, tenant: Tenant, user: User
     ) -> None:
-        """Phone verification is deliberately not required to try the agent."""
+        """The contact phone plays no part in trying the agent."""
         _complete_everything(db, tenant, user)
         user.phone_verified_at = None
         db.flush()
@@ -218,9 +218,11 @@ class TestActivationThreshold:
         checklist = build_checklist(db, tenant_id=tenant.id, user=user)
         assert checklist.blocker == "checklist_incomplete"
 
-    def test_phone_verification_gates_activation_but_not_the_sandbox(
+    def test_an_unverified_contact_phone_does_not_block_activation(
         self, db: Session, tenant: Tenant, user: User
     ) -> None:
+        """Owning the number is proved by its YCloud API key, so the contact phone
+        is not on the checklist."""
         _complete_everything(db, tenant, user)
         _connect_number(db, tenant)
         user.phone_verified_at = None
@@ -228,7 +230,7 @@ class TestActivationThreshold:
 
         checklist = build_checklist(db, tenant_id=tenant.id, user=user)
         assert checklist.sandbox_ready is True
-        assert checklist.activation_ready is False
+        assert checklist.activation_ready is True
 
 
 class TestProfileAndAgentCompleteness:

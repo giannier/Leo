@@ -56,7 +56,7 @@ class TestChecklistEndpoint:
         body = (await api.get(f"{TENANT}/activation-checklist", headers=headers)).json()
         assert body["sandbox_ready"] is False
         assert body["activation_ready"] is False
-        assert len(body["items"]) == 6
+        assert len(body["items"]) == 5
         # Email is verified during registration in this fixture.
         assert next(i for i in body["items"] if i["key"] == "email_verified")["done"] is True
 

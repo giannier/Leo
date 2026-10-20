@@ -105,9 +105,6 @@ export default function ChannelPage() {
       {!number && !open && requests !== null ? (
         <ConnectForm
           canConfigure={canConfigure}
-          phoneVerified={
-            checklist?.items.find((item) => item.key === "phone_verified")?.done ?? false
-          }
           onConnected={load}
         />
       ) : null}
@@ -304,11 +301,9 @@ function Progress({ request }: { request: ConnectionRequest }) {
 
 function ConnectForm({
   canConfigure,
-  phoneVerified,
   onConnected,
 }: {
   canConfigure: boolean;
-  phoneVerified: boolean;
   onConnected: () => Promise<void>;
 }) {
   const [apiKey, setApiKey] = useState("");
@@ -322,25 +317,6 @@ function ConnectForm({
     return (
       <Alert tone="info" title="Solo lectura">
         Tu rol no puede conectar el número. Pídeselo al dueño de la cuenta.
-      </Alert>
-    );
-  }
-
-  if (!phoneVerified) {
-    // Clarification 005's anti-abuse gate. Explained rather than enforced
-    // silently: a disabled form with no reason is the worst version of this.
-    return (
-      <Alert tone="warning" title="Primero verifica tu teléfono">
-        Antes de conectar un número necesitamos confirmar el teléfono de tu cuenta. Es un código de
-        seis dígitos y toma un minuto.
-        <div className="mt-3">
-          <Link
-            href="/verify-phone"
-            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-semibold text-accent-fg hover:bg-accent-hover"
-          >
-            Verificar mi teléfono
-          </Link>
-        </div>
       </Alert>
     );
   }
