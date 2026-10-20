@@ -31,10 +31,18 @@ def build_email_provider(settings: Settings | None = None) -> EmailProvider:
     if settings.email_provider == "resend":
         if not settings.resend_api_key:
             raise EmailConfigurationError("EMAIL_PROVIDER=resend but RESEND_API_KEY is not set.")
-        return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
+        return ResendEmailProvider(
+            api_key=settings.resend_api_key,
+            sender=settings.email_from,
+            reply_to=settings.email_reply_to,
+        )
 
     if settings.resend_api_key:
-        return ResendEmailProvider(api_key=settings.resend_api_key, sender=settings.email_from)
+        return ResendEmailProvider(
+            api_key=settings.resend_api_key,
+            sender=settings.email_from,
+            reply_to=settings.email_reply_to,
+        )
 
     # No credential. In development that is the normal case - the console
     # provider logs the verification link so the flow stays walkable with no
