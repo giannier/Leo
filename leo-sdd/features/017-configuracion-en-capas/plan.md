@@ -72,7 +72,7 @@ situations              id, tenant_id, titulo, cuando_aplica, que_hace,
                         origen ('manual' | 'sugerida_rubro' | 'migrada' | 'aprendida'),
                         embedding vector(1024), created_by, timestamps
 agent_configs           + tratamiento ('tu' | 'usted'), emojis ('no' | 'pocos' | 'si'),
-                          saludo text ≤ 120, politica_descuentos ('no_ofrece' | 'solo_promociones' |
+                          saludo text ≤ 400 (era 120; ampliado el 2026-10-20, migración 0047), politica_descuentos ('no_ofrece' | 'solo_promociones' |
                           'negociable'), descuento_maximo_pct numeric NULL, max_situaciones int = 5
                         − restrictions (se migra a una situación y la columna se elimina)
 payment_methods_business + titular text NULL                   (D-1 de la 004: destinatario)

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
 from app.api.errors import error_responses
+from app.models.business import MAX_SALUDO
 from app.services.wizard import WizardService
 
 router = APIRouter(prefix="/tenant", tags=["wizard"])
@@ -85,7 +86,9 @@ class AgentConfigRequest(ConcurrencyAware):
     escalation_rules: list[str] | None = Field(default=None, max_length=20)
     tratamiento: Literal["tu", "usted"] | None = None
     emojis: Literal["no", "pocos", "si"] | None = None
-    saludo: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    saludo: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_SALUDO)] | None
+    ) = None
     farewell_on_pause: LongText | None = None
 
 
