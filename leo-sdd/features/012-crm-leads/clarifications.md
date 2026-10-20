@@ -17,6 +17,7 @@ determinista: sin cambiar el prompt, sin evals con el modelo real y sin costo de
 | INICIO, CALIFICAR, ANUNCIO | (sin lead: saludo o calificación) |
 | IDENTIFICAR, solo si el cliente ya vio productos (`vio_productos`) | nuevo |
 | PEDIDO, DATOS, ASESORIA | interesado (monto estimado = total del pedido) |
+| DERIVADO con `asesoria_derivada_en` (el asistente pasó la conversación a un asesor para cotizar o asesorar) | interesado (2026-10-20; una derivación por queja u otro motivo sigue sin lead) |
 | COBRO, VERIFICACION | por_pagar (monto estimado) |
 | CERRADO (pedido confirmado) | ganado (monto real = total del pedido confirmado) |
 | `pedido_descartado` (el borrador venció sin respuesta) | perdido, motivo "dejó de responder" |
@@ -67,3 +68,8 @@ y el historial dejan de mostrar sus datos, y montos y eventos quedan para métri
 "borrar datos de un contacto" por pedido del titular (F007 no lo trae); cuando exista, debe borrar también
 las notas de sus conversaciones y el `product_interest` del lead.
 **Registrado por:** Claude — por ratificar
+
+**2026-10-20 · por qué un cliente real no aparecía.** La regla `vio_productos` se cumple cuando `buscar_productos`
+devuelve coincidencias. Si el modelo filtraba por una categoría que el negocio no tenía cargada, la búsqueda no
+encontraba nada, caía al listado de respaldo (que no cuenta) y el cliente nunca llegaba a "nuevo". Ahora, si la
+categoría no coincide, la herramienta busca por el nombre que dijo el cliente.

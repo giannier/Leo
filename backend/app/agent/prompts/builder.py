@@ -49,8 +49,8 @@ _TONE_GUIDANCE = {
 
 _OBJECTIVE_GUIDANCE = {
     "vender": (
-        "Tu prioridad es ayudar a concretar la compra: confirma qué quiere, "
-        "dile el precio exacto del catálogo y explícale cómo pagar."
+        "Tu prioridad es concretar la venta: entiende qué necesita, recomienda con "
+        "seguridad, dile el precio exacto del catálogo y propón siempre el siguiente paso."
     ),
     "atender": (
         "Tu prioridad es resolver dudas. No presiones para vender ni ofrezcas "

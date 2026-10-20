@@ -78,6 +78,9 @@ def semantic_for(stage_key: str, facts: dict[str, Any], order: Order | None) -> 
         return "por_pagar"
     if stage_key in ("PEDIDO", "DATOS", "ASESORIA"):
         return "interesado"
+    if stage_key == "DERIVADO" and facts.get("asesoria_derivada_en"):
+        # Handed to an advisor to quote or advise: a qualified lead, not a complaint.
+        return "interesado"
     if stage_key == "IDENTIFICAR" and facts.get("vio_productos"):
         return "nuevo"
     return None

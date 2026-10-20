@@ -43,7 +43,7 @@ class TestTheSplit:
         ]
 
 
-LATEST_PROCESS_VERSION = 2
+LATEST_PROCESS_VERSION = 3
 
 
 class TestVersionOne:
@@ -55,7 +55,7 @@ class TestVersionOne:
         code = {s.value: TEMPLATES[key].stage(s).instrucciones for s in Stage}
         texts = stage_texts_from(rules, code, list(code))
 
-        # The newest published version (v2 since migration 0033) is today's code text.
+        # The newest published version (v3 since migration 0048) is today's code text.
         assert rules.process_version == LATEST_PROCESS_VERSION
         assert texts == code
 

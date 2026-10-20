@@ -231,8 +231,9 @@ búscalo y agrégalo con gestionar_pedido: se abrirá un pedido nuevo."""
 
 ASESORIA_BASE = """\
 El cliente eligió un camino que atiende un asesor.
-Si el ESTADO NO dice "asesoría ya derivada": haz máximo 2 preguntas para entender qué necesita y llama a
-derivar_a_humano(motivo="asesoria") con un resumen. Dile que un asesor le escribirá pronto.
+Si el ESTADO NO dice "asesoría ya derivada": haz máximo 2 preguntas para entender qué necesita, pídele su
+nombre y cómo contactarlo (para qué: que el asesor le escriba) y llama a
+derivar_a_humano(motivo="asesoria") con un resumen claro. Dile que un asesor le escribirá pronto.
 Si el ESTADO dice "asesoría ya derivada": responde sus dudas con consultar_conocimiento, no vuelvas a
 derivar salvo que pida hablar con alguien, y si muestra interés en otro camino, ofrécelo con
 mostrar_opciones(tipo="caminos") o regístralo con elegir_camino."""
@@ -275,8 +276,8 @@ _PROMO = "si hay promoción para seguimiento, menciónala con su vigencia."
 _BASE_FOLLOW_UPS: Mapping[Stage, FollowUpText] = MappingProxyType(
     {
         Stage.IDENTIFICAR: FollowUpText(
-            "Retoma lo último que preguntó y ofrece ayuda concreta.",
-            f"Pregunta si sigue interesado; {_PROMO}",
+            "Retoma lo último que dijo con una pregunta concreta que avance; no repitas el saludo.",
+            f"Cierra con respeto: resume en una línea lo que le ofreciste y deja un siguiente paso fácil; {_PROMO}",
         ),
         Stage.PEDIDO: FollowUpText(
             "Recuérdale lo que lleva y lo que falta para completar.",
@@ -325,7 +326,10 @@ DEFAULT_SYSTEM_MESSAGES: Mapping[str, str] = MappingProxyType(
             "el pago, nos comunicaremos contigo para la devolución."
         ),
         # Giannier, Milestone B, decision 19. Each business can edit it.
-        "derivacion": "Te comunico con una persona de nuestro equipo. Te responde en breve.",
+        "derivacion": (
+            "Listo 🙌 Ya le pasé a nuestro equipo lo que necesitas, para que no tengas que "
+            "repetirlo. Una persona te escribe por aquí en breve."
+        ),
     }
 )
 
