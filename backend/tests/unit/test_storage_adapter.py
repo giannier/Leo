@@ -156,6 +156,21 @@ class TestExistenceAndDeletion:
 
         assert provider.exists(KEY) is False
 
+    def test_an_unreachable_store_is_an_error_not_a_no(
+        self, provider: S3StorageProvider, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ "I could not look" must not read as "it is not there"."""
+
+        def unreachable(**_: object) -> None:
+            raise EndpointConnectionError(endpoint_url="http://storage.invalid:9000")
+
+        monkeypatch.setattr(provider._client, "head_object", unreachable)  # noqa: SLF001
+
+        with pytest.raises(StorageError, match="could not check"):
+            provider.exists(KEY)
+        with pytest.raises(StorageError):
+            provider.delete(KEY)
+
     def test_deleting_something_that_is_there_reports_it(
         self, provider: S3StorageProvider, stub: Stubber
     ) -> None:
@@ -261,3 +276,38 @@ class TestPublicEndpoint:
         )
 
         assert provider.presigned_url(KEY).startswith("http://minio:9000/")
+
+
+class TestListing:
+    """`iter_objects` exists to move files to another store, never to serve them."""
+
+    def test_every_key_comes_with_its_content_type(
+        self, provider: S3StorageProvider, stub: Stubber
+    ) -> None:
+        stub.add_response(
+            "list_objects_v2",
+            {"Contents": [{"Key": "tenants/a"}, {"Key": "tenants/b"}], "IsTruncated": False},
+            {"Bucket": BUCKET},
+        )
+        stub.add_response(
+            "head_object", {"ContentType": "image/png"}, {"Bucket": BUCKET, "Key": "tenants/a"}
+        )
+        stub.add_response("head_object", {}, {"Bucket": BUCKET, "Key": "tenants/b"})
+
+        assert list(provider.iter_objects()) == [
+            ("tenants/a", "image/png"),
+            ("tenants/b", "application/octet-stream"),
+        ]
+
+    def test_an_empty_bucket_lists_nothing(
+        self, provider: S3StorageProvider, stub: Stubber
+    ) -> None:
+        stub.add_response("list_objects_v2", {"IsTruncated": False}, {"Bucket": BUCKET})
+
+        assert list(provider.iter_objects()) == []
+
+    def test_a_failure_is_a_storage_error(self, provider: S3StorageProvider, stub: Stubber) -> None:
+        stub.add_client_error("list_objects_v2", service_error_code="AccessDenied")
+
+        with pytest.raises(StorageError, match="could not list"):
+            list(provider.iter_objects())

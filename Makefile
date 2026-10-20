@@ -1,4 +1,4 @@
-.PHONY: admin reindex mark-e2e seed-milestone-b simulate-trial env-reference hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
+.PHONY: admin reindex mark-e2e seed-milestone-b simulate-trial env-reference storage-migrate hooks up down test isolation coverage evals lint format migrate worker front-install front-lint front-build front-e2e front-dev
 
 # `--env-file .env` is load-bearing, not decoration: it makes the repo's
 # own .env the source for variable interpolation. Compose otherwise
@@ -12,12 +12,15 @@ COMPOSE := docker compose -f deploy/docker-compose.dev.yml --env-file .env
 env-reference: ## Regenerate deploy/env.reference from Settings.
 	uv run --directory backend python -m scripts.env_reference
 
+storage-migrate: ## Move stored files between backends: make storage-migrate ARGS="--from postgres --to s3 [--apply]".
+	uv run --directory backend python -m scripts.storage_migrate $(ARGS)
+
 hooks: ## Install the git hooks that gate pushes to main.
 	git config core.hooksPath deploy/git-hooks
 	chmod +x deploy/git-hooks/* 2>/dev/null || true
 	@echo "core.hooksPath -> deploy/git-hooks"
 
-up: ## Start the local dev stack (Postgres, Redis, MinIO, backend, frontend).
+up: ## Start the local dev stack (Postgres, Redis, backend, worker, frontend).
 	$(COMPOSE) up -d --build
 
 down: ## Stop the local dev stack.

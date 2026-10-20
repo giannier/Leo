@@ -6,6 +6,7 @@ both, so production does not run a different code path from development.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import boto3
@@ -116,7 +117,24 @@ class S3StorageProvider:
             self._client.head_object(Bucket=self._bucket, Key=key)
         except ClientError:
             return False
+        except BotoCoreError as exc:
+            # An unreachable endpoint or a timeout is not "no such object". Answering
+            # False would let a caller act on a store it could not even see.
+            raise StorageError(f"could not check {key}: {exc}") from exc
         return True
+
+    def iter_objects(self) -> Iterator[tuple[str, str]]:
+        """Every `(key, content_type)` in the bucket, for moving files to another store.
+
+        Not part of the port: listing is only needed to migrate, never to serve.
+        """
+        try:
+            for page in self._client.get_paginator("list_objects_v2").paginate(Bucket=self._bucket):
+                for entry in page.get("Contents", []):
+                    head = self._client.head_object(Bucket=self._bucket, Key=entry["Key"])
+                    yield entry["Key"], head.get("ContentType", "application/octet-stream")
+        except (ClientError, BotoCoreError) as exc:
+            raise StorageError(f"could not list {self._bucket}: {exc}") from exc
 
     def presigned_url(self, key: str, *, expires_in: int = 900) -> str:
         try:

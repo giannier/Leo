@@ -199,7 +199,23 @@ class Settings(BaseSettings):
     # only where a proxy we control (Caddy, in `deploy/`) rewrites the header.
     trust_proxy_headers: bool = False
 
-    # Object storage (S3-compatible / MinIO in dev)
+    # Where uploaded files live. "postgres" keeps them in the database (nothing
+    # else to run, one backup); "s3" uses any S3-compatible store (the S3_*
+    # settings below). Both sit behind the same `StorageProvider` port.
+    storage_backend: Literal["postgres", "s3"] = "postgres"
+    # The largest single file the Postgres store accepts. 100 MB is the biggest
+    # thing the media library allows (a PDF); everything else is smaller.
+    storage_max_object_bytes: int = 100 * 1024 * 1024
+    # Bytes one business may keep in the Postgres store. 0 = no limit, which is
+    # the behaviour of the S3 store too; set it once there is a plan to enforce.
+    storage_tenant_quota_bytes: int = 0
+    # The address the API is reached at from *outside*: links to stored files are
+    # built on it, and they are opened by a browser and downloaded by WhatsApp,
+    # so it has to be absolute and reachable by both. In production it is the
+    # site's own address (https://<LEO_DOMAIN>); locally the API's port.
+    api_public_base_url: str = "http://localhost:8000"
+
+    # Object storage, only read when STORAGE_BACKEND=s3 (any S3-compatible store).
     s3_endpoint_url: str | None = "http://localhost:9000"
     # Base URL a browser can reach the object store on. Signed links (receipt
     # photos, library files) are built with this host; empty means "same as
