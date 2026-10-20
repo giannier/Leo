@@ -200,6 +200,93 @@ sentidos. La suite de aislamiento comprueba que la respuesta es un booleano y
 que ni el 409 de registro ni el de verificación nombran al negocio que tiene el
 número.
 
+### 2026-10-19 — Los archivos viven en PostgreSQL, no en MinIO (TASK-026)
+
+**Problema.** La Constitution fija el almacenamiento de archivos como
+"S3-compatible (MinIO en el VPS)". Al preparar el despliegue, el CI de GitHub no
+pudo descargar `minio/minio:RELEASE.2024-10-13T13-34-11Z` (`pull access denied`)
+y Quay responde `no such manifest` también para `latest`; la imagen auxiliar
+`mc` tampoco aparece. El `docker-compose.prod.yml` no podía levantar. Que MinIO
+haya dejado de publicar sus imágenes oficiales es una suposición; que hoy no se
+pueden descargar es un hecho medido.
+
+**Decisión (Giannier, 2026-10-19).** Los archivos se guardan en PostgreSQL detrás
+del mismo puerto `StorageProvider`. El almacenamiento S3-compatible sigue
+soportado y se elige con `STORAGE_BACKEND=s3`. No hay dependencias nuevas: es
+SQLAlchemy y psycopg, ya presentes. La línea de la Constitution se actualiza en
+el mismo cambio.
+
+| Punto | Elegido | Razón | Alternativa descartada |
+|-------|---------|-------|----------------------|
+| Forma | `stored_objects` (catálogo: clave, dueño, tipo, tamaño, SHA-256) y `stored_object_chunks` (bytes en trozos de ≤ 1 MiB) | El límite de la biblioteca es un PDF de 100 MB: como un solo valor serían 100 MB en memoria y un registro enorme en el WAL. En trozos, una lectura retiene uno, y existencia, tamaño y cuota consultan solo el catálogo | Un `bytea` por archivo; *Large Objects* (`lo_*`): no tienen FK ni `CASCADE`, no se ven en consultas normales y piden `vacuumlo` |
+| Compresión | `STORAGE EXTERNAL` en la columna de bytes | JPEG, PNG, PDF y MP4 ya vienen comprimidos: comprimirlos otra vez gasta CPU sin ahorrar | El `EXTENDED` por defecto |
+| Espacio liberado | `autovacuum_vacuum_scale_factor = 0.02` en la tabla de trozos (y su TOAST) | Borrar un archivo libera mucho de golpe; con el 20 % por defecto la tabla queda inflada hasta la próxima limpieza | Valores por defecto |
+| Transacciones | Cada llamada abre la suya, corta y propia; no usa la de la petición | Es el contrato que ya tiene el adaptador S3: los servicios son dueños de la transacción y ya compensan huérfanos a mano (`knowledge.py`). Atar el archivo a la transacción obligaba a cambiar seis servicios y el singleton del worker | Compartir la sesión de la petición |
+| Límites | Tope por objeto (100 MB, el mayor de la biblioteca) y cuota por negocio **opcional** (`0` = sin límite) | No cambia lo que un cliente puede subir hoy. Una cuota por defecto es decisión de planes y producto, no de infraestructura | Una cuota por defecto inventada |
+| Integridad | El SHA-256 guardado se verifica al leer | Un archivo truncado o mezclado es un error, no una imagen rota en silencio | Confiar en la base |
+| Claves | Solo `tenants/<uuid>/<tipo>/<nombre>`; el dueño se lee de la clave | Una clave mal formada no puede salirse de su prefijo ni quedar sin dueño; la cuota y la limpieza son una consulta indexada | Aceptar cualquier texto como clave |
+
+**Contras asumidos.** La base crece y con ella los backups; los archivos pasan
+por Python y no hay CDN; con mucho volumen conviene volver a S3. Ese día es
+cambiar de adaptador, no tocar a quien lo usa.
+
+**Enlaces firmados (hecho, con la aprobación de Giannier).** Los archivos se
+sirven en `GET /api/v1/files/<token>`, sin login, porque `<img>` y WhatsApp no
+pueden mandar credenciales: el enlace es la credencial.
+
+| Punto | Elegido | Razón | Alternativa descartada |
+|-------|---------|-------|----------------------|
+| Firma | HMAC-SHA256 con una subclave **derivada** de `SECRET_KEY` (`v1.<carga>.<mac>`) | Sin secreto nuevo que cuidar, y la clave que firma sesiones nunca firma enlaces | Reusar `SECRET_KEY` directamente; un secreto aparte |
+| Verificación | Aritmética, sin consulta; todo rechazo (falsificado, vencido, borrado, malformado) es el mismo 404 | Un extraño no puede hacer trabajar a la base adivinando, ni saber qué parte acertó | 401/403 distintos |
+| Vencimiento | Redondeado **hacia abajo** a un cubo de hasta 5 min | La misma foto da la misma URL unos minutos (el navegador la reutiliza) y **ningún enlace dura más de lo prometido**: uno de 10 minutos no llega a 11 | Redondear hacia arriba; URL distinta en cada render |
+| Caché | `private, max-age=<lo que le queda>`; los comprobantes, `private, no-store` | El comprobante es papeleo privado de un cliente: se muestra, no se guarda en el disco del navegador | Misma política para todo |
+| Rangos | `Range` de un solo rango; lo que no entiende se responde con el archivo entero | Abrir un video o audio en pestaña nueva lo exige en Safari; un salto al final de un archivo largo lee un trozo, no todos | Sin rangos |
+| Cabeceras | Las del middleware global (`nosniff`, CSP, `no-referrer`, CORP, marcos prohibidos); la ruta no añade ninguna de seguridad | Un solo lugar decide, y ninguna ruta puede debilitarlas. La ruta añade solo ETag, rangos, caché y `Content-Disposition` (lo que no es imagen, audio, video o PDF se descarga, no se abre) | Repetir cabeceras en la ruta (el middleware las pisa) |
+| Dirección | Ajuste nuevo `API_PUBLIC_BASE_URL` (en producción, `https://<LEO_DOMAIN>`) | WhatsApp necesita una URL absoluta y no existía el ajuste | URL relativa (no sirve fuera del navegador) |
+
+**Salida.** `make storage-migrate ARGS="--from postgres --to s3"` copia todos los
+archivos a otro almacenamiento, y vale en los dos sentidos. Por defecto solo
+simula; con `--apply` verifica cada copia por checksum antes de darla por buena y
+nunca sobrescribe; `--delete-source` borra el original solo después de esa
+verificación. Es lo que vuelve cierto que "pasar a S3 es cambiar de adaptador".
+
+**Dejó de depender de MinIO.** `STORAGE_BACKEND` es `postgres` por defecto; MinIO
+salió de los compose de desarrollo y producción, del Caddyfile (`files.`), de
+`backup.sh` / `restore.sh` (un solo archivo de backup), del runbook y del CI. El
+backup ahora usa `pg_dump -Z 1` y termina con una línea con el volumen de
+archivos, que es el número a vigilar.
+
+**Pendiente, anotado para no perderlo.**
+1. **Conciliador de huérfanos**: archivos sin ninguna fila que los referencie.
+   Cuesta espacio, no correctitud. Los servicios ya compensan a mano los casos
+   que conocen.
+2. **Mensaje claro cuando la cuota esté encendida.** Hoy `QuotaExceededError` es un
+   `StorageError` y los llamadores lo muestran como un fallo genérico. No se ve
+   mientras la cuota esté en `0` (sin límite); hay que mapearlo a un 413 con
+   texto antes de encenderla.
+3. **Revisión manual en Chrome**: abrir un PDF de la biblioteca en una pestaña
+   nueva. El middleware global manda `default-src 'none'` y no pude comprobar que
+   el visor de PDF lo respete (el Chromium sin pantalla no lo muestra). Si no
+   abre, el arreglo es eximir de la CSP a las respuestas `application/pdf` en el
+   middleware; no se hizo a ciegas.
+4. **`.env.example`** conserva `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `MINIO_API_PORT` y
+   `MINIO_CONSOLE_PORT`: son variables sin uso ahora. No se tocó por los permisos
+   del entorno de trabajo; hay que quitarlas a mano.
+5. Los archivos que hoy están en el volumen `leo-dev_minio_data` (datos de
+   prueba) no se migran; el volumen se puede borrar.
+
+**Verificación.** `alembic check` sin diferencias; `downgrade`/`upgrade` de la
+`0045` probados en ambos sentidos; la columna queda en `EXTERNAL`. Contra la base
+real: ida y vuelta, bordes de trozo, reemplazo sin huérfanos, integridad, tope,
+cuota exacta y aislada por negocio, claves y tipos inválidos, firma y vencimiento,
+rangos entre trozos, y el endpoint por HTTP (todo rechazo idéntico; ningún 500).
+Se comprobó que los tests detectan: sin la verificación del SHA-256 caen 2; sin
+la cuota, 1; sin la firma, 5; sin el vencimiento, 2; redondeando hacia arriba, 4.
+En un navegador real (Playwright) una foto subida **se decodifica** a través del
+enlace, y se vio fallar ese spec al cambiar `Cross-Origin-Resource-Policy` a
+`same-origin`. El ciclo `pg_dump -Z 1` → cifrar → descifrar → `pg_restore` devolvió
+un archivo de 2,5 MB byte a byte idéntico.
+
 ## Estimación
 - **Esfuerzo total:** 3–4 semanas calendario supervisando a Claude Code (≈ 26 tasks de 1 sesión c/u; varias paralelizables).
 - **Complejidad:** Alta (es la feature fundacional: define auth, multi-tenancy, adaptadores y el esqueleto del agente para todo lo demás).
