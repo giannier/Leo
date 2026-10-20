@@ -96,6 +96,12 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
   corre dentro del contenedor (`docker compose`, `make up`) o en WSL2. Si una task pide "tests en verde",
   se miden ahí.
 
+## Despliegue en el VPS
+Quien opere el servidor (Giannier o un Claude en el VPS) sigue `deploy/RUNBOOK.md`, sección 10 incluida:
+qué hace cada quien, qué comandos **nunca** correr (`down -v` y `prune --volumes` borran la base y con ella
+los archivos) y cómo no exponer `deploy/.env.prod`. Los archivos (fotos, comprobantes, documentos) viven
+en Postgres (`STORAGE_BACKEND=postgres`); la Constitution se actualizó en consecuencia.
+
 ## Definition of Done de una task
 - Código + tests de la task en verde localmente (`make test`), lint y mypy limpios.
 - Cobertura del módulo dentro del estándar (80% críticos / 70% resto).
