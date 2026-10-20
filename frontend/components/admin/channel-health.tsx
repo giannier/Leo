@@ -3,7 +3,7 @@
 /**
  * Whether YCloud's deliveries reach Leo (TASK-459): the first thing to look at when a
  * connected number "receives nothing". The usual causes, in order: no public URL (tunnel or
- * server), no webhook secret, or the webhook not created in YCloud's console.
+ * server), or the business's webhook disabled in its own YCloud account.
  */
 
 import { useEffect, useState } from "react";
@@ -31,16 +31,11 @@ export function ChannelHealthCard() {
   const silent = health.numeros_conectados > 0 && health.recibidos_24h === 0;
   return (
     <section aria-label="Estado del canal de WhatsApp" className="space-y-2" data-testid="channel-health">
-      {!health.secreto_configurado ? (
-        <Alert tone="danger" title="Falta el secreto del webhook de YCloud">
-          Sin <code>YCLOUD_WEBHOOK_SECRET</code> Leo rechaza todos los mensajes que llegan. Cópialo de YCloud
-          (Desarrolladores → Webhooks), ponlo en el <code>.env</code> y reinicia el backend.
-        </Alert>
-      ) : silent ? (
+      {silent ? (
         <Alert tone="warning" title="No llega nada de YCloud">
           Hay {health.numeros_conectados} número(s) conectado(s) y ningún mensaje en 24 h (último: {ago(health.ultimo_webhook)}).
-          Revisa que el webhook de YCloud apunte a <code>https://…/webhooks/ycloud</code> y que esa URL sea
-          pública (túnel abierto o servidor).
+          Cada negocio tiene su propio webhook en su cuenta de YCloud (<code>https://…/webhooks/ycloud/…</code>);
+          revisa que siga activo allí y que el servidor sea accesible desde internet.
         </Alert>
       ) : null}
       <p className="text-sm text-ink-soft">

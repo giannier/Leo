@@ -3576,8 +3576,6 @@ export interface components {
          *     connected number "receives nothing".
          */
         ChannelHealth: {
-            /** Secreto Configurado */
-            secreto_configurado: boolean;
             /** Numeros Conectados */
             numeros_conectados: number;
             /** Ultimo Webhook */

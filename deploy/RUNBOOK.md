@@ -97,11 +97,18 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod \
 
 ## 4. Conectar WhatsApp (YCloud)
 
-- **URL del webhook en YCloud:** `https://app.tudominio.pe/webhooks/ycloud`
-- `YCLOUD_WEBHOOK_SECRET` en `deploy/.env.prod` = el secreto que muestra YCloud; luego
-  `docker compose ... up -d backend worker`.
-- El negocio pide la conexión desde **Mi número**; tú la conectas en **/admin → Solicitudes** con la API
-  key, el WABA ID y el phone number ID de YCloud (igual que en TASK-459).
+Cada negocio usa **su propia cuenta de YCloud**, y cada cuenta firma sus webhooks con su propio secreto.
+No hay webhook ni secreto de la plataforma en `deploy/.env.prod`.
+
+- El negocio entra a **Mi número** (`/channel`), pega la **clave API** de su cuenta de YCloud, el número y el
+  nombre que verán sus clientes.
+- Leo comprueba la clave contra YCloud, confirma que el número está en esa cuenta, **crea el webhook en la
+  cuenta del negocio** (`https://<dominio>/webhooks/ycloud/<token>`) y guarda cifrado el secreto que YCloud
+  devuelve. Nadie copia ninguna URL ni secreto a mano, tampoco quien opera la plataforma.
+- Requisito: `API_PUBLIC_BASE_URL` apunta al dominio público (el compose la toma de `LEO_DOMAIN`), porque
+  esa es la dirección que se registra en YCloud.
+- Si un webhook deja de llegar: en la cuenta del negocio, Desarrolladores → Webhooks, que el endpoint de Leo
+  esté activo. YCloud lo pasa a `pending` si falla muchas veces seguidas.
 
 ## 5. Actualizar
 
@@ -229,14 +236,13 @@ y este runbook.
 
 **Este despliegue** (valores no secretos): dominio `agente.zentek360.com` (`LEO_DOMAIN`), VPS Contabo,
 operado como `root` con clave de despliegue de solo lectura, correo de Resend con dominio propio ya
-verificado, YCloud ya con el número conectado.
+verificado, cada negocio conecta su número con su propia clave de YCloud desde el panel.
 
 **Lo que hace Giannier, no la IA.**
 - Llenar `deploy/.env.prod`. Los secretos **no pasan por el chat**: se escriben directo en el archivo
   del servidor. Si la IA necesita saber si una variable está puesta, que lo compruebe sin imprimirla
   (`[ -n "$(grep -E '^SECRET_KEY=.+' deploy/.env.prod)" ] && echo puesta`), nunca con `cat`.
 - Guardar `CREDENTIALS_ENCRYPTION_KEY` y `BACKUP_PASSPHRASE` fuera del servidor.
-- Crear el webhook en la consola de YCloud y pegar su secreto en `YCLOUD_WEBHOOK_SECRET`.
 - Decidir cuándo se enciende el cobro (`BILLING_ENFORCED`). Sale **apagado** y no se toca.
 
 **Lo que la IA no debe hacer en el servidor.**

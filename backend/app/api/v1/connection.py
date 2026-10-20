@@ -22,13 +22,20 @@ from typing import Annotated
 from fastapi import APIRouter, status
 from pydantic import BaseModel, StringConstraints
 
-from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
+from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep, WhatsAppProviderDep
 from app.api.errors import ApiError, error_responses
+from app.providers.whatsapp.base import (
+    InvalidCredentials,
+    NumberNotInAccount,
+    WhatsAppAuthError,
+    WhatsAppError,
+)
 from app.services.connection import (
     ConnectionService,
     OpenRequestExists,
     PhoneAlreadyConnected,
     PhoneNotVerified,
+    WebhookRegistrationFailed,
 )
 
 router = APIRouter(prefix="/tenant", tags=["connection"])
@@ -54,6 +61,14 @@ class ConnectionRequestPayload(BaseModel):
     # Set when re-filing after a rejection, so the admin can see the history
     # of what was corrected (Clarification 012).
     previous_request_id: uuid.UUID | None = None
+
+
+class ConnectNumberPayload(BaseModel):
+    """The business's own YCloud API key and the number it wants to connect."""
+
+    api_key: Annotated[str, StringConstraints(strip_whitespace=True, min_length=10, max_length=200)]
+    phone_e164: PhoneE164
+    display_name: DisplayName
 
 
 class ConnectionRequestResponse(BaseModel):
@@ -161,4 +176,75 @@ async def get_number(principal: MemberDep, session: SessionDep) -> WhatsAppNumbe
             error="no_number",
             message="No WhatsApp number is connected yet.",
         )
+    return WhatsAppNumberResponse.model_validate(number, from_attributes=True)
+
+
+@router.post(
+    "/whatsapp-number",
+    status_code=status.HTTP_201_CREATED,
+    summary="Connect your WhatsApp number with your own YCloud account",
+    responses=error_responses(
+        (400, "`invalid_api_key`, `number_not_in_account` or `webhook_not_created`"),
+        (403, "`phone_not_verified` or `insufficient_role`"),
+        (409, "`phone_already_connected`"),
+        (502, "`provider_unavailable`"),
+        *AUTH_RESPONSES,
+    ),
+)
+async def connect_number(
+    payload: ConnectNumberPayload,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    provider: WhatsAppProviderDep,
+) -> WhatsAppNumberResponse:
+    """Checks the key against YCloud, creates the webhook in the business's account
+    and stores the credentials encrypted. Nothing about the key is echoed back."""
+    service = ConnectionService(session, principal.tenant_id)
+    try:
+        number = await service.connect_ycloud(
+            user=principal.user,
+            api_key=payload.api_key,
+            phone_e164=payload.phone_e164,
+            display_name=payload.display_name,
+            provider=provider,
+        )
+    except PhoneNotVerified as exc:
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            error="phone_not_verified",
+            message="Verify your contact phone before connecting a number.",
+        ) from exc
+    except PhoneAlreadyConnected as exc:
+        raise ApiError(
+            status_code=status.HTTP_409_CONFLICT,
+            error="phone_already_connected",
+            message="That number is already connected. Contact support if it is yours.",
+        ) from exc
+    except (WhatsAppAuthError, InvalidCredentials) as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="invalid_api_key",
+            message="YCloud did not accept that API key. Copy it again from Developers > API key.",
+        ) from exc
+    except NumberNotInAccount as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="number_not_in_account",
+            message="That number is not in the YCloud account this key belongs to.",
+        ) from exc
+    except WebhookRegistrationFailed as exc:
+        raise ApiError(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            error="webhook_not_created",
+            message=(
+                "YCloud would not let us create the webhook. "
+                "Check that the key has access to webhooks."
+            ),
+        ) from exc
+    except WhatsAppError as exc:
+        raise ApiError(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            error="provider_unavailable",
+            message="We could not reach YCloud. Try again in a minute.",
+        ) from exc
     return WhatsAppNumberResponse.model_validate(number, from_attributes=True)

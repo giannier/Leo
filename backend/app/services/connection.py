@@ -23,6 +23,8 @@ holds the number, and a scoped answer would always be no.
 from __future__ import annotations
 
 import json
+import logging
+import secrets
 import uuid
 from dataclasses import dataclass
 
@@ -30,11 +32,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.crypto import decrypt_secret, encrypt_secret
 from app.models.user import User
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
-from app.providers.whatsapp.base import NumberCredentials, WhatsAppProvider
+from app.providers.whatsapp.base import NumberCredentials, WhatsAppError, WhatsAppProvider
 from app.repositories.whatsapp import ConnectionRequestRepository, WhatsAppNumberRepository
+
+logger = logging.getLogger(__name__)
 
 OPEN_STATUSES = ("requested", "in_progress")
 
@@ -49,6 +54,10 @@ class PhoneNotVerified(ConnectionError_):
 
 class PhoneAlreadyConnected(ConnectionError_):
     """That number is already live for some business on the platform."""
+
+
+class WebhookRegistrationFailed(ConnectionError_):
+    """The provider would not create the webhook in the business's account."""
 
 
 class OpenRequestExists(ConnectionError_):
@@ -88,6 +97,73 @@ class ConnectionService:
         self._requests = ConnectionRequestRepository(session, tenant_id)
         self._numbers = WhatsAppNumberRepository(session, tenant_id)
         self._global = GlobalNumberLookup(session)
+
+    async def connect_ycloud(
+        self,
+        *,
+        user: User,
+        api_key: str,
+        phone_e164: str,
+        display_name: str,
+        provider: WhatsAppProvider,
+    ) -> WhatsAppNumber:
+        """Connect a number with the business's own YCloud account, no human in between.
+
+        The API key is the proof of ownership: only the account that holds the
+        number can list it. Leo then creates the webhook in that account and keeps
+        the secret YCloud returns, so the business never copies a URL or a secret
+        by hand.
+
+        Order matters. The webhook is created last among the remote calls and
+        removed again if anything after it fails, so a refused connection does not
+        leave a stray endpoint pointing at Leo in somebody's account.
+        """
+        if user.phone_verified_at is None:
+            raise PhoneNotVerified("verify your contact phone before connecting a number")
+        if self._global.is_connected(phone_e164):
+            raise PhoneAlreadyConnected(phone_e164)
+
+        found = await provider.discover_number(api_key=api_key, phone_e164=phone_e164)
+
+        number = WhatsAppNumber(
+            tenant_id=self._tenant_id,
+            phone_e164=phone_e164,
+            display_name=display_name,
+            provider="ycloud",
+            status="connected",
+            webhook_token=secrets.token_hex(32),
+        )
+        base = get_settings().api_public_base_url.rstrip("/")
+        url = f"{base}/webhooks/ycloud/{number.webhook_token}"
+        try:
+            registration = await provider.register_webhook(api_key=api_key, url=url)
+        except WhatsAppError as exc:
+            raise WebhookRegistrationFailed(str(exc)) from exc
+
+        credentials = NumberCredentials(
+            provider="ycloud",
+            values={
+                "api_key": api_key,
+                "waba_id": found.waba_id,
+                "phone_number_id": found.phone_number_id,
+                "webhook_secret": registration.secret,
+                "webhook_endpoint_id": registration.endpoint_id,
+            },
+        )
+        try:
+            # The global unique index decides a race for the same number.
+            with self._session.begin_nested():
+                self._session.add(number)
+                self._session.flush()
+            store_credentials(self._session, number, credentials=credentials, provider=provider)
+            self._session.commit()
+        except Exception as exc:
+            self._session.rollback()
+            await provider.remove_webhook(api_key=api_key, endpoint_id=registration.endpoint_id)
+            if isinstance(exc, IntegrityError):
+                raise PhoneAlreadyConnected(phone_e164) from exc
+            raise
+        return number
 
     def list_requests(self) -> list[ConnectionRequest]:
         return list(self._requests.list())
