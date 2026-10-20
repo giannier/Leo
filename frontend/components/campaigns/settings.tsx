@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useToast } from "@/components/toast";
 import { Alert, Button, Card, Checkbox, Select, Skeleton } from "@/components/ui";
 import { Bubble } from "@/components/campaigns/templates";
 import { api, type CampaignSettings, type MessageTemplate } from "@/lib/api/client";
@@ -20,6 +21,7 @@ export function SettingsPanel({ canEdit }: { canEdit: boolean }) {
   const [followUp, setFollowUp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -42,6 +44,7 @@ export function SettingsPanel({ canEdit }: { canEdit: boolean }) {
         await api.campaigns.saveSettings({ optin_preguntar: ask, seguimiento_plantilla_id: followUp || null }),
       );
       setSaved(true);
+      toast.success("Guardado", "Ajustes de campañas");
     } catch (caught) {
       setError(humanMessage(caught));
     } finally {
