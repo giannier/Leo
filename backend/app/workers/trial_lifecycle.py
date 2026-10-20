@@ -139,7 +139,7 @@ async def run_trial_notifier(
                 kind=kind,
                 to=owner.email,
                 tenant_name=tenant.name,
-                panel_url=_panel_url(settings, "/planes"),
+                panel_url=_panel_url(settings, "/plans"),
             ),
         )
         acted += 1
@@ -197,7 +197,7 @@ async def run_trial_enforcer(
                     kind="trial_ended",
                     to=owner.email,
                     tenant_name=tenant.name,
-                    panel_url=_panel_url(settings, "/planes"),
+                    panel_url=_panel_url(settings, "/plans"),
                 ),
             )
 

@@ -688,7 +688,7 @@ class ConversationResponder:
                     tenant_name=tenant.name,
                     used=metered.used,
                     limit=metered.limit,
-                    panel_url=f"{get_settings().frontend_base_url}/plan",
+                    panel_url=f"{get_settings().frontend_base_url}/plans",
                 )
             )
 
