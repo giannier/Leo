@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Restore a backup made by deploy/backup.sh (TASK-026).
 #
-#   deploy/restore.sh /var/backups/leo/leo-db-<stamp>.dump.enc [/var/backups/leo/leo-files-<stamp>.tar.gz.enc]
+#   deploy/restore.sh /var/backups/leo/leo-db-<stamp>.dump.enc
 #
-# Replaces the database (and, if given, the files) with the backup's. It stops
-# the API and the worker while it works and starts them again at the end.
+# Replaces the database with the backup's, files included (they live in it). It
+# stops the API and the worker while it works and starts them again at the end.
 # Asks for confirmation unless RESTORE_YES=1.
 set -euo pipefail
 
@@ -18,8 +18,7 @@ source "$ENV_FILE"
 set +a
 : "${BACKUP_PASSPHRASE:?BACKUP_PASSPHRASE is empty in $ENV_FILE}"
 
-db_file="${1:?usage: restore.sh <db backup> [files backup]}"
-files_file="${2:-}"
+db_file="${1:?usage: restore.sh <db backup>}"
 
 decrypt() {
   openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_PASSPHRASE -in "$1"
@@ -40,12 +39,5 @@ fi
 decrypt "$db_file" | "${COMPOSE[@]}" exec -T postgres \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --single-transaction
 
-if [ -n "$files_file" ]; then
-  "${COMPOSE[@]}" stop minio
-  decrypt "$files_file" | docker run --rm -i -v leo_minio_data:/data alpine:3.20 \
-    sh -c 'find /data -mindepth 1 -delete && tar -C /data -xzf -'
-  "${COMPOSE[@]}" start minio
-fi
-
 "${COMPOSE[@]}" up -d backend worker
-echo "restored from $db_file${files_file:+ and $files_file}"
+echo "restored from $db_file"

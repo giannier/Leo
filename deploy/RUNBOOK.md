@@ -7,8 +7,8 @@ Lo que hay en `deploy/`:
 
 | Archivo | Para qué |
 |---|---|
-| `docker-compose.prod.yml` | Caddy (HTTPS), backend, worker, frontend, Postgres, Redis, MinIO, migraciones |
-| `Caddyfile` | `/api` y `/webhooks` → backend; el resto → frontend; `files.` → MinIO |
+| `docker-compose.prod.yml` | Caddy (HTTPS), backend, worker, frontend, Postgres, Redis, migraciones |
+| `Caddyfile` | `/api` y `/webhooks` → backend; el resto → frontend |
 | `env.prod.example` | Plantilla de `deploy/.env.prod` (secretos; nunca se sube al repo) |
 | `backup.sh` / `restore.sh` | Copia diaria cifrada de la base y los archivos, y su restauración |
 | `.github/workflows/deploy.yml` | Despliegue manual desde GitHub (botón "Run workflow") |
@@ -18,9 +18,10 @@ Lo que hay en `deploy/`:
 ## 1. Antes de empezar
 
 - **VPS:** Ubuntu 24.04, 4 vCPU, 8 GB de RAM y 100 GB de disco alcanzan para el piloto.
-- **Dominio:** tres registros DNS tipo A apuntando a la IP del VPS:
-  `app.tudominio.pe`, `files.app.tudominio.pe` y `status.app.tudominio.pe` (este último solo si usas
-  el monitor). Caddy pide los certificados solo cuando los nombres ya resuelven.
+- **Dominio:** registros DNS tipo A apuntando a la IP del VPS: `app.tudominio.pe` y
+  `status.app.tudominio.pe` (este último solo si usas el monitor). Caddy pide los certificados solo
+  cuando los nombres ya resuelven. No hay un nombre aparte para los archivos: las fotos y documentos
+  los sirve el mismo sitio, con enlaces firmados que vencen.
 - **Cuentas:** OpenAI (clave de API, con un límite mensual de gasto), Resend (dominio de correo
   verificado) y YCloud (el número conectado en TASK-459).
 
@@ -44,7 +45,7 @@ Genera los secretos **en el VPS**, no los copies del entorno de desarrollo:
 
 ```bash
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"            # SECRET_KEY
-python3 -c "import secrets; print(secrets.token_urlsafe(24))"            # contraseñas de Postgres y MinIO, BACKUP_PASSPHRASE
+python3 -c "import secrets; print(secrets.token_urlsafe(24))"            # contraseña de Postgres, BACKUP_PASSPHRASE
 docker run --rm python:3.12-slim sh -c "pip -q install cryptography && python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"   # CREDENTIALS_ENCRYPTION_KEY
 ```
 
@@ -61,8 +62,8 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod ps
 curl -s https://app.tudominio.pe/api/v1/health      # {"status":"ok",...}
 ```
 
-El orden lo resuelve el compose: Postgres, Redis y MinIO arrancan; se crea el bucket; corren las
-migraciones; recién entonces arrancan el backend y el worker.
+El orden lo resuelve el compose: Postgres y Redis arrancan; corren las migraciones (entre ellas la
+que crea las tablas de archivos); recién entonces arrancan el backend y el worker.
 
 Hazte administrador de la plataforma (después de registrarte en `https://app.tudominio.pe/register`):
 
@@ -110,20 +111,23 @@ crontab -e
 15 4 * * * cd /opt/leo && deploy/backup.sh >> /var/log/leo-backup.log 2>&1
 ```
 
-Escribe en `/var/backups/leo` dos archivos por día: `leo-db-*.dump.enc` (la base) y
-`leo-files-*.tar.gz.enc` (fotos, documentos, comprobantes). **Cópialos fuera del VPS** al menos una vez
-por semana (por ejemplo, `rsync` a otra máquina o el almacenamiento de objetos del proveedor): un
-backup en el mismo disco no sobrevive a perder el disco.
+Escribe en `/var/backups/leo` un archivo por día: `leo-db-*.dump.enc`. Es la base completa, y **las
+fotos, documentos y comprobantes van dentro**, porque viven en Postgres: no hay una segunda copia que
+acordarse de hacer. **Cópialo fuera del VPS** al menos una vez por semana (por ejemplo, `rsync` a otra
+máquina): un backup en el mismo disco no sobrevive a perder el disco.
+
+Cada corrida termina con una línea como `backup ok: 38M (stored: 412 files, 120 MB)`. Ese segundo
+número es el que hay que mirar: cuánto de la base son archivos. Si crece más rápido de lo esperado,
+ver "Archivos" en la sección 7.
 
 ### Restaurar (y probarlo una vez: es parte de la Verification)
 
 ```bash
 cd /opt/leo
-deploy/restore.sh /var/backups/leo/leo-db-AAAAMMDDTHHMMSSZ.dump.enc \
-                  /var/backups/leo/leo-files-AAAAMMDDTHHMMSSZ.tar.gz.enc
+deploy/restore.sh /var/backups/leo/leo-db-AAAAMMDDTHHMMSSZ.dump.enc
 ```
 
-Detiene el backend y el worker, reemplaza la base (y los archivos si los das), y los arranca. Pide
+Detiene el backend y el worker, reemplaza la base (con sus archivos), y los arranca. Pide
 escribir `restaurar` antes de tocar nada, y si la clave del backup no coincide se detiene sin cambiar
 nada. Para el simulacro, hazlo una vez recién desplegado, con datos de prueba.
 
@@ -138,6 +142,35 @@ nada. Para el simulacro, hazlo una vez recién desplegado, con datos de prueba.
 | Precio de los modelos (costos y márgenes) | `/admin/metricas → Precio de los modelos` |
 | Reiniciar un servicio | `docker compose ... restart worker` |
 | Espacio en disco | `df -h` y `docker system df`; `docker image prune -f` limpia imágenes viejas |
+
+### Archivos
+
+Las fotos de productos, los comprobantes de pago, los documentos de conocimiento y los archivos de la
+biblioteca viven en Postgres (tablas `stored_objects` y `stored_object_chunks`), en trozos de 1 MiB.
+El panel y WhatsApp los leen por enlaces firmados que sirve la propia API (`/api/v1/files/...`).
+
+- **Cuánto ocupan, por negocio:**
+  ```bash
+  docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod exec postgres \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+    "select t.name, count(*) files, pg_size_pretty(sum(o.size_bytes)) size
+       from stored_objects o join tenants t on t.id = o.tenant_id
+      group by t.name order by sum(o.size_bytes) desc limit 20"
+  ```
+- **Límites.** Un archivo no pasa de 100 MB (`STORAGE_MAX_OBJECT_BYTES`). La cuota por negocio
+  (`STORAGE_TENANT_QUOTA_BYTES`, en bytes) viene apagada (`0`): se enciende cuando haya un plan que la
+  respalde, y entonces el negocio que se pasa recibe un error al subir, no antes.
+- **Los enlaces vencen** (10 minutos las vistas previas y los comprobantes, hasta 24 horas las
+  campañas) y **nunca duran más de lo prometido**. Un enlace vencido, uno alterado y un archivo borrado
+  dan el mismo 404: es a propósito, para no dar pistas.
+- **Cuando la base se llene de fotos** (el número `stored:` del backup crece mucho, o el backup tarda
+  demasiado), el siguiente paso es un almacenamiento S3-compatible. Se pasa sin perder nada:
+  `make storage-migrate ARGS="--from postgres --to s3"` simula, y con `--apply` copia y verifica cada
+  archivo por checksum (con la aplicación quieta); luego se cambia `STORAGE_BACKEND=s3` y los `S3_*`.
+  `--delete-source` borra el original, solo después de verificar su copia.
+- **`API_PUBLIC_BASE_URL`** debe ser la dirección pública del sitio (`https://app.tudominio.pe`). Los
+  enlaces se arman con ella y WhatsApp los descarga desde ahí; el compose de producción ya la deriva de
+  `LEO_DOMAIN`.
 
 ### Monitor (opcional)
 
@@ -162,7 +195,11 @@ Giannier**. `BILLING_PAYMENT_INSTRUCTIONS` es el texto que ve el negocio para pa
 
 - **El backend no arranca y el log dice SECRET_KEY / CREDENTIALS_ENCRYPTION_KEY / TRUST_PROXY_HEADERS:**
   falta ese valor en `.env.prod` (Leo se niega a arrancar en producción con claves de desarrollo).
-- **"No pudimos guardar la foto":** MinIO o el bucket; mira `docker compose ... logs minio minio-init`.
+- **"No pudimos guardar la foto":** el archivo pasa de 100 MB, el negocio llegó a su cuota, o la base
+  no tiene espacio (`df -h`); mira `docker compose ... logs backend`.
+- **Las fotos salen rotas (imagen que no carga):** `API_PUBLIC_BASE_URL` no es la dirección pública
+  del sitio, o el enlace ya venció (recarga la página). Un enlace nunca responde con detalles: si hace
+  falta saber qué pasó, mira `logs backend`.
 - **Los mensajes de WhatsApp no llegan:** la URL y el secreto del webhook en YCloud (sección 4), y
   `logs backend | grep webhook`.
 - **Certificado HTTPS que no sale:** los registros DNS aún no apuntan al VPS; `logs caddy`.

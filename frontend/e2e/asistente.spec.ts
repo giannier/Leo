@@ -115,7 +115,8 @@ test.describe("Asistente por capas", () => {
     ).toBeVisible();
   });
 
-  // Needs the object store (MinIO in `make up`); without it the upload answers 503.
+  // The file goes to the database (STORAGE_BACKEND=postgres) and the card previews it
+  // through a signed link, so a broken preview here means the link or the endpoint.
   test("una imagen se sube a la biblioteca", async ({ page }) => {
     await page.goto("/asistente/multimedia");
     await page.getByTestId("media-file").setInputFiles({ name: "qr.png", mimeType: "image/png", buffer: PNG });

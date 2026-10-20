@@ -9,8 +9,8 @@ import { freshIdentity, verificationPath, waitForEmail } from "./outbox";
  *
  * Runs against the real stack with the indexing worker running (`make worker`):
  * a source goes from "En cola" to "Listo" for real. Not covered here, and why:
- * a PDF upload needs the object store (MinIO), and reading a website needs the
- * public internet; both are covered by the backend suites and by the milestone.
+ * a PDF needs a real PDF to read, and reading a website needs the public
+ * internet; both are covered by the backend suites and by the milestone.
  */
 
 async function owner(page: Page): Promise<void> {

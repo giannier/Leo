@@ -44,25 +44,6 @@ services:
       retries: 10
       start_period: 5s
 
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-leo-minio}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-leo-minio-secret}
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
   backend:
     build:
       context: ../backend
@@ -75,7 +56,6 @@ services:
       # Override host-facing defaults from `.env` with in-network hostnames.
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-leo}:${POSTGRES_PASSWORD:-leo}@postgres:5432/${POSTGRES_DB:-leo}
       REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT_URL: http://minio:9000
       # Development sends no real email by default. A Resend sandbox account
       # cannot send to anybody but its owner, nor from an unverified domain,
       # so registration - the one step that gates entry to the panel - fails
@@ -105,8 +85,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
     healthcheck:
       test:
@@ -140,7 +118,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-leo}:${POSTGRES_PASSWORD:-leo}@postgres:5432/${POSTGRES_DB:-leo}
       REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT_URL: http://minio:9000
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_OUTBOX_PATH: /app/.tmp/outbox.jsonl
       LLM_PROFILE: ${LLM_PROFILE:-offline}
@@ -151,8 +128,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      minio:
         condition: service_healthy
 
   frontend:
@@ -190,6 +165,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
   frontend_node_modules:
   frontend_next:

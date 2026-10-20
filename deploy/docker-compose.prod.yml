@@ -4,10 +4,11 @@
 #   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --build
 #
 # Caddy is the only service with public ports: it gets the HTTPS certificates
-# by itself (Let's Encrypt) and sends `/api` and `/webhooks` to the backend,
-# everything else to the frontend, and `files.<domain>` to MinIO (the
-# short-lived links to photos and documents). Postgres, Redis and MinIO are
-# reachable only inside the compose network. The runbook is deploy/RUNBOOK.md.
+# by itself (Let's Encrypt) and sends `/api` and `/webhooks` to the backend and
+# everything else to the frontend. Files (photos, receipts, documents) live in
+# Postgres and are served by the API through short-lived signed links, so there
+# is no object store to run. Postgres and Redis are reachable only inside the
+# compose network. The runbook is deploy/RUNBOOK.md.
 
 name: leo
 
@@ -15,11 +16,10 @@ x-backend-env: &backend-env
   ENVIRONMENT: production
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
   REDIS_URL: redis://redis:6379/0
-  S3_ENDPOINT_URL: http://minio:9000
-  S3_PUBLIC_ENDPOINT_URL: https://files.${LEO_DOMAIN}
-  S3_ACCESS_KEY: ${MINIO_ROOT_USER}
-  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-  S3_BUCKET: ${S3_BUCKET:-leo-storage}
+  # Files in Postgres. Links to them are built on the site's own address, which
+  # is also what WhatsApp downloads media from.
+  STORAGE_BACKEND: postgres
+  API_PUBLIC_BASE_URL: https://${LEO_DOMAIN}
   FRONTEND_BASE_URL: https://${LEO_DOMAIN}
   CORS_ORIGINS: https://${LEO_DOMAIN}
   # Caddy is in front: the client's address comes in X-Forwarded-For.
@@ -40,8 +40,6 @@ x-backend: &backend
     postgres:
       condition: service_healthy
     redis:
-      condition: service_healthy
-    minio:
       condition: service_healthy
 
 services:
@@ -92,37 +90,6 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
-    restart: unless-stopped
-    command: ["server", "/data"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # The bucket, created once (idempotent): the app never creates it by itself.
-  minio-init:
-    image: minio/mc:RELEASE.2024-10-08T09-37-26Z
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - mc alias set leo http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        && mc mb --ignore-existing "leo/$$S3_BUCKET"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET:-leo-storage}
-    restart: "no"
-
   # Migrations first, once per deploy; the API and the worker wait for it.
   migrate:
     <<: *backend
@@ -136,8 +103,6 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -189,5 +154,4 @@ volumes:
   caddy_config:
   postgres_data:
   redis_data:
-  minio_data:
   uptime_kuma_data:

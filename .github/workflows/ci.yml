@@ -280,25 +280,6 @@ jobs:
       - name: Apply migrations
         run: make migrate
 
-      - name: Start object storage
-        # Photos and library files go to S3-compatible storage; without it the
-        # upload specs (catalogue, assistant library) have nowhere to write. The
-        # credentials are `Settings`' development defaults, and the backend creates
-        # the bucket on first use. Same pinned image as `deploy/`.
-        run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=leo-minio -e MINIO_ROOT_PASSWORD=leo-minio-secret \
-            minio/minio:RELEASE.2024-10-13T13-34-11Z server /data
-          for _ in $(seq 1 30); do
-            if curl -fsS http://localhost:9000/minio/health/live > /dev/null; then
-              echo "Object storage up"; exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::Object storage never became healthy."
-          docker logs minio
-          exit 1
-
       - name: Start the API
         run: |
           mkdir -p backend/.tmp
