@@ -30,6 +30,17 @@ def number_by_phone(session: Session, phone_e164: str) -> WhatsAppNumber | None:
     return session.execute(statement).scalar_one_or_none()
 
 
+def number_by_webhook_token(session: Session, token: str) -> WhatsAppNumber | None:
+    """The number a webhook URL belongs to.
+
+    Unscoped for the same reason as `number_by_phone`: the token is how the
+    tenant is discovered. It is 256 random bits and unique, so there is one
+    possible answer and it cannot be guessed.
+    """
+    statement = select(WhatsAppNumber).where(WhatsAppNumber.webhook_token == token)
+    return session.execute(statement).scalar_one_or_none()
+
+
 class WhatsAppNumberRepository(BaseRepository[WhatsAppNumber]):
     """Numbers bound to one tenant."""
 

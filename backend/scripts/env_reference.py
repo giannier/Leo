@@ -25,7 +25,6 @@ SECRETS = frozenset(
         "openai_api_key",
         "credentials_encryption_key",
         "secret_key",
-        "ycloud_webhook_secret",
     }
 )
 
@@ -73,7 +72,6 @@ GROUPS: list[tuple[str, list[str]]] = [
     (
         "WhatsApp channel",
         [
-            "ycloud_webhook_secret",
             "ycloud_base_url",
             "channel_debounce_seconds",
             "channel_send_max_attempts",

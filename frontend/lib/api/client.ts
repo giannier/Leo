@@ -358,6 +358,12 @@ export type ConnectionRequestBody = JsonBody<
   Ops["/api/v1/tenant/connection-requests"]["post"]["requestBody"]
 >;
 export type WhatsAppNumber = Ok<Ops["/api/v1/tenant/whatsapp-number"]["get"]>;
+/** The business's own YCloud API key and the number to connect with it. */
+export interface ConnectNumberBody {
+  api_key: string;
+  phone_e164: string;
+  display_name: string;
+}
 
 export type Team = Ok<Ops["/api/v1/tenant/team"]["get"]>;
 export type TeamMember = Team["members"][number];
@@ -433,7 +439,6 @@ export type OperatorState = JsonBody<
 // ------------------------------------------------- the assistant by layers (017)
 export type Overview = Ok<Ops["/api/v1/assistant/overview"]["get"]>;
 export interface ChannelHealth {
-  secreto_configurado: boolean;
   numeros_conectados: number;
   ultimo_webhook: string | null;
   recibidos_24h: number;
@@ -798,6 +803,10 @@ export const api = {
     list: () => request<ConnectionRequest[]>("/tenant/connection-requests"),
     create: (body: ConnectionRequestBody) =>
       request<ConnectionRequest>("/tenant/connection-requests", { method: "POST", body }),
+    /** Connects the number with the business's own YCloud account: Leo checks the key,
+     * creates the webhook there and stores its secret. */
+    connect: (body: ConnectNumberBody) =>
+      request<WhatsAppNumber>("/tenant/whatsapp-number", { method: "POST", body }),
     /** The live number, or `null`. A 404 here means "none yet", which is a
      * state and not an error - so it is translated rather than thrown. */
     number: async () => {

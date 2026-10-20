@@ -62,6 +62,7 @@ from app.providers.whatsapp.base import (
     MAX_ROW_DESCRIPTION,
     MAX_ROW_TITLE,
     Button,
+    DiscoveredNumber,
     DownloadedMedia,
     InboundMedia,
     InboundMessage,
@@ -70,6 +71,7 @@ from app.providers.whatsapp.base import (
     ListSection,
     MediaRef,
     NumberCredentials,
+    NumberNotInAccount,
     ParsedEvent,
     QualityUpdate,
     Recipient,
@@ -80,6 +82,7 @@ from app.providers.whatsapp.base import (
     TemplateStatusUpdate,
     TemplateSubmitted,
     UploadedMedia,
+    WebhookRegistration,
     WhatsAppAuthError,
     WhatsAppError,
     WhatsAppRateLimited,
@@ -92,6 +95,8 @@ API_BASE_URL = "https://api.ycloud.com/v2"
 MESSAGES_PATH = "/whatsapp/messages"
 MEDIA_UPLOAD_PATH = "/whatsapp/media/{phone}/upload"
 TEMPLATES_PATH = "/whatsapp/templates"
+PHONE_NUMBERS_PATH = "/whatsapp/phoneNumbers"
+WEBHOOK_ENDPOINTS_PATH = "/webhookEndpoints"
 
 # Uploading a file is slower than posting a few hundred bytes of JSON.
 UPLOAD_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
@@ -101,6 +106,9 @@ DOWNLOAD_TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 
 # YCloud (through Meta) keeps an uploaded file for 30 days.
 MEDIA_LIFETIME = timedelta(days=30)
+
+# Pages of 100 numbers read when looking one up; far above any real account.
+MAX_PHONE_PAGES = 20
 
 
 # 20 seconds. A customer is watching a typing indicator, and past that the
@@ -119,6 +127,12 @@ EVENT_MESSAGE_UPDATED = "whatsapp.message.updated"
 EVENT_QUALITY_UPDATED = "whatsapp.business_account.phone_number.quality.updated"
 # YCloud documents `reviewed`; recorded payloads also carry `updated`. Both say the same.
 EVENT_TEMPLATE = frozenset({"whatsapp.template.reviewed", "whatsapp.template.updated"})
+
+# What a business's webhook is subscribed to. The first three are the ones Leo
+# cannot work without; `OPTIONAL_WEBHOOK_EVENTS` is retried without if YCloud
+# rejects a name, so a renamed event never blocks connecting a number.
+REQUIRED_WEBHOOK_EVENTS = (EVENT_INBOUND, EVENT_MESSAGE_UPDATED, "whatsapp.template.reviewed")
+OPTIONAL_WEBHOOK_EVENTS = (EVENT_QUALITY_UPDATED,)
 
 # Meta's template states, mapped onto ours. Anything else (a state Meta adds) is
 # left as `pending`, which shows "en revisión" rather than inventing a verdict.
@@ -473,16 +487,20 @@ class YCloudProvider:
         json: dict[str, Any] | None = None,
         files: dict[str, tuple[str, bytes, str]] | None = None,
         limit: httpx.Timeout | None = None,
+        method: str = "POST",
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
         headers = {"X-API-Key": api_key, "Accept": "application/json"}
-        if files is None:
+        if files is None and json is not None:
             # With `files`, httpx sets the multipart boundary itself.
             headers["Content-Type"] = "application/json"
         limit = limit or self._timeout
         try:
             async with httpx.AsyncClient(timeout=limit, transport=self._transport) as client:
-                response = await client.post(url, headers=headers, json=json, files=files)
+                response = await client.request(
+                    method, url, headers=headers, json=json, files=files, params=params
+                )
         except httpx.TimeoutException as exc:
             raise WhatsAppTransientError(f"YCloud timed out after {limit.read}s") from exc
         except httpx.HTTPError as exc:
@@ -513,6 +531,73 @@ class YCloudProvider:
             raise WhatsAppError(
                 f"YCloud refused the message (HTTP {response.status_code}): {response.text[:200]}"
             )
+
+    # --------------------------------------------------- connecting a number
+
+    async def discover_number(self, *, api_key: str, phone_e164: str) -> DiscoveredNumber:
+        """Look the number up in the account the key belongs to."""
+        wanted = _digits(phone_e164)
+        page = 1
+        while page <= MAX_PHONE_PAGES:
+            answer = await self._request(
+                PHONE_NUMBERS_PATH,
+                api_key=api_key,
+                method="GET",
+                params={"page": page, "limit": 100},
+            )
+            items = answer.get("items")
+            rows = (
+                [row for row in items if isinstance(row, dict)] if isinstance(items, list) else []
+            )
+            for row in rows:
+                if _digits(str(row.get("phoneNumber") or "")) == wanted:
+                    waba_id = str(row.get("wabaId") or "")
+                    if not waba_id:
+                        raise WhatsAppError("YCloud listed the number without its WABA id")
+                    return DiscoveredNumber(
+                        phone_e164=phone_e164,
+                        waba_id=waba_id,
+                        # YCloud addresses a sender by its phone number, so that is
+                        # the fallback when the listing carries no usable id.
+                        phone_number_id=_usable_id(row.get("id")) or wanted,
+                    )
+            if len(rows) < 100:
+                break
+            page += 1
+        raise NumberNotInAccount(phone_e164)
+
+    async def register_webhook(self, *, api_key: str, url: str) -> WebhookRegistration:
+        """Create the endpoint in the business's own YCloud account."""
+        events = [*REQUIRED_WEBHOOK_EVENTS, *OPTIONAL_WEBHOOK_EVENTS]
+        try:
+            answer = await self._create_endpoint(api_key, url, events)
+        except WhatsAppError as exc:
+            if isinstance(exc, WhatsAppAuthError | WhatsAppTransientError | WhatsAppRateLimited):
+                raise
+            # A 4xx that is not about the key: most likely an event name YCloud
+            # does not know. Subscribe to what Leo cannot work without.
+            logger.warning("YCloud refused the full event list; retrying with the required ones")
+            answer = await self._create_endpoint(api_key, url, list(REQUIRED_WEBHOOK_EVENTS))
+        endpoint_id = answer.get("id")
+        secret = answer.get("secret")
+        if not endpoint_id or not secret:
+            raise WhatsAppError("YCloud created the webhook but returned no id or secret")
+        return WebhookRegistration(endpoint_id=str(endpoint_id), secret=str(secret))
+
+    async def _create_endpoint(self, api_key: str, url: str, events: list[str]) -> dict[str, Any]:
+        return await self._request(
+            WEBHOOK_ENDPOINTS_PATH,
+            api_key=api_key,
+            json={"url": url, "enabledEvents": events, "description": "Leo"},
+        )
+
+    async def remove_webhook(self, *, api_key: str, endpoint_id: str) -> None:
+        try:
+            await self._request(
+                f"{WEBHOOK_ENDPOINTS_PATH}/{endpoint_id}", api_key=api_key, method="DELETE"
+            )
+        except WhatsAppError:
+            logger.warning("could not remove a YCloud webhook endpoint", exc_info=True)
 
     # ------------------------------------------------------------- webhooks
 
@@ -667,6 +752,15 @@ def _parse_template(template: dict[str, Any]) -> TemplateStatusUpdate | None:
         reason=reason if reason not in ("", "NONE") else None,
         provider_template_id=str(template.get("officialTemplateId") or "") or None,
     )
+
+
+def _usable_id(value: object) -> str:
+    text = str(value or "").strip()
+    return text if len(text) >= MIN_CREDENTIAL_LENGTH else ""
+
+
+def _digits(phone: str) -> str:
+    return "".join(ch for ch in phone if ch.isdigit())
 
 
 def _address(to: Recipient) -> dict[str, str]:
