@@ -41,12 +41,16 @@ function MethodRow({
   images: MediaAsset[];
   onChanged: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
   const [instructions, setInstructions] = useState(method.instructions);
   const [holder, setHolder] = useState(method.titular ?? "");
   const [qr, setQr] = useState(method.media_asset_id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const label = METHOD_LABEL.get(method.method) ?? method.method;
+  const photo = images.find((m) => m.id === method.media_asset_id);
 
   async function save() {
     setBusy(true);
@@ -59,7 +63,9 @@ function MethodRow({
         media_asset_id: qr || null,
       });
       onChanged();
-      // The button stops spinning in a blink; without this nothing says it worked.
+      // Closed once saved, and the row says so for a moment: the button used to stop
+      // spinning in a blink and nothing told the person it had worked.
+      setEditing(false);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (caught) {
@@ -69,9 +75,59 @@ function MethodRow({
     }
   }
 
+  function cancel() {
+    setInstructions(method.instructions);
+    setHolder(method.titular ?? "");
+    setQr(method.media_asset_id ?? "");
+    setError(null);
+    setEditing(false);
+  }
+
+  async function remove() {
+    if (!window.confirm(`¿Quitar ${label}? El asistente dejará de ofrecerlo.`)) return;
+    setError(null);
+    try {
+      await api.payments.remove(method.id);
+      onChanged();
+    } catch (caught) {
+      setError(humanMessage(caught));
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="rounded-lg border border-line p-3">
+        {error ? (
+          <div className="mb-2">
+            <Alert tone="danger">{error}</Alert>
+          </div>
+        ) : null}
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-ink">
+              {label} <Saved show={saved} />
+            </p>
+            <p className="truncate text-sm text-ink-soft">{method.instructions}</p>
+            <p className="truncate text-xs text-ink-faint">
+              {[method.titular, photo ? `Imagen: ${photo.titulo}` : null].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Button type="button" variant="secondary" onClick={() => setEditing(true)}>
+              Editar
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => void remove()}>
+              Quitar
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3 rounded-lg border border-line p-3">
-      <p className="text-sm font-semibold text-ink">{METHOD_LABEL.get(method.method) ?? method.method}</p>
+    <div className="space-y-3 rounded-lg border border-accent p-3">
+      <p className="text-sm font-semibold text-ink">{label}</p>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <TextArea
         label="Lo que el asistente le envía al cliente"
@@ -92,26 +148,13 @@ function MethodRow({
         onChange={(e) => setQr(e.target.value)}
         hint="Súbela antes en Multimedia."
       />
-      <div className="flex items-center gap-2">
+      <div className="flex gap-2">
         <Button type="button" loading={busy} onClick={() => void save()}>
           Guardar
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={async () => {
-            setError(null);
-            try {
-              await api.payments.remove(method.id);
-              onChanged();
-            } catch (caught) {
-              setError(humanMessage(caught));
-            }
-          }}
-        >
-          Quitar
+        <Button type="button" variant="ghost" onClick={cancel} disabled={busy}>
+          Cancelar
         </Button>
-        <Saved show={saved} />
       </div>
     </div>
   );
