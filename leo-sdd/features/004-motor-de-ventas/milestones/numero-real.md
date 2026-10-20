@@ -39,15 +39,14 @@ Comprueba que llega: `curl https://<tu-url>/api/v1/health` debe responder `ok`.
 
 ## 3. Configurar el secreto y conectar el número
 
-1. En `.env` agrega `YCLOUD_WEBHOOK_SECRET=<el secreto de YCloud>` y reinicia: `make up`.
-2. En YCloud, crea el webhook con la URL del paso 2 y suscríbelo a los mensajes entrantes y a los
-   estados de entrega.
-3. Hazte administrador de plataforma si aún no lo eres: `make admin EMAIL=<tu correo>`.
-4. Con el negocio que vas a probar (Tienda Demo o Escuela Capacita): en el panel, **Mi número**, verifica
-   tu teléfono de contacto y solicita la conexión con el número de WhatsApp del negocio.
-5. En el panel de plataforma (`/admin`), aprueba la solicitud como **conectada** y pega la API key de
-   YCloud (`api_key`).
-6. Activa el asistente del negocio (interruptor del panel) y deja el **Modo pruebas** como está.
+1. Ya no hay `YCLOUD_WEBHOOK_SECRET` (decisión 2026-10-20, `002-canal-whatsapp/plan.md`): cada negocio
+   conecta su propia cuenta de YCloud y Leo crea el webhook en ella.
+2. Con el túnel (o el VPS) arriba y `API_PUBLIC_BASE_URL` apuntando a su URL pública, entra al panel del
+   negocio → **Mi número**, pega la clave API de YCloud, el número y el nombre.
+4. Hazte administrador de plataforma si aún no lo eres: `make admin EMAIL=<tu correo>`.
+3. Con el negocio que vas a probar (Tienda Demo o Escuela Capacita), verifica tu teléfono de contacto
+   y conecta el número como en el paso 2. No hay aprobación en `/admin`.
+5. Activa el asistente del negocio (interruptor del panel) y deja el **Modo pruebas** como está.
 
 ## 4. Guion de prueba
 

@@ -1,4 +1,4 @@
-"""`POST /webhooks/ycloud` (TASK-203).
+"""`POST /webhooks/ycloud/<token>` (TASK-203, one URL and one secret per number).
 
 This URL is reachable by anyone on the internet and writes into the inbox of
 every business on the platform, so what is pinned here is mostly what it
@@ -25,12 +25,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_job_queue
-from app.core.config import get_settings
 from app.models.channel import WebhookEvent
+from app.models.tenant import Tenant
+from app.models.whatsapp import WhatsAppNumber
+from app.providers.whatsapp.base import NumberCredentials
+from app.providers.whatsapp.ycloud import YCloudProvider
 from app.repositories.channel import WebhookEventRepository
+from app.repositories.whatsapp import number_by_webhook_token
+from app.services.connection import store_credentials
 from tests.fixtures import load
 
-WEBHOOK = "/webhooks/ycloud"
+# Every business has its own YCloud account, so its own URL and its own secret.
+# The token is random per run because `webhook_token` is unique platform-wide
+# and this suite shares a database with everything else.
+TOKEN = uuid.uuid4().hex + uuid.uuid4().hex
+WEBHOOK = f"/webhooks/ycloud/{TOKEN}"
 SECRET = "whsec_the_suites_own_secret"
 
 
@@ -48,11 +57,43 @@ class RecordingQueue:
         return f"job-{len(self.enqueued)}"
 
 
+def _connect_number(db: Session, *, token: str, secret: str | None) -> WhatsAppNumber:
+    """A tenant with a connected number whose webhook URL carries `token`."""
+    tenant = Tenant(name=f"Webhook {uuid.uuid4().hex[:8]}")
+    db.add(tenant)
+    db.flush()
+    number = WhatsAppNumber(
+        tenant_id=tenant.id,
+        phone_e164=f"+5191{uuid.uuid4().int % 10**7:07d}",
+        display_name="Panaderia Quispe",
+        provider="ycloud",
+        status="connected",
+        webhook_token=token,
+    )
+    db.add(number)
+    db.flush()
+    values = {
+        "api_key": "key_for_the_suite",
+        "waba_id": "waba_suite",
+        "phone_number_id": "pn_suite",
+    }
+    if secret is not None:
+        values["webhook_secret"] = secret
+    store_credentials(
+        db,
+        number,
+        credentials=NumberCredentials(provider="ycloud", values=values),
+        provider=YCloudProvider(),
+    )
+    db.commit()
+    return number
+
+
 @pytest.fixture(autouse=True)
-def webhook_secret(monkeypatch: pytest.MonkeyPatch) -> str:
-    """A secret the suite owns, never whatever is in a developer's `.env`."""
-    monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", SECRET)
-    return SECRET
+def webhook_number(db: Session) -> WhatsAppNumber:
+    """The number the suite's URL belongs to, with a secret the suite owns."""
+    existing = number_by_webhook_token(db, TOKEN)
+    return existing or _connect_number(db, token=TOKEN, secret=SECRET)
 
 
 @pytest.fixture
@@ -152,15 +193,60 @@ class TestWhatItRefuses:
         assert response.status_code == 400
         assert queue.enqueued == []
 
-    async def test_with_no_secret_configured_everything_is_refused(
-        self, api: AsyncClient, queue: RecordingQueue, monkeypatch: pytest.MonkeyPatch
+    async def test_an_unknown_token_is_401_like_a_bad_signature(
+        self, api: AsyncClient, queue: RecordingQueue
+    ) -> None:
+        """The same answer, so the response cannot be used to find out which
+        tokens exist."""
+        raw, headers = _delivery()
+
+        unknown = await api.post("/webhooks/ycloud/not-a-real-token", content=raw, headers=headers)
+        unsigned = await api.post(
+            WEBHOOK, content=raw, headers={"Content-Type": "application/json"}
+        )
+
+        assert unknown.status_code == unsigned.status_code == 401
+        assert unknown.json() == unsigned.json()
+        assert queue.enqueued == []
+
+    async def test_a_number_with_no_secret_refuses_everything(
+        self, api: AsyncClient, queue: RecordingQueue, db: Session
     ) -> None:
         """The correct failure. An endpoint with no secret is a public write
-        API to every tenant's inbox."""
+        API to a business's inbox."""
+        token = uuid.uuid4().hex + uuid.uuid4().hex
+        _connect_number(db, token=token, secret=None)
         raw, headers = _delivery()
-        monkeypatch.setattr(get_settings(), "ycloud_webhook_secret", None)
 
-        response = await api.post(WEBHOOK, content=raw, headers=headers)
+        response = await api.post(f"/webhooks/ycloud/{token}", content=raw, headers=headers)
+
+        assert response.status_code == 401
+        assert queue.enqueued == []
+
+    async def test_another_businesss_secret_does_not_open_this_url(
+        self, api: AsyncClient, queue: RecordingQueue, db: Session
+    ) -> None:
+        """Two businesses, two YCloud accounts, two secrets. A delivery signed
+        with the other one's secret must not be accepted on this URL."""
+        token = uuid.uuid4().hex + uuid.uuid4().hex
+        _connect_number(db, token=token, secret="whsec_another_business")
+        raw, headers = _delivery()  # signed with the suite's own SECRET
+
+        response = await api.post(f"/webhooks/ycloud/{token}", content=raw, headers=headers)
+
+        assert response.status_code == 401
+        assert queue.enqueued == []
+
+    async def test_a_disconnected_number_is_refused(
+        self, api: AsyncClient, queue: RecordingQueue, db: Session
+    ) -> None:
+        token = uuid.uuid4().hex + uuid.uuid4().hex
+        number = _connect_number(db, token=token, secret=SECRET)
+        number.status = "disconnected"
+        db.commit()
+        raw, headers = _delivery()
+
+        response = await api.post(f"/webhooks/ycloud/{token}", content=raw, headers=headers)
 
         assert response.status_code == 401
 

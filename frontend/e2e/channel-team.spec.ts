@@ -149,13 +149,21 @@ test.describe("Conexión del número", () => {
     });
     expect(verified.ok(), await verified.text()).toBeTruthy();
 
-    // --- the customer files it -------------------------------------------
+    // --- the customer sees the self-service form --------------------------
+    // Connecting with the business's own YCloud key needs YCloud itself (the
+    // backend suite covers that against a stub). What stays here is the legacy
+    // request an operator can still process, filed through the API.
     await page.goto("/channel");
-    const number = `+519${Date.now().toString().slice(-8)}`;
-    await page.getByLabel("Número de WhatsApp").fill(number);
-    await page.getByLabel("Nombre que verán tus clientes").fill("Panadería Leo");
-    await page.getByRole("button", { name: "Pedir la conexión" }).click();
+    await expect(page.getByText("Conecta tu número de WhatsApp")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel("Clave API de YCloud")).toBeVisible();
 
+    const number = `+519${Date.now().toString().slice(-8)}`;
+    const filed = await request.post(`${API}/tenant/connection-requests`, {
+      headers: { Authorization: `Bearer ${session.token}` },
+      data: { phone_e164: number, display_name: "Panadería Leo" },
+    });
+    expect(filed.ok(), await filed.text()).toBeTruthy();
+    await page.reload();
     await expect(page.getByText("Tu solicitud está en camino")).toBeVisible({ timeout: 15_000 });
 
     // --- the operator picks it up ----------------------------------------

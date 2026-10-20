@@ -3,11 +3,10 @@
 /**
  * Mi número de WhatsApp (HU-04 and HU-05).
  *
- * Connecting a number is the one step of onboarding that a person does, not
- * software: Giannier does the YCloud work by hand (Clarification 007). So the
- * screen's real job is to make waiting bearable - show exactly which stage the
- * request is in, and when it is refused, say why and let them fix it and file
- * again in one move.
+ * Each business connects its own YCloud account by pasting its API key: Leo checks
+ * the key, creates the webhook in that account and keeps the secret it returns.
+ * Nobody on the platform's side has to do anything by hand. Requests filed before
+ * this existed still show their progress and history below.
  *
  * The activation switch lives here too, next to the number it switches on.
  * Splitting them would mean somebody connects a number, sees nothing happen,
@@ -67,7 +66,6 @@ export default function ChannelPage() {
   }, [load]);
 
   const open = requests?.find((r) => r.status === "requested" || r.status === "in_progress");
-  const lastRejected = requests?.find((r) => r.status === "rejected");
 
   return (
     <div className="space-y-5">
@@ -105,13 +103,12 @@ export default function ChannelPage() {
       {!number && open ? <Progress request={open} /> : null}
 
       {!number && !open && requests !== null ? (
-        <RequestForm
+        <ConnectForm
           canConfigure={canConfigure}
-          rejected={lastRejected}
           phoneVerified={
             checklist?.items.find((item) => item.key === "phone_verified")?.done ?? false
           }
-          onFiled={load}
+          onConnected={load}
         />
       ) : null}
 
@@ -305,28 +302,26 @@ function Progress({ request }: { request: ConnectionRequest }) {
 
 /* ------------------------------------------------------------------ form */
 
-function RequestForm({
+function ConnectForm({
   canConfigure,
-  rejected,
   phoneVerified,
-  onFiled,
+  onConnected,
 }: {
   canConfigure: boolean;
-  rejected?: ConnectionRequest;
   phoneVerified: boolean;
-  onFiled: () => Promise<void>;
+  onConnected: () => Promise<void>;
 }) {
-  const [phone, setPhone] = useState(rejected?.phone_e164 ?? "+51");
-  const [displayName, setDisplayName] = useState(rejected?.display_name ?? "");
-  const [description, setDescription] = useState(rejected?.business_description ?? "");
-  const [errors, setErrors] = useState<{ phone?: string; displayName?: string }>({});
+  const [apiKey, setApiKey] = useState("");
+  const [phone, setPhone] = useState("+51");
+  const [displayName, setDisplayName] = useState("");
+  const [errors, setErrors] = useState<{ apiKey?: string; phone?: string; displayName?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!canConfigure) {
     return (
       <Alert tone="info" title="Solo lectura">
-        Tu rol no puede pedir la conexión del número. Pídeselo al dueño de la cuenta.
+        Tu rol no puede conectar el número. Pídeselo al dueño de la cuenta.
       </Alert>
     );
   }
@@ -336,7 +331,7 @@ function RequestForm({
     // silently: a disabled form with no reason is the worst version of this.
     return (
       <Alert tone="warning" title="Primero verifica tu teléfono">
-        Antes de pedir un número necesitamos confirmar el teléfono de tu cuenta. Es un código de
+        Antes de conectar un número necesitamos confirmar el teléfono de tu cuenta. Es un código de
         seis dígitos y toma un minuto.
         <div className="mt-3">
           <Link
@@ -355,6 +350,7 @@ function RequestForm({
     setFailure(null);
 
     const found: typeof errors = {};
+    if (apiKey.trim().length < 10) found.apiKey = "Pega la clave API completa de YCloud.";
     if (!E164.test(phone.trim())) found.phone = "Usa el formato +51987654321.";
     if (!displayName.trim()) found.displayName = "Escribe el nombre que verán tus clientes.";
     if (displayName.trim().length > MAX_DISPLAY_NAME) {
@@ -368,18 +364,20 @@ function RequestForm({
 
     setBusy(true);
     try {
-      await api.connection.create({
+      await api.connection.connect({
+        api_key: apiKey.trim(),
         phone_e164: phone.trim(),
         display_name: displayName.trim(),
-        business_description: description.trim() || null,
-        // Chains the retry back to what it replaces, so the admin sees what
-        // was corrected (Clarification 012).
-        previous_request_id: rejected?.id ?? null,
       });
-      await onFiled();
+      setApiKey("");
+      await onConnected();
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === "phone_already_connected") {
         setErrors({ phone: "Ese número ya está conectado. Escríbenos si es tuyo." });
+      } else if (caught instanceof ApiError && caught.code === "invalid_api_key") {
+        setErrors({ apiKey: "YCloud no aceptó esa clave. Cópiala de nuevo en Desarrolladores → Clave API." });
+      } else if (caught instanceof ApiError && caught.code === "number_not_in_account") {
+        setErrors({ phone: "Ese número no está en la cuenta de YCloud de esa clave." });
       } else {
         setFailure(humanMessage(caught));
       }
@@ -390,23 +388,29 @@ function RequestForm({
 
   return (
     <Card
-      title={rejected ? "Corrige y vuelve a enviar" : "Pide la conexión de tu número"}
-      description={
-        rejected
-          ? undefined
-          : "Una persona de nuestro equipo lo gestiona con el proveedor oficial. Suele tomar entre uno y tres días hábiles."
-      }
+      title="Conecta tu número de WhatsApp"
+      description="Usas tu propia cuenta de YCloud. Tú pegas la clave y nosotros creamos el webhook por ti: no tienes que copiar ninguna dirección."
     >
-      {rejected ? (
-        <div className="mb-4">
-          <Alert tone="warning" title="Tu solicitud anterior fue rechazada">
-            {rejected.rejection_reason ?? "No se indicó un motivo."}
-          </Alert>
-        </div>
-      ) : null}
+      <ol className="mb-4 list-decimal space-y-1 rounded-lg bg-surface-muted p-3 pl-7 text-xs text-ink-soft">
+        <li>En YCloud, entra a Desarrolladores → Clave API y copia tu clave.</li>
+        <li>Pégala aquí con el número de WhatsApp que ya tienes conectado en esa cuenta.</li>
+        <li>Listo: Leo verifica la clave, crea el webhook en tu cuenta y empieza a recibir tus mensajes.</li>
+      </ol>
 
       <form onSubmit={submit} noValidate className="space-y-4">
         {failure ? <Alert tone="danger">{failure}</Alert> : null}
+
+        <Field
+          label="Clave API de YCloud"
+          name="api_key"
+          type="password"
+          autoComplete="off"
+          required
+          hint="Se guarda cifrada y no se vuelve a mostrar."
+          value={apiKey}
+          error={errors.apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+        />
 
         <Field
           label="Número de WhatsApp"
@@ -414,7 +418,7 @@ function RequestForm({
           type="tel"
           inputMode="tel"
           required
-          hint="Con código de país. Debe ser un número que no esté usando WhatsApp personal."
+          hint="Con código de país, tal como aparece en tu cuenta de YCloud."
           value={phone}
           error={errors.phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -425,23 +429,14 @@ function RequestForm({
           name="display_name"
           required
           maxLength={MAX_DISPLAY_NAME}
-          hint={`Hasta ${MAX_DISPLAY_NAME} caracteres. Es el nombre que aparece arriba del chat.`}
+          hint={`Hasta ${MAX_DISPLAY_NAME} caracteres. Es el nombre de tu negocio en Leo.`}
           value={displayName}
           error={errors.displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
 
-        <TextArea
-          label="¿A qué se dedica tu negocio?"
-          name="business_description"
-          rows={3}
-          hint="El proveedor lo pide para aprobar la cuenta. Opcional, pero acelera el trámite."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-
         <Button type="submit" loading={busy}>
-          {rejected ? "Reenviar solicitud" : "Pedir la conexión"}
+          Conectar mi número
         </Button>
       </form>
     </Card>

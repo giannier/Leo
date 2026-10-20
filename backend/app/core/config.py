@@ -228,14 +228,9 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     # --- WhatsApp channel (Feature 002) -----------------------------------
-    # Shared secret YCloud signs its webhooks with. Account-level, not
-    # per-number: one endpoint receives every tenant's traffic.
-    #
-    # Without it the endpoint refuses everything, which is the correct
-    # failure. An unsigned webhook endpoint is a public write API to the
-    # inbox of every business on the platform.
-    ycloud_webhook_secret: str | None = None
-
+    # There is no platform-wide webhook secret: every business brings its own
+    # YCloud account, and the secret YCloud returns when Leo creates the webhook
+    # there is kept encrypted with that number's credentials.
     # Base URL of YCloud's API. Overridable so a staging deployment can be
     # pointed at a recorded mock without touching code.
     ycloud_base_url: str = "https://api.ycloud.com/v2"
