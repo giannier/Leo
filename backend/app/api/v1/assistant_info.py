@@ -24,7 +24,7 @@ from sqlalchemy import func, select, update
 from app.agent.model_policy import allowed_levels
 from app.api.deps import ConfigurationManagerDep, JobQueueDep, SessionDep
 from app.api.errors import ApiError, error_responses
-from app.models.business import Product, ProductCategory
+from app.models.business import MAX_SALUDO, Product, ProductCategory
 from app.models.orders import Order
 from app.models.sales_config import BUSINESS_INFO_SECTIONS, Faq, Promotion
 from app.process.service import DEFAULT_CACHE
@@ -465,7 +465,9 @@ class BehaviorRequest(BaseModel):
     # The profile by form (017, RF-010).
     tratamiento: Literal["tu", "usted"] | None = None
     emojis: Literal["no", "pocos", "si"] | None = None
-    saludo: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    saludo: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_SALUDO)] | None
+    ) = None
     politica_descuentos: Literal["no_ofrece", "solo_promociones", "negociable"] | None = None
     descuento_maximo_pct: Decimal | None = Field(default=None, ge=0, le=100, decimal_places=2)
     max_situaciones: int | None = Field(default=None, ge=1, le=10)

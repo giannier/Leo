@@ -158,6 +158,33 @@ class TestPromotions:
         assert [(p["id"], p["is_active"]) for p in items] == [(promo["id"], False)]
 
 
+class TestGreetingLength:
+    GREETING = (
+        "¡Hola! 👋 ¡Bienvenido a Zentek360!\n\nSoy tu asistente virtual y estoy aquí para "
+        "ayudarte. Puedo brindarte información sobre nuestros servicios de desarrollo web, "
+        "sistemas a medida, automatizaciones, inteligencia artificial y hosting.\n\nCuéntame, "
+        "¿qué necesitas para llevar tu negocio al siguiente nivel? 🚀"
+    )
+
+    async def test_a_real_welcome_message_fits(self, api: AsyncClient, mail: Any) -> None:
+        _, headers = await _account(api, mail)
+        assert len(self.GREETING) > 120
+
+        saved = await api.put(f"{A}/behavior", headers=headers, json={"saludo": self.GREETING})
+
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["saludo"] == self.GREETING
+
+    async def test_the_cap_is_400(self, api: AsyncClient, mail: Any) -> None:
+        _, headers = await _account(api, mail)
+
+        exact = await api.put(f"{A}/behavior", headers=headers, json={"saludo": "a" * 400})
+        over = await api.put(f"{A}/behavior", headers=headers, json={"saludo": "a" * 401})
+
+        assert exact.status_code == 200
+        assert over.status_code == 400
+
+
 class TestBehavior:
     async def test_the_profile_by_form_and_system_messages(
         self, api: AsyncClient, mail: Any

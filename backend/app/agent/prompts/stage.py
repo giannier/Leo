@@ -54,6 +54,7 @@ from app.agent.prompts.builder import (
     _format_today,
 )
 from app.agent.situations import SelectedSituation
+from app.models.business import MAX_SALUDO
 from app.process.engine import anuncio_vigente
 from app.process.facts import Facts, PromoCierre
 from app.process.service import EffectiveProcessConfig
@@ -294,7 +295,7 @@ def _style_block(config: EffectiveProcessConfig) -> str:
     ]
     if behavior.saludo:
         lines.append(
-            f"Saludo del negocio, para tu primer mensaje: «{_one_line(behavior.saludo, 120)}»"
+            f"Saludo del negocio, para tu primer mensaje: «{_one_line(behavior.saludo, MAX_SALUDO)}»"
         )
     return "\n".join(lines)
 
