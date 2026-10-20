@@ -1,7 +1,9 @@
 # Runbook de producción — Leo (TASK-026)
 
-Cómo poner Leo en un VPS (Contabo) y operarlo. Va **después** de la prueba con el número real
-(TASK-459, `leo-sdd/features/004-motor-de-ventas/milestones/numero-real.md`).
+Cómo poner Leo en un VPS (Contabo) y operarlo. Se despliega **antes** de la prueba con el número real
+(TASK-459, `leo-sdd/features/004-motor-de-ventas/milestones/numero-real.md`), desde el 2026-10-19: el VPS
+da la dirección fija que necesita el webhook de YCloud y evita el túnel. Si lo va a hacer Claude en el
+servidor, ver la sección 10.
 
 Lo que hay en `deploy/`:
 
@@ -27,19 +29,33 @@ Lo que hay en `deploy/`:
 
 ## 2. Preparar el VPS (una vez)
 
+El repositorio es **privado**, así que el servidor lo clona con una *clave de despliegue* de solo
+lectura (no con usuario y contraseña, ni con un token que quede guardado).
+
 ```bash
-# Como root
-adduser leo && usermod -aG docker leo         # usuario sin privilegios para operar
+# Como root (Giannier opera directo con root; ver la nota de abajo)
 apt update && apt install -y docker.io docker-compose-v2 git ufw
 ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw enable
+mkdir -p /opt/leo /var/backups/leo && chmod 700 /var/backups/leo
 
-# Como leo
-sudo mkdir -p /opt/leo /var/backups/leo && sudo chown leo: /opt/leo /var/backups/leo
-git clone https://github.com/giannier/leo.git /opt/leo
-cd /opt/leo && git checkout main
+# Clave de despliegue: se pega la pública en GitHub (giannier/Leo -> Settings -> Deploy keys),
+# SIN "Allow write access"
+ssh-keygen -t ed25519 -C "leo-vps-deploy" -f ~/.ssh/leo_deploy -N ""
+cat ~/.ssh/leo_deploy.pub
+
+GIT_SSH_COMMAND="ssh -i ~/.ssh/leo_deploy -o IdentitiesOnly=yes" git clone git@github.com:giannier/Leo.git /opt/leo
+git -C /opt/leo config core.sshCommand "ssh -i /root/.ssh/leo_deploy -o IdentitiesOnly=yes"
+cd /opt/leo && git checkout main && git log --oneline -1
+
 cp deploy/env.prod.example deploy/.env.prod && chmod 600 deploy/.env.prod
 nano deploy/.env.prod     # llena TODO: dominio, secretos, claves
 ```
+
+**Nota sobre root.** Con root, el acceso SSH tiene que ser solo por clave: en
+`/etc/ssh/sshd_config`, `PermitRootLogin prohibit-password` y `PasswordAuthentication no`. Sin eso, la
+contraseña de root queda expuesta a internet. Con un usuario `leo` (`adduser leo && usermod -aG docker
+leo`) el riesgo es casi el mismo, porque el grupo `docker` equivale a root en el servidor. En el workflow
+de despliegue, `DEPLOY_USER` es entonces `root`.
 
 Genera los secretos **en el VPS**, no los copies del entorno de desarrollo:
 
@@ -205,3 +221,46 @@ Giannier**. `BILLING_PAYMENT_INSTRUCTIONS` es el texto que ve el negocio para pa
 - **Certificado HTTPS que no sale:** los registros DNS aún no apuntan al VPS; `logs caddy`.
 - **Volver a la versión anterior:** `git checkout --detach <commit anterior>` y `up -d --build`. Si la
   versión nueva migró la base, restaura el backup previo (sección 6).
+
+## 10. Si lo hace Claude en el VPS
+
+Para quien opere el servidor con una IA. Antes de tocar nada, leer `CLAUDE.md`, `leo-sdd/constitution.md`
+y este runbook.
+
+**Este despliegue** (valores no secretos): dominio `agente.zentek360.com` (`LEO_DOMAIN`), VPS Contabo,
+operado como `root` con clave de despliegue de solo lectura, correo de Resend con dominio propio ya
+verificado, YCloud ya con el número conectado.
+
+**Lo que hace Giannier, no la IA.**
+- Llenar `deploy/.env.prod`. Los secretos **no pasan por el chat**: se escriben directo en el archivo
+  del servidor. Si la IA necesita saber si una variable está puesta, que lo compruebe sin imprimirla
+  (`[ -n "$(grep -E '^SECRET_KEY=.+' deploy/.env.prod)" ] && echo puesta`), nunca con `cat`.
+- Guardar `CREDENTIALS_ENCRYPTION_KEY` y `BACKUP_PASSPHRASE` fuera del servidor.
+- Crear el webhook en la consola de YCloud y pegar su secreto en `YCLOUD_WEBHOOK_SECRET`.
+- Decidir cuándo se enciende el cobro (`BILLING_ENFORCED`). Sale **apagado** y no se toca.
+
+**Lo que la IA no debe hacer en el servidor.**
+- `docker compose down -v`, `docker volume rm`, `docker system prune --volumes`: **borran la base, y con
+  ella los archivos**. Para reiniciar un servicio, `restart`; para parar, `stop`.
+- Correr tests, lint, evals ni `make` de desarrollo: eso va en el contenedor de desarrollo o en CI.
+- Cambiar el esquema a mano (`psql` con `ALTER`): solo migraciones de Alembic, que ya corren solas.
+- Hacer commits o `push` desde el servidor: el servidor solo lee (la clave de despliegue no escribe).
+- Imprimir o copiar a ningún lado `deploy/.env.prod`, `~/.ssh/leo_deploy` ni salidas que los contengan.
+
+**Estado conocido, para no sorprenderse.** El stack de producción **todavía no se ha levantado nunca**
+con el almacenamiento en Postgres: se validó la configuración (`docker compose config`) y el CI pasó,
+pero el CI no construye las imágenes de producción. El primer `up -d --build` es la prueba real. Si
+falla, mirar en este orden: `logs migrate` (migraciones), `logs backend`, `logs caddy` (certificado: casi
+siempre es el DNS).
+
+**Orden y comprobaciones.**
+1. Sección 2 (preparar el VPS) y que `agente.zentek360.com` resuelva a la IP del servidor.
+2. Sección 3 (primer despliegue): `up -d --build`, luego `ps` con todos los servicios `Up`/`healthy`.
+3. `curl -s https://agente.zentek360.com/api/v1/health` debe responder `{"status":"ok",...}`.
+4. Prueba de humo de la sección 3, y probar que **una foto de producto se ve**: sube una en el
+   catálogo. Si sale rota, ver `API_PUBLIC_BASE_URL` (sección 7, "Archivos").
+5. Sección 4 (conectar WhatsApp) y enviar un mensaje de prueba al número: debe aparecer en la bandeja.
+6. Sección 6: configurar el backup diario y **hacer una restauración de prueba una vez**.
+
+**Qué reportar al terminar cada paso:** el comando, si salió bien, y lo mínimo que lo demuestra (el
+`ps`, la respuesta del `health`). Si algo falla, el mensaje de error tal cual, sin interpretarlo.
