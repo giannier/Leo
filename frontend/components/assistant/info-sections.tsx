@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { Saved } from "@/components/assistant/section-nav";
 import { Alert, Button, Checkbox, Field, Select, TextArea } from "@/components/ui";
 import { api, type Behavior, type BehaviorBody, type InfoSection } from "@/lib/api/client";
-import { humanMessage } from "@/lib/api/errors";
+import { ApiError, humanMessage } from "@/lib/api/errors";
 
 type Data = Record<string, unknown>;
 
@@ -41,7 +41,14 @@ function useSection(section: InfoSection) {
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (caught) {
-      setError(humanMessage(caught));
+      // "Revisa los datos marcados" alone is useless when the form marks nothing:
+      // say which field the server rejected.
+      const fields = caught instanceof ApiError ? Object.entries(caught.fields) : [];
+      setError(
+        fields.length > 0
+          ? `${humanMessage(caught)} ${fields.map(([name, why]) => `${name}: ${why}`).join(" · ")}`
+          : humanMessage(caught),
+      );
     } finally {
       setSaving(false);
     }
@@ -404,6 +411,7 @@ export function ContactForm() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [web, setWeb] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -418,8 +426,17 @@ export function ContactForm() {
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
+        // "51974667498", "+51 974 667 498" and "(51) 974-667-498" are the same number.
+        const digits = phone.replace(/[\s\-().]/g, "");
+        const normalized = digits && !digits.startsWith("+") ? `+${digits}` : digits;
+        if (normalized && !/^\+[1-9]\d{7,14}$/.test(normalized)) {
+          setPhoneError("Usa el formato +51987654321: el signo +, el código de país y el número.");
+          return;
+        }
+        setPhoneError(null);
+        setPhone(normalized);
         void save({
-          telefono_humano: phone.trim() || null,
+          telefono_humano: normalized || null,
           correo: email.trim() || null,
           web: web.trim() || null,
           redes: (data?.redes as Record<string, string> | undefined) ?? {},
@@ -432,6 +449,7 @@ export function ContactForm() {
         placeholder="+51987654321"
         hint="Con código de país. El asistente lo da cuando alguien pide hablar con una persona."
         value={phone}
+        error={phoneError ?? undefined}
         onChange={(e) => setPhone(e.target.value)}
       />
       <Field label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
