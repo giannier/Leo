@@ -32,14 +32,15 @@ import { api, type Checklist } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useHasRole } from "@/lib/session";
 
-/** Which checklist key tells us a step is finished. `null` = never blocks. */
+/** Which checklist key tells us a step is finished. `knowledge` and `summary` are not
+ * checklist items: knowledge is optional, and the summary is done when the agent can be tried. */
 const STEPS = [
   { title: "Tu negocio", short: "Negocio", key: "business_profile_complete" },
   { title: "Tu agente", short: "Agente", key: "agent_config_complete" },
   { title: "Qué vendes", short: "Catálogo", key: "has_active_product" },
-  { title: "Lo que Leo debe saber", short: "Conocimiento", key: null },
+  { title: "Lo que Leo debe saber", short: "Conocimiento", key: "knowledge" },
   { title: "Cómo te pagan", short: "Pagos", key: "has_payment_method" },
-  { title: "Resumen", short: "Resumen", key: null },
+  { title: "Resumen", short: "Resumen", key: "summary" },
 ] as const;
 
 function Wizard() {
@@ -48,6 +49,7 @@ function Wizard() {
   const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
 
   const [checklist, setChecklist] = useState<Checklist | null>(null);
+  const [hasKnowledge, setHasKnowledge] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const raw = Number(params.get("paso") ?? "1");
@@ -57,7 +59,15 @@ function Wizard() {
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      setChecklist(await api.tenant.checklist());
+      const [list, overview] = await Promise.all([
+        api.tenant.checklist(),
+        // Only to know whether the optional knowledge step has something in it.
+        api.assistant.overview().catch(() => null),
+      ]);
+      setChecklist(list);
+      setHasKnowledge(
+        overview?.secciones.find((section) => section.clave === "conocimiento")?.estado === "completa",
+      );
     } catch (caught) {
       setError(humanMessage(caught));
     }
@@ -80,14 +90,18 @@ function Wizard() {
   const done = useMemo(() => {
     const byKey = new Map(checklist?.items.map((item) => [item.key, item]) ?? []);
     return STEPS.map((step) => {
-      if (step.key === null) return null;
+      // Optional steps tick when there is something in them and are otherwise neither
+      // done nor pending, so they never look like a debt.
+      if (step.key === "knowledge") return hasKnowledge ? true : null;
+      if (step.key === "summary") return checklist?.sandbox_ready ? true : null;
       const item = byKey.get(step.key);
-      // A step that does not apply to this business - payment methods for an
-      // agent that only answers questions - is neither done nor pending.
-      if (item && !item.required) return null;
+      // A step that does not apply to this business - payment methods for an agent that
+      // only answers questions - is neither done nor pending... unless the business filled
+      // it in anyway, which is worth a tick.
+      if (item && !item.required) return item.done ? true : null;
       return item?.done ?? false;
     });
-  }, [checklist]);
+  }, [checklist, hasKnowledge]);
 
   if (!canConfigure) {
     return (
