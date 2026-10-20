@@ -40,7 +40,7 @@ test.describe("Asistente por capas", () => {
     await page.getByLabel("Objetivo del asistente").selectOption("vender");
     await page.getByLabel("Pregunta por algo que no vendes").uncheck();
     await page.getByRole("button", { name: "Guardar" }).click();
-    await expect(page.getByText("Guardado", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Guardado", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await page.reload();
     await expect(page.getByLabel("Objetivo del asistente")).toHaveValue("vender");
     await expect(page.getByLabel("Pregunta por algo que no vendes")).not.toBeChecked();
@@ -59,7 +59,7 @@ test.describe("Asistente por capas", () => {
     await page.getByLabel("Costo").fill("8.00");
     await page.getByLabel("Tiempo").fill("24 h");
     await page.getByRole("button", { name: "Guardar" }).click();
-    await expect(page.getByText("Guardado", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Guardado", { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 
     await page.goto("/asistente/proceso");
     await page.getByLabel("Etapa").selectOption("DATOS");

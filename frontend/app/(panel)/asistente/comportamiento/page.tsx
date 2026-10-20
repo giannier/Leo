@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 
 import { AssistantHeader, Saved } from "@/components/assistant/section-nav";
+import { useToast } from "@/components/toast";
 import { Alert, Button, Card, Checkbox, Field, Select, Skeleton, TextArea } from "@/components/ui";
 import { api, type Behavior, type BehaviorBody } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -58,6 +59,7 @@ export default function BehaviorPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     api.assistant
@@ -111,6 +113,7 @@ export default function BehaviorPage() {
       setDraft(updated);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
+      toast.success("Guardado", "Comportamiento del asistente");
     } catch (caught) {
       setError(humanMessage(caught));
     } finally {
