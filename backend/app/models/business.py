@@ -31,6 +31,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_check
 
+# Characters of the business's greeting (`agent_configs.saludo`). It reaches the model on
+# every turn, so the cap is also a cost cap: 120 until 2026-10-20, then 400 (migration 0047).
+MAX_SALUDO = 400
+
 INDUSTRIES = ("restaurante", "instituto", "retail", "servicios", "salud", "otros")
 AGENT_TONES = ("profesional", "cercano", "juvenil")
 AGENT_OBJECTIVES = ("vender", "atender", "ambos")
@@ -113,7 +117,7 @@ class AgentConfig(Base):
         enum_check("tratamiento", TRATAMIENTOS, "tratamiento"),
         enum_check("emojis", EMOJI_LEVELS, "emojis"),
         enum_check("politica_descuentos", DISCOUNT_POLICIES, "politica_descuentos"),
-        CheckConstraint("char_length(saludo) <= 120", name="saludo_length"),
+        CheckConstraint(f"char_length(saludo) <= {MAX_SALUDO}", name="saludo_length"),
         CheckConstraint(
             "descuento_maximo_pct IS NULL OR descuento_maximo_pct BETWEEN 0 AND 100",
             name="descuento_maximo_pct",

@@ -161,7 +161,7 @@ export default function BehaviorPage() {
           <div className="mt-4">
             <Field
               label="Saludo (opcional)"
-              maxLength={120}
+              maxLength={400}
               placeholder="¡Hola! Bienvenido a ..."
               hint="Lo usa en su primer mensaje."
               value={draft.saludo ?? ""}
