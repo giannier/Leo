@@ -69,7 +69,7 @@ CREATE INDEX idx_messages_search ON messages
 - `POST /tenant/conversations/:id/messages` (mensaje humano; guard ventana 24h → `403 outside_24h_window`).
 - `POST /tenant/conversations/:id/notes` · `POST /tenant/contacts/:id/opt-out` · `POST /tenant/contacts/:id/erase` (owner, auditado).
 - `GET/PUT /tenant/notification-settings` · `POST /tenant/push-subscriptions`.
-- `WS /ws?token=` — suscripción a eventos del tenant; mensajes de presencia.
+- `WS /ws` (token como subprotocolo, ver C-107) — suscripción a eventos del tenant; mensajes de presencia.
 
 ## Testing
 Unit: lock de takeover (carrera), cálculo de ventana en compositor, auto-return. Integration: escalamiento→notificación→takeover→mensaje humano→release con contexto (verifica que el agente lee lo humano); CancelGuard con generación en curso (mensaje descartado); WS reconexión con re-sync. E2E Playwright: bandeja con dos sesiones de operador simultáneas.

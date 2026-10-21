@@ -1,9 +1,10 @@
 """The inbox's live channel (Feature 007, TASK-702, RF-001 and RF-003).
 
-`WS /api/v1/ws?token=<access token>`:
+`WS /api/v1/ws`, opened with the subprotocols `["leo", <access token>]`:
 
-* **Authentication.** The access token goes in the query string (a browser cannot
-  set headers on a WebSocket). It is verified like any request, and the membership
+* **Authentication.** A browser cannot set headers on a WebSocket, and a token in the
+  URL ends up in every access log, so the panel offers it as the second subprotocol
+  (the server answers with `leo`). It is verified like any request, and the membership
   in its tenant is read from the database: a removed member is refused even with a
   token that has not expired yet. A refused socket closes with 4401 or 4403.
 * **Events.** Everything published on the tenant's Redis channel
@@ -27,7 +28,7 @@ import uuid
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,13 @@ router = APIRouter(tags=["inbox"])
 
 CLOSE_UNAUTHENTICATED = 4401
 CLOSE_FORBIDDEN = 4403
+SUBPROTOCOL = "leo"
+
+
+def _offered_token(websocket: WebSocket) -> str:
+    """The access token offered as `["leo", <token>]`, or "" when it is not there."""
+    offered = [p.strip() for p in websocket.headers.get("sec-websocket-protocol", "").split(",")]
+    return offered[1] if len(offered) == 2 and offered[0] == SUBPROTOCOL else ""
 
 
 def _member(websocket: WebSocket, token: str) -> tuple[uuid.UUID, uuid.UUID, str] | int:
@@ -71,14 +79,14 @@ def _member(websocket: WebSocket, token: str) -> tuple[uuid.UUID, uuid.UUID, str
 
 
 @router.websocket("/ws")
-async def inbox_socket(websocket: WebSocket, token: str = Query(default="")) -> None:
-    resolved = _member(websocket, token)
+async def inbox_socket(websocket: WebSocket) -> None:
+    resolved = _member(websocket, _offered_token(websocket))
     if isinstance(resolved, int):
         await websocket.close(code=resolved)
         return
     tenant_id, user_id, user_name = resolved
     redis: Redis = websocket.app.dependency_overrides.get(get_redis, get_redis)()
-    await websocket.accept()
+    await websocket.accept(subprotocol=SUBPROTOCOL)
     pubsub = redis.pubsub()
     await pubsub.subscribe(channel(tenant_id))
 

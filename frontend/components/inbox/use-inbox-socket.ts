@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { inboxSocketUrl } from "@/lib/api/client";
+import { inboxSocketTarget } from "@/lib/api/client";
 
 export type InboxEvent =
   | { type: "message.new"; conversation_id: string }
@@ -45,12 +45,12 @@ export function useInboxSocket({
     let retry: ReturnType<typeof setTimeout> | undefined;
 
     function connect() {
-      const url = inboxSocketUrl();
-      if (!url || stopped) {
+      const target = inboxSocketTarget();
+      if (!target || stopped) {
         retry = setTimeout(connect, 2_000);
         return;
       }
-      const socket = new WebSocket(url);
+      const socket = new WebSocket(target.url, target.protocols);
       socketRef.current = socket;
       socket.onopen = () => {
         attempt = 0;

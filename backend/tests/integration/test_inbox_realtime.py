@@ -79,7 +79,7 @@ class TestTheLiveChannel:
         other, _ = _member(db)
         conversation = uuid.uuid4()
 
-        with live.websocket_connect(f"/api/v1/ws?token={token}") as socket:
+        with live.websocket_connect("/api/v1/ws", subprotocols=["leo", token]) as socket:
             socket.send_text(json.dumps({"tipo": "viendo", "conversation_id": str(conversation)}))
             presence = json.loads(socket.receive_text())
             events.publish(other, "message.new", conversation_id=uuid.uuid4())
@@ -98,7 +98,9 @@ class TestTheLiveChannel:
     def test_without_a_valid_token_the_socket_is_closed(self, live: TestClient, bad: str) -> None:
         with (
             pytest.raises(WebSocketDisconnect) as closed,
-            live.websocket_connect(f"/api/v1/ws?token={bad}") as socket,
+            live.websocket_connect(
+                "/api/v1/ws", subprotocols=["leo", bad] if bad else ["leo"]
+            ) as socket,
         ):
             socket.receive_text()
 
@@ -111,7 +113,7 @@ class TestTheLiveChannel:
 
         with (
             pytest.raises(WebSocketDisconnect) as closed,
-            live.websocket_connect(f"/api/v1/ws?token={token}") as socket,
+            live.websocket_connect("/api/v1/ws", subprotocols=["leo", token]) as socket,
         ):
             socket.receive_text()
 

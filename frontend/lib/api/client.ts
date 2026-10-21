@@ -47,10 +47,15 @@ export function setAccessToken(token: string | null, tenantId?: string | null): 
 }
 
 /** The live channel's address (Feature 007): the token goes in the query string. */
-export function inboxSocketUrl(): string | null {
+/**
+ * Where the inbox socket connects, and what it offers as subprotocols. The access token
+ * travels as the second one: a browser cannot set headers on a WebSocket, and in the URL
+ * it would end up in every access log.
+ */
+export function inboxSocketTarget(): { url: string; protocols: string[] } | null {
   if (!accessToken) return null;
   const base = BASE_URL.replace(/^http/, "ws");
-  return `${base}/api/v1/ws?token=${encodeURIComponent(accessToken)}`;
+  return { url: `${base}/api/v1/ws`, protocols: ["leo", accessToken] };
 }
 
 export function getAccessToken(): string | null {
