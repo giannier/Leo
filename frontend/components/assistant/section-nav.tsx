@@ -28,6 +28,12 @@ const SECTIONS = [
     clave: "comportamiento",
   },
   {
+    href: "/asistente/agenda",
+    label: "Agenda",
+    detail: "Qué se agenda, horarios y recordatorios",
+    clave: null,
+  },
+  {
     href: "/asistente/informacion",
     label: "Información del negocio",
     detail: "Pagos, locales, entregas y políticas",

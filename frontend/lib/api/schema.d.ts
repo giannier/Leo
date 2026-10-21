@@ -1851,6 +1851,187 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/scheduling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_tenant_scheduling_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Settings */
+        put: operations["save_settings_api_v1_tenant_scheduling_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Resource */
+        post: operations["create_resource_api_v1_tenant_scheduling_resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Resource */
+        put: operations["update_resource_api_v1_tenant_scheduling_resources__resource_id__put"];
+        post?: never;
+        /** Delete Resource */
+        delete: operations["delete_resource_api_v1_tenant_scheduling_resources__resource_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Block */
+        post: operations["create_block_api_v1_tenant_scheduling_blocks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/blocks/{block_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Block */
+        delete: operations["delete_block_api_v1_tenant_scheduling_blocks__block_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/scheduling/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Availability
+         * @description Free times of a service from a day, for the form of a manual appointment or a move.
+         */
+        get: operations["availability_api_v1_tenant_scheduling_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Appointments
+         * @description Every appointment that starts from `desde` to `hasta` (inclusive), in local days.
+         */
+        get: operations["list_appointments_api_v1_tenant_appointments_get"];
+        put?: never;
+        /**
+         * Create Appointment
+         * @description A walk-in or a phone call: the same rules and the same refusal of a double booking.
+         */
+        post: operations["create_appointment_api_v1_tenant_appointments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/appointments/{appointment_id}/action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Act */
+        post: operations["act_api_v1_tenant_appointments__appointment_id__action_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/appointments/{appointment_id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reschedule */
+        post: operations["reschedule_api_v1_tenant_appointments__appointment_id__reschedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/knowledge": {
         parameters: {
             query?: never;
@@ -3162,6 +3343,16 @@ export interface components {
             /** Password */
             password?: string | null;
         };
+        /** ActionIn */
+        ActionIn: {
+            /**
+             * Accion
+             * @enum {string}
+             */
+            accion: "confirmar" | "completar" | "no_asistio" | "cancelar";
+            /** Motivo */
+            motivo?: string | null;
+        };
         /** AddonOut */
         AddonOut: {
             /** Id */
@@ -3196,7 +3387,7 @@ export interface components {
             /** Farewell On Pause */
             farewell_on_pause?: string | null;
             /** Capacidades */
-            capacidades?: ("atender" | "vender" | "cotizar")[] | null;
+            capacidades?: ("atender" | "vender" | "cotizar" | "agendar")[] | null;
         };
         /** AgentConfigResponse */
         AgentConfigResponse: {
@@ -3243,10 +3434,87 @@ export interface components {
             /** Reporte Mensual */
             reporte_mensual: boolean;
         };
+        /** AppointmentIn */
+        AppointmentIn: {
+            /**
+             * Servicio Id
+             * Format: uuid
+             */
+            servicio_id: string;
+            /** Inicio */
+            inicio: string;
+            /** Nombre Cliente */
+            nombre_cliente: string;
+            /** Telefono */
+            telefono?: string | null;
+            /** Notas */
+            notas?: string | null;
+        };
+        /** AppointmentList */
+        AppointmentList: {
+            /** Zona */
+            zona: string;
+            /** Items */
+            items: components["schemas"]["AppointmentOut"][];
+        };
+        /** AppointmentOut */
+        AppointmentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Servicio Id
+             * Format: uuid
+             */
+            servicio_id: string;
+            /** Servicio */
+            servicio: string;
+            /**
+             * Recurso Id
+             * Format: uuid
+             */
+            recurso_id: string;
+            /** Recurso */
+            recurso: string;
+            /** Cliente */
+            cliente: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Contact Id */
+            contact_id: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Inicio Local */
+            inicio_local: string;
+            /** Fin Local */
+            fin_local: string;
+            /**
+             * Inicio
+             * Format: date-time
+             */
+            inicio: string;
+            /** Texto */
+            texto: string;
+            /** Status */
+            status: string;
+            /** Notas */
+            notas: string | null;
+            /** Created By */
+            created_by: string;
+            /** Sin Confirmar */
+            sin_confirmar: boolean;
+        };
         /** AssignIn */
         AssignIn: {
             /** User Id */
             user_id?: string | null;
+        };
+        /** AvailabilityOut */
+        AvailabilityOut: {
+            /** Items */
+            items: components["schemas"]["SlotOut"][];
         };
         /** BehaviorRequest */
         BehaviorRequest: {
@@ -3338,6 +3606,39 @@ export interface components {
             pagos: components["schemas"]["PaymentOut"][];
             /** Cobro Activo */
             cobro_activo: boolean;
+        };
+        /** BlockIn */
+        BlockIn: {
+            /**
+             * Resource Id
+             * Format: uuid
+             */
+            resource_id: string;
+            /** Desde */
+            desde: string;
+            /** Hasta */
+            hasta: string;
+            /** Motivo */
+            motivo?: string | null;
+        };
+        /** BlockOut */
+        BlockOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Resource Id
+             * Format: uuid
+             */
+            resource_id: string;
+            /** Desde */
+            desde: string;
+            /** Hasta */
+            hasta: string;
+            /** Motivo */
+            motivo: string | null;
         };
         /** BoardColumn */
         BoardColumn: {
@@ -5318,6 +5619,12 @@ export interface components {
             tags?: string[] | null;
             /** Datos A Pedir */
             datos_a_pedir?: string[] | null;
+            /** Agendable */
+            agendable?: boolean | null;
+            /** Duracion Min */
+            duracion_min?: number | null;
+            /** Buffer Min */
+            buffer_min?: number | null;
         };
         /** ProductRequest */
         ProductRequest: {
@@ -5369,6 +5676,18 @@ export interface components {
             tags?: string[];
             /** Datos A Pedir */
             datos_a_pedir?: string[];
+            /**
+             * Agendable
+             * @default false
+             */
+            agendable: boolean;
+            /** Duracion Min */
+            duracion_min?: number | null;
+            /**
+             * Buffer Min
+             * @default 0
+             */
+            buffer_min: number;
         };
         /** ProductResponse */
         ProductResponse: {
@@ -5411,6 +5730,18 @@ export interface components {
             tags: string[];
             /** Datos A Pedir */
             datos_a_pedir?: string[];
+            /**
+             * Agendable
+             * @default false
+             */
+            agendable: boolean;
+            /** Duracion Min */
+            duracion_min?: number | null;
+            /**
+             * Buffer Min
+             * @default 0
+             */
+            buffer_min: number;
             /** Foto Url */
             foto_url?: string | null;
         };
@@ -5712,10 +6043,49 @@ export interface components {
             /** Content */
             content: string;
         };
+        /** RescheduleIn */
+        RescheduleIn: {
+            /** Inicio */
+            inicio: string;
+        };
         /** ResendVerificationRequest */
         ResendVerificationRequest: {
             /** Email */
             email: string;
+        };
+        /** ResourceIn */
+        ResourceIn: {
+            /** Nombre */
+            nombre: string;
+            /** Horario */
+            horario?: {
+                [key: string]: unknown;
+            } | null;
+            /** Product Ids */
+            product_ids?: string[];
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ResourceOut */
+        ResourceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Horario */
+            horario: {
+                [key: string]: unknown;
+            } | null;
+            /** Product Ids */
+            product_ids: string[];
+            /** Is Active */
+            is_active: boolean;
         };
         /** Row */
         Row: {
@@ -5811,6 +6181,22 @@ export interface components {
             /** Filas */
             filas?: components["schemas"]["Row"][] | null;
         };
+        /** SchedulingOut */
+        SchedulingOut: {
+            /** Zona */
+            zona: string;
+            /** Horario Negocio */
+            horario_negocio: {
+                [key: string]: unknown;
+            };
+            ajustes: components["schemas"]["app__api__v1__scheduling__SettingsOut"];
+            /** Recursos */
+            recursos: components["schemas"]["ResourceOut"][];
+            /** Servicios */
+            servicios: components["schemas"]["ServiceOut"][];
+            /** Bloqueos */
+            bloqueos: components["schemas"]["BlockOut"][];
+        };
         /** SeatsResponse */
         SeatsResponse: {
             /** Used */
@@ -5874,6 +6260,20 @@ export interface components {
              */
             aviso: "enviado" | "en_cola" | "sin_numero" | "simulador";
         };
+        /** ServiceOut */
+        ServiceOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            nombre: string;
+            /** Duracion Min */
+            duracion_min: number;
+            /** Buffer Min */
+            buffer_min: number;
+        };
         /**
          * SessionResponse
          * @description `200` body of both `POST /auth/login` and `POST /auth/refresh`.
@@ -5906,13 +6306,6 @@ export interface components {
             unattended_queue_minutes: number;
             /** Auto Return Minutes */
             auto_return_minutes?: number | null;
-        };
-        /** SettingsIn */
-        SettingsIn: {
-            /** Optin Preguntar */
-            optin_preguntar: boolean;
-            /** Seguimiento Plantilla Id */
-            seguimiento_plantilla_id?: string | null;
         };
         /** SituationList */
         SituationList: {
@@ -5989,6 +6382,18 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** SlotOut */
+        SlotOut: {
+            /** Inicio Local */
+            inicio_local: string;
+            /** Texto */
+            texto: string;
+            /**
+             * Recurso Id
+             * Format: uuid
+             */
+            recurso_id: string;
         };
         /**
          * Stage
@@ -6615,6 +7020,13 @@ export interface components {
             /** Ultimo Mensaje */
             ultimo_mensaje: string | null;
         };
+        /** SettingsIn */
+        app__api__v1__campaigns__SettingsIn: {
+            /** Optin Preguntar */
+            optin_preguntar: boolean;
+            /** Seguimiento Plantilla Id */
+            seguimiento_plantilla_id?: string | null;
+        };
         /** SettingsOut */
         app__api__v1__campaigns__SettingsOut: {
             /** Optin Preguntar */
@@ -6677,6 +7089,38 @@ export interface components {
             unattended_queue_minutes: number;
             /** Auto Return Minutes */
             auto_return_minutes?: number | null;
+        };
+        /** SettingsIn */
+        app__api__v1__scheduling__SettingsIn: {
+            /** Anticipacion Min Horas */
+            anticipacion_min_horas?: number | null;
+            /** Anticipacion Max Dias */
+            anticipacion_max_dias?: number | null;
+            /** Max Citas Activas */
+            max_citas_activas?: number | null;
+            /** Recordatorio 24H */
+            recordatorio_24h?: boolean | null;
+            /** Recordatorio 2H */
+            recordatorio_2h?: boolean | null;
+            /** Plantilla Recordatorio Id */
+            plantilla_recordatorio_id?: string | null;
+        };
+        /** SettingsOut */
+        app__api__v1__scheduling__SettingsOut: {
+            /** Anticipacion Min Horas */
+            anticipacion_min_horas: number;
+            /** Anticipacion Max Dias */
+            anticipacion_max_dias: number;
+            /** Max Citas Activas */
+            max_citas_activas: number;
+            /** Recordatorio 24H */
+            recordatorio_24h: boolean;
+            /** Recordatorio 2H */
+            recordatorio_2h: boolean;
+            /** Plantilla Recordatorio Id */
+            plantilla_recordatorio_id: string | null;
+            /** Plantilla Aprobada */
+            plantilla_aprobada: boolean;
         };
     };
     responses: never;
@@ -10962,7 +11406,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SettingsIn"];
+                "application/json": components["schemas"]["app__api__v1__campaigns__SettingsIn"];
             };
         };
         responses: {
@@ -12343,6 +12787,594 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    overview_api_v1_tenant_scheduling_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulingOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    save_settings_api_v1_tenant_scheduling_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__scheduling__SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__v1__scheduling__SettingsOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_resource_api_v1_tenant_scheduling_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_resource_api_v1_tenant_scheduling_resources__resource_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_resource_api_v1_tenant_scheduling_resources__resource_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_block_api_v1_tenant_scheduling_blocks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_block_api_v1_tenant_scheduling_blocks__block_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    availability_api_v1_tenant_scheduling_availability_get: {
+        parameters: {
+            query: {
+                servicio_id: string;
+                desde?: string | null;
+                ignore?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvailabilityOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_appointments_api_v1_tenant_appointments_get: {
+        parameters: {
+            query: {
+                desde: string;
+                hasta?: string | null;
+                recurso_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_appointment_api_v1_tenant_appointments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `slot_taken` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    act_api_v1_tenant_appointments__appointment_id__action_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reschedule_api_v1_tenant_appointments__appointment_id__reschedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                appointment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `slot_taken` */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

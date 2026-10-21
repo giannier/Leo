@@ -58,6 +58,13 @@ from app.models.metrics import DashboardSettings, MetricsDaily, ModelCost
 from app.models.orders import Order, OrderItem, PaymentProof, TenantSequence
 from app.models.plan import Plan
 from app.models.sales_config import BusinessInfo, Faq, Promotion
+from app.models.scheduling import (
+    Appointment,
+    AppointmentEvent,
+    Resource,
+    ResourceBlock,
+    SchedulingSettings,
+)
 from app.models.situation import Situation
 from app.models.storage import StoredObject, StoredObjectChunk
 from app.models.tenant import (
@@ -146,4 +153,9 @@ __all__ = [
     "User",
     "WebhookEvent",
     "WhatsAppNumber",
+    "Appointment",
+    "AppointmentEvent",
+    "Resource",
+    "ResourceBlock",
+    "SchedulingSettings",
 ]

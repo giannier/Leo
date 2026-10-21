@@ -18,7 +18,7 @@ The tools that write (the order, the customer's data, a message) are declared wi
 another write.
 
 The descriptions are short: the definitions of every enabled tool share a
-1 400-token allowance of the 6 000-token prompt (`plan.md`).
+1 700-token allowance of the 6 000-token prompt (`plan.md`; 1 400 before the agenda tools).
 """
 
 from __future__ import annotations
@@ -46,6 +46,7 @@ from app.agent.tools.registry import (
     ToolScope,
 )
 from app.agent.tools.sales import elegir_camino, enviar_recurso, mostrar_opciones
+from app.agent.tools.scheduling import agendar_cita, consultar_horarios, gestionar_cita
 from app.process.facts import Facts
 from app.process.templates.base import EffectiveOptions, Stage, Template
 
@@ -248,20 +249,54 @@ def _handover_schema(scope: ToolScope) -> dict[str, Any]:
             "datos": {
                 "type": "array",
                 "maxItems": 8,
-                "description": (
-                    "Solo con motivo cotizacion: cada dato que el cliente ya te dio, "
-                    'por ejemplo {"dato": "personas", "valor": "20"}.'
-                ),
+                "description": "Solo cotizacion: lo que el cliente ya dijo (dato y valor).",
                 "items": _object(
                     {
-                        "dato": _text("Nombre corto del dato.", maxLength=40),
-                        "valor": _text("Lo que dijo el cliente.", maxLength=120),
+                        "dato": {"type": "string", "maxLength": 40},
+                        "valor": {"type": "string", "maxLength": 120},
                     },
                     ["dato", "valor"],
                 ),
             },
         },
         ["motivo", "resumen"],
+    )
+
+
+def _can_schedule(scope: ToolScope) -> bool:
+    return scope.options.agendar
+
+
+def _hours_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "servicio_id": _text("producto_id del servicio."),
+            "desde": _text("Opcional: AAAA-MM-DD, si pidió un día."),
+        },
+        ["servicio_id"],
+    )
+
+
+def _book_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "servicio_id": _text("producto_id del servicio."),
+            "slot": _text("El slot elegido, como lo devolvió consultar_horarios."),
+            "notas": {"type": "string", "maxLength": 300},
+        },
+        ["servicio_id", "slot"],
+    )
+
+
+def _appointment_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "accion": {"type": "string", "enum": ["ver", "reprogramar", "cancelar", "confirmar"]},
+            "cita_id": _text("Puede omitirse si tiene una sola."),
+            "slot": _text("Al reprogramar: el nuevo slot."),
+            "motivo": {"type": "string", "maxLength": 200},
+        },
+        ["accion"],
     )
 
 
@@ -339,6 +374,29 @@ def _definitions() -> list[ToolDefinition]:
             parameters=_path_schema,
             handler=elegir_camino,
             available=_has_paths,
+        ),
+        ToolDefinition(
+            name="consultar_horarios",
+            description="Horarios libres de un servicio. Úsala antes de ofrecer un día u hora.",
+            parameters=_hours_schema,
+            handler=consultar_horarios,
+            available=_can_schedule,
+        ),
+        ToolDefinition(
+            name="agendar_cita",
+            description="Agenda la cita en el horario elegido.",
+            parameters=_book_schema,
+            handler=agendar_cita,
+            available=_can_schedule,
+            effect=True,
+        ),
+        ToolDefinition(
+            name="gestionar_cita",
+            description="Ver, reprogramar, cancelar o confirmar las citas del cliente.",
+            parameters=_appointment_schema,
+            handler=gestionar_cita,
+            available=_can_schedule,
+            effect=True,
         ),
         ToolDefinition(
             name="derivar_a_humano",

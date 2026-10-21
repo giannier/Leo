@@ -61,6 +61,7 @@ STORED_KEYS = frozenset(
         "asesoria_derivada_en",
         "seguimiento",
         "promos_ofrecidas",
+        "cita_agendada",
     }
 )
 
@@ -100,6 +101,8 @@ class Derivado(_Model):
     # When it began, and whether the business was told nobody took it (Feature 007).
     desde: datetime | None = None
     avisado: bool = False
+    # A quote's structured data (feature 019, phase B): what the customer already said.
+    datos: dict[str, str] = Field(default_factory=dict)
 
 
 class Seguimiento(_Model):
@@ -167,6 +170,8 @@ class Facts(_Model):
     derivado: Derivado | None = None
     # Kept after the pause ends, so advisory handovers are not repeated.
     asesoria_derivada_en: datetime | None = None
+    # When the customer booked an appointment (feature 019, phase D): a qualified lead.
+    cita_agendada: datetime | None = None
     seguimiento: Seguimiento | None = None
     # Closing promotions offered in this conversation, with their expiry.
     promos_ofrecidas: dict[str, datetime] = Field(default_factory=dict)
@@ -223,6 +228,7 @@ class Facts(_Model):
                 "opciones_mostradas",
                 "derivado",
                 "asesoria_derivada_en",
+                "cita_agendada",
                 "seguimiento",
                 "promos_ofrecidas",
             },

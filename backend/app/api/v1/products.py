@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from app.api.deps import (
     ConfigurationManagerDep,
@@ -57,6 +57,8 @@ AUTH_RESPONSES = (
 
 Tags = Annotated[list[Annotated[str, StringConstraints(max_length=200)]], Field(max_length=50)]
 # What to ask before a quote is handed over: up to six short questions, one per message.
+Duration = Annotated[int, Field(ge=15, le=480)]
+Buffer = Annotated[int, Field(ge=0, le=120)]
 AskFields = Annotated[
     list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]],
     Field(max_length=6),
@@ -93,11 +95,21 @@ class ProductRequest(BaseModel):
     # Up to ten labels; the agent also finds the product by them (Feature 018).
     tags: Tags = Field(default_factory=list)
     datos_a_pedir: AskFields = Field(default_factory=list)
+    # A service that can be booked (feature 019, phase D): minutes it takes, and the gap after it.
+    agendable: bool = False
+    duracion_min: Duration | None = None
+    buffer_min: Buffer = 0
 
     @field_validator("tags")
     @classmethod
     def _tags(cls, value: list[str]) -> list[str]:
         return _clean(value) or []
+
+    @model_validator(mode="after")
+    def _bookable_has_a_duration(self) -> ProductRequest:
+        if self.agendable and not self.duracion_min:
+            raise ValueError("un servicio que se agenda necesita su duración")
+        return self
 
 
 class ProductPatch(BaseModel):
@@ -117,6 +129,9 @@ class ProductPatch(BaseModel):
     destacado: bool | None = None
     tags: Tags | None = None
     datos_a_pedir: AskFields | None = None
+    agendable: bool | None = None
+    duracion_min: Duration | None = None
+    buffer_min: Buffer | None = None
 
     @field_validator("tags")
     @classmethod
@@ -126,7 +141,14 @@ class ProductPatch(BaseModel):
         return _clean(value)
 
     @field_validator(
-        "modo_venta", "periodo", "es_digital", "bundle_permite_libres", "destacado", "datos_a_pedir"
+        "modo_venta",
+        "periodo",
+        "es_digital",
+        "bundle_permite_libres",
+        "destacado",
+        "datos_a_pedir",
+        "agendable",
+        "buffer_min",
     )
     @classmethod
     def _not_null(cls, value: Any) -> Any:
@@ -152,6 +174,9 @@ class ProductResponse(BaseModel):
     destacado: bool
     tags: list[str]
     datos_a_pedir: list[str] = Field(default_factory=list)
+    agendable: bool = False
+    duracion_min: int | None = None
+    buffer_min: int = 0
     # The main photo (the first by order), for the catalogue list; None without photos.
     foto_url: str | None = None
 
@@ -316,7 +341,16 @@ async def update_product(
 ) -> ProductResponse:
     """Partial: fields not sent keep their current value."""
     values = payload.model_dump(exclude_unset=True)
-    product = CatalogService(session, principal.tenant_id).update(product_id, **values)
+    catalog = CatalogService(session, principal.tenant_id)
+    if values.get("agendable") and not values.get("duracion_min"):
+        current = catalog.get(product_id)
+        if current is not None and not current.duracion_min:
+            raise ApiError(
+                status_code=400,
+                error="validation_error",
+                message="Un servicio que se agenda necesita su duración.",
+            )
+    product = catalog.update(product_id, **values)
     if product is None:
         raise _not_found()
     return _as_response(product)

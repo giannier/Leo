@@ -11,6 +11,7 @@ from app.process.templates import certificaciones, productos, servicios
 from app.process.templates.base import (
     GLOBAL_TOOLS,
     KNOWN_PLACEHOLDERS,
+    SCHEDULING_TOOL_NAMES,
     TOOL_NAMES,
     EffectiveOptions,
     Stage,
@@ -34,6 +35,7 @@ def get_template(key: str) -> Template:
 
 __all__ = [
     "GLOBAL_TOOLS",
+    "SCHEDULING_TOOL_NAMES",
     "KNOWN_PLACEHOLDERS",
     "TEMPLATES",
     "TOOL_NAMES",

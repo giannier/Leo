@@ -45,8 +45,8 @@ Industry = Literal[
 ]
 Tone = Literal["profesional", "cercano", "juvenil"]
 Objective = Literal["vender", "atender", "ambos"]
-# What the screens offer today; "agendar" and "captar" arrive in later phases.
-Capability = Literal["atender", "vender", "cotizar"]
+# What the screens offer today; "captar" arrives in a later phase.
+Capability = Literal["atender", "vender", "cotizar", "agendar"]
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]

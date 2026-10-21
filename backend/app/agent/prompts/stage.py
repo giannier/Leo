@@ -71,13 +71,15 @@ TOKEN_LIMIT = 6000
 SECTION_CAPS: Mapping[str, int] = {
     "plataforma": 450,
     "venta": 540,
+    "agenda": 200,
     "estilo": 300,
     "estado": 500,
     "etapa": 700,
     "rubro": 350,
     "negocio": 1300,
     "situaciones": 1000,
-    "herramientas": 1400,
+    # 1 400 for the ten tools of the sales engine, 300 more for the three of the agenda.
+    "herramientas": 1700,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are
@@ -153,6 +155,16 @@ def _sales_block(config: EffectiveProcessConfig, stage: Stage) -> str:
     if config.behavior.objetivo == "atender":
         return SERVICE_ONLY_PLAYBOOK
     return SALES_PLAYBOOK
+
+
+SCHEDULE_RULES = """\
+AGENDA: para agendar usa consultar_horarios y ofrece como máximo 3 horarios; nunca inventes uno.
+Antes de agendar_cita ten el nombre del cliente y repite servicio, día y hora. Si piden cambiar o
+cancelar, usa gestionar_cita. Si responden "sí" a un recordatorio, confirma la cita."""
+
+
+def _schedule_block(config: EffectiveProcessConfig) -> str:
+    return SCHEDULE_RULES if config.options.agendar else ""
 
 
 # ------------------------------------------------------------------- style
@@ -756,6 +768,9 @@ def build_stage_prompt(
     sales = _sales_block(config, stage)
     if sales:
         parts["venta"] = sales
+    schedule = _schedule_block(config)
+    if schedule:
+        parts["agenda"] = schedule
     parts |= {
         "estilo": _style_block(config),
         "estado": _state_block(config, facts, stage, turn or TurnContext(), now),

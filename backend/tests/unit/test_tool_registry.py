@@ -27,7 +27,7 @@ from app.agent.tools.registry import (
     ToolResult,
 )
 from app.process.facts import Facts, Pedido
-from app.process.templates import GLOBAL_TOOLS, TEMPLATES, TOOL_NAMES
+from app.process.templates import GLOBAL_TOOLS, SCHEDULING_TOOL_NAMES, TEMPLATES, TOOL_NAMES
 from app.process.templates.base import Stage
 from app.schemas.process_options import ProcessOptions
 from tests.unit.test_stage_prompt import NOW, full_facts, make_config
@@ -150,9 +150,11 @@ class TestAliases:
 
 
 class TestCatalog:
-    def test_the_catalogue_declares_exactly_the_ten_tools_of_the_contract(self) -> None:
-        assert set(default_catalog().names()) == set(TOOL_NAMES)
-        assert len(default_catalog().names()) == 10
+    def test_the_catalogue_declares_the_ten_tools_of_the_contract_and_the_three_of_the_agenda(
+        self,
+    ) -> None:
+        assert set(default_catalog().names()) == set(TOOL_NAMES) | set(SCHEDULING_TOOL_NAMES)
+        assert len(default_catalog().names()) == 13
 
     def test_a_tool_cannot_be_defined_twice(self) -> None:
         definition = default_catalog().get("ver_producto")
@@ -540,7 +542,7 @@ class TestThePromptBudgetWithTheRealTools:
         assert prompt.tokens <= TOKEN_LIMIT, prompt.sections
         assert prompt.over_budget == []
 
-    def test_all_ten_tools_together_still_fit_the_allowance(self) -> None:
+    def test_every_tool_together_still_fits_the_allowance(self) -> None:
         """The richest case: every tool at once, which no stage actually has."""
         from app.agent.tools.registry import ToolScope
 
@@ -557,6 +559,7 @@ class TestThePromptBudgetWithTheRealTools:
                 "parameters": d.parameters(scope),
             }
             for d in (default_catalog().get(name) for name in default_catalog().names())
+            # The ten of the contract plus, for a business that books, the three of the agenda.
         ]
 
         assert (

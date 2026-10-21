@@ -46,9 +46,9 @@ def derive_template(capabilities: Iterable[str], suggested: str | None) -> str:
 
 
 def derive_objective(capabilities: Iterable[str]) -> str:
-    """`atender` if the agent neither sells nor quotes; otherwise `ambos` (answer, then close)."""
+    """`atender` if the agent neither sells, quotes nor books; else `ambos` (answer, then close)."""
     caps = set(capabilities)
-    return "ambos" if caps & {"vender", "cotizar"} else "atender"
+    return "ambos" if caps & {"vender", "cotizar", "agendar"} else "atender"
 
 
 def sells(capabilities: Iterable[str] | None) -> bool:
@@ -56,4 +56,4 @@ def sells(capabilities: Iterable[str] | None) -> bool:
 
 
 def leads_to_a_sale(capabilities: Iterable[str] | None) -> bool:
-    return bool(set(capabilities or DEFAULT_CAPABILITIES) & {"vender", "cotizar"})
+    return bool(set(capabilities or DEFAULT_CAPABILITIES) & {"vender", "cotizar", "agendar"})

@@ -131,6 +131,9 @@ class CatalogService:
             destacado=False,
             tags=list(source.tags),
             datos_a_pedir=list(source.datos_a_pedir),
+            agendable=source.agendable,
+            duracion_min=source.duracion_min,
+            buffer_min=source.buffer_min,
         )
 
     def soft_delete(self, product_id: uuid.UUID) -> bool:

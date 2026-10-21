@@ -24,7 +24,7 @@ import logging
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import MappingProxyType
@@ -248,7 +248,10 @@ class ProcessConfigService:
         ).current()
 
         template = _template_for(agent)
-        options = _options_for(template, agent)
+        options = replace(
+            _options_for(template, agent),
+            agendar="agendar" in (agent.capacidades or ()) if agent else False,
+        )
 
         layers = LayerResolver(self._session, tenant_id).resolve(
             template.key, profile.industry if profile else None

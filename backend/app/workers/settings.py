@@ -55,6 +55,7 @@ from app.workers.inbox import (
 from app.workers.knowledge_indexer import index_knowledge_source
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
 from app.workers.metrics import PURGE_JOB, ROLLUP_JOB, metrics_purge, metrics_rollup
+from app.workers.reminders import REMINDER_JOB, run_reminders
 from app.workers.situations import embed_situations
 from app.workers.trial_lifecycle import (
     tenant_archiver,
@@ -139,6 +140,12 @@ class WorkerSettings:
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
         cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
+        # Feature 019, phase D: the appointment reminders, every five minutes off the boundary.
+        cron(
+            run_reminders,
+            name=f"cron:{REMINDER_JOB}",
+            minute={1, 6, 11, 16, 21, 26, 31, 36, 41, 46, 51, 56},
+        ),
         # Feature 009: renewals, the end of a period and dunning, once an hour.
         cron(billing_calendar, name=f"cron:{CALENDAR_JOB}", minute=27),
         # Feature 010: yesterday's metrics after midnight in Lima (06:15 UTC), then the purge.

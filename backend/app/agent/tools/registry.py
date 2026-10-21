@@ -38,7 +38,13 @@ from app.agent.budget import TurnBudget
 from app.agent.outbound import TurnOutbound
 from app.orders.notices import OrderNotices
 from app.process.facts import Facts
-from app.process.templates.base import GLOBAL_TOOLS, EffectiveOptions, Stage, Template
+from app.process.templates.base import (
+    GLOBAL_TOOLS,
+    SCHEDULING_TOOL_NAMES,
+    EffectiveOptions,
+    Stage,
+    Template,
+)
 from app.process.turn import TurnContext
 from app.providers.llm.base import LLMProvider, ToolSpec
 
@@ -285,6 +291,8 @@ def tools_of_stage(scope: ToolScope) -> tuple[str, ...]:
     rejected = scope.facts.pago_estado == "rechazado"
     names = list(scope.template.stage(scope.stage).tools_for(rejected=rejected))
     names.extend(tool for tool in GLOBAL_TOOLS if tool not in names)
+    if scope.options.agendar:
+        names.extend(tool for tool in SCHEDULING_TOOL_NAMES if tool not in names)
     return tuple(names)
 
 

@@ -3,7 +3,7 @@
 /**
  * The inbox's live channel (Feature 007, TASK-702 and TASK-707).
  *
- * Connects to `WS /api/v1/ws?token=`, hands every event to `onEvent`, and says
+ * Connects to `WS /api/v1/ws` (the token travels as a subprotocol), hands every event to `onEvent`, and says
  * every 15 seconds which conversation this panel is looking at (presence).
  * Reconnects with a growing pause; on every (re)connection `onResync` runs, because
  * events sent while the socket was down are not replayed: the panel reads the state

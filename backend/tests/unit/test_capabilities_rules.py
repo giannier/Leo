@@ -14,8 +14,8 @@ class TestNormalize:
         assert normalize(None) == ["atender"]
 
     def test_planned_capabilities_are_dropped_until_they_exist(self) -> None:
-        assert normalize(["vender", "agendar", "captar"]) == ["atender", "vender"]
-        assert normalize(["agendar"], only_available=False) == ["atender", "agendar"]
+        assert normalize(["vender", "agendar", "captar"]) == ["atender", "vender", "agendar"]
+        assert normalize(["captar"], only_available=False) == ["atender", "captar"]
 
     def test_what_is_unknown_is_ignored(self) -> None:
         assert normalize(["vender", "inventada"]) == ["atender", "vender"]
@@ -34,6 +34,9 @@ class TestTheTemplateFollowsWhatTheAgentDoes:
             (["atender", "vender"], "certificaciones", "certificaciones"),
             (["atender", "vender", "cotizar"], "certificaciones", "certificaciones"),
             (["atender", "cotizar"], "certificaciones", "servicios"),
+            (["atender", "agendar"], None, "servicios"),
+            (["atender", "agendar"], "productos", "servicios"),
+            (["atender", "vender", "agendar"], "productos", "productos"),
         ],
     )
     def test_the_table(self, capabilities: list[str], suggested: str | None, expected: str) -> None:
@@ -44,6 +47,7 @@ class TestTheObjective:
     def test_it_sells_when_it_sells_or_quotes(self) -> None:
         assert derive_objective(["atender", "vender"]) == "ambos"
         assert derive_objective(["atender", "cotizar"]) == "ambos"
+        assert derive_objective(["atender", "agendar"]) == "ambos"
 
     def test_it_only_answers_when_it_does_nothing_else(self) -> None:
         assert derive_objective(["atender"]) == "atender"

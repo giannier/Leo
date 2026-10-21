@@ -70,7 +70,7 @@ PRICE_PERIODS = ("unico", "mes", "ano")
 # What the agent does (migration 0051). `agendar` and `captar` are planned: the column accepts them,
 # the screens offer only `CAPABILITIES_AVAILABLE`.
 CAPABILITIES = ("atender", "vender", "cotizar", "agendar", "captar")
-CAPABILITIES_AVAILABLE = ("atender", "vender", "cotizar")
+CAPABILITIES_AVAILABLE = ("atender", "vender", "cotizar", "agendar")
 BUNDLE_MIN_SIZE = 2
 BUNDLE_MAX_SIZE = 50
 
@@ -284,6 +284,13 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         CheckConstraint("price >= 0", name="ck_products_products_price_non_negative"),
         CheckConstraint("cardinality(tags) <= 10", name="products_tags_count"),
         CheckConstraint("cardinality(datos_a_pedir) <= 6", name="products_datos_a_pedir_count"),
+        CheckConstraint(
+            "duracion_min IS NULL OR duracion_min BETWEEN 15 AND 480", name="products_duracion"
+        ),
+        CheckConstraint("buffer_min BETWEEN 0 AND 120", name="products_buffer"),
+        CheckConstraint(
+            "NOT agendable OR duracion_min IS NOT NULL", name="products_agendable_con_duracion"
+        ),
         enum_check("periodo", PRICE_PERIODS, "periodo"),
         Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
@@ -331,6 +338,10 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The assistant pushes a highlighted product first.
     destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # A service that can be booked (feature 019, phase D): how long it takes and the gap after it.
+    agendable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    duracion_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    buffer_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     # What the agent asks before handing a quote over, one item per message ("para cuándo").
     datos_a_pedir: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
