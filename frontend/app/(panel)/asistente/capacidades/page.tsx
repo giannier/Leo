@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { CapabilityPicker, HowItSells } from "@/components/assistant/capability-picker";
+import { QualificationQuestions } from "@/components/assistant/qualification-questions";
 import { AssistantHeader } from "@/components/assistant/section-nav";
 import { useToast } from "@/components/toast";
 import { Alert, Button, Card, Skeleton } from "@/components/ui";
@@ -50,7 +51,7 @@ export default function CapabilitiesPage() {
     setBusy(true);
     setError(null);
     try {
-      const config = await api.agentConfig.save({ capacidades: draft as ("atender" | "vender" | "cotizar" | "agendar")[] });
+      const config = await api.agentConfig.save({ capacidades: draft as ("atender" | "vender" | "cotizar" | "agendar" | "captar")[] });
       const current = config.capacidades ?? draft;
       setSaved(current);
       setDraft(current);
@@ -72,17 +73,24 @@ export default function CapabilitiesPage() {
       {saved === null ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <Card>
-          <div className="space-y-4">
-            <CapabilityPicker value={draft} onChange={setDraft} suggested={suggested} notice={notice} disabled={!canEdit} />
-            <HowItSells refreshKey={(saved ?? []).join(",")} />
-            {canEdit ? (
-              <Button type="button" loading={busy} disabled={!changed} onClick={() => void save()}>
-                Guardar
-              </Button>
-            ) : null}
-          </div>
-        </Card>
+        <>
+          <Card>
+            <div className="space-y-4">
+              <CapabilityPicker value={draft} onChange={setDraft} suggested={suggested} notice={notice} disabled={!canEdit} />
+              <HowItSells refreshKey={(saved ?? []).join(",")} />
+              {canEdit ? (
+                <Button type="button" loading={busy} disabled={!changed} onClick={() => void save()}>
+                  Guardar
+                </Button>
+              ) : null}
+            </div>
+          </Card>
+          {saved.includes("captar") ? (
+            <Card>
+              <QualificationQuestions canEdit={canEdit} />
+            </Card>
+          ) : null}
+        </>
       )}
     </div>
   );

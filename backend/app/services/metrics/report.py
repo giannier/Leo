@@ -32,6 +32,7 @@ from app.models.metrics import DEFAULT_MINUTES_PER_CONVERSATION, DashboardSettin
 from app.models.orders import Order, OrderItem
 from app.models.tenant import Tenant
 from app.models.whatsapp import OPEN_REQUEST_STATUSES, ConnectionRequest, WhatsAppNumber
+from app.services.metrics.handoffs import handoff_response
 from app.services.metrics.rollup import DayMetrics, bounds, compute_day, local_today, zone_of
 
 MAX_RANGE_DAYS = 400
@@ -178,6 +179,8 @@ def tenant_report(
             for d in days
         ],
     }
+    # How fast a person answers after a handover (feature 019, phase C); no money in it.
+    report["traspasos"] = handoff_response(session, tenant_id, days[0].day, days[-1].day)
     if money:
         report["mas_vendidos"] = top_products(session, tenant_id, days[0].day, days[-1].day)
         # What Meta will bill this month (Feature 011, C-111); an estimate, not the invoice.

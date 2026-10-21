@@ -25,6 +25,7 @@ const CAUSES: Record<string, string> = {
   "persona:mover": "Movido a mano",
   "persona:asignar": "Asignado",
   "turno:cotizacion_solicitada": "El asistente pasó la cotización",
+  "turno:lead_calificado": "El asistente calificó al cliente",
   "persona:cotizacion_enviada": "Cotización enviada",
   "persona:descartar": "Marcado como no lead",
   "operador:confirmar": "Pedido confirmado",
@@ -37,6 +38,20 @@ function cause(text: string): string {
 }
 
 type Quote = NonNullable<LeadDetail["lead"]["cotizacion"]>;
+type Score = NonNullable<LeadDetail["lead"]["calificacion"]>;
+
+export const SCORE: Record<string, { label: string; tone: string }> = {
+  caliente: { label: "Caliente", tone: "bg-danger-soft text-danger" },
+  tibio: { label: "Tibio", tone: "bg-warning-soft text-warning" },
+  frio: { label: "Frío", tone: "bg-surface-muted text-ink-soft" },
+};
+
+/** A small pill with how warm the lead is; nothing when it has not been qualified. */
+export function ScoreChip({ score }: { score: Score | null | undefined }) {
+  if (!score) return null;
+  const style = SCORE[score.puntaje] ?? SCORE.frio;
+  return <span className={cx("rounded-full px-2 py-0.5 text-xs font-semibold", style.tone)}>{style.label}</span>;
+}
 
 /** What to do next with a quote: the follow-up cadence (day 2 to 3, 7, 14, and close at 21). */
 export function quoteHint(quote: Quote): string {
@@ -178,6 +193,26 @@ export function LeadDrawer({
                   <dd className="text-ink">{lead.days_in_stage} días</dd>
                 </div>
               </dl>
+
+              {lead.calificacion ? (
+                <section className="space-y-2 rounded-lg border border-line p-3" data-testid="lead-score">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-semibold text-ink">Qué tan interesado está</h3>
+                    <ScoreChip score={lead.calificacion} />
+                  </div>
+                  {lead.calificacion.motivo ? <p className="text-ink">{lead.calificacion.motivo}</p> : null}
+                  {Object.keys(lead.calificacion.respuestas).length ? (
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      {Object.entries(lead.calificacion.respuestas).map(([question, answer]) => (
+                        <div key={question} className="contents">
+                          <dt className="text-xs text-ink-faint">{question}</dt>
+                          <dd className="text-ink">{answer}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </section>
+              ) : null}
 
               {lead.cotizacion ? (
                 <section className="space-y-3 rounded-lg border border-line p-3" data-testid="lead-quote">

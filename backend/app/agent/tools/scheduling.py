@@ -40,14 +40,36 @@ def _contact_id(context: ToolContext) -> uuid.UUID | None:
     return conversation.contact_id
 
 
-def _product(context: ToolContext, scheduling: Scheduling, raw: object) -> Product | None:
+def _product(
+    context: ToolContext, scheduling: Scheduling, arguments: dict[str, Any]
+) -> Product | None:
+    """The service the model means: by `producto_id` (as every other tool names it), or by its name.
+
+    A model sometimes writes the name of the service where an id goes; one that matches a single
+    bookable service is accepted instead of sending the customer to a person over a typo.
+    """
+    raw = str(arguments.get("producto_id") or arguments.get("servicio_id") or "").strip()
     try:
-        product = scheduling.products.get(uuid.UUID(str(raw).strip()))
+        product = scheduling.products.get(uuid.UUID(raw))
     except ValueError:
-        return None
-    if product is None or product.deleted_at is not None or not product.agendable:
+        wanted = raw.lower()
+        named = [
+            p
+            for p in scheduling.bookable()
+            if wanted and (wanted in p.name.lower() or p.name.lower() in wanted)
+        ]
+        product = named[0] if len(named) == 1 else None
+    if product is None or product.deleted_at is not None:
         return None
     return product
+
+
+def _not_bookable(product: Product | None) -> ToolResult | None:
+    if product is None:
+        return ToolResult.error("producto_id no es válido: usa el que devolvió buscar_productos.")
+    if not product.agendable:
+        return ToolResult.no_disponible(decir=PRODUCT_NOT_BOOKABLE)
+    return None
 
 
 def _options_text(
@@ -73,9 +95,10 @@ def _day(raw: object) -> date | None:
 
 async def consultar_horarios(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
     scheduling = Scheduling(context.session, context.tenant_id)
-    product = _product(context, scheduling, arguments.get("servicio_id"))
-    if product is None:
-        return ToolResult.no_disponible(decir=PRODUCT_NOT_BOOKABLE)
+    product = _product(context, scheduling, arguments)
+    refused = _not_bookable(product)
+    if refused is not None or product is None:
+        return refused or ToolResult.error("producto_id no es válido.")
     slots = scheduling.offer(product, on_or_after=_day(arguments.get("desde")))
     if not slots:
         return ToolResult.no_disponible(
@@ -92,9 +115,10 @@ async def consultar_horarios(context: ToolContext, arguments: dict[str, Any]) ->
 
 async def agendar_cita(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
     scheduling = Scheduling(context.session, context.tenant_id)
-    product = _product(context, scheduling, arguments.get("servicio_id"))
-    if product is None:
-        return ToolResult.no_disponible(decir=PRODUCT_NOT_BOOKABLE)
+    product = _product(context, scheduling, arguments)
+    refused = _not_bookable(product)
+    if refused is not None or product is None:
+        return refused or ToolResult.error("producto_id no es válido.")
     zone = scheduling.zone()
     start = parse_slot(arguments.get("slot"), zone)
     if start is None:
@@ -134,7 +158,8 @@ async def agendar_cita(context: ToolContext, arguments: dict[str, Any]) -> ToolR
         data={"servicio": product.name, "inicio": start.isoformat()},
         decir=(
             f"Confirma al cliente su cita de {product.name}: {describe(start, zone)}. "
-            "Si el negocio tiene dirección, dísela; avísale que puede escribir aquí para cambiarla."
+            "Si el negocio tiene dirección, dísela; avísale que puede escribir para cambiarla. "
+            "No derives a una persona: la cita ya quedó agendada."
         ),
     )
 

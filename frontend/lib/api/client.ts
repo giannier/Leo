@@ -352,9 +352,18 @@ export interface MetricsDay {
   derivaciones: number;
   pedidos: number;
 }
+/** How fast a person answers after the assistant hands a conversation over (minutes). */
+export interface HandoffResponse {
+  total: number;
+  atendidos: number;
+  sin_atender: number;
+  mediana_minutos: number | null;
+  p90_minutos: number | null;
+}
 export interface MetricsReport {
   desde: string;
   hasta: string;
+  traspasos?: HandoffResponse;
   minutos_por_conversacion: number;
   total: MetricsSummary;
   anterior: MetricsSummary;
@@ -1002,7 +1011,7 @@ export const api = {
       request<Pipeline>("/tenant/pipeline/stages", { method: "PUT", body }),
     saveReasons: (body: { key?: string | null; label: string; is_active?: boolean }[]) =>
       request<Pipeline>("/tenant/pipeline/lost-reasons", { method: "PUT", body }),
-    board: (query?: { asignado?: string; search?: string }) =>
+    board: (query?: { asignado?: string; search?: string; puntaje?: "caliente" | "tibio" | "frio" }) =>
       request<LeadBoard>("/tenant/leads/board", { query }),
     today: (dias = 3) => request<LeadPage>("/tenant/leads/today", { query: { dias } }),
     detail: (id: string) => request<LeadDetail>(`/tenant/leads/${id}`),

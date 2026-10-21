@@ -94,6 +94,15 @@ class QuoteOut(BaseModel):
     dias_desde_envio: int | None
 
 
+class ScoreOut(BaseModel):
+    """How warm the lead is and what the customer answered (feature 019, phase E)."""
+
+    puntaje: str
+    motivo: str | None
+    respuestas: dict[str, str]
+    en: datetime | None
+
+
 class LeadOut(BaseModel):
     id: uuid.UUID
     stage_id: uuid.UUID
@@ -119,6 +128,7 @@ class LeadOut(BaseModel):
     last_activity_at: datetime
     closed_at: datetime | None
     cotizacion: QuoteOut | None = None
+    calificacion: ScoreOut | None = None
 
 
 class LeadPage(BaseModel):
@@ -237,6 +247,16 @@ def _out(
         last_activity_at=lead.last_activity_at,
         closed_at=lead.closed_at,
         cotizacion=_quote(lead, now) if lead.quote_status else None,
+        calificacion=_score(lead) if lead.score else None,
+    )
+
+
+def _score(lead: Lead) -> ScoreOut:
+    return ScoreOut(
+        puntaje=str(lead.score),
+        motivo=lead.score_reason,
+        respuestas={str(k): str(v) for k, v in (lead.qualification or {}).items()},
+        en=lead.scored_at,
     )
 
 
@@ -347,6 +367,7 @@ def put_reasons(
 
 
 Status = Literal["active", "won", "lost", "discarded"]
+Score = Literal["caliente", "tibio", "frio"]
 
 
 @router.get("/tenant/leads", responses=error_responses(*AUTH))
@@ -358,6 +379,7 @@ def list_leads(
     asignado: Annotated[str | None, Query(pattern=r"^(me|nadie|[0-9a-f-]{36})$")] = None,
     search: Annotated[str | None, Query(max_length=100)] = None,
     sin_actividad_dias: Annotated[int | None, Query(ge=1, le=365)] = None,
+    puntaje: Annotated[Score | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LeadPage:
@@ -377,6 +399,7 @@ def list_leads(
         idle_before=(
             datetime.now(UTC) - timedelta(days=sin_actividad_dias) if sin_actividad_dias else None
         ),
+        score=puntaje,
         limit=limit,
         offset=offset,
     )
@@ -394,6 +417,7 @@ def board(
     session: SessionDep,
     asignado: Annotated[str | None, Query(pattern=r"^(me|nadie|[0-9a-f-]{36})$")] = None,
     search: Annotated[str | None, Query(max_length=100)] = None,
+    puntaje: Annotated[Score | None, Query()] = None,
 ) -> BoardOut:
     """The kanban: every active stage with its first 50 cards. Won and lost show the last 30 days
     (C-005: a working tool, not an archive)."""
@@ -416,6 +440,7 @@ def board(
             unassigned=asignado == "nadie",
             search=search,
             closed_since=since if closed else None,
+            score=puntaje,
             limit=BOARD_PAGE,
         )
         columns.append(

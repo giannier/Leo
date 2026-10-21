@@ -70,8 +70,18 @@ CUSTOMER_UNREACHED = "ventana_cerrada"
 LLM_DOWN = "llm_caido"
 # Feature 007: a handover nobody took within the business's minutes.
 UNATTENDED = "derivacion_sin_atender"
+# Feature 019, phase E: the assistant judged a lead hot.
+HOT_LEAD = "lead_caliente"
 
-EVENT_KINDS = (NEW_RECEIPT, CASH_ORDER, HANDOFF, CUSTOMER_UNREACHED, LLM_DOWN, UNATTENDED)
+EVENT_KINDS = (
+    NEW_RECEIPT,
+    CASH_ORDER,
+    HANDOFF,
+    CUSTOMER_UNREACHED,
+    LLM_DOWN,
+    UNATTENDED,
+    HOT_LEAD,
+)
 
 NOTIFICATION_KINDS = (*ONE_SHOT_KINDS, *EVENT_KINDS)
 

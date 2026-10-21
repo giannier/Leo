@@ -125,9 +125,15 @@ class Scheduling:
         return dict(resource.horario) if resource.horario else self.business_hours()
 
     def _eligible(self, product: Product) -> list[Resource]:
-        return [
-            r for r in self.resources.active() if not r.product_ids or product.id in r.product_ids
-        ]
+        """The active resources that take `product`.
+
+        A business that never set one up has a single resource, `Atención`, that follows its
+        opening hours: it is created the first time it is needed.
+        """
+        resources = list(self.resources.active())
+        if not resources and not self.resources.all():
+            resources = [self.ensure_resource()]
+        return [r for r in resources if not r.product_ids or product.id in r.product_ids]
 
     # ----------------------------------------------------------------- offer
 

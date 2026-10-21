@@ -95,9 +95,9 @@ Cada dato tiene un solo dueño. El Asistente es el mismo recorrido como menú. L
 |---|---|---|
 | **A · Oferta y capacidades** (hecha: migraciones 0049 a 0052; falta el aviso de política por rubro) | oferta con tipo y forma de venta; periodo del precio; categorías con pantalla y creación; web una vez; ejemplos neutros; capacidades como interruptores y lista de progreso única; presets en lugar de plantillas; avisos de política por rubro; rubros nuevos | ninguno |
 | **B · Cotizar de verdad** | datos a pedir por servicio, resumen estructurado, estado de la cotización en el CRM, seguimiento con cadencia | ninguno |
-| **C · Traspaso, calidad y piloto** | traspaso tibio, tiempo de respuesta humana, conjunto de prueba, modo piloto, muestreo | ninguno |
+| **C · Traspaso, calidad y piloto** (hecha en parte: modo piloto por porcentaje y tiempo de respuesta humana tras un traspaso; falta el conjunto de prueba generado y el muestreo semanal) | traspaso tibio, tiempo de respuesta humana, conjunto de prueba, modo piloto, muestreo | ninguno |
 | **D · Agendar y recordar** (hecha: migración 0055, `scheduling/`, tres herramientas, agenda y configuración en el panel; falta Google Calendar y el piloto) | 014: calendario propio con bloqueo anti doble reserva, recursos y capacidad, recordatorios; adaptadores Cal.com y Google Calendar | plantillas de WhatsApp para recordatorios; verificación de Google |
-| **E · Captar y calificar** | preguntas por rubro, puntaje, destino del lead, reunión | ninguno |
+| **E · Captar y calificar** (hecha: migración 0057, herramienta `calificar_cliente`, puntaje en el CRM y aviso de lead caliente; falta el destino del lead y la reunión) | preguntas por rubro, puntaje, destino del lead, reunión | ninguno |
 | **F · Canales** | identidades por canal, chat web, atribución de origen, luego Instagram y Messenger; sedes | revisión de Meta (semanas) |
 | **G · Postventa y B2B** | estado de pedido, devoluciones, repetir pedido, documentos | integraciones |
 | **H · Aprender** | resultados por capacidad y rubro; mejora de instrucciones con revisión humana (017, fases 3 y 4) | consentimiento, Ley 29733 |

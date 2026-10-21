@@ -36,6 +36,7 @@ from app.agent.tools.catalog import (
 )
 from app.agent.tools.customer import registrar_datos_cliente
 from app.agent.tools.handover import derivar_a_humano
+from app.agent.tools.leads import calificar_cliente
 from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.payments import enviar_metodos_pago
 from app.agent.tools.registry import (
@@ -270,21 +271,21 @@ def _can_schedule(scope: ToolScope) -> bool:
 def _hours_schema(scope: ToolScope) -> dict[str, Any]:
     return _object(
         {
-            "servicio_id": _text("producto_id del servicio."),
+            "producto_id": _text("producto_id del servicio, el que devolvió buscar_productos."),
             "desde": _text("Opcional: AAAA-MM-DD, si pidió un día."),
         },
-        ["servicio_id"],
+        ["producto_id"],
     )
 
 
 def _book_schema(scope: ToolScope) -> dict[str, Any]:
     return _object(
         {
-            "servicio_id": _text("producto_id del servicio."),
+            "producto_id": _text("producto_id del servicio, el que devolvió buscar_productos."),
             "slot": _text("El slot elegido, como lo devolvió consultar_horarios."),
             "notas": {"type": "string", "maxLength": 300},
         },
-        ["servicio_id", "slot"],
+        ["producto_id", "slot"],
     )
 
 
@@ -297,6 +298,31 @@ def _appointment_schema(scope: ToolScope) -> dict[str, Any]:
             "motivo": {"type": "string", "maxLength": 200},
         },
         ["accion"],
+    )
+
+
+def _can_qualify(scope: ToolScope) -> bool:
+    return scope.options.captar
+
+
+def _qualify_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "interes": {"type": "string", "enum": ["alto", "medio", "bajo"]},
+            "motivo": {"type": "string", "maxLength": 200},
+            "respuestas": {
+                "type": "array",
+                "maxItems": 6,
+                "items": _object(
+                    {
+                        "pregunta": {"type": "string", "maxLength": 80},
+                        "respuesta": {"type": "string", "maxLength": 160},
+                    },
+                    ["pregunta", "respuesta"],
+                ),
+            },
+        },
+        ["interes", "respuestas"],
     )
 
 
@@ -396,6 +422,14 @@ def _definitions() -> list[ToolDefinition]:
             parameters=_appointment_schema,
             handler=gestionar_cita,
             available=_can_schedule,
+            effect=True,
+        ),
+        ToolDefinition(
+            name="calificar_cliente",
+            description="Anota lo que sabes del cliente y su interés. Nota interna.",
+            parameters=_qualify_schema,
+            handler=calificar_cliente,
+            available=_can_qualify,
             effect=True,
         ),
         ToolDefinition(

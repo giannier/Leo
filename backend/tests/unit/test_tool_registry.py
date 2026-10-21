@@ -7,13 +7,12 @@ a guard refuses are checked without a database.
 
 from __future__ import annotations
 
-import json
 import uuid
 from typing import Any, cast
 
 import pytest
 
-from app.agent.prompts.stage import SECTION_CAPS, TOKEN_LIMIT, build_stage_prompt, estimate_tokens
+from app.agent.prompts.stage import SECTION_CAPS, TOKEN_LIMIT, build_stage_prompt
 from app.agent.tools.definitions import (
     default_catalog,
     registry_for_stage,
@@ -27,7 +26,13 @@ from app.agent.tools.registry import (
     ToolResult,
 )
 from app.process.facts import Facts, Pedido
-from app.process.templates import GLOBAL_TOOLS, SCHEDULING_TOOL_NAMES, TEMPLATES, TOOL_NAMES
+from app.process.templates import (
+    GLOBAL_TOOLS,
+    LEAD_TOOL_NAMES,
+    SCHEDULING_TOOL_NAMES,
+    TEMPLATES,
+    TOOL_NAMES,
+)
 from app.process.templates.base import Stage
 from app.schemas.process_options import ProcessOptions
 from tests.unit.test_stage_prompt import NOW, full_facts, make_config
@@ -150,11 +155,12 @@ class TestAliases:
 
 
 class TestCatalog:
-    def test_the_catalogue_declares_the_ten_tools_of_the_contract_and_the_three_of_the_agenda(
+    def test_the_catalogue_declares_the_ten_tools_of_the_contract_and_those_of_the_capabilities(
         self,
     ) -> None:
-        assert set(default_catalog().names()) == set(TOOL_NAMES) | set(SCHEDULING_TOOL_NAMES)
-        assert len(default_catalog().names()) == 13
+        extra = set(SCHEDULING_TOOL_NAMES) | set(LEAD_TOOL_NAMES)
+        assert set(default_catalog().names()) == set(TOOL_NAMES) | extra
+        assert len(default_catalog().names()) == 14
 
     def test_a_tool_cannot_be_defined_twice(self) -> None:
         definition = default_catalog().get("ver_producto")
@@ -542,29 +548,33 @@ class TestThePromptBudgetWithTheRealTools:
         assert prompt.tokens <= TOKEN_LIMIT, prompt.sections
         assert prompt.over_budget == []
 
-    def test_every_tool_together_still_fits_the_allowance(self) -> None:
-        """The richest case: every tool at once, which no stage actually has."""
-        from app.agent.tools.registry import ToolScope
+    @pytest.mark.parametrize(("template_key", "stage"), _ALL)
+    def test_a_business_that_books_and_qualifies_still_fits(
+        self, template_key: str, stage: Stage
+    ) -> None:
+        """The richest real case: the agenda and qualification tools on top of a stage's own."""
+        from dataclasses import replace
 
-        scope = ToolScope(
-            template=CERT,
-            stage=Stage.IDENTIFICAR,
-            facts=full_facts(requiere_entrega=True),
-            options=CERT_OPTIONS,
+        template = TEMPLATES[template_key]
+        base = make_config(template_key, full=True)
+        config = replace(
+            base,
+            options=replace(base.options, agendar=True, captar=True),
+            preguntas_calificacion=(
+                "¿Qué proceso quieres resolver?",
+                "¿Cuántas personas lo usarían?",
+                "¿Para cuándo lo necesitas?",
+                "¿Tienes un presupuesto aproximado?",
+            ),
         )
-        specs = [
-            {
-                "name": d.name,
-                "description": d.description,
-                "parameters": d.parameters(scope),
-            }
-            for d in (default_catalog().get(name) for name in default_catalog().names())
-            # The ten of the contract plus, for a business that books, the three of the agenda.
-        ]
+        facts = full_facts(requiere_entrega=True, modalidad_pago="contra_entrega")
+        registry = registry_for_stage(template, stage, facts, config.options)
 
-        assert (
-            estimate_tokens(json.dumps(specs, ensure_ascii=False)) <= SECTION_CAPS["herramientas"]
-        )
+        prompt = build_stage_prompt(config, facts, stage, now=NOW, tool_specs=registry.specs())
+
+        assert prompt.sections["herramientas"] <= SECTION_CAPS["herramientas"], prompt.sections
+        assert prompt.tokens <= TOKEN_LIMIT, prompt.sections
+        assert prompt.over_budget == []
 
     def test_a_definition_is_a_plain_value(self) -> None:
         assert isinstance(default_catalog().get("ver_producto"), ToolDefinition)

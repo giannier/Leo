@@ -35,6 +35,7 @@ from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app.models.business import AgentConfig, BusinessProfile
+from app.models.catalog import Rubro
 from app.models.sales_config import Promotion
 from app.process.capabilities import derive_objective
 from app.process.facts import FactsConfig
@@ -120,6 +121,8 @@ class EffectiveProcessConfig:
     # The profile's website: what the assistant gives when the contact section has none.
     website: str | None = None
     industry: str | None = None
+    # The questions the agent asks to know a customer (`captar`): the owner's, else the rubro's.
+    preguntas_calificacion: tuple[str, ...] = ()
     currency: str = DEFAULT_CURRENCY
     timezone: str = DEFAULT_TIMEZONE
     opening_hours: Mapping[str, Any] = field(default_factory=dict)
@@ -248,9 +251,11 @@ class ProcessConfigService:
         ).current()
 
         template = _template_for(agent)
+        capacities = tuple(agent.capacidades or ()) if agent else ()
         options = replace(
             _options_for(template, agent),
-            agendar="agendar" in (agent.capacidades or ()) if agent else False,
+            agendar="agendar" in capacities,
+            captar="captar" in capacities,
         )
 
         layers = LayerResolver(self._session, tenant_id).resolve(
@@ -290,6 +295,7 @@ class ProcessConfigService:
             business_description=profile.description if profile else None,
             website=profile.website if profile else None,
             industry=profile.industry if profile else None,
+            preguntas_calificacion=_questions(self._session, agent, profile),
             currency=(profile.currency if profile else None) or DEFAULT_CURRENCY,
             timezone=(profile.timezone if profile else None) or DEFAULT_TIMEZONE,
             opening_hours=dict(profile.opening_hours) if profile and profile.opening_hours else {},
@@ -297,6 +303,16 @@ class ProcessConfigService:
             payment_methods=tuple(method.method for method in methods),
             promotions=tuple(_detach(promotion) for promotion in promotions),
         )
+
+
+def _questions(
+    session: Session, agent: AgentConfig | None, profile: BusinessProfile | None
+) -> tuple[str, ...]:
+    """The owner's list if there is one, else the questions of the business's rubro."""
+    if agent is not None and agent.preguntas_calificacion is not None:
+        return tuple(q for q in agent.preguntas_calificacion if q.strip())
+    rubro = session.get(Rubro, profile.industry) if profile and profile.industry else None
+    return tuple(rubro.preguntas_calificacion) if rubro else ()
 
 
 def _behavior(agent: AgentConfig | None) -> Behavior:

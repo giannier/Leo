@@ -36,8 +36,9 @@ def slot_token(moment: datetime, zone: ZoneInfo) -> str:
 
 def parse_slot(token: object, zone: ZoneInfo) -> datetime | None:
     """A slot token (local time, no zone) as UTC, or None if it is not one."""
+    # The model writes "2026-10-21 15:00" as often as "2026-10-21T15:00": both mean the same slot.
     try:
-        local = datetime.strptime(str(token).strip()[:16], SLOT_FORMAT)
+        local = datetime.strptime(str(token).strip().replace(" ", "T", 1)[:16], SLOT_FORMAT)
     except ValueError:
         return None
     return local.replace(tzinfo=zone).astimezone(UTC)

@@ -45,8 +45,8 @@ Industry = Literal[
 ]
 Tone = Literal["profesional", "cercano", "juvenil"]
 Objective = Literal["vender", "atender", "ambos"]
-# What the screens offer today; "captar" arrives in a later phase.
-Capability = Literal["atender", "vender", "cotizar", "agendar"]
+# What the screens offer: every capability of the platform.
+Capability = Literal["atender", "vender", "cotizar", "agendar", "captar"]
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
@@ -108,6 +108,11 @@ class AgentConfigRequest(ConcurrencyAware):
     farewell_on_pause: LongText | None = None
     # What the agent does (feature 019): the template and the objective follow from it.
     capacidades: list[Capability] | None = Field(default=None, max_length=10)
+    # What the agent asks to know a customer (`captar`), up to five. An empty list goes back to the
+    # rubro's own questions; absent leaves them as they are (feature 019, phase E).
+    preguntas_calificacion: (
+        list[Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)]] | None
+    ) = Field(default=None, max_length=5)
 
 
 class AgentConfigResponse(BaseModel):
@@ -120,6 +125,8 @@ class AgentConfigResponse(BaseModel):
     emojis: str = "pocos"
     saludo: str | None = None
     capacidades: list[str] = Field(default_factory=lambda: ["atender", "vender"])
+    # None: the rubro's questions are used.
+    preguntas_calificacion: list[str] | None = None
     farewell_on_pause: str | None
     is_active: bool
     updated_at: datetime | None
@@ -186,6 +193,11 @@ def _agent_response(
         emojis=record.emojis,
         saludo=record.saludo,
         capacidades=list(record.capacidades or ["atender", "vender"]),
+        preguntas_calificacion=(
+            list(record.preguntas_calificacion)
+            if record.preguntas_calificacion is not None
+            else None
+        ),
         escalation_rules=record.escalation_rules,
         farewell_on_pause=record.farewell_on_pause,
         is_active=record.is_active,

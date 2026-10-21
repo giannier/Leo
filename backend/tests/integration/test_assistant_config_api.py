@@ -616,7 +616,7 @@ class TestCapabilities:
         _, headers = await _account(api, mail)
 
         refused = await api.put(
-            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["captar"]}
+            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["inventada"]}
         )
 
         assert refused.status_code == 400

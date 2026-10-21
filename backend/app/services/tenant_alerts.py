@@ -35,6 +35,7 @@ from app.models.tenant import (
     CASH_ORDER,
     CUSTOMER_UNREACHED,
     HANDOFF,
+    HOT_LEAD,
     LLM_DOWN,
     NEW_RECEIPT,
     UNATTENDED,
@@ -47,6 +48,7 @@ from app.services.activation import owner_of
 from app.services.emails import (
     build_cash_order_email,
     build_handoff_email,
+    build_hot_lead_email,
     build_llm_down_email,
     build_new_receipt_email,
     build_unattended_email,
@@ -170,6 +172,17 @@ class TenantAlerts:
                 motivo=motivo,
                 resumen=resumen,
                 panel_url=self._panel(""),
+            )
+        )
+
+    def hot_lead(self, conversation_id: uuid.UUID, *, resumen: str | None = None) -> None:
+        """A customer the assistant judged hot: the team hears while it is still hot."""
+        self._notices.record(
+            HOT_LEAD, {"conversation_id": str(conversation_id), "resumen": resumen}
+        )
+        self._email(
+            lambda to, name: build_hot_lead_email(
+                to=to, tenant_name=name, resumen=resumen, panel_url=self._panel("")
             )
         )
 
