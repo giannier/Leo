@@ -631,6 +631,18 @@ class TestCapabilities:
 
         assert rubro.json()["capacidades_sugeridas"] == ["atender", "vender", "cotizar"]
 
+    @pytest.mark.parametrize(("industry", "has_notice"), [("salud", True), ("otros", False)])
+    async def test_the_rubro_carries_the_policy_notice_of_the_platform(
+        self, api: AsyncClient, mail: Any, industry: str, has_notice: bool
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(f"{TENANT}/business-profile", headers=headers, json={"industry": industry})
+
+        notice = (await api.get(f"{A}/rubro", headers=headers)).json()["aviso_politica"]
+
+        assert bool(notice) is has_notice
+        assert not has_notice or "WhatsApp" in notice
+
 
 class TestOneListOfSteps:
     """The setup is one list that depends on what the agent does (feature 019)."""

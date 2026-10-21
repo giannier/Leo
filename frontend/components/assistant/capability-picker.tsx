@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Checkbox, cx } from "@/components/ui";
+import { Alert, Checkbox, cx } from "@/components/ui";
 import { api, type ProcessTemplate } from "@/lib/api/client";
 
 export interface CapabilityInfo {
@@ -52,12 +52,15 @@ export function CapabilityPicker({
   value,
   onChange,
   suggested = [],
+  notice = null,
   disabled = false,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   /** What agents of the business's rubro usually do. */
   suggested?: string[];
+  /** What the owner should know before turning something on, from the policy of the platform. */
+  notice?: string | null;
   disabled?: boolean;
 }) {
   function toggle(key: string, on: boolean) {
@@ -106,6 +109,12 @@ export function CapabilityPicker({
           );
         })}
       </ul>
+
+      {notice ? (
+        <Alert tone="warning" title="Ten en cuenta en tu rubro">
+          {notice}
+        </Alert>
+      ) : null}
 
       {suggested.length > 0 && !sameAsSuggested ? (
         <button

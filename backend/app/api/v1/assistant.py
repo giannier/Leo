@@ -398,6 +398,7 @@ class RubroView(BaseModel):
     nombre: str | None
     plantilla_sugerida: str | None
     capacidades_sugeridas: list[str] = Field(default_factory=list)
+    aviso_politica: str | None = None
     version: int | None
     reglas: list[RuleView]
     faqs: list[FaqView]
@@ -565,6 +566,7 @@ def get_rubro(principal: ReviewerDep, session: SessionDep) -> RubroView:
         nombre=rubro.nombre if rubro else None,
         plantilla_sugerida=rubro.plantilla_sugerida if rubro else None,
         capacidades_sugeridas=list(rubro.capacidades_sugeridas) if rubro else [],
+        aviso_politica=rubro.aviso_politica if rubro else None,
         version=version.version if version else None,
         reglas=_rules(resolver.rules("rubro", rubro_key)),
         faqs=[FaqView(pregunta=f.pregunta, respuesta=f.respuesta) for f in catalog.faqs(version.id)]

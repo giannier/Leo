@@ -61,12 +61,16 @@ export function StepAgent({ onSaved }: StepProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const seeded = useRef(false);
   const [suggested, setSuggested] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // What agents of the business's rubro usually do: a suggestion, never applied on its own.
   useEffect(() => {
     api.assistant
       .rubro()
-      .then((rubro) => setSuggested(rubro.capacidades_sugeridas ?? []))
+      .then((rubro) => {
+        setSuggested(rubro.capacidades_sugeridas ?? []);
+        setNotice(rubro.aviso_politica ?? null);
+      })
       .catch(() => setSuggested([]));
   }, []);
 
@@ -160,6 +164,7 @@ export function StepAgent({ onSaved }: StepProps) {
       <CapabilityPicker
         value={form.capacidades}
         suggested={suggested}
+        notice={notice}
         onChange={(capacidades) => set({ capacidades })}
       />
 
