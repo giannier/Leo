@@ -32,7 +32,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.billing import UsagePeriod
 from app.models.business import AgentConfig
-from app.models.conversation import Conversation, Message
+from app.models.conversation import REAL_CHANNELS, Conversation, Message
 from app.models.plan import Plan
 from app.models.tenant import (
     TRIAL_ENDED,
@@ -96,7 +96,7 @@ def record_ai_message(session: Session, tenant_id: uuid.UUID, *, channel: str) -
 
     limit = message_limit(session, tenant)
 
-    if channel != "whatsapp":
+    if channel not in REAL_CHANNELS:
         return MeteringResult(counted=False, used=tenant.ai_messages_used, limit=limit)
 
     tenant.ai_messages_used += 1

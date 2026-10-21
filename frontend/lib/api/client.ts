@@ -605,6 +605,9 @@ export interface CampaignReport {
   monto_vendido?: Record<string, string>;
   costo_estimado_usd?: string | null;
 }
+// The web chat (feature 019, phase F).
+export type WebChatSettings = Ok<Ops["/api/v1/tenant/web-chat"]["get"]>;
+export type WebChatPatch = Partial<Pick<WebChatSettings, "enabled" | "saludo" | "color" | "limite_diario">>;
 // The agenda (feature 019, phase D).
 export type Scheduling = Ok<Ops["/api/v1/tenant/scheduling"]["get"]>;
 export type SchedulingSettings = Scheduling["ajustes"];
@@ -722,6 +725,12 @@ export const api = {
     get: () => request<BusinessProfile>("/tenant/business-profile"),
     save: (body: BusinessProfilePatch) =>
       request<BusinessProfile>("/tenant/business-profile", { method: "PUT", body }),
+  },
+
+  webChat: {
+    get: () => request<WebChatSettings>("/tenant/web-chat"),
+    save: (body: WebChatPatch) => request<WebChatSettings>("/tenant/web-chat", { method: "PUT", body }),
+    rotate: () => request<WebChatSettings>("/tenant/web-chat/rotate", { method: "POST" }),
   },
 
   scheduling: {

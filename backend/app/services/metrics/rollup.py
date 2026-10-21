@@ -36,14 +36,13 @@ from sqlalchemy import and_, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.business import BusinessProfile
-from app.models.conversation import AgentTrace, Conversation, Message
+from app.models.conversation import REAL_CHANNELS, AgentTrace, Conversation, Message
 from app.models.conversation_state import ConversationStageEvent
 from app.models.metrics import MetricsDaily
 from app.models.orders import Order
 from app.models.tenant import Tenant
 
 DEFAULT_ZONE = "America/Lima"
-CHANNEL = "whatsapp"
 RECOMPUTE_DAYS = 3
 MAX_BACKFILL_DAYS = 400
 TAKEN_EVENTS = ("tomada", "robada")
@@ -100,7 +99,7 @@ def compute_day(session: Session, tenant_id: uuid.UUID, day: date, zone: ZoneInf
         Message.tenant_id == tenant_id,
         Message.created_at >= start,
         Message.created_at < end,
-        Conversation.channel == CHANNEL,
+        Conversation.channel.in_(REAL_CHANNELS),
     )
     rows = session.execute(
         select(
@@ -167,7 +166,7 @@ def _first_responses(
         .where(
             Message.tenant_id == tenant_id,
             Message.direction == "inbound",
-            Conversation.channel == CHANNEL,
+            Conversation.channel.in_(REAL_CHANNELS),
         )
         .group_by(Message.conversation_id)
         .subquery()
@@ -210,7 +209,7 @@ def _handovers(
             ConversationStageEvent.to_stage == "DERIVADO",
             ConversationStageEvent.created_at >= start,
             ConversationStageEvent.created_at < end,
-            Conversation.channel == CHANNEL,
+            Conversation.channel.in_(REAL_CHANNELS),
         )
     ).all():
         handed = snapshot.get("derivado") if isinstance(snapshot, dict) else None

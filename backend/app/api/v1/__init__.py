@@ -24,11 +24,13 @@ from app.api.v1 import (
     platform_billing,
     platform_catalog,
     products,
+    public_chat,
     realtime,
     sandbox,
     scheduling,
     team,
     tenant,
+    web_chat,
     wizard,
 )
 
@@ -57,6 +59,8 @@ router.include_router(platform_catalog.router)
 router.include_router(team.router)
 router.include_router(products.router)
 router.include_router(realtime.router)
+router.include_router(public_chat.router)
+router.include_router(web_chat.router)
 router.include_router(sandbox.router)
 router.include_router(tenant.router)
 router.include_router(wizard.router)

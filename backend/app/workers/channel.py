@@ -43,7 +43,7 @@ from app.providers.whatsapp.base import (
     WhatsAppProvider,
 )
 from app.repositories.channel import WebhookEventRepository
-from app.repositories.conversation import MessageRepository
+from app.repositories.conversation import ConversationRepository, MessageRepository
 from app.services.campaigns.templates import apply_review
 from app.services.channel import (
     ChannelEventProcessor,
@@ -380,6 +380,11 @@ async def process_webhook_event(ctx: dict[str, Any], event_id: str) -> str:
     return str(outcome)
 
 
+def _is_web(session: Any, tenant: uuid.UUID, conversation: uuid.UUID) -> bool:
+    row = ConversationRepository(session, tenant).get(conversation)
+    return row is not None and row.channel == "web"
+
+
 async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_id: str) -> str:
     """Answer everything one customer has said since the last reply.
 
@@ -459,6 +464,14 @@ async def answer_conversation(ctx: dict[str, Any], tenant_id: str, conversation_
                 session.commit()
                 publish(tenant, "conversation.updated", conversation_id=conversation)
                 return OUTCOME_DISCARDED
+            if _is_web(session, tenant, conversation):
+                # The web chat has no provider: an answer is delivered by being written, and the
+                # visitor's page reads it (feature 019, phase F).
+                for answer in answers:
+                    answer.delivery_status = "sent"
+                session.commit()
+                publish(tenant, "message.new", conversation_id=conversation)
+                return OUTCOME_ANSWERED
             sender = ReplySender(
                 session,
                 tenant,

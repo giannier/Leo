@@ -611,7 +611,10 @@ class ConversationResponder:
         # bubbles it takes.
         tenant = self._session.get(Tenant, self._tenant_id)
         if tenant is not None:
-            metered = record_ai_message(self._session, self._tenant_id, channel="whatsapp")
+            thread = self._session.get(Conversation, conversation_id)
+            metered = record_ai_message(
+                self._session, self._tenant_id, channel=thread.channel if thread else "whatsapp"
+            )
             self._react_to_the_meter(tenant, metered)
         return answers
 

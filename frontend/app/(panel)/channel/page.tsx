@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { WebChatCard } from "@/components/channel/web-chat-card";
 import { AlertIcon, CheckIcon, ClockIcon, PhoneIcon } from "@/components/icons";
 import { PhoneField, isCompletePhone } from "@/components/phone-field";
 import { Alert, Button, Card, Field, Skeleton, cx } from "@/components/ui";
@@ -110,6 +111,8 @@ export default function ChannelPage() {
       ) : null}
 
       {requests && requests.length > 0 ? <History requests={requests} /> : null}
+
+      {canConfigure ? <WebChatCard /> : null}
     </div>
   );
 }

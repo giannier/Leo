@@ -74,6 +74,7 @@ from app.models.tenant import (
     TenantUser,
 )
 from app.models.user import EmailToken, OtpCode, RefreshToken, User
+from app.models.web_chat import WebChat
 from app.models.whatsapp import ConnectionRequest, WhatsAppNumber
 
 __all__ = [
@@ -158,4 +159,5 @@ __all__ = [
     "Resource",
     "ResourceBlock",
     "SchedulingSettings",
+    "WebChat",
 ]
