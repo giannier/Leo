@@ -62,6 +62,7 @@ STORED_KEYS = frozenset(
         "seguimiento",
         "promos_ofrecidas",
         "cita_agendada",
+        "lead_calificado",
     }
 )
 
@@ -103,6 +104,15 @@ class Derivado(_Model):
     avisado: bool = False
     # A quote's structured data (feature 019, phase B): what the customer already said.
     datos: dict[str, str] = Field(default_factory=dict)
+
+
+class LeadCalificado(_Model):
+    """What the assistant learned about a customer and how interested they are (019, phase E)."""
+
+    interes: Literal["alto", "medio", "bajo"]
+    motivo: str | None = None
+    respuestas: dict[str, str] = Field(default_factory=dict)
+    en: datetime | None = None
 
 
 class Seguimiento(_Model):
@@ -172,6 +182,8 @@ class Facts(_Model):
     asesoria_derivada_en: datetime | None = None
     # When the customer booked an appointment (feature 019, phase D): a qualified lead.
     cita_agendada: datetime | None = None
+    # How warm the customer is, as the assistant judged it (`captar`).
+    lead_calificado: LeadCalificado | None = None
     seguimiento: Seguimiento | None = None
     # Closing promotions offered in this conversation, with their expiry.
     promos_ofrecidas: dict[str, datetime] = Field(default_factory=dict)
@@ -229,6 +241,7 @@ class Facts(_Model):
                 "derivado",
                 "asesoria_derivada_en",
                 "cita_agendada",
+                "lead_calificado",
                 "seguimiento",
                 "promos_ofrecidas",
             },

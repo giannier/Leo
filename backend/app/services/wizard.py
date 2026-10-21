@@ -87,6 +87,9 @@ class WizardService:
         if capacities is not None:
             # The objective is derived from what the agent does, not asked.
             values.pop("objective", None)
+        if "preguntas_calificacion" in values:
+            asked = [q.strip() for q in values["preguntas_calificacion"] or [] if q.strip()]
+            values["preguntas_calificacion"] = asked or None
         stale = self._is_stale(self._agents.current(), expected_updated_at)
         # The old free-text rules live on as the migrated situation (017, RF-011)
         # until the wizard stops asking for them (TASK-468).

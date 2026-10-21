@@ -480,6 +480,8 @@ class BehaviorRequest(BaseModel):
     escalation_rules: (
         list[Literal["cliente_molesto", "pide_humano", "fuera_de_catalogo"]] | None
     ) = Field(default=None, max_length=3)
+    # Pilot mode (feature 019, phase C): the share of customers the assistant answers.
+    piloto_pct: int | None = Field(default=None, ge=0, le=100)
 
 
 class BehaviorResponse(BaseModel):
@@ -501,6 +503,7 @@ class BehaviorResponse(BaseModel):
     max_situaciones: int
     objective: str
     escalation_rules: list[str]
+    piloto_pct: int = 100
 
 
 def _allowed_levels(session: SessionDep, tenant_id: uuid.UUID) -> list[str]:
@@ -539,6 +542,7 @@ def _behavior(session: SessionDep, tenant_id: uuid.UUID) -> BehaviorResponse:
         max_situaciones=agent.max_situaciones,
         objective=agent.objective,
         escalation_rules=list(agent.escalation_rules or []),
+        piloto_pct=agent.piloto_pct,
     )
 
 
@@ -562,6 +566,8 @@ def put_behavior(
     body: BehaviorRequest, principal: ConfigurationManagerDep, session: SessionDep
 ) -> BehaviorResponse:
     values = body.model_dump(exclude_unset=True)
+    if values.get("piloto_pct") is None:
+        values.pop("piloto_pct", None)  # a column that is never empty: absent means unchanged
     if (level := values.get("nivel_inteligencia")) and level not in _allowed_levels(
         session, principal.tenant_id
     ):

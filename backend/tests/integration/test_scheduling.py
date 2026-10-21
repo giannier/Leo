@@ -331,3 +331,27 @@ class TestEachBusinessSeesItsOwn:
 
         assert b.appointments.get(booked.id) is None
         assert [x.id for x in a.appointments.between(at(0), at(23))] == [booked.id]
+
+
+class TestAFirstBusinessNeedsNoSetup:
+    def test_the_single_resource_is_created_the_first_time_it_is_needed(self, db: Session) -> None:
+        tenant = _business(db)
+        service = _service(db, tenant)
+        scheduling = Scheduling(db, tenant.id, now=NOW)  # nobody created a resource
+
+        slots = scheduling.offer(service, days=1)
+
+        assert slots and slots[0].start == at(10)
+        assert [r.nombre for r in scheduling.resources.all()] == ["Atención"]
+
+    def test_a_business_that_switched_every_resource_off_does_not_get_a_new_one(
+        self, db: Session
+    ) -> None:
+        tenant = _business(db)
+        service = _service(db, tenant)
+        scheduling = _scheduling(db, tenant)
+        scheduling.ensure_resource().is_active = False
+        db.flush()
+
+        assert scheduling.offer(service, days=1) == []
+        assert len(scheduling.resources.all()) == 1

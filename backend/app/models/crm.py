@@ -51,6 +51,8 @@ LEAD_STATUSES = ("active", "won", "lost", "discarded")
 LEAD_ACTORS = ("agent", "user", "system")
 # The quote a customer asked for (feature 019): handed over by the agent, then sent by a person.
 QUOTE_STATUSES = ("solicitada", "enviada")
+# How warm a lead is (feature 019, phase E): judged by the assistant, read by a person.
+LEAD_SCORES = ("caliente", "tibio", "frio")
 DEFAULT_LOST_REASONS = {
     "precio": "Precio",
     "sin_stock": "Sin stock",
@@ -89,6 +91,10 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "quote_status IS NULL OR quote_status IN ('solicitada', 'enviada')",
             name="leads_quote_status",
         ),
+        CheckConstraint(
+            "score IS NULL OR score IN ('caliente', 'tibio', 'frio')", name="leads_score"
+        ),
+        Index("ix_leads_tenant_id_score", "tenant_id", "score"),
         CheckConstraint(
             "(amount_estimated IS NULL OR amount_estimated >= 0) "
             "AND (amount_real IS NULL OR amount_real >= 0)",
@@ -148,6 +154,13 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     quote_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # How warm it is and why, with what the customer answered (feature 019, migration 0057).
+    score: Mapped[str | None] = mapped_column(Text, nullable=True)
+    score_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    qualification: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Once a person moved it, the process only advances it with evidence (C-103).
     moved_by_person: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     stage_entered_at: Mapped[datetime] = mapped_column(

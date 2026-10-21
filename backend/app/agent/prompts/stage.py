@@ -72,14 +72,15 @@ SECTION_CAPS: Mapping[str, int] = {
     "plataforma": 450,
     "venta": 540,
     "agenda": 200,
+    "captacion": 220,
     "estilo": 300,
     "estado": 500,
     "etapa": 700,
     "rubro": 350,
     "negocio": 1300,
     "situaciones": 1000,
-    # 1 400 for the ten tools of the sales engine, 300 more for the three of the agenda.
-    "herramientas": 1700,
+    # 1 400 for the ten tools of the sales engine, 400 more for those of the agenda and the leads.
+    "herramientas": 1800,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are
@@ -158,9 +159,26 @@ def _sales_block(config: EffectiveProcessConfig, stage: Stage) -> str:
 
 
 SCHEDULE_RULES = """\
-AGENDA: para agendar usa consultar_horarios y ofrece como máximo 3 horarios; nunca inventes uno.
-Antes de agendar_cita ten el nombre del cliente y repite servicio, día y hora. Si piden cambiar o
-cancelar, usa gestionar_cita. Si responden "sí" a un recordatorio, confirma la cita."""
+AGENDA: un servicio que se agenda se agenda: no lo pidas con gestionar_pedido ni lo derives por eso.
+Usa consultar_horarios y ofrece como máximo 3 horarios; nunca inventes uno. Cuando el cliente elija
+uno que ya ofreciste y tengas su nombre, llama a agendar_cita con ese slot (AAAA-MM-DDTHH:MM, hora
+local) sin volver a consultar ni pedir otra confirmación; una cita agendada ya es el cierre: confírmala
+y NO derives. Si piden cambiar o cancelar, usa gestionar_cita. Si responden "sí" a un recordatorio,
+confirma la cita."""
+
+
+LEAD_RULES = """\
+CAPTACIÓN: ve conociendo al cliente sin interrogarlo. Entre tus respuestas haz UNA pregunta a la vez,
+solo las que falten y no repitas lo que ya dijo: {preguntas}.
+Con 2 respuestas, o apenas muestre interés claro, llama a calificar_cliente (nota interna: no la
+menciones). Interés ALTO: necesidad concreta y plazo corto, o pide precio, cita o propuesta. MEDIO:
+interés con plazo o presupuesto sin definir. BAJO: solo curiosidad. No pidas tarjeta ni documentos."""
+
+
+def _lead_block(config: EffectiveProcessConfig) -> str:
+    if not config.options.captar or not config.preguntas_calificacion:
+        return ""
+    return LEAD_RULES.format(preguntas="; ".join(config.preguntas_calificacion))
 
 
 def _schedule_block(config: EffectiveProcessConfig) -> str:
@@ -771,6 +789,9 @@ def build_stage_prompt(
     schedule = _schedule_block(config)
     if schedule:
         parts["agenda"] = schedule
+    leads = _lead_block(config)
+    if leads:
+        parts["captacion"] = leads
     parts |= {
         "estilo": _style_block(config),
         "estado": _state_block(config, facts, stage, turn or TurnContext(), now),

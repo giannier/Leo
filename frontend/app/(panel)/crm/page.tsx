@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LeadDrawer, money, quoteChip, quoteHint } from "@/components/crm/lead-drawer";
+import { LeadDrawer, ScoreChip, money, quoteChip, quoteHint } from "@/components/crm/lead-drawer";
 import { PipelineConfig } from "@/components/crm/pipeline-config";
 import { useInboxSocket } from "@/components/inbox/use-inbox-socket";
 import { Alert, Button, Skeleton, cx } from "@/components/ui";
@@ -48,6 +48,7 @@ export default function CrmPage() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [assigned, setAssigned] = useState("");
+  const [score, setScore] = useState<"" | "caliente" | "tibio" | "frio">("");
   const [open, setOpen] = useState<string | null>(null);
   const [configuring, setConfiguring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,11 @@ export default function CrmPage() {
     try {
       const [p, b, t, m] = await Promise.all([
         api.crm.pipeline(),
-        api.crm.board({ search: query || undefined, asignado: assigned || undefined }),
+        api.crm.board({
+          search: query || undefined,
+          asignado: assigned || undefined,
+          puntaje: score || undefined,
+        }),
         api.crm.today(),
         api.crm.metrics(),
       ]);
@@ -76,7 +81,7 @@ export default function CrmPage() {
     } catch (caught) {
       setError(humanMessage(caught));
     }
-  }, [query, assigned]);
+  }, [query, assigned, score]);
 
   useEffect(() => {
     void load();
@@ -237,6 +242,19 @@ export default function CrmPage() {
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+          Calificación
+          <select
+            value={score}
+            onChange={(e) => setScore(e.target.value as typeof score)}
+            className="min-h-11 cursor-pointer rounded-lg border border-line-strong bg-surface px-3 text-base text-ink"
+          >
+            <option value="">Todas</option>
+            <option value="caliente">Caliente</option>
+            <option value="tibio">Tibio</option>
+            <option value="frio">Frío</option>
+          </select>
+        </label>
       </div>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -328,7 +346,10 @@ export default function CrmPage() {
                         onClick={() => setOpen(lead.id)}
                         className="block w-full cursor-pointer text-left"
                       >
-                        <p className="font-medium text-ink">{lead.nombre ?? lead.telefono ?? "Sin nombre"}</p>
+                        <p className="flex flex-wrap items-center gap-1.5 font-medium text-ink">
+                          {lead.nombre ?? lead.telefono ?? "Sin nombre"}
+                          <ScoreChip score={lead.calificacion} />
+                        </p>
                         {lead.product_interest ? (
                           <p className="truncate text-xs text-ink-soft">{lead.product_interest}</p>
                         ) : null}

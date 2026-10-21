@@ -43,6 +43,8 @@ from app.repositories.orders import OrderItemRepository, OrderRepository
 # The stages a sale moves through by itself, in order. `perdido` is not a step forward.
 FORWARD = ("nuevo", "interesado", "por_pagar", "ganado")
 EVIDENCE = frozenset({"por_pagar", "ganado"})
+# How interested the customer is, as the assistant words it, and the score on the lead.
+SCORE_BY_INTEREST = {"alto": "caliente", "medio": "tibio", "bajo": "frio"}
 # Why the process discarded a stale draft (followups.REASON_DISCARDED).
 REASON_DISCARDED = "pedido_descartado"
 # Causes written by the model's turn; everything else the process does is the system.
@@ -87,6 +89,10 @@ def semantic_for(stage_key: str, facts: dict[str, Any], order: Order | None) -> 
     if facts.get("cita_agendada"):
         # An appointment is evidence of interest whatever stage the conversation is in.
         return "interesado"
+    qualified = facts.get("lead_calificado")
+    if isinstance(qualified, dict):
+        # The assistant qualified the customer: a lead even before there is an order.
+        return "nuevo" if qualified.get("interes") == "bajo" else "interesado"
     if stage_key == "IDENTIFICAR" and facts.get("vio_productos"):
         return "nuevo"
     return None
@@ -189,6 +195,7 @@ class LeadService:
             self._record(lead, None, board.semantic(target), cause, actor_for(cause), None)
             self._amounts(lead, order)
             self._quote(lead, facts)
+            self._score(lead, facts)
             if target == "ganado":
                 self._close(lead, board.semantic("ganado"), "won", cause, actor_for(cause), None)
             return lead
@@ -197,6 +204,7 @@ class LeadService:
         lead.last_activity_at = moment
         self._amounts(lead, order)
         self._quote(lead, facts)
+        self._score(lead, facts)
         if target is None:
             return lead
         current = self.stages.get(lead.stage_id)
@@ -235,6 +243,27 @@ class LeadService:
         self._event(
             lead, "turno:cotizacion_solicitada", "agent", None, detail=dict(lead.quote_data)
         )
+
+    def _score(self, lead: Lead, facts: dict[str, Any]) -> None:
+        """What the assistant judged about the customer becomes the lead's score (`captar`)."""
+        qualified = facts.get("lead_calificado")
+        if not isinstance(qualified, dict):
+            return
+        score = SCORE_BY_INTEREST.get(str(qualified.get("interes")))
+        if score is None:
+            return
+        try:
+            moment = datetime.fromisoformat(str(qualified.get("en")))
+        except ValueError:
+            return
+        if lead.scored_at is not None and moment <= lead.scored_at:
+            return
+        answers = qualified.get("respuestas")
+        lead.score = score
+        lead.score_reason = (qualified.get("motivo") or None) and str(qualified["motivo"])[:200]
+        lead.qualification = dict(answers) if isinstance(answers, dict) else {}
+        lead.scored_at = moment
+        self._event(lead, "turno:lead_calificado", "agent", None, detail={"score": score})
 
     def quote_sent(
         self,

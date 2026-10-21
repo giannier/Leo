@@ -3387,7 +3387,9 @@ export interface components {
             /** Farewell On Pause */
             farewell_on_pause?: string | null;
             /** Capacidades */
-            capacidades?: ("atender" | "vender" | "cotizar" | "agendar")[] | null;
+            capacidades?: ("atender" | "vender" | "cotizar" | "agendar" | "captar")[] | null;
+            /** Preguntas Calificacion */
+            preguntas_calificacion?: string[] | null;
         };
         /** AgentConfigResponse */
         AgentConfigResponse: {
@@ -3415,6 +3417,8 @@ export interface components {
             saludo?: string | null;
             /** Capacidades */
             capacidades?: string[];
+            /** Preguntas Calificacion */
+            preguntas_calificacion?: string[] | null;
             /** Farewell On Pause */
             farewell_on_pause: string | null;
             /** Is Active */
@@ -3551,6 +3555,8 @@ export interface components {
             objective?: ("vender" | "atender" | "ambos") | null;
             /** Escalation Rules */
             escalation_rules?: ("cliente_molesto" | "pide_humano" | "fuera_de_catalogo")[] | null;
+            /** Piloto Pct */
+            piloto_pct?: number | null;
         };
         /** BehaviorResponse */
         BehaviorResponse: {
@@ -3591,6 +3597,11 @@ export interface components {
             objective: string;
             /** Escalation Rules */
             escalation_rules: string[];
+            /**
+             * Piloto Pct
+             * @default 100
+             */
+            piloto_pct: number;
         };
         /** BillingOut */
         BillingOut: {
@@ -4835,6 +4846,7 @@ export interface components {
             /** Closed At */
             closed_at: string | null;
             cotizacion?: components["schemas"]["QuoteOut"] | null;
+            calificacion?: components["schemas"]["ScoreOut"] | null;
         };
         /** LeadPage */
         LeadPage: {
@@ -6108,6 +6120,8 @@ export interface components {
             capacidades_sugeridas?: string[];
             /** Aviso Politica */
             aviso_politica?: string | null;
+            /** Preguntas Calificacion */
+            preguntas_calificacion?: string[];
             /** Version */
             version: number | null;
             /** Reglas */
@@ -6196,6 +6210,22 @@ export interface components {
             servicios: components["schemas"]["ServiceOut"][];
             /** Bloqueos */
             bloqueos: components["schemas"]["BlockOut"][];
+        };
+        /**
+         * ScoreOut
+         * @description How warm the lead is and what the customer answered (feature 019, phase E).
+         */
+        ScoreOut: {
+            /** Puntaje */
+            puntaje: string;
+            /** Motivo */
+            motivo: string | null;
+            /** Respuestas */
+            respuestas: {
+                [key: string]: string;
+            };
+            /** En */
+            en: string | null;
         };
         /** SeatsResponse */
         SeatsResponse: {
@@ -12306,6 +12336,7 @@ export interface operations {
                 asignado?: string | null;
                 search?: string | null;
                 sin_actividad_dias?: number | null;
+                puntaje?: ("caliente" | "tibio" | "frio") | null;
                 limit?: number;
                 offset?: number;
             };
@@ -12349,6 +12380,7 @@ export interface operations {
             query?: {
                 asignado?: string | null;
                 search?: string | null;
+                puntaje?: ("caliente" | "tibio" | "frio") | null;
             };
             header?: never;
             path?: never;

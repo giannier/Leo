@@ -35,6 +35,13 @@ function change(now: number, before: number): { text: string; tone: string } | n
   return { text: `${pct > 0 ? "+" : ""}${pct} % vs. período anterior`, tone: "text-ink-soft" };
 }
 
+function waitMinutes(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  if (value < 1) return "menos de 1 min";
+  if (value < 90) return `${Math.round(value)} min`;
+  return `${(value / 60).toFixed(1)} h`;
+}
+
 function seconds(value: number | null): string {
   if (value === null) return "—";
   return value < 120 ? `${value} s` : `${Math.round(value / 60)} min`;
@@ -171,6 +178,18 @@ function Resumen() {
               note="En promedio"
             />
             <Tile label="Pasaron a una persona" value={String(total.handovers)} note={change(total.handovers, before.handovers)?.text} />
+            {report.traspasos && report.traspasos.total > 0 ? (
+              <Tile
+                label="Tu equipo responde en"
+                value={waitMinutes(report.traspasos.mediana_minutos)}
+                note={
+                  report.traspasos.sin_atender
+                    ? `${report.traspasos.sin_atender} sin responder · el 90 % en ${waitMinutes(report.traspasos.p90_minutos)}`
+                    : `El 90 % en ${waitMinutes(report.traspasos.p90_minutos)}`
+                }
+                testid="kpi-handoff-response"
+              />
+            ) : null}
             <Tile label="Pedidos confirmados" value={String(total.orders_confirmed)} testid="kpi-orders" />
             {total.ventas ? (
               <Tile

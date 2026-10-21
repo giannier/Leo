@@ -101,16 +101,16 @@ class TestTheCycle:
         self, api: AsyncClient, mail: Any, db: Session, queue: RecordingQueue
     ) -> None:
         headers, _ = await _admin(api, mail, db)
-        content = (await api.post(f"{CAT}/rubro/salud/versions", headers=headers)).json()
-        version = CatalogRepository(db).version("rubro", "salud", 2)
+        content = (await api.post(f"{CAT}/rubro/retail/versions", headers=headers)).json()
+        version = CatalogRepository(db).version("rubro", "retail", 2)
         assert version is not None
         await run_evals(db, version, _passing_llm("rubro"))
         db.commit()
         body = {k: content[k] for k in ("reglas", "faqs", "objeciones", "situaciones_sugeridas")}
         body["reglas"][0]["texto"] = "Otro texto."
 
-        await api.put(f"{CAT}/rubro/salud/versions/2", headers=headers, json=body)
-        refused = await api.post(f"{CAT}/rubro/salud/versions/2/publicar", headers=headers)
+        await api.put(f"{CAT}/rubro/retail/versions/2", headers=headers, json=body)
+        refused = await api.post(f"{CAT}/rubro/retail/versions/2/publicar", headers=headers)
 
         assert refused.status_code == 409 and refused.json()["error"] == "evals_not_passed"
 

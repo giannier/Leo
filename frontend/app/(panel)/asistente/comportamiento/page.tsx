@@ -40,6 +40,14 @@ const ESCALATIONS = [
   { value: "pide_humano", label: "Pide hablar con una persona" },
   { value: "fuera_de_catalogo", label: "Pregunta por algo que no vendes" },
 ] as const;
+/** Pilot mode: the share of customers the assistant answers; the rest wait for the team. */
+const PILOT = [
+  { value: "100", label: "Todos tus clientes" },
+  { value: "50", label: "La mitad" },
+  { value: "25", label: "Uno de cada cuatro" },
+  { value: "10", label: "Uno de cada diez" },
+  { value: "0", label: "Ninguno: solo responde tu equipo" },
+] as const;
 const LEVELS: Record<string, string> = { economico: "Económico", medio: "Medio", mejor: "El mejor" };
 const MESSAGES: Record<string, string> = {
   pago_confirmado: "Cuando confirmas un pago",
@@ -98,6 +106,7 @@ export default function BehaviorPage() {
       nivel_inteligencia: draft.nivel_inteligencia as BehaviorBody["nivel_inteligencia"],
       seguimiento: draft.seguimiento,
       derivacion_pausa_horas: draft.derivacion_pausa_horas,
+      piloto_pct: draft.piloto_pct,
       max_situaciones: draft.max_situaciones,
       objective: draft.objective as BehaviorBody["objective"],
       escalation_rules: draft.escalation_rules as BehaviorBody["escalation_rules"],
@@ -220,6 +229,13 @@ export default function BehaviorPage() {
               max={72}
               value={draft.derivacion_pausa_horas}
               onChange={(e) => set({ derivacion_pausa_horas: Number(e.target.value) })}
+            />
+            <Select
+              label="A quiénes atiende el asistente"
+              options={PILOT}
+              value={String(draft.piloto_pct)}
+              onChange={(e) => set({ piloto_pct: Number(e.target.value) })}
+              hint="Para empezar con calma: el asistente atiende solo a una parte de tus clientes y tu equipo al resto. Cada cliente es siempre de un mismo lado."
             />
           </div>
           <div className="mt-4 space-y-3">

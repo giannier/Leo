@@ -51,7 +51,7 @@ class TestOffering:
         tenant, service, conversation = _shop(db)
         context = _context(db, tenant, conversation)
 
-        result = await consultar_horarios(context, {"servicio_id": str(service.id)})
+        result = await consultar_horarios(context, {"producto_id": str(service.id)})
 
         assert result.status == "hecho" and result.texto is not None
         assert result.texto.count("- slot ") == 3
@@ -63,7 +63,7 @@ class TestOffering:
         db.flush()
 
         result = await consultar_horarios(
-            _context(db, tenant, conversation), {"servicio_id": str(service.id)}
+            _context(db, tenant, conversation), {"producto_id": str(service.id)}
         )
 
         assert result.status == "no_disponible" and "derivar_a_humano" in (result.decir or "")
@@ -74,7 +74,7 @@ class TestOffering:
         conversation = _conversation(db, tenant, channel="whatsapp")
 
         result = await consultar_horarios(
-            _context(db, tenant, conversation), {"servicio_id": str(service.id)}
+            _context(db, tenant, conversation), {"producto_id": str(service.id)}
         )
 
         assert result.status == "no_disponible" and "una persona" in (result.decir or "")
@@ -86,7 +86,7 @@ class TestBooking:
         context = _context(db, tenant, conversation)
 
         result = await agendar_cita(
-            context, {"servicio_id": str(service.id), "slot": slot_token(at(10), LIMA)}
+            context, {"producto_id": str(service.id), "slot": slot_token(at(10), LIMA)}
         )
 
         assert result.status == "hecho"
@@ -101,11 +101,11 @@ class TestBooking:
         other = _conversation(db, tenant, channel="whatsapp")
         token = slot_token(at(10), LIMA)
         await agendar_cita(
-            _context(db, tenant, other), {"servicio_id": str(service.id), "slot": token}
+            _context(db, tenant, other), {"producto_id": str(service.id), "slot": token}
         )
 
         result = await agendar_cita(
-            _context(db, tenant, conversation), {"servicio_id": str(service.id), "slot": token}
+            _context(db, tenant, conversation), {"producto_id": str(service.id), "slot": token}
         )
 
         assert result.status == "no_disponible"
@@ -116,7 +116,7 @@ class TestBooking:
         tenant, service, conversation = _shop(db)
 
         result = await agendar_cita(
-            _context(db, tenant, conversation), {"servicio_id": str(service.id), "slot": "mañana"}
+            _context(db, tenant, conversation), {"producto_id": str(service.id), "slot": "mañana"}
         )
 
         assert result.status == "error"
@@ -127,7 +127,7 @@ class TestBooking:
 
         result = await agendar_cita(
             _context(db, tenant, conversation),
-            {"servicio_id": str(service.id), "slot": slot_token(at(9), LIMA)},
+            {"producto_id": str(service.id), "slot": slot_token(at(9), LIMA)},
         )
 
         assert result.status == "no_disponible" and "anticipación" in (result.decir or "")
@@ -137,7 +137,7 @@ class TestBooking:
         context = _context(db, tenant, conversation, sandbox=True)
 
         result = await agendar_cita(
-            context, {"servicio_id": str(service.id), "slot": slot_token(at(10), LIMA)}
+            context, {"producto_id": str(service.id), "slot": slot_token(at(10), LIMA)}
         )
 
         assert result.status == "hecho"
@@ -149,7 +149,7 @@ class TestManagingMyAppointments:
         tenant, service, conversation = _shop(db)
         await agendar_cita(
             _context(db, tenant, conversation),
-            {"servicio_id": str(service.id), "slot": slot_token(at(10), LIMA)},
+            {"producto_id": str(service.id), "slot": slot_token(at(10), LIMA)},
         )
         (booked,) = Scheduling(db, tenant.id).appointments.between(at(0), at(23))
         return tenant, service, conversation, str(booked.id)
@@ -200,3 +200,42 @@ class TestTheToolsOnlyExistWhenTheBusinessBooks:
         names = set(registry.names())
 
         assert (scheduling <= names) if agendar else not (scheduling & names)
+
+
+class TestWhatTheModelActuallyWrites:
+    """Found by the evals against the real model: it names the service instead of passing its id,
+    calls the id `servicio_id`, and writes the slot with a space."""
+
+    async def test_the_service_may_be_named_instead_of_identified(self, db: Session) -> None:
+        tenant, service, conversation = _shop(db)
+        context = _context(db, tenant, conversation)
+
+        result = await consultar_horarios(context, {"producto_id": "consulta dental"})
+        missing = await consultar_horarios(context, {"producto_id": "algo que no existe"})
+
+        assert result.status == "hecho" and "Consulta" in (result.texto or "")
+        assert missing.status == "error"  # a typo is retried, it does not send the customer away
+
+    async def test_the_old_name_of_the_argument_and_a_slot_with_a_space_still_book(
+        self, db: Session
+    ) -> None:
+        tenant, service, conversation = _shop(db)
+        token = slot_token(at(10), LIMA).replace("T", " ")
+
+        result = await agendar_cita(
+            _context(db, tenant, conversation), {"servicio_id": str(service.id), "slot": token}
+        )
+
+        assert result.status == "hecho"
+        (booked,) = Scheduling(db, tenant.id).appointments.between(at(0), at(23))
+        assert booked.starts_at == at(10)
+
+    async def test_a_name_that_matches_two_services_is_not_guessed(self, db: Session) -> None:
+        tenant, service, conversation = _shop(db)
+        _service(db, tenant, name="Consulta de seguimiento")
+
+        result = await consultar_horarios(
+            _context(db, tenant, conversation), {"producto_id": "consulta"}
+        )
+
+        assert result.status == "error"

@@ -74,6 +74,9 @@ TOOL_NAMES: tuple[str, ...] = (
 # on top of the stage's own tools, in every stage that runs the model.
 SCHEDULING_TOOL_NAMES: tuple[str, ...] = ("consultar_horarios", "agendar_cita", "gestionar_cita")
 
+# The tool of a business whose agent also qualifies leads (capability `captar`, feature 019, phase E).
+LEAD_TOOL_NAMES: tuple[str, ...] = ("calificar_cliente",)
+
 # Available in every stage that runs the model, on top of the stage's own tools.
 GLOBAL_TOOLS: tuple[str, ...] = (
     "consultar_conocimiento",
@@ -383,6 +386,8 @@ class EffectiveOptions:
     variables: Mapping[str, str]
     # The business turned on the capability to book appointments (feature 019).
     agendar: bool = False
+    # ...and the one to capture and qualify leads (feature 019, phase E).
+    captar: bool = False
 
     @property
     def calificacion_activa(self) -> bool:

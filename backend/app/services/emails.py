@@ -570,6 +570,7 @@ El equipo de Leo
 NEW_RECEIPT_SUBJECT = "Nuevo comprobante por revisar"
 CASH_ORDER_SUBJECT = "Nuevo pedido contra entrega por confirmar"
 HANDOFF_SUBJECT = "Un cliente necesita que lo atiendas"
+HOT_LEAD_SUBJECT = "Tienes un cliente con mucho interés"
 LLM_DOWN_SUBJECT = "Tu agente tuvo un problema y no esta respondiendo"
 UNATTENDED_SUBJECT = "Un cliente sigue esperando que lo atiendas"
 
@@ -648,6 +649,25 @@ def build_handoff_email(
         lines=lines,
         panel_url=panel_url,
         link_label="Abrir el panel",
+    )
+
+
+def build_hot_lead_email(
+    *, to: str, tenant_name: str, resumen: str | None, panel_url: str
+) -> EmailMessage:
+    """The assistant judged a customer hot: worth a person's minutes now."""
+    lines = [f"El asistente de {tenant_name} encontró un cliente con mucho interés."]
+    if resumen:
+        lines.append(f"Por qué: {resumen}")
+    lines.append(
+        "Está en el CRM como «Caliente». Escríbele pronto: un cliente así se enfría rápido."
+    )
+    return _alert_email(
+        to=to,
+        subject=HOT_LEAD_SUBJECT,
+        lines=lines,
+        panel_url=panel_url,
+        link_label="Abrir el CRM",
     )
 
 

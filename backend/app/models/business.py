@@ -70,7 +70,7 @@ PRICE_PERIODS = ("unico", "mes", "ano")
 # What the agent does (migration 0051). `agendar` and `captar` are planned: the column accepts them,
 # the screens offer only `CAPABILITIES_AVAILABLE`.
 CAPABILITIES = ("atender", "vender", "cotizar", "agendar", "captar")
-CAPABILITIES_AVAILABLE = ("atender", "vender", "cotizar", "agendar")
+CAPABILITIES_AVAILABLE = ("atender", "vender", "cotizar", "agendar", "captar")
 BUNDLE_MIN_SIZE = 2
 BUNDLE_MAX_SIZE = 50
 
@@ -148,6 +148,11 @@ class AgentConfig(Base):
             "AND 'atender' = ANY(capacidades)",
             name="capacidades",
         ),
+        CheckConstraint(
+            "preguntas_calificacion IS NULL OR cardinality(preguntas_calificacion) <= 5",
+            name="preguntas_calificacion",
+        ),
+        CheckConstraint("piloto_pct BETWEEN 0 AND 100", name="piloto_pct"),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
@@ -158,6 +163,10 @@ class AgentConfig(Base):
     capacidades: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY['atender','vender']::text[]")
     )
+    # The owner's own questions to know a customer (up to five); None uses the rubro's (019).
+    preguntas_calificacion: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # Pilot mode (019, phase C): the share of customers, per person, that the assistant answers.
+    piloto_pct: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
     # True when the owner picked the template by hand: capabilities then leave it alone.
     plantilla_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 

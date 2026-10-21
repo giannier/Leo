@@ -116,11 +116,14 @@ class LeadRepository(BaseRepository[Lead]):
         search: str | None = None,
         idle_before: datetime | None = None,
         closed_since: datetime | None = None,
+        score: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[tuple[Lead, Contact]], int]:
         """Leads with their contact, newest activity first, and how many matched."""
         criteria: list[Any] = [Lead.status.in_(list(status))]
+        if score is not None:
+            criteria.append(Lead.score == score)
         if stage_id is not None:
             criteria.append(Lead.stage_id == stage_id)
         if assigned_to is not None:

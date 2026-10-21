@@ -12,7 +12,7 @@ import { Alert, Checkbox, cx } from "@/components/ui";
 import { api, type ProcessTemplate } from "@/lib/api/client";
 
 export interface CapabilityInfo {
-  key: "atender" | "vender" | "cotizar" | "agendar";
+  key: "atender" | "vender" | "cotizar" | "agendar" | "captar";
   titulo: string;
   detalle: string;
   pide: string;
@@ -48,11 +48,14 @@ export const CAPABILITIES: readonly CapabilityInfo[] = [
       "Ofrece horarios libres, agenda sin que dos clientes tomen la misma hora, y permite cambiar o cancelar desde el chat.",
     pide: "Te pediremos qué se agenda, cuánto dura y tus horarios.",
   },
+  {
+    key: "captar",
+    titulo: "Captar y calificar clientes",
+    detalle:
+      "Conoce a quien escribe con unas pocas preguntas, anota qué tan interesado está (caliente, tibio o frío) y te avisa cuando un cliente está listo.",
+    pide: "Revisa las preguntas que hará: ya vienen sugeridas para tu rubro.",
+  },
 ] as const;
-
-const SOON = [
-  { titulo: "Captar y calificar clientes", detalle: "Preguntas de calificación y aviso a tu equipo." },
-];
 
 export function CapabilityPicker({
   value,
@@ -132,16 +135,6 @@ export function CapabilityPicker({
         </button>
       ) : null}
 
-      <div className="rounded-lg border border-dashed border-line-strong p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Próximamente</p>
-        <ul className="mt-1 space-y-0.5 text-sm text-ink-soft">
-          {SOON.map((item) => (
-            <li key={item.titulo}>
-              <span className="font-medium text-ink">{item.titulo}.</span> {item.detalle}
-            </li>
-          ))}
-        </ul>
-      </div>
     </fieldset>
   );
 }

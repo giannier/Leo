@@ -34,3 +34,7 @@ class OrderNotices(Protocol):
     def handoff(self, conversation_id: uuid.UUID, *, motivo: str, resumen: str | None) -> None:
         """The assistant handed the conversation to a person (`derivar_a_humano`)."""
         ...
+
+    def hot_lead(self, conversation_id: uuid.UUID, *, resumen: str | None) -> None:
+        """The assistant judged a customer hot (`calificar_cliente`, feature 019, phase E)."""
+        ...
