@@ -245,6 +245,21 @@ def _handover_schema(scope: ToolScope) -> dict[str, Any]:
         {
             "motivo": {"type": "string", "enum": list(HANDOVER_REASONS)},
             "resumen": _text("Qué necesita el cliente, en pocas líneas.", maxLength=_MAX_SUMMARY),
+            "datos": {
+                "type": "array",
+                "maxItems": 8,
+                "description": (
+                    "Solo con motivo cotizacion: cada dato que el cliente ya te dio, "
+                    'por ejemplo {"dato": "personas", "valor": "20"}.'
+                ),
+                "items": _object(
+                    {
+                        "dato": _text("Nombre corto del dato.", maxLength=40),
+                        "valor": _text("Lo que dijo el cliente.", maxLength=120),
+                    },
+                    ["dato", "valor"],
+                ),
+            },
         },
         ["motivo", "resumen"],
     )

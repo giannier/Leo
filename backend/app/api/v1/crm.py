@@ -82,6 +82,18 @@ class ReasonIn(BaseModel):
     is_active: bool = True
 
 
+class QuoteOut(BaseModel):
+    """The quote the customer asked for (feature 019): what was collected and where it stands."""
+
+    estado: str
+    resumen: str | None
+    datos: dict[str, str]
+    solicitada_en: datetime | None
+    enviada_en: datetime | None
+    # Days since the quote was sent, to follow up; None until it is sent.
+    dias_desde_envio: int | None
+
+
 class LeadOut(BaseModel):
     id: uuid.UUID
     stage_id: uuid.UUID
@@ -106,6 +118,7 @@ class LeadOut(BaseModel):
     created_at: datetime
     last_activity_at: datetime
     closed_at: datetime | None
+    cotizacion: QuoteOut | None = None
 
 
 class LeadPage(BaseModel):
@@ -151,6 +164,12 @@ class LeadDetail(BaseModel):
 class MoveIn(BaseModel):
     stage_id: uuid.UUID
     lost_reason: str | None = Field(default=None, max_length=40)
+
+
+class QuoteSentIn(BaseModel):
+    # What the quote came to, if the person wants it on the lead. Never read by an operator (C-106).
+    monto: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    moneda: Literal["PEN", "USD"] | None = None
 
 
 class AssignIn(BaseModel):
@@ -217,6 +236,18 @@ def _out(
         created_at=lead.created_at,
         last_activity_at=lead.last_activity_at,
         closed_at=lead.closed_at,
+        cotizacion=_quote(lead, now) if lead.quote_status else None,
+    )
+
+
+def _quote(lead: Lead, now: datetime) -> QuoteOut:
+    return QuoteOut(
+        estado=str(lead.quote_status),
+        resumen=lead.quote_summary,
+        datos={str(k): str(v) for k, v in (lead.quote_data or {}).items()},
+        solicitada_en=lead.quote_requested_at,
+        enviada_en=lead.quote_sent_at,
+        dias_desde_envio=max(0, (now - lead.quote_sent_at).days) if lead.quote_sent_at else None,
     )
 
 
@@ -546,6 +577,30 @@ def assign(
     _changed(principal.tenant_id, lead)
     if body.user_id is not None and body.user_id != principal.user_id:
         publish(principal.tenant_id, "lead.assigned", lead_id=lead.id, user_id=body.user_id)
+    return detail(lead_id, principal, session)
+
+
+@router.post(
+    "/tenant/leads/{lead_id}/quote/sent",
+    responses=error_responses(*AUTH, (404, "`not_found`"), (422, "`no_quote`")),
+)
+def quote_sent(
+    lead_id: uuid.UUID, body: QuoteSentIn, principal: MemberDep, session: SessionDep
+) -> LeadDetail:
+    """A person sent the quote the agent handed over: it becomes `enviada` and starts counting."""
+    service = LeadService(session, principal.tenant_id)
+    lead = _lead(service, lead_id)
+    try:
+        service.quote_sent(
+            lead,
+            by=principal.user_id,
+            amount=body.monto if _money(principal) else None,
+            moneda=body.moneda,
+        )
+    except CrmError as exc:
+        raise _error(exc) from exc
+    session.commit()
+    _changed(principal.tenant_id, lead)
     return detail(lead_id, principal, session)
 
 

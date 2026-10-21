@@ -56,6 +56,11 @@ AUTH_RESPONSES = (
 
 
 Tags = Annotated[list[Annotated[str, StringConstraints(max_length=200)]], Field(max_length=50)]
+# What to ask before a quote is handed over: up to six short questions, one per message.
+AskFields = Annotated[
+    list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]],
+    Field(max_length=6),
+]
 
 
 def _clean(value: list[str] | None) -> list[str] | None:
@@ -87,6 +92,7 @@ class ProductRequest(BaseModel):
     destacado: bool = False
     # Up to ten labels; the agent also finds the product by them (Feature 018).
     tags: Tags = Field(default_factory=list)
+    datos_a_pedir: AskFields = Field(default_factory=list)
 
     @field_validator("tags")
     @classmethod
@@ -110,6 +116,7 @@ class ProductPatch(BaseModel):
     bundle_permite_libres: bool | None = None
     destacado: bool | None = None
     tags: Tags | None = None
+    datos_a_pedir: AskFields | None = None
 
     @field_validator("tags")
     @classmethod
@@ -118,7 +125,9 @@ class ProductPatch(BaseModel):
             raise ValueError("must not be null")
         return _clean(value)
 
-    @field_validator("modo_venta", "periodo", "es_digital", "bundle_permite_libres", "destacado")
+    @field_validator(
+        "modo_venta", "periodo", "es_digital", "bundle_permite_libres", "destacado", "datos_a_pedir"
+    )
     @classmethod
     def _not_null(cls, value: Any) -> Any:
         """These columns are NOT NULL: omit the field to leave it as it is."""
@@ -142,6 +151,7 @@ class ProductResponse(BaseModel):
     bundle_permite_libres: bool
     destacado: bool
     tags: list[str]
+    datos_a_pedir: list[str] = Field(default_factory=list)
     # The main photo (the first by order), for the catalogue list; None without photos.
     foto_url: str | None = None
 

@@ -20,6 +20,8 @@ import { humanMessage } from "@/lib/api/errors";
 const MAX_PHOTOS = 10;
 const MAX_TAGS = 10;
 const MAX_TAG_CHARS = 30;
+const MAX_ASK = 6;
+const MAX_ASK_CHARS = 80;
 
 interface Draft {
   name: string;
@@ -37,6 +39,8 @@ interface Draft {
   destacado: boolean;
   is_active: boolean;
   tags: string[];
+  /** What to ask before a quote is handed over: one question per line. */
+  datos_a_pedir: string;
 }
 
 function draftOf(product: Product | null): Draft {
@@ -56,10 +60,11 @@ function draftOf(product: Product | null): Draft {
     destacado: product?.destacado ?? false,
     is_active: product?.is_active ?? true,
     tags: product?.tags ?? [],
+    datos_a_pedir: (product?.datos_a_pedir ?? []).join("\n"),
   };
 }
 
-type Errors = Partial<Record<"name" | "price" | "stock" | "bundle_size", string>>;
+type Errors = Partial<Record<"name" | "price" | "stock" | "bundle_size" | "datos_a_pedir", string>>;
 
 function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
   const errors: Errors = {};
@@ -76,6 +81,14 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
   const size = Number(draft.bundle_size);
   if (draft.isBundle && (!Number.isInteger(size) || size < 2 || size > 50)) {
     errors.bundle_size = "Un paquete lleva de 2 a 50 elecciones.";
+  }
+  const ask = draft.datos_a_pedir
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (ask.length > MAX_ASK) errors.datos_a_pedir = `Máximo ${MAX_ASK} preguntas.`;
+  else if (ask.some((line) => line.length > MAX_ASK_CHARS)) {
+    errors.datos_a_pedir = `Cada pregunta, hasta ${MAX_ASK_CHARS} letras.`;
   }
   if (Object.keys(errors).length) return { errors, body: null };
   return {
@@ -95,6 +108,7 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
       destacado: draft.destacado,
       is_active: draft.is_active,
       tags: draft.tags,
+      datos_a_pedir: ask,
     },
   };
 }
@@ -223,6 +237,18 @@ export function ProductEditor({
                 onChange={(e) => set("price", e.target.value)}
               />
             </div>
+
+            {draft.modo_venta === "cotizacion" ? (
+              <TextArea
+                label="Qué le preguntas para cotizar"
+                rows={3}
+                placeholder={"Para cuántas personas\nPara cuándo lo necesita"}
+                hint="Una pregunta por línea, hasta 6. El asistente las hace una por mensaje y le pasa las respuestas a tu equipo."
+                value={draft.datos_a_pedir}
+                error={errors.datos_a_pedir}
+                onChange={(e) => set("datos_a_pedir", e.target.value)}
+              />
+            ) : null}
 
             <Select
               label="El precio se cobra"

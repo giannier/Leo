@@ -9,6 +9,8 @@ The tool:
   pause, so ASESORIA does not hand the customer over again every time they write;
 * tells the business, in the panel and by email, with the summary (not in the
   simulator: `notices` is None there);
+* with `motivo = cotizacion` also keeps `datos`, what the customer already said ("personas": "20"),
+  so the CRM shows the quote as a form and not only as a sentence;
 * **ends the turn.** The customer receives the business's handover message
   (`mensajes_sistema.derivacion`, Milestone B decision 19), never more words from
   the model.
@@ -30,9 +32,23 @@ from app.repositories.business import AgentConfigRepository
 
 DEFAULT_PAUSE_HOURS = 6
 MAX_SUMMARY = 500
+MAX_QUOTE_DATA = 8
 logger = logging.getLogger(__name__)
 
 REASONS = ("pide_humano", "queja", "sin_respuesta", "asesoria", "cotizacion", "otro")
+
+
+def _quote_data(raw: object) -> dict[str, str]:
+    """`[{"dato": "personas", "valor": "20"}]` as a dict: short, unique, at most eight."""
+    data: dict[str, str] = {}
+    for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
+        name = " ".join(str(item.get("dato") or "").split())[:40]
+        value = " ".join(str(item.get("valor") or "").split())[:120]
+        if name and value and name not in data and len(data) < MAX_QUOTE_DATA:
+            data[name] = value
+    return data
 
 
 def handover_text(context: ToolContext) -> str:
@@ -67,6 +83,8 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
         "hasta": hasta.isoformat(),
         "desde": now.isoformat(),
     }
+    if motivo == "cotizacion":
+        context.facts_patch["derivado"]["datos"] = _quote_data(arguments.get("datos"))
     if motivo == "asesoria":
         context.facts_patch["asesoria_derivada_en"] = now.isoformat()
     if context.notices is not None:

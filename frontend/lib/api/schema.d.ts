@@ -1794,6 +1794,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/leads/{lead_id}/quote/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote Sent
+         * @description A person sent the quote the agent handed over: it becomes `enviada` and starts counting.
+         */
+        post: operations["quote_sent_api_v1_tenant_leads__lead_id__quote_sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/leads/{lead_id}/discard": {
         parameters: {
             query?: never;
@@ -4513,6 +4533,7 @@ export interface components {
             last_activity_at: string;
             /** Closed At */
             closed_at: string | null;
+            cotizacion?: components["schemas"]["QuoteOut"] | null;
         };
         /** LeadPage */
         LeadPage: {
@@ -5295,6 +5316,8 @@ export interface components {
             destacado?: boolean | null;
             /** Tags */
             tags?: string[] | null;
+            /** Datos A Pedir */
+            datos_a_pedir?: string[] | null;
         };
         /** ProductRequest */
         ProductRequest: {
@@ -5344,6 +5367,8 @@ export interface components {
             destacado: boolean;
             /** Tags */
             tags?: string[];
+            /** Datos A Pedir */
+            datos_a_pedir?: string[];
         };
         /** ProductResponse */
         ProductResponse: {
@@ -5384,6 +5409,8 @@ export interface components {
             destacado: boolean;
             /** Tags */
             tags: string[];
+            /** Datos A Pedir */
+            datos_a_pedir?: string[];
             /** Foto Url */
             foto_url?: string | null;
         };
@@ -5563,6 +5590,33 @@ export interface components {
             creado: string;
             /** Revisado */
             revisado: string | null;
+        };
+        /**
+         * QuoteOut
+         * @description The quote the customer asked for (feature 019): what was collected and where it stands.
+         */
+        QuoteOut: {
+            /** Estado */
+            estado: string;
+            /** Resumen */
+            resumen: string | null;
+            /** Datos */
+            datos: {
+                [key: string]: string;
+            };
+            /** Solicitada En */
+            solicitada_en: string | null;
+            /** Enviada En */
+            enviada_en: string | null;
+            /** Dias Desde Envio */
+            dias_desde_envio: number | null;
+        };
+        /** QuoteSentIn */
+        QuoteSentIn: {
+            /** Monto */
+            monto?: number | string | null;
+            /** Moneda */
+            moneda?: ("PEN" | "USD") | null;
         };
         /** ReasonIn */
         ReasonIn: {
@@ -12104,6 +12158,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AssignIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    quote_sent_api_v1_tenant_leads__lead_id__quote_sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuoteSentIn"];
             };
         };
         responses: {

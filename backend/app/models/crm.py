@@ -49,6 +49,8 @@ DEFAULT_STAGE_LABELS = {
 MAX_STAGES = 8
 LEAD_STATUSES = ("active", "won", "lost", "discarded")
 LEAD_ACTORS = ("agent", "user", "system")
+# The quote a customer asked for (feature 019): handed over by the agent, then sent by a person.
+QUOTE_STATUSES = ("solicitada", "enviada")
 DEFAULT_LOST_REASONS = {
     "precio": "Precio",
     "sin_stock": "Sin stock",
@@ -83,6 +85,10 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __tablename__ = "leads"
     __table_args__ = (
         enum_check("status", LEAD_STATUSES, "leads_status"),
+        CheckConstraint(
+            "quote_status IS NULL OR quote_status IN ('solicitada', 'enviada')",
+            name="leads_quote_status",
+        ),
         CheckConstraint(
             "(amount_estimated IS NULL OR amount_estimated >= 0) "
             "AND (amount_real IS NULL OR amount_real >= 0)",
@@ -131,6 +137,17 @@ class Lead(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("leads.id"), nullable=True
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    # The quote the customer asked for: the agent's structured hand-over and, once a person
+    # sends it, the amount (`amount_estimated`) and the date (feature 019, migration 0054).
+    quote_status: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quote_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quote_data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    quote_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    quote_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Once a person moved it, the process only advances it with evidence (C-103).
     moved_by_person: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     stage_entered_at: Mapped[datetime] = mapped_column(
