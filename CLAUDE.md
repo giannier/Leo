@@ -75,6 +75,16 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
   revisor (`suggestions`, Fase 3).
 - **Ejemplo ganador**: conversación de una venta confirmada, anonimizada, aprobada como ejemplo (en lote).
 - **Perfil de estilo**: cómo escribe el vendedor real, sacado de sus mensajes escritos (Fase 2).
+- **Capacidad**: lo que el agente hace (`atender`, `vender`, `cotizar`, `agendar`, `captar`; `agent_configs.capacidades`).
+  La plantilla de proceso y el objetivo **se derivan** de las capacidades (`process/capabilities.py`); la plantilla manual queda
+  como avanzado. Cada capacidad enciende sus herramientas y su bloque del prompt (feature 019, `leo-sdd/features/019-*`).
+- **Agenda**: calendario propio (`scheduling/`): servicios agendables (`products.agendable`), recursos, bloqueos y citas; la
+  base impide dos citas vivas que se pisen en un recurso. Herramientas `consultar_horarios`, `agendar_cita`, `gestionar_cita`.
+  Recordatorios apagados por defecto: necesitan una plantilla aprobada fuera de la ventana de 24 h.
+- **Cotización**: una cotización pedida vive en el lead (`leads.quote_*`: solicitada, enviada) con lo que el agente juntó.
+- **Calificación**: el asistente anota el interés (`calificar_cliente`) y el lead queda `caliente`, `tibio` o `frio`.
+- **Modo piloto**: `agent_configs.piloto_pct`, el porcentaje de clientes (por persona) que atiende el asistente; el resto, el equipo.
+- **Chat web**: canal `web` sin número de WhatsApp (página pública y widget); `REAL_CHANNELS` agrupa los canales reales.
 - **Operador de plataforma (Zentek360)**: mantiene y publica plantillas y rubros, con evals obligatorios.
 - `consultar_catalogo`: nombre viejo de la tool de catálogo (agente previo a la 004). En el registry por
   etapa es solo un **alias** de `buscar_productos` (no aparece en las tools que ve el modelo); el
