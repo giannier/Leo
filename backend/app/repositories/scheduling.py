@@ -6,6 +6,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
+from sqlalchemy.dialects.postgresql import insert
+
 from app.models.scheduling import (
     LIVE_STATUSES,
     Appointment,
@@ -105,11 +107,21 @@ class SchedulingSettingsRepository(BaseRepository[SchedulingSettings]):
         return self._session.execute(self._scoped()).scalar_one_or_none()
 
     def ensure(self) -> SchedulingSettings:
-        """The row of this business, created with the defaults the first time it is needed."""
+        """The row of this business, created with the defaults the first time it is needed.
+
+        Two first requests at once must not both insert (found by the concurrency test): the insert
+        does nothing if the row exists, and waits for a concurrent one to commit.
+        """
         existing = self.current()
         if existing is not None:
             return existing
-        row = self.add()
+        self._session.execute(
+            insert(SchedulingSettings)
+            .values(tenant_id=self._tenant_id)
+            .on_conflict_do_nothing(index_elements=["tenant_id"])
+        )
         self._session.flush()
-        self._session.refresh(row)
+        row = self.current()
+        if row is None:  # pragma: no cover - the insert or a concurrent one just created it
+            raise RuntimeError("scheduling settings could not be created")
         return row

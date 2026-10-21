@@ -31,6 +31,7 @@ from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.tenant import Tenant
 from app.models.web_chat import WebChat
+from app.services.origin import normalize_origin
 
 SESSION_DAYS = 7
 MAX_TEXT = 500
@@ -123,12 +124,16 @@ def read_token(token: str, *, now: datetime | None = None) -> WebSession | None:
         return None
 
 
-def open_session(session: Session, tenant: Tenant) -> WebSession:
-    """A new visitor: a contact without a phone and an open conversation of channel `web`."""
+def open_session(session: Session, tenant: Tenant, *, origen: str | None = None) -> WebSession:
+    """A new visitor: a contact without a phone and an open conversation of channel `web`.
+
+    `origen` is what the link said (`?o=instagram`); without one the visit is simply "Chat web".
+    """
     contact = Contact(
         tenant_id=tenant.id,
         external_user_id=f"{EXTERNAL_PREFIX}{uuid.uuid4()}",
         last_inbound_at=datetime.now(UTC),
+        origen=normalize_origin(origen) or "Chat web",
     )
     session.add(contact)
     session.flush()

@@ -29,6 +29,18 @@ def describe(moment: datetime, zone: ZoneInfo) -> str:
     return f"{WEEKDAYS[local.weekday()]} {local.day} de {MONTHS[local.month - 1]}, {local:%H:%M}"
 
 
+def when_phrase(moment: datetime, zone: ZoneInfo, now: datetime) -> str:
+    """`hoy a las 15:00`, `mañana a las 09:00` or `el lunes a las 09:00`, as it is said."""
+    local, today = moment.astimezone(zone), now.astimezone(zone).date()
+    days = (local.date() - today).days
+    at = f"a las {local:%H:%M}"
+    if days == 0:
+        return f"hoy {at}"
+    if days == 1:
+        return f"mañana {at}"
+    return f"el {WEEKDAYS[local.weekday()]} {at}"
+
+
 def slot_token(moment: datetime, zone: ZoneInfo) -> str:
     """The local `2026-10-27T10:00` the model passes back to book that slot."""
     return moment.astimezone(zone).strftime(SLOT_FORMAT)

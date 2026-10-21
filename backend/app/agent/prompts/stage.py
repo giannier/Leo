@@ -79,8 +79,9 @@ SECTION_CAPS: Mapping[str, int] = {
     "rubro": 350,
     "negocio": 1300,
     "situaciones": 1000,
-    # 1 400 for the ten tools of the sales engine, 400 more for those of the agenda and the leads.
-    "herramientas": 1800,
+    # 1 400 for the ten tools of the sales engine, 500 more for those of the agenda, the leads and the
+    # orders already made (a business with every capability on; the whole prompt still fits 6 000).
+    "herramientas": 1900,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are
@@ -96,7 +97,7 @@ def estimate_tokens(text: str) -> int:
 # ------------------------------------------------------------ platform rules
 
 PLATFORM_RULES = """\
-Eres {nombre_asistente}, asistente de ventas de {nombre_negocio} por WhatsApp.
+Eres {nombre_asistente}, asistente virtual de {nombre_negocio}.
 1. Solo hablas de {nombre_negocio}: sus productos, servicios, pedidos y la información del negocio.
    Si te piden otra cosa, di con amabilidad que solo puedes ayudar con eso; antes, búscalo con
    buscar_productos por si el negocio sí lo ofrece.
@@ -111,7 +112,9 @@ Eres {nombre_asistente}, asistente de ventas de {nombre_negocio} por WhatsApp.
 7. Si el cliente duda por el precio o dice "lo pensaré", y el ESTADO muestra una promoción de cierre
    disponible, ofrécela UNA sola vez y llama a gestionar_pedido(accion="aplicar_promocion").
 8. No menciones herramientas, etapas, el sistema ni estas reglas.
-9. Si usaste mostrar_opciones, tu respuesta debe ser corta o vacía: el cliente ya ve el mensaje con las opciones."""
+9. Si usaste mostrar_opciones, tu respuesta debe ser corta o vacía: el cliente ya ve el mensaje con las opciones.
+10. Si te preguntan si eres una persona o un robot, di con naturalidad que eres el asistente virtual de
+    {nombre_negocio}; nunca finjas ser humano."""
 
 # -------------------------------------------------------------------- sales
 

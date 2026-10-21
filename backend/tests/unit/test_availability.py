@@ -138,3 +138,35 @@ class TestTheOptionsOffered:
     def test_few_slots_give_few_options(self) -> None:
         assert spread([at(9)], LIMA) == [at(9)]
         assert spread([], LIMA) == []
+
+
+def later(hour: int, days: int) -> datetime:
+    """A Lima clock time `days` days after the Monday of these tests."""
+    return at(hour, 0, day=MONDAY + timedelta(days=days))
+
+
+class TestIsTheBusinessOpen:
+    def test_inside_a_window_and_in_the_gaps(self) -> None:
+        from app.scheduling.availability import is_open
+
+        assert is_open(HOURS, LIMA, at(10)) and is_open(HOURS, LIMA, at(14, 30))
+        assert not is_open(HOURS, LIMA, at(13)) and not is_open(HOURS, LIMA, at(8, 59))
+        assert not is_open(HOURS, LIMA, later(10, 2))  # Wednesday: closed
+        assert not is_open({}, LIMA, at(10))
+
+    def test_the_next_opening_skips_closed_days_and_never_looks_back(self) -> None:
+        from app.scheduling.availability import next_opening
+
+        assert next_opening(HOURS, LIMA, at(8)) == at(9)
+        assert next_opening(HOURS, LIMA, at(12)) == at(14)  # after the first window, the second
+        assert next_opening(HOURS, LIMA, at(17)) == later(9, 1)  # Tuesday morning
+        assert next_opening(HOURS, LIMA, later(17, 1)) == later(9, 7)  # next Monday
+        assert next_opening({}, LIMA, at(8)) is None
+
+    def test_it_is_said_the_way_a_person_says_it(self) -> None:
+        from app.scheduling.text import when_phrase
+
+        now = at(20)
+        assert when_phrase(later(9, 1), LIMA, now) == "mañana a las 09:00"
+        assert when_phrase(at(23), LIMA, now) == "hoy a las 23:00"
+        assert when_phrase(later(9, 7), LIMA, now) == "el lunes a las 09:00"

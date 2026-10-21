@@ -10,6 +10,7 @@ checklist - that a configuration form does not evaluate.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -17,8 +18,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
-from app.api.errors import error_responses
+from app.api.errors import ApiError, error_responses
 from app.models.business import MAX_SALUDO
+from app.repositories.tenant import TenantUserRepository
 from app.services.wizard import WizardService
 
 router = APIRouter(prefix="/tenant", tags=["wizard"])
@@ -113,6 +115,9 @@ class AgentConfigRequest(ConcurrencyAware):
     preguntas_calificacion: (
         list[Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)]] | None
     ) = Field(default=None, max_length=5)
+    # Who a hot lead is assigned to and told (`captar`): a member of the team. Sent as null, nobody
+    # in particular (it reaches the whole team); not sent, it stays as it is.
+    destino_leads: uuid.UUID | None = None
 
 
 class AgentConfigResponse(BaseModel):
@@ -127,6 +132,7 @@ class AgentConfigResponse(BaseModel):
     capacidades: list[str] = Field(default_factory=lambda: ["atender", "vender"])
     # None: the rubro's questions are used.
     preguntas_calificacion: list[str] | None = None
+    destino_leads: uuid.UUID | None = None
     farewell_on_pause: str | None
     is_active: bool
     updated_at: datetime | None
@@ -198,6 +204,7 @@ def _agent_response(
             if record.preguntas_calificacion is not None
             else None
         ),
+        destino_leads=record.destino_leads,
         escalation_rules=record.escalation_rules,
         farewell_on_pause=record.farewell_on_pause,
         is_active=record.is_active,
@@ -265,6 +272,18 @@ async def put_agent_config(
     session: SessionDep,
 ) -> AgentConfigResponse:
     values = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
+    destination = values.get("destino_leads")
+    if (
+        destination is not None
+        and TenantUserRepository(session, principal.tenant_id).active_membership_for(destination)
+        is None
+    ):
+        raise ApiError(
+            status_code=400,
+            error="validation_error",
+            message="Esa persona no está en tu equipo.",
+            fields={"destino_leads": "Elige a alguien de tu equipo."},
+        )
     service = WizardService(session, principal.tenant_id)
     outcome = service.save_agent_config(expected_updated_at=payload.expected_updated_at, **values)
     return _agent_response(

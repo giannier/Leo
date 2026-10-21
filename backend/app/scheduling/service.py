@@ -18,6 +18,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -108,6 +109,15 @@ class Scheduling:
 
     def ensure_resource(self) -> Resource:
         """The first resource, created on demand: a business with one chair needs no setup."""
+        existing = self.resources.all()
+        if existing:
+            return existing[0]
+        # Two first requests at once must not each create "Atención" (that doubles the capacity):
+        # the lock makes the second wait for the first to commit, then find its resource.
+        self._session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {"key": f"scheduling-resource:{self._tenant_id}"},
+        )
         existing = self.resources.all()
         if existing:
             return existing[0]
@@ -437,6 +447,31 @@ class Scheduling:
         )
 
     # ------------------------------------------------------------------ read
+
+    def conflicts(self) -> list[tuple[Appointment, str]]:
+        """Live appointments to come that no longer fit: the hours changed, the resource was
+        switched off, or a block was put over them. Nothing is cancelled on its own (spec 014,
+        C-003): a person decides what to do with each one."""
+        now = self.now()
+        zone = self.zone()
+        resources = {r.id: r for r in self.resources.all()}
+        found: list[tuple[Appointment, str]] = []
+        for appointment in self.appointments.between(now, now + timedelta(days=366)):
+            if appointment.status not in ("agendada", "confirmada"):
+                continue
+            resource = resources.get(appointment.resource_id)
+            if resource is None or not resource.is_active:
+                found.append((appointment, "recurso_inactivo"))
+            elif not self._inside_hours(
+                self.hours_of(resource), zone, appointment.starts_at, appointment.ends_at
+            ):
+                found.append((appointment, "fuera_de_horario"))
+            elif any(
+                b.resource_id == resource.id
+                for b in self.blocks.overlapping(appointment.starts_at, appointment.ocupa_hasta)
+            ):
+                found.append((appointment, "bloqueada"))
+        return found
 
     def upcoming_of(self, contact_id: uuid.UUID) -> list[Appointment]:
         return list(self.appointments.live_of_contact(contact_id, self.now() - timedelta(hours=1)))

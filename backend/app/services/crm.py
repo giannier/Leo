@@ -19,6 +19,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.business import AgentConfig
+from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.conversation_state import ConversationState
 from app.models.crm import (
@@ -39,6 +41,7 @@ from app.repositories.crm import (
     PipelineStageRepository,
 )
 from app.repositories.orders import OrderItemRepository, OrderRepository
+from app.repositories.tenant import TenantUserRepository
 
 # The stages a sale moves through by itself, in order. `perdido` is not a step forward.
 FORWARD = ("nuevo", "interesado", "por_pagar", "ganado")
@@ -158,6 +161,7 @@ class LeadService:
         board = self.board()
         lead = self.leads.active_for_contact(conversation.contact_id)
         moment = self._moment()
+        contact = self._session.get(Contact, conversation.contact_id)
 
         if cause == REASON_DISCARDED:
             # The draft expired without an answer: lost, unless a person is working it.
@@ -187,7 +191,7 @@ class LeadService:
                 conversation_id=conversation.id,
                 stage_id=board.semantic(target).id,
                 previous_lead_id=latest.id if latest is not None else None,
-                origen=self._origin(state),
+                origen=self._origin(state, contact),
                 stage_entered_at=moment,
                 last_activity_at=moment,
             )
@@ -202,6 +206,8 @@ class LeadService:
 
         lead.conversation_id = conversation.id
         lead.last_activity_at = moment
+        if lead.origen is None:
+            lead.origen = self._origin(state, contact)
         self._amounts(lead, order)
         self._quote(lead, facts)
         self._score(lead, facts)
@@ -264,6 +270,25 @@ class LeadService:
         lead.qualification = dict(answers) if isinstance(answers, dict) else {}
         lead.scored_at = moment
         self._event(lead, "turno:lead_calificado", "agent", None, detail={"score": score})
+        if score == "caliente" and lead.assigned_to is None:
+            self._to_the_destination(lead)
+
+    def _to_the_destination(self, lead: Lead) -> None:
+        """A hot lead goes to the person the business chose, if they are still on the team."""
+        config = self._session.get(AgentConfig, self._tenant_id)
+        if config is None or config.destino_leads is None:
+            return
+        members = TenantUserRepository(self._session, self._tenant_id)
+        if members.membership_for(config.destino_leads) is None:
+            return
+        lead.assigned_to = config.destino_leads
+        self._event(
+            lead,
+            "turno:asignado_al_destino",
+            "agent",
+            None,
+            detail={"asignado": str(config.destino_leads)},
+        )
 
     def quote_sent(
         self,
@@ -292,12 +317,13 @@ class LeadService:
         )
         return lead
 
-    def _origin(self, state: ConversationState) -> str | None:
+    def _origin(self, state: ConversationState, contact: Contact | None = None) -> str | None:
+        """The ad the customer came through, else where they or the link said they came from."""
         entry = (state.facts or {}).get("entrada_anuncio")
         if isinstance(entry, dict):
             shown = entry.get("headline") or entry.get("body") or entry.get("source_url")
             return f"Anuncio: {str(shown)[:120]}" if shown else "Anuncio"
-        return None
+        return contact.origen if contact is not None else None
 
     def _amounts(self, lead: Lead, order: Order | None) -> None:
         if order is None:

@@ -56,6 +56,11 @@ class ChatConfig(BaseModel):
     color: str
 
 
+class SessionIn(BaseModel):
+    # Where the visitor came from, as the link said (`?o=instagram`).
+    origen: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = None
+
+
 class SessionOut(BaseModel):
     token: str
 
@@ -135,13 +140,19 @@ def config(key: str, session: SessionDep) -> ChatConfig:
     status_code=status.HTTP_201_CREATED,
     responses=error_responses((404, "`not_found`"), (429, "`rate_limited`")),
 )
-async def start(key: str, request: Request, session: SessionDep, redis: RedisDep) -> SessionOut:
+async def start(
+    key: str,
+    request: Request,
+    session: SessionDep,
+    redis: RedisDep,
+    body: SessionIn | None = None,
+) -> SessionOut:
     chat = _chat(session, key)
     await _allow(redis, "webchat-open", f"{key}:{_address(request)}", 10, 600)
     tenant = session.get(Tenant, chat.tenant_id)
     if tenant is None:
         raise NOT_FOUND
-    visitor = open_session(session, tenant)
+    visitor = open_session(session, tenant, origen=body.origen if body else None)
     session.commit()
     return SessionOut(token=issue_token(visitor))
 

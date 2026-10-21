@@ -488,7 +488,7 @@ def test_values_are_filled_in_a_single_pass() -> None:
 def test_the_platform_rules_name_the_assistant_and_the_business() -> None:
     text = _prompt(Stage.IDENTIFICAR)
 
-    assert text.startswith("Eres Capacitín, asistente de ventas de Escuela Capacita por WhatsApp.")
+    assert text.startswith("Eres Capacitín, asistente virtual de Escuela Capacita.")
     assert "9. Si usaste mostrar_opciones" in text
 
 
@@ -632,7 +632,7 @@ def test_a_business_with_nothing_configured_still_builds() -> None:
     text = build_stage_prompt(config, Facts(), Stage.INICIO, now=NOW).text
 
     assert "Negocio: el negocio." in text
-    assert "asistente de ventas de el negocio" in text
+    assert "asistente virtual de el negocio" in text
     assert "se paga antes de entregar" not in text
 
 

@@ -165,6 +165,10 @@ class AgentConfig(Base):
     )
     # The owner's own questions to know a customer (up to five); None uses the rubro's (019).
     preguntas_calificacion: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    # Who a hot lead is assigned to, and told (feature 019, phase E); None: nobody.
+    destino_leads: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     # Pilot mode (019, phase C): the share of customers, per person, that the assistant answers.
     piloto_pct: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
     # True when the owner picked the template by hand: capabilities then leave it alone.

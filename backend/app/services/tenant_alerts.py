@@ -30,6 +30,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models.business import AgentConfig
 from app.models.orders import Order, PaymentProof
 from app.models.tenant import (
     CASH_ORDER,
@@ -41,6 +42,7 @@ from app.models.tenant import (
     UNATTENDED,
     Tenant,
 )
+from app.models.user import User
 from app.orders.notices import NotReached
 from app.providers.email.base import EmailMessage, EmailProvider
 from app.repositories.notification import TenantNotificationRepository
@@ -176,15 +178,27 @@ class TenantAlerts:
         )
 
     def hot_lead(self, conversation_id: uuid.UUID, *, resumen: str | None = None) -> None:
-        """A customer the assistant judged hot: the team hears while it is still hot."""
+        """A customer the assistant judged hot: the team hears while it is still hot.
+
+        The owner is told, and so is the person the business chose for hot leads, if there is one.
+        """
         self._notices.record(
             HOT_LEAD, {"conversation_id": str(conversation_id), "resumen": resumen}
         )
-        self._email(
-            lambda to, name: build_hot_lead_email(
+
+        def build(to: str, name: str) -> EmailMessage:
+            return build_hot_lead_email(
                 to=to, tenant_name=name, resumen=resumen, panel_url=self._panel("")
             )
-        )
+
+        self._email(build)
+        config = self._session.get(AgentConfig, self._tenant_id)
+        chosen = config.destino_leads if config is not None else None
+        destination = self._session.get(User, chosen) if chosen is not None else None
+        owner = owner_of(self._session, self._tenant_id)
+        tenant = self._session.get(Tenant, self._tenant_id)
+        if destination is not None and (owner is None or destination.id != owner.id):
+            self.pending_emails.append(build(destination.email, tenant.name if tenant else ""))
 
     def unattended(
         self, conversation_id: uuid.UUID, *, motivo: str, resumen: str | None, minutes: int

@@ -85,3 +85,30 @@ sus redes": el **enlace del chat** va en la biografía de Instagram o TikTok y e
 5. **Sin CORS:** el widget es un `iframe` a la página `/chat/<clave>?embed=1` del mismo dominio de la API.
 **Pendiente:** Instagram y Messenger (adaptador de Meta, cuando se apruebe la aplicación) y la atribución de origen
 (`ctwa_clid` ya llega en los anuncios de WhatsApp).
+
+## C-07: lo que quedó sin depender de Meta (fases C, E, F y G)
+1. **Aviso de que es un asistente (regla 10 de la plataforma).** Si el cliente pregunta si habla con una persona o un robot, el
+   asistente lo dice en una frase y ofrece pasarlo a una persona. Primera línea del prompt: «Eres {asistente}, asistente
+   virtual de {negocio}». Medido con el modelo real (caso nuevo en `evals/sales_flows.py`).
+2. **Traspaso tibio:** el mensaje al cliente dice cuándo lo atienden (fuera de horario: «te escribimos a las 09:00 del lunes»),
+   y la nota para el equipo trae lo que ya se le ofreció y el ánimo del cliente. Motivo nuevo `postventa`.
+3. **Origen del cliente** (`contacts.origen`, `leads.origen`): sale del enlace (`?o=instagram` en el chat web, el texto «Hola, te
+   escribo desde Instagram» del enlace de WhatsApp) o de lo que el cliente dice. «Directo» si no hay dato. Resultados lo cuenta con
+   los ganados. El panel genera un enlace por red social.
+4. **Destino del lead caliente** (`agent_configs.destino_leads`): debe ser alguien del equipo; el lead se le asigna (si no tenía
+   dueño) y se le avisa por correo, además del dueño. Sin destino llega a todo el equipo.
+5. **Revisión semanal** (`conversation_reviews`): una muestra de conversaciones reales de la semana que el revisor marca bien,
+   regular o mal con el motivo (inventó un dato, tono, no resolvió, debió derivar, muy largo, repetitivo). Sin llamadas al modelo.
+   **Preguntas de prueba** del simulador, armadas con los datos del negocio (producto, servicio agendable, pago, entrega).
+   *Decisión de Giannier pendiente:* calificar solas esas preguntas con el modelo (cuesta llamadas).
+6. **Agenda:** las citas que dejaron de caber (cambio de horario, recurso apagado, bloqueo) salen en un aviso con motivo, **sin
+   cancelarse solas**; cada cita muestra las faltas anteriores del cliente; una reunión se agenda desde el lead y queda ligada a su
+   contacto. Dos primeras solicitudes a la vez ya no duplican el recurso «Atención» ni la fila de ajustes (lo encontró la prueba de
+   concurrencia: 100 intentos al mismo minuto dan exactamente una cita; con 2 recursos y 5 horas, exactamente 10).
+7. **Rubro:** preguntas sugeridas para cotizar por rubro (`rubros.datos_a_pedir_sugeridos`), con botón en el catálogo.
+8. **Resultados por capacidad:** citas agendadas (por el asistente / por una persona, completadas, faltas), cotizaciones pedidas y
+   enviadas, clientes calificados (calientes, tibios, fríos). Un bloque en cero no aparece.
+**Siguen fuera, por decisión:** Instagram y Messenger (revisión de Meta), seguimientos con plantilla pasadas las 24 h (costo;
+Giannier lo dejó para después), Google Calendar y Cal.com (verificación y cuentas externas), la fase H de aprendizaje (consentimiento
+y Ley 29733), el calificado automático de preguntas de prueba (costo del modelo) y el DNI (C-01).
+

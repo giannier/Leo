@@ -489,7 +489,7 @@ class TestCustomerData:
 
 
 class TestTheHandover:
-    def test_the_reason_is_one_of_six_and_the_summary_is_capped(self) -> None:
+    def test_the_reason_is_one_of_seven_and_the_summary_is_capped(self) -> None:
         registry = registry_for_stage(SHOP, Stage.IDENTIFICAR, Facts(), SHOP_OPTIONS)
         properties = _tool_args(registry, "derivar_a_humano")
 
@@ -499,9 +499,11 @@ class TestTheHandover:
             "sin_respuesta",
             "asesoria",
             "cotizacion",
+            "postventa",
             "otro",
         ]
         assert properties["resumen"]["maxLength"] == 500
+        assert properties["animo"]["enum"] == ["tranquilo", "apurado", "molesto", "dudoso"]
 
 
 # ------------------------------------------------------------------- the alias
