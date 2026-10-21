@@ -43,8 +43,9 @@ Cerrar termina el hilo: el siguiente mensaje del cliente abre una conversación 
 002). Reabrir solo se permite si el cliente no tiene otra conversación abierta (una por contacto).
 
 ## C-107: Tiempo real
-WebSocket en `/api/v1/ws?token=` con el token de acceso en la URL (el navegador no puede poner cabeceras),
-membresía verificada en la base. Los eventos llevan ids, nunca contenido. La presencia se publica por el
+WebSocket en `/api/v1/ws`. El token de acceso viaja como segundo subprotocolo (`["leo", <token>]`): el navegador
+no puede poner cabeceras y, en la URL, el token quedaba en cada registro de acceso (cambiado el 2026-10-21).
+Membresía verificada en la base. Los eventos llevan ids, nunca contenido. La presencia se publica por el
 mismo canal cada 15 s y el panel la olvida a los 30 s (sin claves en Redis). Al reconectar, el panel vuelve
 a leer por la API (sin reproducir eventos). Sin dependencias nuevas: `uvicorn[standard]` ya trae WebSockets.
 
