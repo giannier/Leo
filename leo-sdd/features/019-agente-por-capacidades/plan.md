@@ -99,7 +99,7 @@ Cada dato tiene un solo dueño. El Asistente es el mismo recorrido como menú. L
 | **D · Agendar y recordar** (hecha: migración 0055, `scheduling/`, tres herramientas, agenda y configuración en el panel; falta Google Calendar y el piloto) | 014: calendario propio con bloqueo anti doble reserva, recursos y capacidad, recordatorios; adaptadores Cal.com y Google Calendar | plantillas de WhatsApp para recordatorios; verificación de Google |
 | **E · Captar y calificar** (hecha: migración 0057, herramienta `calificar_cliente`, puntaje en el CRM y aviso de lead caliente; falta el destino del lead y la reunión) | preguntas por rubro, puntaje, destino del lead, reunión | ninguno |
 | **F · Canales** | identidades por canal, chat web, atribución de origen, luego Instagram y Messenger; sedes | revisión de Meta (semanas) |
-| **G · Postventa y B2B** | estado de pedido, devoluciones, repetir pedido, documentos | integraciones |
+| **G · Postventa y B2B** (hecha en parte: el asistente consulta el estado de los pedidos ya hechos y los repite; faltan devoluciones y documentos) | estado de pedido, devoluciones, repetir pedido, documentos | integraciones |
 | **H · Aprender** | resultados por capacidad y rubro; mejora de instrucciones con revisión humana (017, fases 3 y 4) | consentimiento, Ley 29733 |
 
 ## 5. Riesgos

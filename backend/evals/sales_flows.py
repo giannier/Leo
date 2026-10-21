@@ -31,6 +31,7 @@ from app.agent.pipeline import InboundTurn, TurnPipeline, TurnResult
 from app.models.business import AgentConfig, BusinessProfile, PaymentMethodBusiness
 from app.models.channel import Contact
 from app.models.conversation import Conversation, Message
+from app.models.orders import OrderItem
 from app.models.sales_config import Promotion
 from app.models.tenant import Tenant
 from app.process.service import ProcessConfigCache, ProcessConfigService
@@ -300,6 +301,9 @@ class FlowCase:
     mentions_any: tuple[str, ...] = ()
     # Words no reply may contain.
     never: tuple[str, ...] = ()
+    # What happened before this customer wrote (a past order, say): called with the session,
+    # the business, the customer's contact and the conversation of the case.
+    prelude: Callable[[Session, Tenant, Contact, Conversation], None] | None = None
 
 
 def _case(
@@ -310,6 +314,7 @@ def _case(
     tools: Sequence[str] = (),
     mentions_any: Sequence[str] = (),
     never: Sequence[str] = (),
+    prelude: Callable[[Session, Tenant, Contact, Conversation], None] | None = None,
 ) -> FlowCase:
     return FlowCase(
         template,
@@ -319,7 +324,44 @@ def _case(
         frozenset(tools),
         tuple(mentions_any),
         tuple(never),
+        prelude,
     )
+
+
+def _a_past_order(session: Session, tenant: Tenant, contact: Contact, _now: Conversation) -> None:
+    """The customer bought two polos last week; the order is on its way."""
+    from app.repositories.orders import OrderRepository
+
+    earlier = Conversation(
+        tenant_id=tenant.id, channel="sandbox", contact_id=contact.id, status="closed"
+    )
+    session.add(earlier)
+    session.flush()
+    order = OrderRepository(session, tenant.id).add_numbered(
+        conversation_id=earlier.id,
+        contact_id=contact.id,
+        moneda="PEN",
+        subtotal=Decimal("70.00"),
+        total=Decimal("70.00"),
+        estado="en_curso",
+        is_sandbox=True,
+        tipo_entrega="delivery",
+        zona_envio="Miraflores",
+        confirmed_at=datetime.now(UTC),
+    )
+    polo = next(p for p in ProductRepository(session, tenant.id).list() if p.name == "Polo básico")
+    session.add(
+        OrderItem(
+            tenant_id=tenant.id,
+            order_id=order.id,
+            product_id=polo.id,
+            nombre=polo.name,
+            precio_unitario=Decimal("35.00"),
+            cantidad=2,
+            subtotal=Decimal("70.00"),
+        )
+    )
+    session.flush()
 
 
 SHOP_DATA = (
@@ -398,6 +440,25 @@ FLOW_CASES: tuple[FlowCase, ...] = (
         ["Quiero una gorra urbana", "Sí, agrégala", SHOP_DATA, "¿Cómo pago?"],
         ["COBRO"],
         ["enviar_metodos_pago"],
+    ),
+    _case(
+        "productos",
+        "pregunta cómo va su pedido",
+        ["Hola, ¿cómo va mi pedido?"],
+        ["INICIO", "IDENTIFICAR"],
+        ["consultar_pedidos"],
+        mentions_any=["camino", "preparación", "en curso"],
+        never=["llegará mañana", "te llega mañana", "llega hoy"],
+        prelude=_a_past_order,
+    ),
+    _case(
+        "productos",
+        "quiere repetir su último pedido",
+        ["Hola, quiero lo mismo que pedí la vez pasada"],
+        ["INICIO", "IDENTIFICAR", "PEDIDO", "DATOS"],
+        ["consultar_pedidos"],
+        mentions_any=["polo"],
+        prelude=_a_past_order,
     ),
     # ---------------------------------------------------------- certificaciones
     _case(
@@ -682,8 +743,12 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
     session.add(conversation)
     session.flush()
 
+    if case.prelude is not None:
+        case.prelude(session, tenant, contact, conversation)
     outcome = FlowOutcome(case)
     allowed = {amount.quantize(Decimal("0.01")) for amount in known_amounts(business)}
+    if case.prelude is not None:
+        allowed.add(Decimal("70.00"))  # what the past order came to
     allowed.add(Decimal("0.00"))  # no shipping, no discount
     tools: set[str] = set()
     sent_resources: list[str] = []

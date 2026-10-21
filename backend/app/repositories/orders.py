@@ -206,6 +206,22 @@ class OrderRepository(BaseRepository[Order]):
         )
         return self._session.execute(statement).scalars().all()
 
+    def of_contact(
+        self, contact_id: uuid.UUID, *, sandbox: bool = False, limit: int = 3
+    ) -> Sequence[Order]:
+        """The orders a customer made (drafts are not orders yet), newest first."""
+        statement = (
+            self._scoped()
+            .where(
+                Order.contact_id == contact_id,
+                Order.estado != "borrador",
+                Order.is_sandbox.is_(sandbox),
+            )
+            .order_by(Order.created_at.desc(), Order.numero.desc())
+            .limit(limit)
+        )
+        return self._session.execute(statement).scalars().all()
+
     def active_for_conversation(self, conversation_id: uuid.UUID) -> Order | None:
         """The last order of the conversation that was not discarded (C-06).
 

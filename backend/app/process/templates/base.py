@@ -77,6 +77,9 @@ SCHEDULING_TOOL_NAMES: tuple[str, ...] = ("consultar_horarios", "agendar_cita", 
 # The tool of a business whose agent also qualifies leads (capability `captar`, feature 019, phase E).
 LEAD_TOOL_NAMES: tuple[str, ...] = ("calificar_cliente",)
 
+# The tool of a business that sells: what happened to an order already made (feature 019, phase G).
+POSTSALE_TOOL_NAMES: tuple[str, ...] = ("consultar_pedidos",)
+
 # Available in every stage that runs the model, on top of the stage's own tools.
 GLOBAL_TOOLS: tuple[str, ...] = (
     "consultar_conocimiento",
@@ -388,6 +391,8 @@ class EffectiveOptions:
     agendar: bool = False
     # ...and the one to capture and qualify leads (feature 019, phase E).
     captar: bool = False
+    # A business that sells answers for its orders too (feature 019, phase G).
+    postventa: bool = False
 
     @property
     def calificacion_activa(self) -> bool:

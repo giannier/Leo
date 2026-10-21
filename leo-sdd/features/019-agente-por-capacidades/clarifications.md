@@ -58,3 +58,13 @@ nuevas), pagos o señas para reservar, citas grupales, varias zonas horarias.
    la mediana de los respondidos los escondería. Se calcula en vivo en el reporte (Resultados), sin dinero.
 3. **Pendiente:** conjunto de prueba generado desde el negocio como requisito para encender (cuesta llamadas al modelo:
    decisión de Giannier) y muestreo semanal de transcripciones.
+
+## C-05: postventa (fase G)
+1. **`consultar_pedidos`** (solo lectura) está disponible para todo negocio que vende. Lee los **3 últimos pedidos del
+   mismo cliente** (nunca el borrador en armado, nunca los de otra persona; el simulador ve los suyos) y dice el estado en
+   palabras, las líneas, el total y lo que el negocio escribió como siguiente paso. **No promete fechas** que el negocio
+   no escribió. Un pedido cancelado con devolución pendiente se pasa a una persona.
+2. **Repetir un pedido** (el cliente B2B que pide "lo mismo") no es una herramienta aparte: el asistente lee el último
+   pedido y agrega los mismos productos con `gestionar_pedido` (la herramienta devuelve `producto_id` y cantidad).
+3. Medido con el modelo real: 10 de 10 casos de `productos` en 4 corridas con la redacción final de la herramienta (antes
+   de afinarla, "lo mismo que la vez pasada" fallaba: el modelo contestaba que no veía nada y no llamaba a la herramienta).

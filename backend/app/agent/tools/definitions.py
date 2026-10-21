@@ -39,6 +39,7 @@ from app.agent.tools.handover import derivar_a_humano
 from app.agent.tools.leads import calificar_cliente
 from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.payments import enviar_metodos_pago
+from app.agent.tools.postsale import consultar_pedidos
 from app.agent.tools.registry import (
     ToolCatalog,
     ToolDefinition,
@@ -301,23 +302,28 @@ def _appointment_schema(scope: ToolScope) -> dict[str, Any]:
     )
 
 
+def _after_the_sale(scope: ToolScope) -> bool:
+    return scope.options.postventa
+
+
+def _no_arguments(scope: ToolScope) -> dict[str, Any]:
+    return _object({})
+
+
 def _can_qualify(scope: ToolScope) -> bool:
     return scope.options.captar
 
 
 def _qualify_schema(scope: ToolScope) -> dict[str, Any]:
+    # No length limits in the schema: the handler cuts what is long, and the schema costs tokens.
     return _object(
         {
             "interes": {"type": "string", "enum": ["alto", "medio", "bajo"]},
-            "motivo": {"type": "string", "maxLength": 200},
+            "motivo": {"type": "string"},
             "respuestas": {
                 "type": "array",
-                "maxItems": 6,
                 "items": _object(
-                    {
-                        "pregunta": {"type": "string", "maxLength": 80},
-                        "respuesta": {"type": "string", "maxLength": 160},
-                    },
+                    {"pregunta": {"type": "string"}, "respuesta": {"type": "string"}},
                     ["pregunta", "respuesta"],
                 ),
             },
@@ -423,6 +429,15 @@ def _definitions() -> list[ToolDefinition]:
             handler=gestionar_cita,
             available=_can_schedule,
             effect=True,
+        ),
+        ToolDefinition(
+            name="consultar_pedidos",
+            description=(
+                "Pedidos ya hechos del cliente. Úsala si pregunta por su pedido o pide «lo mismo»."
+            ),
+            parameters=_no_arguments,
+            handler=consultar_pedidos,
+            available=_after_the_sale,
         ),
         ToolDefinition(
             name="calificar_cliente",
