@@ -717,7 +717,11 @@ export interface paths {
         /** List Categories */
         get: operations["list_categories_api_v1_assistant_categories_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Category
+         * @description A category before it has products: the owner organises the catalogue first.
+         */
+        post: operations["create_category_api_v1_assistant_categories_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1527,7 +1531,12 @@ export interface paths {
          */
         get: operations["get_number_api_v1_tenant_whatsapp_number_get"];
         put?: never;
-        post?: never;
+        /**
+         * Connect your WhatsApp number with your own YCloud account
+         * @description Checks the key against YCloud, creates the webhook in the business's account
+         *     and stores the credentials encrypted. Nothing about the key is echoed back.
+         */
+        post: operations["connect_number_api_v1_tenant_whatsapp_number_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3669,6 +3678,18 @@ export interface components {
             /** Siguiente Paso */
             siguiente_paso?: string | null;
         };
+        /**
+         * ConnectNumberPayload
+         * @description The business's own YCloud API key and the number it wants to connect.
+         */
+        ConnectNumberPayload: {
+            /** Api Key */
+            api_key: string;
+            /** Phone E164 */
+            phone_e164: string;
+            /** Display Name */
+            display_name: string;
+        };
         /** ConnectionRequestAdminResponse */
         ConnectionRequestAdminResponse: {
             /**
@@ -5223,6 +5244,8 @@ export interface components {
             is_active?: boolean | null;
             /** Modo Venta */
             modo_venta?: ("precio_fijo" | "cotizacion") | null;
+            /** Periodo */
+            periodo?: ("unico" | "mes" | "ano") | null;
             /** Es Digital */
             es_digital?: boolean | null;
             /** Bundle Size */
@@ -5257,6 +5280,12 @@ export interface components {
              * @enum {string}
              */
             modo_venta: "precio_fijo" | "cotizacion";
+            /**
+             * Periodo
+             * @default unico
+             * @enum {string}
+             */
+            periodo: "unico" | "mes" | "ano";
             /**
              * Es Digital
              * @default false
@@ -5301,6 +5330,11 @@ export interface components {
              * @enum {string}
              */
             modo_venta: "precio_fijo" | "cotizacion";
+            /**
+             * Periodo
+             * @enum {string}
+             */
+            periodo: "unico" | "mes" | "ano";
             /** Es Digital */
             es_digital: boolean;
             /** Bundle Size */
@@ -8965,6 +8999,57 @@ export interface operations {
             };
         };
     };
+    create_category_api_v1_assistant_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `category_exists` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     update_category_api_v1_assistant_categories__category_id__put: {
         parameters: {
             query?: never;
@@ -11336,6 +11421,75 @@ export interface operations {
             };
             /** @description `no_number` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    connect_number_api_v1_tenant_whatsapp_number_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectNumberPayload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppNumberResponse"];
+                };
+            };
+            /** @description `invalid_api_key`, `number_not_in_account` or `webhook_not_created` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `phone_already_connected` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `provider_unavailable` */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

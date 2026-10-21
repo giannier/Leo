@@ -26,6 +26,7 @@ interface Draft {
   description: string;
   price: string;
   modo_venta: "precio_fijo" | "cotizacion";
+  periodo: "unico" | "mes" | "ano";
   category: string;
   tracksStock: boolean;
   stock: string;
@@ -44,6 +45,7 @@ function draftOf(product: Product | null): Draft {
     description: product?.description ?? "",
     price: product ? Number(product.price).toFixed(2) : "",
     modo_venta: product?.modo_venta ?? "precio_fijo",
+    periodo: product?.periodo ?? "unico",
     category: product?.category ?? "",
     tracksStock: product?.stock !== null && product?.stock !== undefined,
     stock: product?.stock != null ? String(product.stock) : "",
@@ -84,6 +86,7 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
       // Money as a two-decimal string: the column is NUMERIC(12,2).
       price: quoted && !draft.price.trim() ? "0.00" : amount.toFixed(2),
       modo_venta: draft.modo_venta,
+      periodo: draft.periodo,
       category: draft.category.trim() || null,
       stock: draft.tracksStock ? stock : null,
       es_digital: draft.es_digital,
@@ -188,7 +191,7 @@ export function ProductEditor({
               required
               value={draft.name}
               error={errors.name}
-              placeholder="Ej.: Certificado en SIAF"
+              placeholder="Ej.: Hosting web básico, Corte de cabello o Zapatillas urbanas"
               onChange={(e) => set("name", e.target.value)}
             />
             <TextArea
@@ -221,12 +224,24 @@ export function ProductEditor({
               />
             </div>
 
+            <Select
+              label="El precio se cobra"
+              value={draft.periodo}
+              onChange={(e) => set("periodo", e.target.value as Draft["periodo"])}
+              hint="Una vez, o cada mes o cada año si es un plan o una suscripción. El asistente lo dice así."
+              options={[
+                { value: "unico", label: "Una sola vez" },
+                { value: "mes", label: "Cada mes" },
+                { value: "ano", label: "Cada año" },
+              ]}
+            />
+
             <div>
               <Field
                 label="Categoría"
                 list="catalog-categories"
                 value={draft.category}
-                placeholder="Ej.: Certificaciones"
+                placeholder="Ej.: Servicios, Planes o Calzado"
                 hint="Elige una que ya tienes o escribe una nueva."
                 onChange={(e) => set("category", e.target.value)}
               />
@@ -243,7 +258,7 @@ export function ProductEditor({
               <legend className="px-1 text-sm font-medium text-ink">Paquete</legend>
               <Checkbox
                 label="Es un paquete de varias elecciones"
-                hint="Ej.: 5 certificaciones a elegir. El cliente elige los temas y el asistente cuenta cuántos faltan."
+                hint="Ej.: un paquete de 5 clases o de 3 servicios a elegir. El cliente elige y el asistente cuenta cuántos faltan."
                 checked={draft.isBundle}
                 onChange={(e) => set("isBundle", e.target.checked)}
               />
@@ -257,7 +272,7 @@ export function ProductEditor({
                     onChange={(e) => set("bundle_size", e.target.value)}
                   />
                   <Checkbox
-                    label="Puede elegir temas que no están en el catálogo"
+                    label="Puede elegir opciones que no están en el catálogo"
                     checked={draft.bundle_permite_libres}
                     onChange={(e) => set("bundle_permite_libres", e.target.checked)}
                   />
@@ -389,7 +404,7 @@ export function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: 
             }
           }}
           onBlur={() => text.trim() && add(text)}
-          placeholder={tags.length ? "" : "Ej.: oferta, verano, SIAF"}
+          placeholder={tags.length ? "" : "Ej.: oferta, nuevo, popular"}
           className="min-h-9 min-w-32 flex-1 bg-transparent px-1 text-base text-ink outline-none placeholder:text-ink-faint"
         />
       </div>

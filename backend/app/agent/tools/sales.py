@@ -35,7 +35,7 @@ from app.agent.tools.shared import (
     clip,
     currency_symbol,
     describe_promotion,
-    money,
+    price_text,
 )
 from app.models.business import Product
 from app.models.sales_config import Promotion
@@ -164,10 +164,14 @@ def _category_rows(context: ToolContext) -> list[ListRow]:
 
 
 def _price_label(product: Product, symbol: str) -> str:
-    if product.modo_venta == "cotizacion":
-        return "Se cotiza"
     price: Decimal = product.price
-    return money(price, symbol)
+    if product.modo_venta == "cotizacion":
+        return (
+            "Se cotiza"
+            if price <= 0
+            else f"{price_text(price, symbol, periodo=product.periodo, quoted=True)} (se cotiza)"
+        )
+    return price_text(price, symbol, periodo=product.periodo)
 
 
 def _product_rows(context: ToolContext, filtro: str | None) -> list[ListRow]:

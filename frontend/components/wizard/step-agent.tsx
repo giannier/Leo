@@ -252,7 +252,7 @@ export function StepAgent({ onSaved }: StepProps) {
         label="Saludo (opcional)"
         name="saludo"
         maxLength={400}
-        placeholder="¡Hola! Bienvenido a Escuela Capacita"
+        placeholder="¡Hola! Soy el asistente virtual de tu negocio. ¿En qué te ayudo?"
         value={form.saludo}
         onChange={(e) => set({ saludo: e.target.value })}
       />

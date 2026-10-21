@@ -47,6 +47,23 @@ def money(amount: Decimal, symbol: str) -> str:
     return f"{symbol} {amount:.2f}"
 
 
+_PERIOD_SUFFIX = {"mes": " al mes", "ano": " al año"}
+
+
+def price_text(
+    amount: Decimal, symbol: str, *, periodo: str = "unico", quoted: bool = False
+) -> str:
+    """A price as it is spoken: "S/ 110.00 al año", or "desde S/ 800.00" for a reference price.
+
+    A quote with no reference price (amount 0) is "a cotizar": "S/ 0.00" would read as free.
+    """
+    if quoted:
+        if amount <= 0:
+            return "precio a cotizar"
+        return f"desde {money(amount, symbol)}{_PERIOD_SUFFIX.get(periodo, '')}"
+    return f"{money(amount, symbol)}{_PERIOD_SUFFIX.get(periodo, '')}"
+
+
 def clip(text: str, limit: int) -> str:
     """`text` on one line, at most `limit` characters, ending in an ellipsis if cut."""
     flat = " ".join(text.split())
