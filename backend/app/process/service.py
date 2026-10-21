@@ -256,6 +256,7 @@ class ProcessConfigService:
             _options_for(template, agent),
             agendar="agendar" in capacities,
             captar="captar" in capacities,
+            postventa="vender" in capacities,
         )
 
         layers = LayerResolver(self._session, tenant_id).resolve(

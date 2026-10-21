@@ -29,6 +29,7 @@ from app.process.facts import Facts, Pedido
 from app.process.templates import (
     GLOBAL_TOOLS,
     LEAD_TOOL_NAMES,
+    POSTSALE_TOOL_NAMES,
     SCHEDULING_TOOL_NAMES,
     TEMPLATES,
     TOOL_NAMES,
@@ -158,9 +159,9 @@ class TestCatalog:
     def test_the_catalogue_declares_the_ten_tools_of_the_contract_and_those_of_the_capabilities(
         self,
     ) -> None:
-        extra = set(SCHEDULING_TOOL_NAMES) | set(LEAD_TOOL_NAMES)
+        extra = set(SCHEDULING_TOOL_NAMES) | set(LEAD_TOOL_NAMES) | set(POSTSALE_TOOL_NAMES)
         assert set(default_catalog().names()) == set(TOOL_NAMES) | extra
-        assert len(default_catalog().names()) == 14
+        assert len(default_catalog().names()) == 15
 
     def test_a_tool_cannot_be_defined_twice(self) -> None:
         definition = default_catalog().get("ver_producto")
@@ -559,7 +560,7 @@ class TestThePromptBudgetWithTheRealTools:
         base = make_config(template_key, full=True)
         config = replace(
             base,
-            options=replace(base.options, agendar=True, captar=True),
+            options=replace(base.options, agendar=True, captar=True, postventa=True),
             preguntas_calificacion=(
                 "¿Qué proceso quieres resolver?",
                 "¿Cuántas personas lo usarían?",
