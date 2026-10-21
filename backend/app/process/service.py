@@ -116,6 +116,8 @@ class EffectiveProcessConfig:
     intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
     business_name: str | None = None
     business_description: str | None = None
+    # The profile's website: what the assistant gives when the contact section has none.
+    website: str | None = None
     industry: str | None = None
     currency: str = DEFAULT_CURRENCY
     timezone: str = DEFAULT_TIMEZONE
@@ -282,6 +284,7 @@ class ProcessConfigService:
             or DEFAULT_INTELLIGENCE_LEVEL,
             business_name=profile.business_name if profile else None,
             business_description=profile.description if profile else None,
+            website=profile.website if profile else None,
             industry=profile.industry if profile else None,
             currency=(profile.currency if profile else None) or DEFAULT_CURRENCY,
             timezone=(profile.timezone if profile else None) or DEFAULT_TIMEZONE,

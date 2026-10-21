@@ -497,3 +497,61 @@ class TestOverview:
         assert partial["siguiente_paso"] == "proceso_venta"
         sections = {s["clave"]: s["estado"] for s in partial["secciones"]}
         assert sections["situaciones"] == "completa" and sections["multimedia"] == "opcional"
+
+
+class TestOneWebsiteAskedOnce:
+    """The web written in the profile reaches the contact section, and the other way round."""
+
+    async def test_the_profile_web_becomes_the_contact_web(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        await api.put(
+            f"{TENANT}/business-profile", headers=headers, json={"website": "mitienda.pe"}
+        )
+        contact = await api.get(f"{A}/business-info/contacto", headers=headers)
+
+        assert contact.json()["data"]["web"] == "https://mitienda.pe"
+
+    async def test_the_contact_web_fills_an_empty_profile(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        await api.put(
+            f"{A}/business-info/contacto", headers=headers, json={"web": "https://zentek360.com"}
+        )
+        profile = await api.get(f"{TENANT}/business-profile", headers=headers)
+
+        assert profile.json()["website"] == "https://zentek360.com/"
+
+    async def test_a_contact_web_already_written_is_not_overwritten(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(
+            f"{A}/business-info/contacto", headers=headers, json={"web": "https://one.example.com"}
+        )
+
+        await api.put(
+            f"{TENANT}/business-profile", headers=headers, json={"website": "other.example.com"}
+        )
+        contact = await api.get(f"{A}/business-info/contacto", headers=headers)
+
+        assert contact.json()["data"]["web"] == "https://one.example.com/"
+
+
+class TestCreatingACategory:
+    async def test_a_category_can_exist_before_its_products(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        created = await api.post(f"{A}/categories", headers=headers, json={"nombre": "Hosting"})
+        again = await api.post(f"{A}/categories", headers=headers, json={"nombre": "hosting "})
+        listed = await api.get(f"{A}/categories", headers=headers)
+
+        assert created.status_code == 201 and created.json()["productos"] == 0
+        assert again.status_code == 409 and again.json()["error"] == "category_exists"
+        assert [c["nombre"] for c in listed.json()["items"]] == ["Hosting"]

@@ -22,9 +22,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.business import AgentConfig, BusinessProfile
+from app.process.service import DEFAULT_CACHE
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.situation import SituationRepository
 from app.services.situations import SituationService
+from app.services.website import mirror_profile_website_into_contact
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,11 @@ class WizardService:
     ) -> SaveOutcome[BusinessProfile]:
         stale = self._is_stale(self._profiles.current(), expected_updated_at)
         record = self._profiles.upsert(**values)
+        if values.get("website"):
+            # One website, asked once: the contact section the assistant reads gets it too.
+            mirror_profile_website_into_contact(self._session, self._tenant_id, values["website"])
         self._session.commit()
+        DEFAULT_CACHE.invalidate(self._tenant_id)
         return SaveOutcome(record=record, overwrote_newer=stale)
 
     def save_agent_config(

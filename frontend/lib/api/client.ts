@@ -1046,6 +1046,8 @@ export const api = {
     saveBehavior: (body: BehaviorBody) =>
       request<Behavior>("/assistant/behavior", { method: "PUT", body }),
     categories: () => request<{ items: Category[] }>("/assistant/categories"),
+    createCategory: (body: { nombre: string; orden?: number; activa?: boolean }) =>
+      request<Category>("/assistant/categories", { method: "POST", body }),
     saveCategory: (id: string, body: { nombre: string; orden: number; activa: boolean }) =>
       request<Category>(`/assistant/categories/${id}`, { method: "PUT", body }),
     templates: () => request<{ items: ProcessTemplate[] }>("/assistant/templates"),

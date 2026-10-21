@@ -32,7 +32,7 @@ from app.agent.tools.shared import (
     clip,
     currency_symbol,
     describe_promotion,
-    money,
+    price_text,
 )
 from app.models.business import Product
 from app.models.media import MediaAsset
@@ -185,6 +185,7 @@ def _product_data(
         "descripcion": description,
         "stock": product.stock,
         "modo_venta": product.modo_venta,
+        "periodo": product.periodo,
         "bundle_size": product.bundle_size,
         "destacado": product.destacado,
         "es_digital": product.es_digital,
@@ -219,7 +220,14 @@ def _product_line(item: dict[str, Any], symbol: str = "S/") -> str:
     `gestionar_pedido`; it never needs to say it aloud.
     """
     parts = [f"- {item['nombre']} (producto_id: {item['producto_id']}):"]
-    parts.append(money(Decimal(item["precio"]), symbol))
+    parts.append(
+        price_text(
+            Decimal(item["precio"]),
+            symbol,
+            periodo=item["periodo"],
+            quoted=item["modo_venta"] == "cotizacion",
+        )
+    )
     if item["bundle_size"]:
         parts.append(f"[paquete de {item['bundle_size']} selecciones]")
     if item["modo_venta"] == "cotizacion":
