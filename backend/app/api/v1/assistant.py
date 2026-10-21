@@ -36,6 +36,7 @@ from app.process.templates import TEMPLATES
 from app.process.templates.base import Stage
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.catalog import CatalogRepository
+from app.services.capabilities import automatic_again
 from app.services.situations import (
     EMBED_JOB,
     MAX_QUE_HACE,
@@ -357,6 +358,8 @@ class TemplateList(BaseModel):
 
 class ProcessView(BaseModel):
     template_key: str
+    # True while the platform picks the template from what the agent does (feature 019).
+    plantilla_automatica: bool = True
     template_version: int | None
     options: dict[str, Any]
     etapas: list[StageView]
@@ -394,6 +397,7 @@ class RubroView(BaseModel):
     key: str | None
     nombre: str | None
     plantilla_sugerida: str | None
+    capacidades_sugeridas: list[str] = Field(default_factory=list)
     version: int | None
     reglas: list[RuleView]
     faqs: list[FaqView]
@@ -458,6 +462,7 @@ def _process(session: Session, tenant_id: uuid.UUID) -> ProcessView:
     agent = AgentConfigRepository(session, tenant_id).current()
     return ProcessView(
         template_key=template_key,
+        plantilla_automatica=not (agent.plantilla_manual if agent else False),
         template_version=version.version if version else None,
         options=dict(agent.process_options or {}) if agent else {},
         etapas=[
@@ -504,9 +509,23 @@ def put_process(
     AgentConfigRepository(session, principal.tenant_id).upsert(
         process_template_key=template.key,
         process_options=options.model_dump(mode="json", exclude_none=True),
+        # Chosen by hand: what the agent does no longer changes it (feature 019).
+        plantilla_manual=True,
     )
     session.commit()
     DEFAULT_CACHE.invalidate(principal.tenant_id)
+    return _process(session, principal.tenant_id)
+
+
+@router.post(
+    "/process/automatica",
+    response_model=ProcessView,
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def automatic_process(principal: ConfigurationManagerDep, session: SessionDep) -> ProcessView:
+    """Give the template back to the platform: it follows what the agent does again."""
+    automatic_again(session, principal.tenant_id)
+    session.commit()
     return _process(session, principal.tenant_id)
 
 
@@ -545,6 +564,7 @@ def get_rubro(principal: ReviewerDep, session: SessionDep) -> RubroView:
         key=rubro.key if rubro else None,
         nombre=rubro.nombre if rubro else None,
         plantilla_sugerida=rubro.plantilla_sugerida if rubro else None,
+        capacidades_sugeridas=list(rubro.capacidades_sugeridas) if rubro else [],
         version=version.version if version else None,
         reglas=_rules(resolver.rules("rubro", rubro_key)),
         faqs=[FaqView(pregunta=f.pregunta, respuesta=f.respuesta) for f in catalog.faqs(version.id)]

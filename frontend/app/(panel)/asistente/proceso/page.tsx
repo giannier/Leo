@@ -193,7 +193,32 @@ export default function ProcessPage() {
         <div className="space-y-5">
           {process.novedades ? <News kind="proceso" news={process.novedades} onSeen={() => void load()} /> : null}
           {canConfigure && templates.length ? (
-            <Card title="Plantilla de proceso" description="Cómo se vende. Tu rubro sugiere una; puedes elegir otra.">
+            <Card
+              title="Plantilla de proceso (avanzado)"
+              description={
+                process.plantilla_automatica
+                  ? "Leo la elige según lo que hace tu agente. Solo cámbiala si sabes que necesitas otra."
+                  : "La elegiste tú: lo que haga tu agente ya no la cambia."
+              }
+            >
+              {!process.plantilla_automatica ? (
+                <div className="mb-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={async () => {
+                      try {
+                        setProcess(await api.assistant.automaticProcess());
+                        setPreview(null);
+                      } catch (caught) {
+                        setError(humanMessage(caught));
+                      }
+                    }}
+                  >
+                    Volver a la automática
+                  </Button>
+                </div>
+              ) : null}
               <div className="grid gap-3 md:grid-cols-3">
                 {templates.map((template) => {
                   const current = template.key === process.template_key;

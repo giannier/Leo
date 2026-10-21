@@ -720,6 +720,8 @@ class OverviewStep(BaseModel):
     paso: str
     hecho: bool
     accion: str
+    grupo: str = "probar"
+    requerido: bool = True
 
 
 class OverviewResponse(BaseModel):
@@ -741,7 +743,14 @@ def get_overview(principal: ConfigurationManagerDep, session: SessionDep) -> Ove
             for s in overview.secciones
         ],
         activacion=[
-            OverviewStep(paso=s.paso, hecho=s.hecho, accion=s.accion) for s in overview.activacion
+            OverviewStep(
+                paso=s.paso,
+                hecho=s.hecho,
+                accion=s.accion,
+                grupo=s.grupo,
+                requerido=s.requerido,
+            )
+            for s in overview.activacion
         ],
         siguiente_paso=overview.siguiente_paso,
     )
