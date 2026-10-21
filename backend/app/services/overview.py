@@ -1,11 +1,11 @@
 """How far a business got configuring its assistant (Feature 004 §1, TASK-437).
 
-Two lists for the panel's home: the state of each section, and the activation
-steps in order with the next one to do. The 017 adds two steps: activate the
-first situation, and try a situation in the simulator.
+Two lists for the panel's home: the state of each section, and the steps in order with the next
+one to do. The steps are **one list for the whole setup** (feature 019) and depend on what the agent
+does: an agent that sells asks for a catalogue and a payment method, one that quotes asks for a
+catalogue and a contact for the cases that need a person, one that only answers needs neither.
 
-Progress: the activation steps weigh 80 % evenly; the optional sections
-(business information complete, media, knowledge) share the other 20 %.
+Progress: a required step weighs 2 and a recommended one 1; progress is the share of the weight.
 
 "Probaste el simulador" is the first sandbox conversation that reached
 IDENTIFICAR or a later stage; "probaste una situación" is a sandbox turn whose
@@ -29,6 +29,7 @@ from app.models.knowledge import KnowledgeSource
 from app.models.media import MediaAsset
 from app.models.sales_config import Faq, Promotion
 from app.models.situation import Situation
+from app.process.capabilities import DEFAULT_CAPABILITIES, leads_to_a_sale, sells
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
 from app.repositories.product import ProductRepository
@@ -46,14 +47,20 @@ PAST_IDENTIFICAR = (
     "ASESORIA",
 )
 STEP_ACTIONS = {
+    "negocio": "/onboarding?paso=1",
+    "agente": "/onboarding?paso=2",
     "productos": "/catalog",
     "metodos_pago": "/asistente/informacion",
-    "proceso_venta": "/asistente/proceso",
+    "conocimiento": "/knowledge",
+    "informacion": "/asistente/informacion",
+    "contacto": "/asistente/informacion?bloque=contacto",
     "primera_situacion": "/asistente/situaciones",
     "probar_simulador": "/sandbox",
     "probar_situacion": "/asistente/situaciones",
     "conectar_whatsapp": "/channel",
 }
+# Where a step belongs in the story of the setup.
+GROUPS = ("probar", "clientes", "mejorar")
 
 
 @dataclass(frozen=True)
@@ -68,6 +75,9 @@ class Step:
     paso: str
     hecho: bool
     accion: str
+    # "probar" (to try the agent), "clientes" (to serve real customers) or "mejorar".
+    grupo: str = "probar"
+    requerido: bool = True
 
 
 @dataclass(frozen=True)
@@ -160,23 +170,46 @@ def build_overview(session: Session, tenant_id: uuid.UUID) -> Overview:
         Section("multimedia", "completa" if has_media else "opcional"),
         Section("conocimiento", "completa" if has_knowledge else "opcional"),
     ]
-    done = {
-        "productos": has_product,
-        "metodos_pago": has_payment,
-        "proceso_venta": agent is not None,
-        "primera_situacion": active_situation,
-        "probar_simulador": tried_simulator,
-        "probar_situacion": tried_situation,
-        "conectar_whatsapp": connected,
-    }
-    steps = [Step(key, done[key], STEP_ACTIONS[key]) for key in STEP_ACTIONS]
-    optional = [info_state == "completa", has_media, has_knowledge]
-    progress = round(
-        80 * sum(s.hecho for s in steps) / len(steps) + 20 * sum(optional) / len(optional)
-    )
+    capabilities = agent.capacidades if agent is not None else DEFAULT_CAPABILITIES
+    sells_ = sells(capabilities)
+    quotes = "cotizar" in capabilities
+    needs_catalogue = leads_to_a_sale(capabilities)
+    contact = sections.get("contacto") or {}
+    has_contact = bool(contact.get("telefono_humano") or contact.get("correo"))
+
+    # (key, done, group, required): only what this agent's capabilities ask for.
+    plan: list[tuple[str, bool, str, bool]] = [
+        ("negocio", bool(profile and profile.business_name and profile.industry), "probar", True),
+        ("agente", bool(agent and agent.agent_name), "probar", True),
+    ]
+    if needs_catalogue:
+        plan.append(("productos", has_product, "probar", True))
+    if sells_:
+        plan.append(("metodos_pago", has_payment, "probar", True))
+    plan.append(("conocimiento", has_knowledge, "probar", False))
+    plan.append(("informacion", info_state != "vacia", "probar", False))
+    if quotes:
+        plan.append(("contacto", has_contact, "probar", False))
+    plan += [
+        ("probar_simulador", tried_simulator, "probar", False),
+        ("conectar_whatsapp", connected, "clientes", True),
+        ("primera_situacion", active_situation, "mejorar", False),
+        ("probar_situacion", tried_situation, "mejorar", False),
+    ]
+    steps = [
+        Step(key, done_, STEP_ACTIONS[key], grupo=group, requerido=required)
+        for key, done_, group, required in plan
+    ]
+    weight = {True: 2, False: 1}
+    total = sum(weight[step.requerido] for step in steps)
+    earned = sum(weight[step.requerido] for step in steps if step.hecho)
     return Overview(
-        progreso=progress,
+        progreso=round(100 * earned / total),
         secciones=secciones,
         activacion=steps,
-        siguiente_paso=next((s.paso for s in steps if not s.hecho), None),
+        # A required step first: what blocks the agent comes before what improves it.
+        siguiente_paso=next(
+            (s.paso for s in steps if not s.hecho and s.requerido),
+            next((s.paso for s in steps if not s.hecho), None),
+        ),
     )

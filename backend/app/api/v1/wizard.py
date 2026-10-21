@@ -28,9 +28,25 @@ router = APIRouter(prefix="/tenant", tags=["wizard"])
 # lets mypy and the generated OpenAPI schema both see the allowed values.
 # `tests/unit/test_wizard_validation.py` asserts these stay in step with the
 # CHECK constraints, so a divergence fails the build rather than production.
-Industry = Literal["restaurante", "instituto", "retail", "servicios", "salud", "otros"]
+Industry = Literal[
+    "restaurante",
+    "instituto",
+    "retail",
+    "servicios",
+    "salud",
+    "tecnologia",
+    "belleza",
+    "inmobiliaria",
+    "automotriz",
+    "hogar",
+    "turismo",
+    "b2b",
+    "otros",
+]
 Tone = Literal["profesional", "cercano", "juvenil"]
 Objective = Literal["vender", "atender", "ambos"]
+# What the screens offer today; "agendar" and "captar" arrive in later phases.
+Capability = Literal["atender", "vender", "cotizar"]
 
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
 LongText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)]
@@ -90,6 +106,8 @@ class AgentConfigRequest(ConcurrencyAware):
         Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_SALUDO)] | None
     ) = None
     farewell_on_pause: LongText | None = None
+    # What the agent does (feature 019): the template and the objective follow from it.
+    capacidades: list[Capability] | None = Field(default=None, max_length=10)
 
 
 class AgentConfigResponse(BaseModel):
@@ -101,6 +119,7 @@ class AgentConfigResponse(BaseModel):
     tratamiento: str = "tu"
     emojis: str = "pocos"
     saludo: str | None = None
+    capacidades: list[str] = Field(default_factory=lambda: ["atender", "vender"])
     farewell_on_pause: str | None
     is_active: bool
     updated_at: datetime | None
@@ -166,6 +185,7 @@ def _agent_response(
         tratamiento=record.tratamiento,
         emojis=record.emojis,
         saludo=record.saludo,
+        capacidades=list(record.capacidades or ["atender", "vender"]),
         escalation_rules=record.escalation_rules,
         farewell_on_pause=record.farewell_on_pause,
         is_active=record.is_active,

@@ -67,7 +67,8 @@ test.describe("Wizard de onboarding", () => {
     await expect(page.getByRole("heading", { name: /2\. Tu agente/ })).toBeVisible();
     await page.getByLabel("¿Cómo se llama tu agente?").fill("Lucía");
     await page.getByLabel("Tono").selectOption("cercano");
-    await page.getByLabel("Para qué lo quieres").selectOption("ambos");
+    // What the agent does: selling is on by default; add quoting.
+    await page.getByLabel("Cotizar").check();
     await saved(page);
 
     // --- 3. the catalogue ------------------------------------------------

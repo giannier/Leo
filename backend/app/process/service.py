@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.models.business import AgentConfig, BusinessProfile
 from app.models.sales_config import Promotion
+from app.process.capabilities import derive_objective
 from app.process.facts import FactsConfig
 from app.process.layers import LayerResolver, stage_texts_from
 from app.process.templates import TEMPLATES, get_template
@@ -306,7 +307,8 @@ def _behavior(agent: AgentConfig | None) -> Behavior:
         tratamiento=agent.tratamiento or "tu",
         emojis=agent.emojis or "pocos",
         saludo=agent.saludo or None,
-        objetivo=agent.objective or "ambos",
+        # Follows from what the agent does (feature 019), not from the legacy column.
+        objetivo=derive_objective(agent.capacidades or ("atender", "vender")),
         politica_descuentos=agent.politica_descuentos or "solo_promociones",
         descuento_maximo_pct=agent.descuento_maximo_pct,
         max_situaciones=agent.max_situaciones or 5,

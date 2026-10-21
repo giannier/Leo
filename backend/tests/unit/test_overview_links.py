@@ -17,7 +17,8 @@ PANEL = Path(__file__).resolve().parents[3] / "frontend" / "app" / "(panel)"
 def test_a_step_links_to_a_page_that_exists(step: str, route: str) -> None:
     """The checklist once sent people to /asistente/simulador, /whatsapp and
     /productos, none of which exist: they landed on a 404."""
-    page = PANEL / route.strip("/") / "page.tsx"
+    # A step may open a section or a wizard step (`?bloque=contacto`): the page is the path.
+    page = PANEL / route.split("?")[0].strip("/") / "page.tsx"
     assert page.is_file(), f"{step} links to {route}, but {page} does not exist"
 
 
