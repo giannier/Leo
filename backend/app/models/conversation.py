@@ -36,7 +36,9 @@ from app.models.base import (
     enum_check,
 )
 
-CHANNELS = ("sandbox", "whatsapp")
+CHANNELS = ("sandbox", "whatsapp", "web")
+# The channels where a customer is real: what counts in the inbox, the results and the quota.
+REAL_CHANNELS = ("whatsapp", "web")
 CONVERSATION_STATUSES = ("open", "closed")
 MESSAGE_DIRECTIONS = ("inbound", "outbound")
 MESSAGE_AUTHORS = ("customer", "agent", "human_operator", "system")

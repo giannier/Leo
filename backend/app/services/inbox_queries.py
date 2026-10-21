@@ -29,7 +29,7 @@ from sqlalchemy import DateTime, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.channel import Contact
-from app.models.conversation import Conversation, Message
+from app.models.conversation import REAL_CHANNELS, Conversation, Message
 from app.models.conversation_state import ConversationState
 from app.repositories.conversation import EVENT
 
@@ -92,7 +92,7 @@ def list_conversations(
         )
         .where(
             Conversation.tenant_id == tenant_id,
-            Conversation.channel == ("sandbox" if sandbox else "whatsapp"),
+            Conversation.channel.in_(("sandbox",) if sandbox else REAL_CHANNELS),
         )
     )
     if filtro == "cerradas":
@@ -183,7 +183,7 @@ def count_waiting(session: Session, tenant_id: uuid.UUID, *, now: datetime) -> i
         )
         .where(
             Conversation.tenant_id == tenant_id,
-            Conversation.channel == "whatsapp",
+            Conversation.channel.in_(REAL_CHANNELS),
             Conversation.status == "open",
             Conversation.takeover_user_id.is_(None),
             _handed_over(now),

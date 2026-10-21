@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.models.audit import AuditLog
 from app.models.business import Product
 from app.models.channel import WebhookEvent
-from app.models.conversation import Conversation, Message
+from app.models.conversation import REAL_CHANNELS, Conversation, Message
 from app.models.knowledge import KnowledgeSource
 from app.models.tenant import Tenant, TenantUser
 from app.models.user import User
@@ -414,7 +414,7 @@ class PlatformAdminService:
             .join(Conversation, Conversation.id == Message.conversation_id)
             .where(
                 Message.tenant_id == tenant_id,
-                Conversation.channel == "whatsapp",
+                Conversation.channel.in_(REAL_CHANNELS),
                 Message.created_at >= since,
             )
         )
@@ -445,7 +445,7 @@ class PlatformAdminService:
                 .join(Conversation, Conversation.id == Message.conversation_id)
                 .where(
                     Message.tenant_id == tenant_id,
-                    Conversation.channel == "whatsapp",
+                    Conversation.channel.in_(REAL_CHANNELS),
                     Message.created_at >= since,
                     Message.author.in_(("customer", "agent")),
                 )

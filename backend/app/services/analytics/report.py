@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.models.analytics import CsatSurvey
 from app.models.business import Product
 from app.models.campaigns import Campaign
-from app.models.conversation import Conversation
+from app.models.conversation import REAL_CHANNELS, Conversation
 from app.models.crm import Lead, LeadEvent
 from app.models.orders import Order, OrderItem
 from app.models.user import User
@@ -59,7 +59,7 @@ def _steps(
         session.execute(
             select(Conversation.id, Conversation.created_at, Conversation.origin_campaign_id).where(
                 Conversation.tenant_id == tenant_id,
-                Conversation.channel == "whatsapp",
+                Conversation.channel.in_(REAL_CHANNELS),
                 Conversation.created_at >= since,
                 Conversation.created_at < until,
             )

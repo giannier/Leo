@@ -245,7 +245,7 @@ class Inbox:
             direction="outbound",
             author="human_operator",
             content=text,
-            delivery_status="queued" if conversation.channel == "whatsapp" else None,
+            delivery_status={"whatsapp": "queued", "web": "sent"}.get(conversation.channel),
             payload={"operador": user.full_name, "operador_id": str(user.id)},
         )
         conversation.unread_count = 0

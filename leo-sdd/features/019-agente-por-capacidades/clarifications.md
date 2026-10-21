@@ -68,3 +68,20 @@ nuevas), pagos o señas para reservar, citas grupales, varias zonas horarias.
    pedido y agrega los mismos productos con `gestionar_pedido` (la herramienta devuelve `producto_id` y cantidad).
 3. Medido con el modelo real: 10 de 10 casos de `productos` en 4 corridas con la redacción final de la herramienta (antes
    de afinarla, "lo mismo que la vez pasada" fallaba: el modelo contestaba que no veía nada y no llamaba a la herramienta).
+
+## C-06: el chat web (fase F)
+**Por qué este canal primero:** Instagram y Messenger exigen la revisión de la aplicación de Meta (semanas) y no se pueden
+probar de punta a punta aquí. El chat web no depende de nadie y sirve para lo que el dueño pidió, "canalizar a quien llega de
+sus redes": el **enlace del chat** va en la biografía de Instagram o TikTok y el **código** va en su página.
+1. **Un canal real:** `conversations.channel = 'web'` (migración 0059). Aparece en la bandeja, en Resultados y cuenta para la
+   cuota (`REAL_CHANNELS`). El asistente es el mismo: agenda, cotiza, vende, califica. Una persona del equipo responde desde la
+   bandeja y el visitante lo ve. Solo texto (las herramientas que mandan archivos o botones contestan `no_disponible`).
+2. **Visitante sin teléfono:** un contacto `web:<uuid>`; la sesión se crea **al primer mensaje**, no al abrir la página, y su
+   token (firmado, 7 días) vive en el navegador. Un visitante solo lee y escribe su conversación.
+3. **Un endpoint público cuesta dinero a quien lo encuentre**, por eso: apagado hasta que el dueño lo active; 10 sesiones por
+   dirección cada 10 min; 12 mensajes por minuto por sesión; **tope diario por negocio** (300 por defecto, entre 10 y 5000);
+   500 caracteres por mensaje; la clave pública se **rota** si se filtra. Un chat apagado y uno que no existe contestan igual.
+4. **Sin seguimientos ni encuestas por WhatsApp** a un visitante web (no hay teléfono): `followups` lo salta.
+5. **Sin CORS:** el widget es un `iframe` a la página `/chat/<clave>?embed=1` del mismo dominio de la API.
+**Pendiente:** Instagram y Messenger (adaptador de Meta, cuando se apruebe la aplicación) y la atribución de origen
+(`ctwa_clid` ya llega en los anuncios de WhatsApp).

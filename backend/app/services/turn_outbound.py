@@ -377,6 +377,8 @@ def live_outbound_factory(
         conversation = ConversationRepository(session, tenant_id).get(conversation_id)
         if conversation is None or conversation.contact_id is None:
             return None
+        if conversation.channel != "whatsapp":
+            return None  # the web chat takes text only: the tools answer `no_disponible`
         contact = ContactRepository(session, tenant_id).get(conversation.contact_id)
         numbers = WhatsAppNumberRepository(session, tenant_id).list_connected()
         if contact is None or not numbers:

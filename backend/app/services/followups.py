@@ -218,6 +218,8 @@ class FollowUps:
         tenant = session.get(Tenant, tenant_id)
         if conversation is None or tenant is None:
             return FollowUpResult("no_existe")
+        if conversation.channel == "web":
+            return FollowUpResult("canal")  # a visitor of the web chat has no WhatsApp to write to
         process = ProcessConfigService(session).effective(tenant_id)
         states = StateRepo(session, tenant_id)
         state = states.get_or_create(conversation, process.template)
