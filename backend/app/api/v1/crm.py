@@ -28,11 +28,13 @@ from pydantic import BaseModel, Field, StringConstraints
 from app.api.deps import ConfigurationManagerDep, MemberDep, Principal, SessionDep
 from app.api.errors import ApiError, error_responses
 from app.core.events import publish
+from app.models.business import Product
 from app.models.channel import Contact
 from app.models.crm import MAX_STAGES, Lead, LostReason, PipelineStage
 from app.models.inbox import ConversationNote
 from app.models.user import User
 from app.repositories.tenant import TenantUserRepository
+from app.scheduling.service import Scheduling
 from app.services.crm import CrmError, LeadService, free_key
 from app.services.crm_report import contact_name, export_csv, pipeline_metrics
 from app.services.inbox import Inbox, InboxError
@@ -165,10 +167,19 @@ class NoteOut(BaseModel):
     created_at: datetime
 
 
+class LeadAppointment(BaseModel):
+    id: uuid.UUID
+    servicio: str
+    inicio: datetime
+    status: str
+
+
 class LeadDetail(BaseModel):
     lead: LeadOut
     history: list[EventOut]
     notes: list[NoteOut]
+    # The appointments this customer has to come (feature 019, phase D).
+    citas: list[LeadAppointment] = []
 
 
 class MoveIn(BaseModel):
@@ -560,7 +571,24 @@ def detail(lead_id: uuid.UUID, principal: MemberDep, session: SessionDep) -> Lea
             )
             for n in notes
         ],
+        citas=_appointments_of(session, principal.tenant_id, lead.contact_id),
     )
+
+
+def _appointments_of(
+    session: SessionDep, tenant_id: uuid.UUID, contact_id: uuid.UUID
+) -> list[LeadAppointment]:
+    scheduling = Scheduling(session, tenant_id)
+    names = {p.id: p.name for p in scheduling.products.list(Product.agendable.is_(True))}
+    return [
+        LeadAppointment(
+            id=a.id,
+            servicio=names.get(a.product_id, "Cita"),
+            inicio=a.starts_at,
+            status=a.status,
+        )
+        for a in scheduling.upcoming_of(contact_id)
+    ]
 
 
 @router.post(

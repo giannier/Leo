@@ -94,6 +94,10 @@ class Contact(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         PgUUID(as_uuid=True), ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True
     )
 
+    # Where the customer came from ("Instagram", "Chat web"...): the link or what they said. A lead
+    # takes it (feature 019, phase F).
+    origen: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Set when this person asked not to be contacted. Auditable by being a
     # timestamp rather than a boolean: "when did they opt out" is a question
     # that gets asked, and a flag cannot answer it.

@@ -18,7 +18,7 @@ The tools that write (the order, the customer's data, a message) are declared wi
 another write.
 
 The descriptions are short: the definitions of every enabled tool share a
-1 700-token allowance of the 6 000-token prompt (`plan.md`; 1 400 before the agenda tools).
+1 900-token allowance of the 6 000-token prompt (`plan.md`; 1 400 before the capability tools).
 """
 
 from __future__ import annotations
@@ -67,7 +67,15 @@ ORDER_ACTIONS = (
 # While the business reviews the payment the order cannot change: the model can
 # only show it, or leave the customer's request on it (Milestone B, decision 8).
 UNDER_REVIEW_ACTIONS = ("ver", "solicitar_cambio")
-HANDOVER_REASONS = ("pide_humano", "queja", "sin_respuesta", "asesoria", "cotizacion", "otro")
+HANDOVER_REASONS = (
+    "pide_humano",
+    "queja",
+    "sin_respuesta",
+    "asesoria",
+    "cotizacion",
+    "postventa",
+    "otro",
+)
 DELIVERY_TYPES = ("delivery", "recojo")
 
 # What the customer can be asked for besides the template's own list. Offered
@@ -248,6 +256,8 @@ def _handover_schema(scope: ToolScope) -> dict[str, Any]:
         {
             "motivo": {"type": "string", "enum": list(HANDOVER_REASONS)},
             "resumen": _text("Qué necesita el cliente, en pocas líneas.", maxLength=_MAX_SUMMARY),
+            "ofrecido": {"type": "string", "description": "Qué se le ofreció, si algo."},
+            "animo": {"type": "string", "enum": ["tranquilo", "apurado", "molesto", "dudoso"]},
             "datos": {
                 "type": "array",
                 "maxItems": 8,

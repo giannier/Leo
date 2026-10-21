@@ -26,7 +26,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Response, status
 from pydantic import BaseModel, Field, StringConstraints, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
 from app.api.errors import ApiError, error_responses
@@ -175,6 +175,16 @@ class AppointmentOut(BaseModel):
     created_by: str
     # A reminder went out and the customer has not confirmed.
     sin_confirmar: bool
+    # How many appointments this customer missed ("no asistió"): information, not a penalty.
+    faltas: int = 0
+
+
+class ConflictOut(AppointmentOut):
+    motivo: str  # "fuera_de_horario", "recurso_inactivo" or "bloqueada"
+
+
+class ConflictList(BaseModel):
+    items: list[ConflictOut]
 
 
 class AppointmentList(BaseModel):
@@ -186,6 +196,8 @@ class AppointmentIn(BaseModel):
     servicio_id: uuid.UUID
     inicio: LocalTime
     nombre_cliente: Name
+    # The customer's contact when booked from a lead: reminders and the history follow it.
+    contact_id: uuid.UUID | None = None
     telefono: Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)] | None = None
     notas: Note | None = None
 
@@ -288,6 +300,18 @@ def _appointments_out(scheduling: Scheduling, rows: list[Appointment]) -> list[A
         ).scalars()
     }
     zone = scheduling.zone()
+    missed: dict[uuid.UUID, int] = {}
+    if contacts:
+        for contact_id, count in session.execute(
+            select(Appointment.contact_id, func.count())
+            .where(
+                Appointment.tenant_id == scheduling.tenant_id,
+                Appointment.status == "no_asistio",
+                Appointment.contact_id.in_(list(contacts)),
+            )
+            .group_by(Appointment.contact_id)
+        ).all():
+            missed[contact_id] = int(count)
     out: list[AppointmentOut] = []
     for row in rows:
         contact = contacts.get(row.contact_id) if row.contact_id else None
@@ -310,9 +334,21 @@ def _appointments_out(scheduling: Scheduling, rows: list[Appointment]) -> list[A
                 notas=row.notas,
                 created_by=row.created_by,
                 sin_confirmar=row.status == "agendada" and row.recordatorio_24h_en is not None,
+                faltas=missed.get(row.contact_id, 0) if row.contact_id else 0,
             )
         )
     return out
+
+
+def _contact(
+    session: SessionDep, tenant_id: uuid.UUID, contact_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    if contact_id is None:
+        return None
+    contact = session.get(Contact, contact_id)
+    if contact is None or contact.tenant_id != tenant_id:
+        raise _not_found()
+    return contact.id
 
 
 def _appointment(scheduling: Scheduling, appointment_id: uuid.UUID) -> Appointment:
@@ -532,6 +568,20 @@ def availability(
     )
 
 
+@router.get("/tenant/scheduling/conflicts", responses=error_responses(*AUTH))
+def conflicts(principal: MemberDep, session: SessionDep) -> ConflictList:
+    """Appointments to come that stopped fitting the hours, the resource or the blocks."""
+    scheduling = Scheduling(session, principal.tenant_id)
+    found = scheduling.conflicts()
+    rows = _appointments_out(scheduling, [a for a, _ in found])
+    return ConflictList(
+        items=[
+            ConflictOut(**row.model_dump(), motivo=reason)
+            for row, (_, reason) in zip(rows, found, strict=True)
+        ]
+    )
+
+
 @router.get("/tenant/appointments", responses=error_responses(*AUTH))
 def list_appointments(
     principal: MemberDep,
@@ -576,6 +626,7 @@ def create_appointment(
             product,
             _utc(body.inicio, scheduling),
             by="user",
+            contact_id=_contact(session, principal.tenant_id, body.contact_id),
             nombre_cliente=body.nombre_cliente,
             telefono=body.telefono,
             notas=body.notas,

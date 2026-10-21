@@ -73,6 +73,7 @@ from app.services.campaigns.hooks import (
 from app.services.connection import read_credentials
 from app.services.emails import build_quality_alert_email, build_quota_warning_email
 from app.services.inbound_media import InboundImageReader
+from app.services.origin import origin_from_text
 from app.services.trial import (
     MeteringResult,
     billing_enforced,
@@ -549,6 +550,7 @@ class ConversationResponder:
             # Already answered - by an earlier run of this job, or by a human
             # in the inbox. Either way there is nothing left to say.
             return []
+        self._learn_origin(conversation_id, burst)
 
         pipeline = TurnPipeline(
             self._session,
@@ -617,6 +619,23 @@ class ConversationResponder:
             )
             self._react_to_the_meter(tenant, metered)
         return answers
+
+    def _learn_origin(self, conversation_id: uuid.UUID, burst: Sequence[Message]) -> None:
+        """The first time a customer says where they came from ("te escribo desde Instagram"), it
+        is kept on the contact (feature 019, phase F). One who already has an origin keeps it."""
+        conversation = self._session.get(Conversation, conversation_id)
+        contact = (
+            self._session.get(Contact, conversation.contact_id)
+            if conversation is not None and conversation.contact_id is not None
+            else None
+        )
+        if contact is None or contact.tenant_id != self._tenant_id or contact.origen is not None:
+            return
+        for message in burst:
+            named = origin_from_text(message.content) if message.msg_type == "text" else None
+            if named is not None:
+                contact.origen = named
+                return
 
     @staticmethod
     def _read_burst(burst: Sequence[Message]) -> InboundTurn:

@@ -57,6 +57,24 @@ def day_windows(hours: Hours | None, day: date, zone: ZoneInfo) -> list[Interval
     return sorted(windows)
 
 
+def is_open(hours: Hours | None, zone: ZoneInfo, now: datetime) -> bool:
+    """Whether `now` falls inside an opening window of its local day."""
+    day = now.astimezone(zone).date()
+    return any(start <= now < end for start, end in day_windows(hours, day, zone))
+
+
+def next_opening(
+    hours: Hours | None, zone: ZoneInfo, now: datetime, *, days: int = 8
+) -> datetime | None:
+    """The next moment the business opens, looking `days` local days ahead; None if never."""
+    first = now.astimezone(zone).date()
+    for offset in range(days):
+        for start, _ in day_windows(hours, first + timedelta(days=offset), zone):
+            if start > now:
+                return start
+    return None
+
+
 def step_for(duration: timedelta) -> timedelta:
     """Slots start every half hour; a short service (under 30 minutes) every quarter."""
     return SHORT_STEP if duration < DEFAULT_STEP else DEFAULT_STEP

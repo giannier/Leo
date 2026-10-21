@@ -26,6 +26,7 @@ from app.api.v1 import (
     products,
     public_chat,
     realtime,
+    reviews,
     sandbox,
     scheduling,
     team,
@@ -59,6 +60,7 @@ router.include_router(platform_catalog.router)
 router.include_router(team.router)
 router.include_router(products.router)
 router.include_router(realtime.router)
+router.include_router(reviews.router)
 router.include_router(public_chat.router)
 router.include_router(web_chat.router)
 router.include_router(sandbox.router)

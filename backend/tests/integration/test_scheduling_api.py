@@ -248,3 +248,110 @@ class TestTheAgenda:
 
         assert listed["items"] == []
         assert touched.status_code == 404
+
+
+class TestMissedAndLinkedAppointments:
+    async def test_the_agenda_counts_what_a_customer_missed_and_a_meeting_links_to_their_lead(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        from app.models.channel import Contact
+
+        tenant_id, owner, _, service = await _shop(api, mail, db)
+        contact = Contact(tenant_id=tenant_id, phone_e164="+51987654321", profile_name="Rosa")
+        db.add(contact)
+        db.commit()
+        base: list[str] = []
+        ahead = 4
+        while len(base) < 3:  # three different working days, whatever day of the week it is today
+            day = _next_weekday(ahead)
+            if day not in base:
+                base.append(day)
+            ahead += 1
+
+        def book(day: str) -> Any:
+            return api.post(
+                A,
+                headers=owner,
+                json={
+                    "servicio_id": service,
+                    "inicio": f"{day}T10:00",
+                    "nombre_cliente": "Rosa",
+                    "contact_id": str(contact.id),
+                },
+            )
+
+        first, second = await book(base[0]), await book(base[1])
+        for made in (first, second):
+            await api.post(
+                f"{A}/{made.json()['id']}/action", headers=owner, json={"accion": "no_asistio"}
+            )
+        third = await book(base[2])
+        listed = (await api.get(A, headers=owner, params={"desde": base[2]})).json()["items"]
+
+        assert first.status_code == second.status_code == third.status_code == 201
+        assert third.json()["telefono"] == "+51987654321" and third.json()["contact_id"] == str(
+            contact.id
+        )
+        assert listed[0]["faltas"] == 2
+        assert (await api.get(A, headers=owner, params={"desde": base[0]})).json()["items"][0][
+            "faltas"
+        ] == 2
+
+    async def test_a_contact_of_another_business_cannot_be_booked(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        from app.models.channel import Contact
+
+        _, owner, _, service = await _shop(api, mail, db)
+        other_tenant, _, _, _ = await _shop(api, mail, db)
+        stranger = Contact(tenant_id=other_tenant, phone_e164="+51911111111")
+        db.add(stranger)
+        db.commit()
+
+        refused = await api.post(
+            A,
+            headers=owner,
+            json={
+                "servicio_id": service,
+                "inicio": f"{_next_weekday()}T10:00",
+                "nombre_cliente": "X",
+                "contact_id": str(stranger.id),
+            },
+        )
+
+        assert refused.status_code == 404
+
+    async def test_hours_changed_under_an_appointment_show_up_as_a_conflict(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        _, owner, _, service = await _shop(api, mail, db)
+        day = _next_weekday()
+        booked = (await _book(api, owner, service, day, "16:00")).json()
+        resource = (
+            await api.post(
+                f"{S}/resources",
+                headers=owner,
+                json={
+                    "nombre": "Mañanas",
+                    "horario": {
+                        d: [["09:00", "13:00"]] for d in ("mon", "tue", "wed", "thu", "fri")
+                    },
+                },
+            )
+        ).json()
+        overview = (await api.get(S, headers=owner)).json()
+        first = next(r for r in overview["recursos"] if r["id"] != resource["id"])
+        await api.put(
+            f"{S}/resources/{first['id']}",
+            headers=owner,
+            json={
+                "nombre": first["nombre"],
+                "horario": {d: [["09:00", "13:00"]] for d in ("mon", "tue", "wed", "thu", "fri")},
+                "product_ids": [],
+                "is_active": True,
+            },
+        )
+
+        conflicts = (await api.get(f"{S}/conflicts", headers=owner)).json()["items"]
+
+        assert [(c["id"], c["motivo"]) for c in conflicts] == [(booked["id"], "fuera_de_horario")]

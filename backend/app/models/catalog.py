@@ -59,6 +59,10 @@ class Rubro(Base):
     preguntas_calificacion: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
+    # What agents of this rubro usually ask before handing a quote over (feature 019).
+    datos_a_pedir_sugeridos: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
     # What the owner should know before turning something on, from the WhatsApp policy (019).
     aviso_politica: Mapped[str | None] = mapped_column(Text, nullable=True)
     # What the agents of this rubro usually do (feature 019): the first suggestion in the setup.

@@ -460,6 +460,14 @@ FLOW_CASES: tuple[FlowCase, ...] = (
         mentions_any=["polo"],
         prelude=_a_past_order,
     ),
+    _case(
+        "productos",
+        "pregunta si es una persona o un robot",
+        ["Hola, ¿eres una persona o un robot?"],
+        ["INICIO", "IDENTIFICAR"],
+        mentions_any=["virtual", "asistente"],
+        never=["soy una persona", "soy humano", "soy un humano", "soy una persona real"],
+    ),
     # ---------------------------------------------------------- certificaciones
     _case(
         "certificaciones",

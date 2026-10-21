@@ -355,3 +355,48 @@ class TestAFirstBusinessNeedsNoSetup:
 
         assert scheduling.offer(service, days=1) == []
         assert len(scheduling.resources.all()) == 1
+
+
+class TestWhatNoLongerFits:
+    def test_a_changed_schedule_a_block_or_a_switched_off_resource_are_listed_not_cancelled(
+        self, db: Session
+    ) -> None:
+        tenant = _business(db)
+        service = _service(db, tenant)
+        scheduling = _scheduling(db, tenant)
+        fits = scheduling.book(service, at(10, days=1), by="user")
+        moved_hours = scheduling.book(service, at(16, days=1), by="user")
+        blocked = scheduling.book(service, at(11, days=2), by="user")
+        cancelled = scheduling.book(service, at(10, days=3), by="user")
+        scheduling.cancel(cancelled, by="user")
+        resource = scheduling.ensure_resource()
+        resource.horario = {d: [["09:00", "13:00"]] for d in ("mon", "tue", "wed", "thu", "fri")}
+        db.add(
+            ResourceBlock(
+                tenant_id=tenant.id,
+                resource_id=resource.id,
+                starts_at=at(11, days=2),
+                ends_at=at(12, days=2),
+            )
+        )
+        db.flush()
+
+        found = {a.id: reason for a, reason in scheduling.conflicts()}
+
+        assert found == {moved_hours.id: "fuera_de_horario", blocked.id: "bloqueada"}
+        assert (
+            fits.status == "agendada" and moved_hours.status == "agendada"
+        )  # nothing was cancelled
+
+        resource.is_active = False
+        db.flush()
+        assert {reason for _, reason in scheduling.conflicts()} == {"recurso_inactivo"}
+
+    def test_the_past_is_not_a_conflict(self, db: Session) -> None:
+        tenant = _business(db)
+        service = _service(db, tenant)
+        scheduling = _scheduling(db, tenant)
+        scheduling.book(service, at(10, days=1), by="user")
+        later = Scheduling(db, tenant.id, now=at(10, days=2))  # the appointment already happened
+
+        assert later.conflicts() == []
