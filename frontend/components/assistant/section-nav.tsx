@@ -65,6 +65,12 @@ const SECTIONS = [
     clave: "multimedia",
   },
   { href: "/knowledge", label: "Conocimiento", detail: "Documentos y tu web", clave: "conocimiento" },
+  {
+    href: "/asistente/revision",
+    label: "Revisión semanal",
+    detail: "Conversaciones reales: ¿lo hizo bien?",
+    clave: null,
+  },
 ] as const;
 
 const DOT: Record<string, { tone: string; text: string }> = {

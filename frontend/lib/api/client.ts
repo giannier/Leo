@@ -364,6 +364,14 @@ export interface MetricsReport {
   desde: string;
   hasta: string;
   traspasos?: HandoffResponse;
+  // Where the period's leads came from, and how many were won (feature 019, phase F).
+  origenes?: { origen: string; leads: number; ganados: number }[];
+  // What the assistant did besides answering; a block with nothing in the period is absent.
+  actividad?: {
+    citas?: { agendadas: number; por_el_asistente: number; completadas: number; faltas: number };
+    cotizaciones?: { pedidas: number; enviadas: number };
+    calificados?: { total: number; calientes: number; tibios: number; frios: number };
+  };
   minutos_por_conversacion: number;
   total: MetricsSummary;
   anterior: MetricsSummary;
@@ -617,6 +625,14 @@ export type BookableService = Scheduling["servicios"][number];
 export type AppointmentList = Ok<Ops["/api/v1/tenant/appointments"]["get"]>;
 export type Appointment = AppointmentList["items"][number];
 export type FreeSlots = Ok<Ops["/api/v1/tenant/scheduling/availability"]["get"]>;
+export type Conflicts = Ok<Ops["/api/v1/tenant/scheduling/conflicts"]["get"]>;
+export type Conflict = Conflicts["items"][number];
+// The weekly review and the questions to try (feature 019, phase C).
+export type ReviewPage = Ok<Ops["/api/v1/assistant/review"]["get"]>;
+export type ReviewItem = ReviewPage["items"][number];
+export type ReviewMark = NonNullable<ReviewItem["revision"]>;
+export type ReviewBody = JsonBody<Ops["/api/v1/assistant/review/{conversation_id}"]["put"]["requestBody"]>;
+export type TestQuestions = Ok<Ops["/api/v1/assistant/test-questions"]["get"]>;
 export type ResourceBody = {
   nombre: string;
   horario: Record<string, string[][]> | null;
@@ -748,6 +764,7 @@ export const api = {
     deleteBlock: (id: string) => request<void>(`/tenant/scheduling/blocks/${id}`, { method: "DELETE" }),
     availability: (query: { servicio_id: string; desde?: string; ignore?: string }) =>
       request<FreeSlots>("/tenant/scheduling/availability", { query }),
+    conflicts: () => request<Conflicts>("/tenant/scheduling/conflicts"),
     appointments: (query: { desde: string; hasta?: string; recurso_id?: string }) =>
       request<AppointmentList>("/tenant/appointments", { query }),
     book: (body: {
@@ -756,6 +773,7 @@ export const api = {
       nombre_cliente: string;
       telefono?: string | null;
       notas?: string | null;
+      contact_id?: string | null;
     }) => request<Appointment>("/tenant/appointments", { method: "POST", body }),
     act: (id: string, accion: "confirmar" | "completar" | "no_asistio" | "cancelar", motivo?: string) =>
       request<Appointment>(`/tenant/appointments/${id}/action`, {
@@ -1106,6 +1124,10 @@ export const api = {
   },
   assistant: {
     overview: () => request<Overview>("/assistant/overview"),
+    review: () => request<ReviewPage>("/assistant/review"),
+    rateReview: (conversationId: string, body: ReviewBody) =>
+      request<ReviewMark>(`/assistant/review/${conversationId}`, { method: "PUT", body }),
+    testQuestions: () => request<TestQuestions>("/assistant/test-questions"),
     section: (section: InfoSection) => request<SectionData>(`/assistant/business-info/${section}`),
     saveSection: (section: InfoSection, body: Record<string, unknown>) =>
       request<SectionData>(`/assistant/business-info/${section}`, { method: "PUT", body }),

@@ -152,6 +152,15 @@ export function ProductEditor({
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
+  /** What a business of this rubro usually asks before quoting; empty if the rubro has none. */
+  const [suggested, setSuggested] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.assistant
+      .rubro()
+      .then((rubro) => setSuggested(rubro.datos_a_pedir_sugeridos ?? []))
+      .catch(() => setSuggested([]));
+  }, []);
 
   useEffect(() => {
     panel.current?.focus();
@@ -268,6 +277,13 @@ export function ProductEditor({
                 error={errors.datos_a_pedir}
                 onChange={(e) => set("datos_a_pedir", e.target.value)}
               />
+            ) : null}
+            {draft.modo_venta === "cotizacion" && suggested.length && !draft.datos_a_pedir.trim() ? (
+              <div>
+                <Button type="button" variant="secondary" onClick={() => set("datos_a_pedir", suggested.join("\n"))}>
+                  Usar las sugeridas para tu rubro
+                </Button>
+              </div>
             ) : null}
 
             <Select

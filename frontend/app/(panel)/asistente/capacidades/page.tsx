@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { CapabilityPicker, HowItSells } from "@/components/assistant/capability-picker";
+import { LeadDestination } from "@/components/assistant/lead-destination";
 import { QualificationQuestions } from "@/components/assistant/qualification-questions";
 import { AssistantHeader } from "@/components/assistant/section-nav";
 import { useToast } from "@/components/toast";
@@ -87,7 +88,10 @@ export default function CapabilitiesPage() {
           </Card>
           {saved.includes("captar") ? (
             <Card>
-              <QualificationQuestions canEdit={canEdit} />
+              <div className="space-y-4">
+                <QualificationQuestions canEdit={canEdit} />
+                <LeadDestination canEdit={canEdit} />
+              </div>
             </Card>
           ) : null}
         </>

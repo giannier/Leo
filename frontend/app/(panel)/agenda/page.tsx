@@ -9,18 +9,24 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 
 import { AppointmentRow } from "@/components/agenda/appointment-row";
 import { NewAppointment } from "@/components/agenda/new-appointment";
 import { addDays, clock, dayLabel, dayOf, mondayOf, todayIn } from "@/components/agenda/dates";
 import { useInboxSocket } from "@/components/inbox/use-inbox-socket";
 import { Alert, Button, Card, Skeleton, cx } from "@/components/ui";
-import { api, type Appointment, type Scheduling } from "@/lib/api/client";
+import { api, type Appointment, type Conflict, type Scheduling } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useHasRole } from "@/lib/session";
 
 type View = "dia" | "semana";
+
+const WHY: Record<string, string> = {
+  fuera_de_horario: "quedó fuera del horario",
+  recurso_inactivo: "su recurso está desactivado",
+  bloqueada: "hay un horario bloqueado encima",
+};
 
 export default function AgendaPage() {
   const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
@@ -29,6 +35,8 @@ export default function AgendaPage() {
   const [day, setDay] = useState<string | null>(null);
   const [items, setItems] = useState<Appointment[] | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Appointments to come that stopped fitting: the hours changed, a resource went off, a block was put. */
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,8 +55,12 @@ export default function AgendaPage() {
   const load = useCallback(async () => {
     if (!from || !to) return;
     try {
-      const list = await api.scheduling.appointments({ desde: from, hasta: to });
+      const [list, clashes] = await Promise.all([
+        api.scheduling.appointments({ desde: from, hasta: to }),
+        api.scheduling.conflicts().catch(() => ({ items: [] as Conflict[] })),
+      ]);
       setItems(list.items);
+      setConflicts(clashes.items);
       setError(null);
     } catch (caught) {
       setError(humanMessage(caught));
@@ -111,6 +123,27 @@ export default function AgendaPage() {
       </header>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      {conflicts.length ? (
+        <section className="space-y-2 rounded-xl border border-warning bg-warning-soft p-4" data-testid="agenda-conflicts">
+          <h2 className="font-heading text-base font-semibold text-ink">
+            {conflicts.length === 1 ? "1 cita ya no cabe en tu agenda" : `${conflicts.length} citas ya no caben en tu agenda`}
+          </h2>
+          <p className="text-sm text-ink-soft">
+            Cambiaste un horario o bloqueaste ese momento. No se canceló nada: cambia la hora o cancela cada una.
+          </p>
+          <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+            {conflicts.map((conflict) => (
+              <Fragment key={conflict.id}>
+                <li className="px-3 pt-2 text-xs font-semibold text-warning">
+                  {dayLabel(dayOf(conflict.inicio_local))} · {WHY[conflict.motivo] ?? conflict.motivo}
+                </li>
+                <AppointmentRow appointment={conflict} onChanged={() => void load()} />
+              </Fragment>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {services.length === 0 ? (
         <Alert tone="info" title="Aún no hay nada que se agende">

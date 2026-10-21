@@ -57,7 +57,12 @@ async function call<T>(path: string, init: RequestInit & { token?: string | null
 
 export const publicChat = {
   config: (key: string) => call<ChatConfig>(`/${key}/config`),
-  open: (key: string) => call<{ token: string }>(`/${key}/session`, { method: "POST" }),
+  /** `origin`: where the visitor came from, as the link said (`?o=instagram`); it goes to the lead. */
+  open: (key: string, origin?: string | null) =>
+    call<{ token: string }>(`/${key}/session`, {
+      method: "POST",
+      body: JSON.stringify(origin ? { origen: origin.slice(0, 40) } : {}),
+    }),
   write: (key: string, token: string, texto: string) =>
     call<ChatLine>(`/${key}/messages`, { method: "POST", token, body: JSON.stringify({ texto }) }),
   read: (key: string, token: string, after?: string) =>

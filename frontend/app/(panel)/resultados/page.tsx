@@ -190,6 +190,35 @@ function Resumen() {
                 testid="kpi-handoff-response"
               />
             ) : null}
+            {report.actividad?.citas ? (
+              <Tile
+                label="Citas agendadas"
+                value={String(report.actividad.citas.agendadas)}
+                note={[
+                  `${report.actividad.citas.por_el_asistente} por el asistente`,
+                  report.actividad.citas.faltas ? `${report.actividad.citas.faltas} faltas` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                testid="kpi-appointments"
+              />
+            ) : null}
+            {report.actividad?.cotizaciones ? (
+              <Tile
+                label="Cotizaciones pedidas"
+                value={String(report.actividad.cotizaciones.pedidas)}
+                note={`${report.actividad.cotizaciones.enviadas} ya enviadas`}
+                testid="kpi-quotes"
+              />
+            ) : null}
+            {report.actividad?.calificados ? (
+              <Tile
+                label="Clientes calificados"
+                value={String(report.actividad.calificados.total)}
+                note={`${report.actividad.calificados.calientes} calientes · ${report.actividad.calificados.tibios} tibios · ${report.actividad.calificados.frios} fríos`}
+                testid="kpi-qualified"
+              />
+            ) : null}
             <Tile label="Pedidos confirmados" value={String(total.orders_confirmed)} testid="kpi-orders" />
             {total.ventas ? (
               <Tile
@@ -224,6 +253,25 @@ function Resumen() {
                 <p className="mt-2 text-sm text-ink-soft">Ninguna en este período.</p>
               )}
             </section>
+            {report.origenes?.length ? (
+              <section className="rounded-xl border border-line bg-surface p-4" aria-label="De dónde llegan" data-testid="lead-origins">
+                <h2 className="font-semibold text-ink">De dónde llegan tus clientes</h2>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {report.origenes.map((item) => (
+                    <li key={item.origen} className="flex justify-between gap-3">
+                      <span className="text-ink-soft">{item.origen}</span>
+                      <span className="font-semibold text-ink">
+                        {item.leads} {item.leads === 1 ? "lead" : "leads"}
+                        {item.ganados ? <span className="font-normal text-ink-soft"> · {item.ganados} ganados</span> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-ink-faint">
+                  Sale del enlace con el que entró el cliente o de lo que dijo. Sin dato, «Directo».
+                </p>
+              </section>
+            ) : null}
             {report.mas_vendidos ? (
               <section className="rounded-xl border border-line bg-surface p-4" aria-label="Más vendidos">
                 <h2 className="font-semibold text-ink">Más vendidos</h2>
