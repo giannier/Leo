@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { CloseIcon } from "@/components/icons";
-import { Alert, Button, Skeleton, cx } from "@/components/ui";
+import { Alert, Button, Field, Skeleton, cx } from "@/components/ui";
 import {
   api,
   type LeadDetail,
@@ -24,6 +24,8 @@ const CAUSES: Record<string, string> = {
   turno: "La conversación",
   "persona:mover": "Movido a mano",
   "persona:asignar": "Asignado",
+  "turno:cotizacion_solicitada": "El asistente pasó la cotización",
+  "persona:cotizacion_enviada": "Cotización enviada",
   "persona:descartar": "Marcado como no lead",
   "operador:confirmar": "Pedido confirmado",
   pedido_descartado: "El pedido venció sin respuesta",
@@ -32,6 +34,26 @@ const CAUSES: Record<string, string> = {
 function cause(text: string): string {
   if (text.startsWith("herramienta:")) return "El asistente armó el pedido";
   return CAUSES[text] ?? text;
+}
+
+type Quote = NonNullable<LeadDetail["lead"]["cotizacion"]>;
+
+/** What to do next with a quote: the follow-up cadence (day 2 to 3, 7, 14, and close at 21). */
+export function quoteHint(quote: Quote): string {
+  if (quote.estado === "solicitada") return "El cliente la pidió: arma la cotización y envíasela.";
+  const days = quote.dias_desde_envio ?? 0;
+  if (days >= 21) return `Pasaron ${days} días: ciérrala con un mensaje cortés o márcala como perdida.`;
+  if (days >= 14) return `Sin respuesta hace ${days} días: tercer seguimiento, con algo nuevo que aportar.`;
+  if (days >= 7) return `Sin respuesta hace ${days} días: segundo seguimiento.`;
+  if (days >= 2) return `Sin respuesta hace ${days} días: buen momento para escribirle.`;
+  return "Enviada: dale un par de días para responder.";
+}
+
+/** A short chip for the board's card and the day's list. */
+export function quoteChip(quote: Quote | null | undefined): string | null {
+  if (!quote) return null;
+  if (quote.estado === "solicitada") return "Cotización pedida";
+  return `Cotización enviada hace ${quote.dias_desde_envio ?? 0} d`;
 }
 
 export function money(amount: string | null | undefined, currency: string | null | undefined): string | null {
@@ -61,6 +83,7 @@ export function LeadDrawer({
   const [losing, setLosing] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [quoted, setQuoted] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -155,6 +178,54 @@ export function LeadDrawer({
                   <dd className="text-ink">{lead.days_in_stage} días</dd>
                 </div>
               </dl>
+
+              {lead.cotizacion ? (
+                <section className="space-y-3 rounded-lg border border-line p-3" data-testid="lead-quote">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-semibold text-ink">Cotización</h3>
+                    <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-soft">
+                      {quoteChip(lead.cotizacion)}
+                    </span>
+                  </div>
+                  {lead.cotizacion.resumen ? <p className="text-ink">{lead.cotizacion.resumen}</p> : null}
+                  {Object.keys(lead.cotizacion.datos).length ? (
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
+                      {Object.entries(lead.cotizacion.datos).map(([name, value]) => (
+                        <div key={name} className="contents">
+                          <dt className="text-xs text-ink-faint">{name}</dt>
+                          <dd className="text-ink">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  <p className="text-xs text-ink-soft">{quoteHint(lead.cotizacion)}</p>
+                  {lead.status === "active" && lead.cotizacion.estado === "solicitada" ? (
+                    <div className="flex flex-wrap items-end gap-2">
+                      <Field
+                        label="Monto cotizado (opcional)"
+                        inputMode="decimal"
+                        placeholder="800.00"
+                        value={quoted}
+                        onChange={(e) => setQuoted(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          const amount = Number(quoted.replace(",", "."));
+                          void act(() =>
+                            api.crm.quoteSent(lead.id, {
+                              monto: quoted.trim() && !Number.isNaN(amount) ? amount.toFixed(2) : null,
+                            }),
+                          ).then(() => setQuoted(""));
+                        }}
+                      >
+                        Ya la envié
+                      </Button>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                 {lead.conversation_id ? (

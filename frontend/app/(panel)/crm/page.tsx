@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { LeadDrawer, money } from "@/components/crm/lead-drawer";
+import { LeadDrawer, money, quoteChip, quoteHint } from "@/components/crm/lead-drawer";
 import { PipelineConfig } from "@/components/crm/pipeline-config";
 import { useInboxSocket } from "@/components/inbox/use-inbox-socket";
 import { Alert, Button, Skeleton, cx } from "@/components/ui";
@@ -338,6 +338,9 @@ export default function CrmPage() {
                               {money(lead.amount_real ?? lead.amount_estimated, lead.moneda)}
                             </span>
                           ) : null}
+                          {quoteChip(lead.cotizacion) ? (
+                            <span className="font-semibold text-accent">{quoteChip(lead.cotizacion)}</span>
+                          ) : null}
                           <span>{lead.days_in_stage} d en etapa</span>
                           {lead.assigned_name ? <span>· {lead.assigned_name}</span> : null}
                           {lead.origen ? <span>· {lead.origen}</span> : null}
@@ -404,7 +407,9 @@ function TodayList({ page, onOpen }: { page: LeadPage | null; onOpen: (id: strin
             <p className="font-medium text-ink">{lead.nombre ?? lead.telefono ?? "Sin nombre"}</p>
             <p className="text-xs text-ink-faint">
               Sin movimiento hace {lead.days_idle} días · {lead.product_interest ?? "sin producto"}
+              {lead.cotizacion ? ` · ${quoteChip(lead.cotizacion)}` : ""}
             </p>
+            {lead.cotizacion ? <p className="text-xs text-ink-soft">{quoteHint(lead.cotizacion)}</p> : null}
           </div>
           <Button variant="secondary" onClick={() => onOpen(lead.id)}>
             Ver

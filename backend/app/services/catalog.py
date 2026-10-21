@@ -130,6 +130,7 @@ class CatalogService:
             bundle_permite_libres=source.bundle_permite_libres,
             destacado=False,
             tags=list(source.tags),
+            datos_a_pedir=list(source.datos_a_pedir),
         )
 
     def soft_delete(self, product_id: uuid.UUID) -> bool:

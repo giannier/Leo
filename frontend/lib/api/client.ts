@@ -959,6 +959,8 @@ export const api = {
     assign: (id: string, userId: string | null) =>
       request<LeadDetail>(`/tenant/leads/${id}/assign`, { method: "POST", body: { user_id: userId } }),
     discard: (id: string) => request<void>(`/tenant/leads/${id}/discard`, { method: "POST" }),
+    quoteSent: (id: string, body: { monto?: string | null; moneda?: "PEN" | "USD" | null } = {}) =>
+      request<LeadDetail>(`/tenant/leads/${id}/quote/sent`, { method: "POST", body }),
     note: (id: string, content: string) =>
       request<unknown>(`/tenant/leads/${id}/notes`, { method: "POST", body: { content } }),
     metrics: () => request<CrmMetrics>("/tenant/leads/metrics"),

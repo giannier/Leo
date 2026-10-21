@@ -283,6 +283,7 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_products_products_price_non_negative"),
         CheckConstraint("cardinality(tags) <= 10", name="products_tags_count"),
+        CheckConstraint("cardinality(datos_a_pedir) <= 6", name="products_datos_a_pedir_count"),
         enum_check("periodo", PRICE_PERIODS, "periodo"),
         Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
@@ -330,6 +331,10 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The assistant pushes a highlighted product first.
     destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # What the agent asks before handing a quote over, one item per message ("para cuándo").
+    datos_a_pedir: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
     # Labels the business writes ("oferta", "SIAF"): the agent also finds the
     # product by them, and the catalogue filters by them (Feature 018).
     tags: Mapped[list[str]] = mapped_column(

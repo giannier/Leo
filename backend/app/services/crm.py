@@ -161,7 +161,8 @@ class LeadService:
         order = OrderRepository(self._session, self._tenant_id).active_for_conversation(
             conversation.id
         )
-        target = semantic_for(state.stage_key, dict(state.facts or {}), order)
+        facts = dict(state.facts or {})
+        target = semantic_for(state.stage_key, facts, order)
 
         if lead is None:
             if target is None:
@@ -184,6 +185,7 @@ class LeadService:
             self._session.flush()
             self._record(lead, None, board.semantic(target), cause, actor_for(cause), None)
             self._amounts(lead, order)
+            self._quote(lead, facts)
             if target == "ganado":
                 self._close(lead, board.semantic("ganado"), "won", cause, actor_for(cause), None)
             return lead
@@ -191,6 +193,7 @@ class LeadService:
         lead.conversation_id = conversation.id
         lead.last_activity_at = moment
         self._amounts(lead, order)
+        self._quote(lead, facts)
         if target is None:
             return lead
         current = self.stages.get(lead.stage_id)
@@ -203,6 +206,58 @@ class LeadService:
             self._close(lead, goal, "won", cause, actor_for(cause), None)
         else:
             self._move(lead, current, goal, cause, actor_for(cause), None)
+        return lead
+
+    def _quote(self, lead: Lead, facts: dict[str, Any]) -> None:
+        """The quote the agent handed over (`derivado` with motivo cotizacion) becomes the lead's.
+
+        A newer hand-over starts a new request: a customer who asks again after one was sent
+        is waiting for a new quote.
+        """
+        handed = facts.get("derivado")
+        if not isinstance(handed, dict) or handed.get("motivo") != "cotizacion":
+            return
+        try:
+            since = datetime.fromisoformat(str(handed.get("desde")))
+        except ValueError:
+            return
+        if lead.quote_requested_at is not None and since <= lead.quote_requested_at:
+            return
+        data = handed.get("datos")
+        lead.quote_status = "solicitada"
+        lead.quote_summary = handed.get("resumen") or None
+        lead.quote_data = dict(data) if isinstance(data, dict) else {}
+        lead.quote_requested_at = since
+        lead.quote_sent_at = None
+        self._event(
+            lead, "turno:cotizacion_solicitada", "agent", None, detail=dict(lead.quote_data)
+        )
+
+    def quote_sent(
+        self,
+        lead: Lead,
+        *,
+        by: uuid.UUID,
+        amount: Decimal | None = None,
+        moneda: str | None = None,
+    ) -> Lead:
+        """A person sent the quote: the amount (if they say it) is the lead's estimated amount."""
+        if lead.status != "active" or lead.quote_status is None:
+            raise CrmError("no_quote", "Este lead no tiene una cotización pedida.")
+        now = self._moment()
+        lead.quote_status = "enviada"
+        lead.quote_sent_at = now
+        lead.last_activity_at = now
+        if amount is not None:
+            lead.amount_estimated = amount
+            lead.moneda = moneda or lead.moneda
+        self._event(
+            lead,
+            "persona:cotizacion_enviada",
+            "user",
+            by,
+            detail={"monto": str(amount) if amount is not None else ""},
+        )
         return lead
 
     def _origin(self, state: ConversationState) -> str | None:

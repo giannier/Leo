@@ -189,6 +189,7 @@ def _product_data(
         "bundle_size": product.bundle_size,
         "destacado": product.destacado,
         "es_digital": product.es_digital,
+        "datos_a_pedir": list(product.datos_a_pedir or []),
         # Files the owner linked to this product, and whether this conversation
         # already received them (`enviar_recurso` answers `omitido` if so).
         "recursos": [
@@ -232,6 +233,12 @@ def _product_line(item: dict[str, Any], symbol: str = "S/") -> str:
         parts.append(f"[paquete de {item['bundle_size']} selecciones]")
     if item["modo_venta"] == "cotizacion":
         parts.append("[se cotiza con una persona, no tiene precio fijo]")
+        if item["datos_a_pedir"]:
+            parts.append(
+                "[antes de derivar pide, uno por mensaje, lo que falte de: "
+                + "; ".join(item["datos_a_pedir"])
+                + "]"
+            )
     if item["destacado"]:
         parts.append("[destacado]")
     if item["categoria"]:
