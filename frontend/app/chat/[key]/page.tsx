@@ -105,7 +105,7 @@ function Chat() {
     try {
       let session = token;
       if (!session) {
-        session = (await publicChat.open(key)).token;
+        session = (await publicChat.open(key, new URLSearchParams(window.location.search).get("o"))).token;
         setToken(session);
       }
       const sent = await publicChat.write(key, session, clean);

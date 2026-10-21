@@ -3,6 +3,8 @@
  *
  *     <script src="https://…/widget.js" data-chat="<key>" data-color="#2563eb" async></script>
  *
+ * Optional `data-origin="Instagram"` marks where the visitors of that page come from (it reaches the lead).
+ *
  * It draws a round button in the corner; a tap opens the business's chat page in a frame, a second tap closes
  * it. The chat itself is the page `/chat/<key>?embed=1`, so the website never touches the visitor's
  * conversation: it only hosts the frame. Served by a route, not a static file, so the production image needs
@@ -26,7 +28,8 @@ const SCRIPT = `(function () {
 
   var frame = document.createElement("iframe");
   frame.title = "Chat";
-  frame.src = origin + "/chat/" + encodeURIComponent(key) + "?embed=1";
+  var from = tag.getAttribute("data-origin");
+  frame.src = origin + "/chat/" + encodeURIComponent(key) + "?embed=1" + (from ? "&o=" + encodeURIComponent(from) : "");
   frame.style.cssText = "position:fixed;right:20px;bottom:90px;width:min(380px,calc(100vw - 24px));height:min(560px,calc(100vh - 110px));border:0;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:2147483646;display:none;background:#fff";
   frame.setAttribute("allow", "clipboard-write");
 

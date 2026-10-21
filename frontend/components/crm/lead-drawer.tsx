@@ -9,6 +9,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { NewAppointment } from "@/components/agenda/new-appointment";
+import { STATUS as APPOINTMENT_STATUS } from "@/components/agenda/appointment-row";
+import { todayIn } from "@/components/agenda/dates";
 import { CloseIcon } from "@/components/icons";
 import { Alert, Button, Field, Skeleton, cx } from "@/components/ui";
 import {
@@ -16,6 +19,7 @@ import {
   type LeadDetail,
   type LostReason,
   type PipelineStage,
+  type Scheduling,
   type TeamMember,
 } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -99,6 +103,9 @@ export function LeadDrawer({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [quoted, setQuoted] = useState("");
+  /** The agenda, to show the meetings in the business's time and to book one from here. */
+  const [agenda, setAgenda] = useState<Scheduling | null>(null);
+  const [booking, setBooking] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -107,6 +114,13 @@ export function LeadDrawer({
       setError(humanMessage(caught));
     }
   }, [leadId]);
+
+  useEffect(() => {
+    api.scheduling
+      .overview()
+      .then(setAgenda)
+      .catch(() => setAgenda(null));
+  }, []);
 
   useEffect(() => {
     void load();
@@ -258,6 +272,51 @@ export function LeadDrawer({
                         Ya la envié
                       </Button>
                     </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {detail && (detail.citas.length || (agenda?.servicios.length && lead.status === "active")) ? (
+                <section className="space-y-3 rounded-lg border border-line p-3" data-testid="lead-appointments">
+                  <h3 className="font-semibold text-ink">Citas</h3>
+                  {detail.citas.length ? (
+                    <ul className="space-y-1">
+                      {detail.citas.map((cita) => (
+                        <li key={cita.id} className="flex flex-wrap items-center gap-2">
+                          <span className="text-ink">
+                            {cita.servicio} ·{" "}
+                            {new Intl.DateTimeFormat("es", {
+                              timeZone: agenda?.zona,
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }).format(new Date(cita.inicio))}
+                          </span>
+                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-semibold text-ink-soft">
+                            {(APPOINTMENT_STATUS[cita.status] ?? APPOINTMENT_STATUS.agendada).label}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-ink-faint">Todavía no tiene citas.</p>
+                  )}
+                  {agenda?.servicios.length && lead.status === "active" ? (
+                    booking ? (
+                      <NewAppointment
+                        services={agenda.servicios}
+                        day={todayIn(agenda.zona)}
+                        contact={{ id: lead.contact_id, nombre: lead.nombre, telefono: lead.telefono }}
+                        onBooked={() => void load()}
+                        onClose={() => setBooking(false)}
+                      />
+                    ) : (
+                      <Button type="button" variant="secondary" onClick={() => setBooking(true)}>
+                        Agendar reunión
+                      </Button>
+                    )
                   ) : null}
                 </section>
               ) : null}

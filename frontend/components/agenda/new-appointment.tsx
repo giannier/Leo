@@ -17,11 +17,14 @@ import { clock, dayOf } from "./dates";
 export function NewAppointment({
   services,
   day,
+  contact,
   onBooked,
   onClose,
 }: {
   services: BookableService[];
   day: string;
+  /** Who it is, when it is booked from their lead: the meeting is linked to them. */
+  contact?: { id: string; nombre: string | null; telefono: string | null };
   onBooked: () => void;
   onClose: () => void;
 }) {
@@ -30,8 +33,8 @@ export function NewAppointment({
   const [date, setDate] = useState(day);
   const [slots, setSlots] = useState<FreeSlots["items"] | null>(null);
   const [chosen, setChosen] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(contact?.nombre ?? "");
+  const [phone, setPhone] = useState(contact?.telefono ?? "");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +69,7 @@ export function NewAppointment({
         nombre_cliente: name.trim(),
         telefono: phone || null,
         notas: notes.trim() || null,
+        contact_id: contact?.id ?? null,
       });
       toast.success("Cita agendada", `${name.trim()} · ${clock(chosen)}`);
       onBooked();
@@ -80,7 +84,7 @@ export function NewAppointment({
   return (
     <Card>
       <div className="space-y-4">
-        <h2 className="font-heading text-lg font-semibold text-ink">Nueva cita</h2>
+        <h2 className="font-heading text-lg font-semibold text-ink">{contact ? "Agendar reunión" : "Nueva cita"}</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Select
             label="Servicio"

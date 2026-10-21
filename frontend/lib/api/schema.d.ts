@@ -1974,6 +1974,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/scheduling/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conflicts
+         * @description Appointments to come that stopped fitting the hours, the resource or the blocks.
+         */
+        get: operations["conflicts_api_v1_tenant_scheduling_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/appointments": {
         parameters: {
             query?: never;
@@ -3069,6 +3089,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sample */
+        get: operations["sample_api_v1_assistant_review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/review/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Rate */
+        put: operations["rate_api_v1_assistant_review__conversation_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/test-questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Questions */
+        get: operations["questions_api_v1_assistant_test_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/chat/{key}/config": {
         parameters: {
             query?: never;
@@ -3480,6 +3551,8 @@ export interface components {
             capacidades?: ("atender" | "vender" | "cotizar" | "agendar" | "captar")[] | null;
             /** Preguntas Calificacion */
             preguntas_calificacion?: string[] | null;
+            /** Destino Leads */
+            destino_leads?: string | null;
         };
         /** AgentConfigResponse */
         AgentConfigResponse: {
@@ -3509,6 +3582,8 @@ export interface components {
             capacidades?: string[];
             /** Preguntas Calificacion */
             preguntas_calificacion?: string[] | null;
+            /** Destino Leads */
+            destino_leads?: string | null;
             /** Farewell On Pause */
             farewell_on_pause: string | null;
             /** Is Active */
@@ -3539,6 +3614,8 @@ export interface components {
             inicio: string;
             /** Nombre Cliente */
             nombre_cliente: string;
+            /** Contact Id */
+            contact_id?: string | null;
             /** Telefono */
             telefono?: string | null;
             /** Notas */
@@ -3599,6 +3676,11 @@ export interface components {
             created_by: string;
             /** Sin Confirmar */
             sin_confirmar: boolean;
+            /**
+             * Faltas
+             * @default 0
+             */
+            faltas: number;
         };
         /** AssignIn */
         AssignIn: {
@@ -4156,6 +4238,67 @@ export interface components {
         ConfirmRequest: {
             /** Siguiente Paso */
             siguiente_paso?: string | null;
+        };
+        /** ConflictList */
+        ConflictList: {
+            /** Items */
+            items: components["schemas"]["ConflictOut"][];
+        };
+        /** ConflictOut */
+        ConflictOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Servicio Id
+             * Format: uuid
+             */
+            servicio_id: string;
+            /** Servicio */
+            servicio: string;
+            /**
+             * Recurso Id
+             * Format: uuid
+             */
+            recurso_id: string;
+            /** Recurso */
+            recurso: string;
+            /** Cliente */
+            cliente: string | null;
+            /** Telefono */
+            telefono: string | null;
+            /** Contact Id */
+            contact_id: string | null;
+            /** Conversation Id */
+            conversation_id: string | null;
+            /** Inicio Local */
+            inicio_local: string;
+            /** Fin Local */
+            fin_local: string;
+            /**
+             * Inicio
+             * Format: date-time
+             */
+            inicio: string;
+            /** Texto */
+            texto: string;
+            /** Status */
+            status: string;
+            /** Notas */
+            notas: string | null;
+            /** Created By */
+            created_by: string;
+            /** Sin Confirmar */
+            sin_confirmar: boolean;
+            /**
+             * Faltas
+             * @default 0
+             */
+            faltas: number;
+            /** Motivo */
+            motivo: string;
         };
         /**
          * ConnectNumberPayload
@@ -4899,6 +5042,23 @@ export interface components {
             /** Files Limit */
             files_limit: number;
         };
+        /** LeadAppointment */
+        LeadAppointment: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Servicio */
+            servicio: string;
+            /**
+             * Inicio
+             * Format: date-time
+             */
+            inicio: string;
+            /** Status */
+            status: string;
+        };
         /** LeadDetail */
         LeadDetail: {
             lead: components["schemas"]["LeadOut"];
@@ -4906,6 +5066,11 @@ export interface components {
             history: components["schemas"]["EventOut"][];
             /** Notes */
             notes: components["schemas"]["app__api__v1__crm__NoteOut"][];
+            /**
+             * Citas
+             * @default []
+             */
+            citas: components["schemas"]["LeadAppointment"][];
         };
         /** LeadOut */
         LeadOut: {
@@ -4993,6 +5158,18 @@ export interface components {
             /** Body */
             body: string;
         };
+        /** Line */
+        Line: {
+            /** De */
+            de: string;
+            /** Texto */
+            texto: string;
+            /**
+             * En
+             * Format: date-time
+             */
+            en: string;
+        };
         /** LineOut */
         LineOut: {
             /** Producto Id */
@@ -5062,6 +5239,15 @@ export interface components {
             moneda_local?: string | null;
             /** Nota */
             nota?: string | null;
+        };
+        /** Mark */
+        Mark: {
+            /** Rating */
+            rating: number;
+            /** Motivos */
+            motivos: string[];
+            /** Nota */
+            nota: string | null;
         };
         /** MediaList */
         MediaList: {
@@ -5885,6 +6071,13 @@ export interface components {
             /** Foto Url */
             foto_url?: string | null;
         };
+        /** Progress */
+        Progress: {
+            /** Revisadas */
+            revisadas: number;
+            /** Total */
+            total: number;
+        };
         /** PromotionList */
         PromotionList: {
             /** Items */
@@ -6227,6 +6420,41 @@ export interface components {
             /** Is Active */
             is_active: boolean;
         };
+        /** ReviewIn */
+        ReviewIn: {
+            /** Rating */
+            rating: number;
+            /** Motivos */
+            motivos?: string[];
+            /** Nota */
+            nota?: string | null;
+        };
+        /** ReviewItem */
+        ReviewItem: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Cliente */
+            cliente: string;
+            /** Canal */
+            canal: string;
+            /** Mensajes */
+            mensajes: components["schemas"]["Line"][];
+            revision: components["schemas"]["Mark"] | null;
+        };
+        /** ReviewPage */
+        ReviewPage: {
+            /** Semana */
+            semana: string;
+            progreso: components["schemas"]["Progress"];
+            /** Items */
+            items: components["schemas"]["ReviewItem"][];
+            /** Motivos */
+            motivos: string[];
+            resumen: components["schemas"]["Summary"];
+        };
         /** Row */
         Row: {
             /** Id */
@@ -6250,6 +6478,8 @@ export interface components {
             aviso_politica?: string | null;
             /** Preguntas Calificacion */
             preguntas_calificacion?: string[];
+            /** Datos A Pedir Sugeridos */
+            datos_a_pedir_sugeridos?: string[];
             /** Version */
             version: number | null;
             /** Reglas */
@@ -6431,6 +6661,11 @@ export interface components {
             duracion_min: number;
             /** Buffer Min */
             buffer_min: number;
+        };
+        /** SessionIn */
+        SessionIn: {
+            /** Origen */
+            origen?: string | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -6729,6 +6964,23 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** Summary */
+        Summary: {
+            /** Total */
+            total: number;
+            /** Bien */
+            bien: number;
+            /** Regular */
+            regular: number;
+            /** Mal */
+            mal: number;
+            /** Porcentaje Bien */
+            porcentaje_bien: number | null;
+            /** Fallas */
+            fallas: {
+                [key: string]: number;
+            };
+        };
         /** SwitchRequest */
         SwitchRequest: {
             /** Apagada */
@@ -6901,6 +7153,18 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** TestQuestionOut */
+        TestQuestionOut: {
+            /** Texto */
+            texto: string;
+            /** Sobre */
+            sobre: string;
+        };
+        /** TestQuestions */
+        TestQuestions: {
+            /** Items */
+            items: components["schemas"]["TestQuestionOut"][];
         };
         /** ThreadPage */
         ThreadPage: {
@@ -13360,6 +13624,44 @@ export interface operations {
             };
         };
     };
+    conflicts_api_v1_tenant_scheduling_conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     list_appointments_api_v1_tenant_appointments_get: {
         parameters: {
             query: {
@@ -16499,6 +16801,135 @@ export interface operations {
             };
         };
     };
+    sample_api_v1_assistant_review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewPage"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rate_api_v1_assistant_review__conversation_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Mark"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    questions_api_v1_assistant_test_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestQuestions"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     config_api_v1_public_chat__key__config_get: {
         parameters: {
             query?: never;
@@ -16539,7 +16970,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SessionIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {

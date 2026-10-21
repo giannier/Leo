@@ -18,6 +18,7 @@ const REASONS: Record<string, string> = {
   sin_respuesta: "El asistente no tenía la respuesta",
   asesoria: "Asesoría",
   cotizacion: "Cotización",
+  postventa: "Postventa o devolución",
   otro: "Otro motivo",
 };
 

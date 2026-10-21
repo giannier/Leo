@@ -77,6 +77,19 @@ export default function SandboxPage() {
   /** A draft situation tried from Situaciones (`?probar=<id>`, 017 RF-009). */
   const [trying, setTrying] = useState<{ id: string; titulo: string } | null>(null);
   const drafts = trying ? [trying.id] : [];
+  /** Questions made from this business's own data; the generic ones until they arrive. */
+  const [questions, setQuestions] = useState<string[]>(SUGGESTIONS);
+
+  useEffect(() => {
+    api.assistant
+      .testQuestions()
+      .then(({ items }) => {
+        if (items.length) setQuestions(items.map((q) => q.texto));
+      })
+      .catch(() => {
+        // Without them the generic ones stay: the simulator works either way.
+      });
+  }, []);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("probar");
@@ -334,7 +347,7 @@ export default function SandboxPage() {
                 <Skeleton className="ml-auto h-16 w-2/3" />
               </div>
             ) : entries.length === 0 ? (
-              <Empty onPick={(text) => void send(text)} />
+              <Empty questions={questions} onPick={(text) => void send(text)} />
             ) : (
               entries.map((entry) => (
                 <Message
@@ -467,16 +480,16 @@ function Header({
   );
 }
 
-function Empty({ onPick }: { onPick: (text: string) => void }) {
+function Empty({ questions, onPick }: { questions: string[]; onPick: (text: string) => void }) {
   return (
     <div className="py-8 text-center">
       <ChatIcon className="mx-auto size-10 text-line-strong" />
       <p className="mt-3 text-sm font-medium text-ink">Escríbele como lo haría un cliente</p>
       <p className="mt-1 text-xs text-ink-faint">
-        Prueba lo que más te preguntan. Si responde mal, ajusta la configuración y vuelve.
+        Prueba lo que más te preguntan (estas salen de los datos de tu negocio). Si responde mal, ajusta la configuración y vuelve.
       </p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
-        {SUGGESTIONS.map((text) => (
+        {questions.map((text) => (
           <button
             key={text}
             type="button"

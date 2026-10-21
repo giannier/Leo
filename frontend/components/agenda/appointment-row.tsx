@@ -106,6 +106,11 @@ export function AppointmentRow({
               Sin confirmar
             </span>
           ) : null}
+          {appointment.faltas > 0 ? (
+            <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+              {appointment.faltas === 1 ? "1 falta antes" : `${appointment.faltas} faltas antes`}
+            </span>
+          ) : null}
           {appointment.created_by === "agent" ? (
             <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">
               Agendada por el asistente

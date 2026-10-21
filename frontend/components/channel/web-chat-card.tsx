@@ -13,7 +13,7 @@ import { Alert, Button, Card, Checkbox, Field, Skeleton, TextArea } from "@/comp
 import { api, type WebChatSettings } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 
-function Copy({ label, value }: { label: string; value: string }) {
+export function Copy({ label, value }: { label: string; value: string }) {
   const toast = useToast();
   return (
     <div className="space-y-1">

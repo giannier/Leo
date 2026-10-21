@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { SocialLinks } from "@/components/channel/social-links";
 import { WebChatCard } from "@/components/channel/web-chat-card";
 import { AlertIcon, CheckIcon, ClockIcon, PhoneIcon } from "@/components/icons";
 import { PhoneField, isCompletePhone } from "@/components/phone-field";
@@ -113,6 +114,7 @@ export default function ChannelPage() {
       {requests && requests.length > 0 ? <History requests={requests} /> : null}
 
       {canConfigure ? <WebChatCard /> : null}
+      {canConfigure ? <SocialLinks phone={number?.phone_e164 ?? null} /> : null}
     </div>
   );
 }
