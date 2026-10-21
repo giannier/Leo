@@ -25,6 +25,7 @@ from app.models.business import AgentConfig, BusinessProfile
 from app.process.service import DEFAULT_CACHE
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.situation import SituationRepository
+from app.services.capabilities import apply as apply_capabilities
 from app.services.situations import SituationService
 from app.services.website import mirror_profile_website_into_contact
 
@@ -82,6 +83,10 @@ class WizardService:
         # activation through `/agent/activate`, which has preconditions the
         # configuration form does not check.
         values.pop("is_active", None)
+        capacities = values.pop("capacidades", None)
+        if capacities is not None:
+            # The objective is derived from what the agent does, not asked.
+            values.pop("objective", None)
         stale = self._is_stale(self._agents.current(), expected_updated_at)
         # The old free-text rules live on as the migrated situation (017, RF-011)
         # until the wizard stops asking for them (TASK-468).
@@ -90,7 +95,10 @@ class WizardService:
                 values.pop("restrictions")
             )
         record = self._agents.upsert(**values)
+        if capacities is not None:
+            apply_capabilities(self._session, self._tenant_id, capacities)
         self._session.commit()
+        DEFAULT_CACHE.invalidate(self._tenant_id)
         return SaveOutcome(record=record, overwrote_newer=stale)
 
     @staticmethod

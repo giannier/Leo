@@ -10,6 +10,7 @@
  * only in the setup wizard. The business's own rules are not here: they are situations.
  */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AssistantHeader, Saved } from "@/components/assistant/section-nav";
@@ -32,11 +33,6 @@ const DETAILS = [
   { value: "breve", label: "Breve (1 a 3 líneas)" },
   { value: "moderado", label: "Moderado (hasta 700 caracteres)" },
   { value: "extenso", label: "Extenso (cuando pide detalles)" },
-] as const;
-const OBJECTIVES = [
-  { value: "ambos", label: "Atender y vender" },
-  { value: "vender", label: "Vender: cerrar pedidos" },
-  { value: "atender", label: "Atender: responder consultas" },
 ] as const;
 /** Mirrors `DEFAULT_ESCALATION_RULES` in `app/models/business.py`. */
 const ESCALATIONS = [
@@ -173,15 +169,14 @@ export default function BehaviorPage() {
           </div>
         </Card>
 
-        <Card title="Objetivo y cuándo pasa a una persona">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Objetivo del asistente"
-              options={OBJECTIVES}
-              value={draft.objective}
-              onChange={(e) => set({ objective: e.target.value })}
-            />
-          </div>
+        <Card title="Cuándo pasa a una persona">
+          <p className="text-sm text-ink-soft">
+            Si vende, cotiza o solo atiende lo eliges en{" "}
+            <Link href="/asistente/capacidades" className="font-semibold text-accent underline">
+              Qué hará tu agente
+            </Link>
+            .
+          </p>
           <fieldset className="mt-4 space-y-3">
             <legend className="text-sm font-medium text-ink">Pasa la conversación a una persona cuando…</legend>
             {ESCALATIONS.map((rule) => (

@@ -522,6 +522,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/process/automatica": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Automatic Process
+         * @description Give the template back to the platform: it follows what the agent does again.
+         */
+        post: operations["automatic_process_api_v1_assistant_process_automatica_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assistant/rules/{kind}/{rule_key}": {
         parameters: {
             query?: never;
@@ -3155,6 +3175,8 @@ export interface components {
             saludo?: string | null;
             /** Farewell On Pause */
             farewell_on_pause?: string | null;
+            /** Capacidades */
+            capacidades?: ("atender" | "vender" | "cotizar")[] | null;
         };
         /** AgentConfigResponse */
         AgentConfigResponse: {
@@ -3180,6 +3202,8 @@ export interface components {
             emojis: string;
             /** Saludo */
             saludo?: string | null;
+            /** Capacidades */
+            capacidades?: string[];
             /** Farewell On Pause */
             farewell_on_pause: string | null;
             /** Is Active */
@@ -3362,7 +3386,7 @@ export interface components {
             /** Business Name */
             business_name?: string | null;
             /** Industry */
-            industry?: ("restaurante" | "instituto" | "retail" | "servicios" | "salud" | "otros") | null;
+            industry?: ("restaurante" | "instituto" | "retail" | "servicios" | "salud" | "tecnologia" | "belleza" | "inmobiliaria" | "automotriz" | "hogar" | "turismo" | "b2b" | "otros") | null;
             /** Description */
             description?: string | null;
             /** Website */
@@ -5032,6 +5056,16 @@ export interface components {
             hecho: boolean;
             /** Accion */
             accion: string;
+            /**
+             * Grupo
+             * @default probar
+             */
+            grupo: string;
+            /**
+             * Requerido
+             * @default true
+             */
+            requerido: boolean;
         };
         /** PaymentMethodPatch */
         PaymentMethodPatch: {
@@ -5207,6 +5241,11 @@ export interface components {
         ProcessView: {
             /** Template Key */
             template_key: string;
+            /**
+             * Plantilla Automatica
+             * @default true
+             */
+            plantilla_automatica: boolean;
             /** Template Version */
             template_version: number | null;
             /** Options */
@@ -5641,6 +5680,8 @@ export interface components {
             nombre: string | null;
             /** Plantilla Sugerida */
             plantilla_sugerida: string | null;
+            /** Capacidades Sugeridas */
+            capacidades_sugeridas?: string[];
             /** Version */
             version: number | null;
             /** Reglas */
@@ -8206,6 +8247,44 @@ export interface operations {
                 "application/json": components["schemas"]["ProcessRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    automatic_process_api_v1_assistant_process_automatica_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

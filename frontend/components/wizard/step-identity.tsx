@@ -26,6 +26,13 @@ const INDUSTRIES = [
   { value: "retail", label: "Tienda o retail" },
   { value: "servicios", label: "Servicios" },
   { value: "salud", label: "Salud" },
+  { value: "tecnologia", label: "Tecnología y software" },
+  { value: "belleza", label: "Belleza, bienestar y fitness" },
+  { value: "inmobiliaria", label: "Inmobiliaria" },
+  { value: "automotriz", label: "Automotriz" },
+  { value: "hogar", label: "Servicios del hogar y técnicos" },
+  { value: "turismo", label: "Turismo y hotelería" },
+  { value: "b2b", label: "Distribución y mayorista (B2B)" },
   { value: "otros", label: "Otros" },
 ] as const;
 

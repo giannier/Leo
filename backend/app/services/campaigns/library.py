@@ -91,7 +91,7 @@ LIBRARY: tuple[LibraryTemplate, ...] = (
         key="recordatorio_control",
         label="Es momento de volver",
         category="marketing",
-        rubros=("salud", "servicios"),
+        rubros=("salud", "servicios", "belleza", "automotriz", "hogar"),
         body=(
             "Hola {{nombre}}, en {{negocio}} te recordamos que ya es buen momento para tu "
             "próxima visita. Responde a este mensaje para coordinar."

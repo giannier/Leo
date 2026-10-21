@@ -35,7 +35,21 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_chec
 # every turn, so the cap is also a cost cap: 120 until 2026-10-20, then 400 (migration 0047).
 MAX_SALUDO = 400
 
-INDUSTRIES = ("restaurante", "instituto", "retail", "servicios", "salud", "otros")
+INDUSTRIES = (
+    "restaurante",
+    "instituto",
+    "retail",
+    "servicios",
+    "salud",
+    "tecnologia",
+    "belleza",
+    "inmobiliaria",
+    "automotriz",
+    "hogar",
+    "turismo",
+    "b2b",
+    "otros",
+)
 AGENT_TONES = ("profesional", "cercano", "juvenil")
 AGENT_OBJECTIVES = ("vender", "atender", "ambos")
 # How fast the assistant moves a customer toward the close, how much it says
@@ -53,6 +67,10 @@ DEFAULT_PROCESS_TEMPLATE = "productos"
 SALE_MODES = ("precio_fijo", "cotizacion")
 # What a price covers: once, per month or per year (migration 0050).
 PRICE_PERIODS = ("unico", "mes", "ano")
+# What the agent does (migration 0051). `agendar` and `captar` are planned: the column accepts them,
+# the screens offer only `CAPABILITIES_AVAILABLE`.
+CAPABILITIES = ("atender", "vender", "cotizar", "agendar", "captar")
+CAPABILITIES_AVAILABLE = ("atender", "vender", "cotizar")
 BUNDLE_MIN_SIZE = 2
 BUNDLE_MAX_SIZE = 50
 
@@ -125,11 +143,23 @@ class AgentConfig(Base):
             name="descuento_maximo_pct",
         ),
         CheckConstraint("max_situaciones BETWEEN 1 AND 10", name="max_situaciones"),
+        CheckConstraint(
+            "capacidades <@ ARRAY['atender','vender','cotizar','agendar','captar']::text[] "
+            "AND 'atender' = ANY(capacidades)",
+            name="capacidades",
+        ),
     )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
     )
+
+    # What the agent does. The process template and the objective follow from it (feature 019).
+    capacidades: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY['atender','vender']::text[]")
+    )
+    # True when the owner picked the template by hand: capabilities then leave it alone.
+    plantilla_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
     agent_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="Leo")
     tone: Mapped[str] = mapped_column(Text, nullable=False, server_default="cercano")

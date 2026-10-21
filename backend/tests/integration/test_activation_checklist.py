@@ -47,15 +47,32 @@ def user(db: Session) -> User:
 
 
 def _complete_everything(
-    db: Session, tenant: Tenant, user: User, *, objective: str = "ambos"
+    db: Session,
+    tenant: Tenant,
+    user: User,
+    *,
+    objective: str = "ambos",
+    capacities: list[str] | None = None,
 ) -> None:
-    """Every item satisfied, so each test can switch exactly one off."""
+    """Every item satisfied, so each test can switch exactly one off.
+
+    What the agent does decides what it needs: "atender" alone needs no payment and no catalogue.
+    `objective` is the old way to say it and maps to the capabilities when none are given.
+    """
+    if capacities is None:
+        capacities = ["atender"] if objective == "atender" else ["atender", "vender"]
     user.email_verified_at = datetime.now(UTC)
     user.phone_verified_at = datetime.now(UTC)
     db.add_all(
         [
             BusinessProfile(tenant_id=tenant.id, business_name="Panaderia", industry="restaurante"),
-            AgentConfig(tenant_id=tenant.id, agent_name="Leo", tone="cercano", objective=objective),
+            AgentConfig(
+                tenant_id=tenant.id,
+                agent_name="Leo",
+                tone="cercano",
+                objective=objective,
+                capacidades=capacities,
+            ),
             Product(tenant_id=tenant.id, name="Pan", price=Decimal("1.00"), is_active=True),
             PaymentMethodBusiness(
                 tenant_id=tenant.id, method="yape", instructions="Yape al 999", is_active=True
@@ -275,3 +292,32 @@ class TestPurity:
         assert len(db.new) == 0
         assert len(db.deleted) == 0
         assert len(db.dirty) == 0
+
+
+class TestWhatTheAgentDoesDecidesWhatItNeeds:
+    def test_a_quoting_agent_needs_a_catalogue_but_not_a_payment_method(
+        self, db: Session, tenant: Tenant, user: User
+    ) -> None:
+        _complete_everything(db, tenant, user, capacities=["atender", "cotizar"])
+        db.query(PaymentMethodBusiness).filter_by(tenant_id=tenant.id).delete()
+        db.flush()
+
+        checklist = build_checklist(db, tenant_id=tenant.id, user=user)
+
+        assert checklist.item("has_payment_method").required is False
+        assert checklist.item("has_active_product").required is True
+        assert checklist.sandbox_ready is True
+
+    def test_an_agent_that_only_answers_needs_neither(
+        self, db: Session, tenant: Tenant, user: User
+    ) -> None:
+        _complete_everything(db, tenant, user, capacities=["atender"])
+        db.query(PaymentMethodBusiness).filter_by(tenant_id=tenant.id).delete()
+        db.query(Product).filter_by(tenant_id=tenant.id).delete()
+        db.flush()
+
+        checklist = build_checklist(db, tenant_id=tenant.id, user=user)
+
+        assert checklist.item("has_payment_method").required is False
+        assert checklist.item("has_active_product").required is False
+        assert checklist.sandbox_ready is True
