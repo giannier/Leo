@@ -51,6 +51,8 @@ DEFAULT_PROCESS_TEMPLATE = "productos"
 # How a product is sold: `precio_fijo` goes into an order, `cotizacion` is handed
 # to a person with a summary (Feature 004).
 SALE_MODES = ("precio_fijo", "cotizacion")
+# What a price covers: once, per month or per year (migration 0050).
+PRICE_PERIODS = ("unico", "mes", "ano")
 BUNDLE_MIN_SIZE = 2
 BUNDLE_MAX_SIZE = 50
 
@@ -251,6 +253,7 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_products_products_price_non_negative"),
         CheckConstraint("cardinality(tags) <= 10", name="products_tags_count"),
+        enum_check("periodo", PRICE_PERIODS, "periodo"),
         Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
         # out of the index keeps it small and the catalog query fast.
@@ -284,6 +287,8 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Fit for sale (Feature 004, migration 0018).
     modo_venta: Mapped[str] = mapped_column(Text, nullable=False, server_default="precio_fijo")
+    # What the price covers: `unico`, `mes` or `ano`. Shown and spoken; totals add the amount.
+    periodo: Mapped[str] = mapped_column(Text, nullable=False, server_default="unico")
     # A digital product needs no delivery address.
     es_digital: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # A bundle ("paquete") is a product with a size: the N selections that

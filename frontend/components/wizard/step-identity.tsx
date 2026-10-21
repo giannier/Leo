@@ -15,6 +15,7 @@ import { Field, Select, Skeleton, TextArea } from "@/components/ui";
 import { api, type BusinessProfile, type BusinessProfilePatch } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { useAutosave } from "@/lib/use-autosave";
+import { ReadMyWeb } from "./read-my-web";
 import { SaveStatus, StepIntro, type StepProps } from "./shared";
 
 /** Mirrors `INDUSTRIES` in `app/models/business.py`. */
@@ -157,17 +158,17 @@ export function StepIdentity({ onSaved }: StepProps) {
       />
 
       <Field
-        label="Página web o red social"
+        label="Tu página web"
         name="website"
-        type="url"
         inputMode="url"
         autoCapitalize="none"
         spellCheck={false}
-        hint="Opcional."
-        placeholder="https://instagram.com/mi-negocio"
+        hint="Opcional. Escríbela una sola vez: la damos a tus clientes y, si quieres, la leemos para que el asistente conozca tu negocio."
+        placeholder="mitienda.pe"
         value={form.website}
         onChange={(e) => set("website", e.target.value)}
       />
+      <ReadMyWeb website={form.website} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Select

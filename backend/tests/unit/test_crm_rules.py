@@ -36,6 +36,8 @@ def _order(estado: str) -> Any:
         # Handed to an advisor for a quote: interested. Handed over for any other reason: no lead.
         ("DERIVADO", {"asesoria_derivada_en": "2026-10-20T20:00:00+00:00"}, None, "interesado"),
         ("DERIVADO", {"derivado": {"motivo": "queja"}}, None, None),
+        ("DERIVADO", {"derivado": {"motivo": "cotizacion"}}, None, "interesado"),
+        ("DERIVADO", {"derivado": {"motivo": "asesoria"}}, None, "interesado"),
     ],
 )
 def test_the_map(stage: str, facts: dict[str, Any], order: Any, expected: str | None) -> None:

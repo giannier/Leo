@@ -9,6 +9,7 @@
  * price or "se cotiza", package of N, stock.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ProductEditor } from "@/components/catalog/product-editor";
@@ -24,6 +25,14 @@ type StateFilter = "todos" | "activos" | "inactivos";
 
 function money(value: string): string {
   return `S/ ${Number(value).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+const PERIOD_SUFFIX = { unico: "", mes: " al mes", ano: " al año" } as const;
+
+function priceOf(product: Product): string {
+  const period = PERIOD_SUFFIX[product.periodo];
+  if (product.modo_venta !== "cotizacion") return `${money(product.price)}${period}`;
+  return Number(product.price) > 0 ? `Desde ${money(product.price)}${period} · se cotiza` : "Se cotiza";
 }
 
 export default function CatalogPage() {
@@ -116,6 +125,12 @@ export default function CatalogPage() {
         </div>
         {canEdit ? (
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/catalog/categorias"
+              className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-semibold text-ink hover:bg-surface-muted"
+            >
+              Categorías
+            </Link>
             <Button variant="secondary" onClick={() => setImporting((on) => !on)}>
               Importar Excel o CSV
             </Button>
@@ -272,7 +287,7 @@ export default function CatalogPage() {
                   ) : null}
                 </div>
                 <span className="tabular shrink-0 text-sm font-semibold text-ink">
-                  {product.modo_venta === "cotizacion" ? "Se cotiza" : money(product.price)}
+                  {priceOf(product)}
                 </span>
                 {canEdit ? (
                   <div className="flex w-full shrink-0 flex-wrap gap-1 sm:w-auto">

@@ -45,6 +45,7 @@ from app.services.knowledge import (
     SourceNotFoundError,
 )
 from app.services.overview import build_overview
+from app.services.website import mirror_contact_website_into_profile
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
@@ -121,6 +122,9 @@ def put_section(
     row = BusinessInfoRepository(session, principal.tenant_id).upsert(
         section, parsed.model_dump(mode="json")
     )
+    if section == "contacto":
+        # One website, asked once: the profile's gets it too if it had none.
+        mirror_contact_website_into_profile(session, principal.tenant_id, row.data.get("web"))
     session.commit()
     _changed(principal.tenant_id)
     return SectionResponse(section=section, data=row.data, updated_at=row.updated_at)
@@ -651,6 +655,25 @@ def _categories(session: SessionDep, tenant_id: uuid.UUID) -> list[CategoryRespo
 @router.get("/categories", response_model=CategoryList, responses=error_responses(*AUTH_RESPONSES))
 def list_categories(principal: ConfigurationManagerDep, session: SessionDep) -> CategoryList:
     return CategoryList(items=_categories(session, principal.tenant_id))
+
+
+@router.post(
+    "/categories",
+    response_model=CategoryResponse,
+    status_code=201,
+    responses=error_responses(*AUTH_RESPONSES, (409, "`category_exists`")),
+)
+def create_category(
+    body: CategoryRequest, principal: ConfigurationManagerDep, session: SessionDep
+) -> CategoryResponse:
+    """A category before it has products: the owner organises the catalogue first."""
+    repository = ProductCategoryRepository(session, principal.tenant_id)
+    if repository.by_name(body.nombre) is not None:
+        raise ApiError(status_code=409, error="category_exists", message="That name is taken.")
+    row = repository.add(nombre=" ".join(body.nombre.split()), orden=body.orden, activa=body.activa)
+    session.commit()
+    _changed(principal.tenant_id)
+    return next(c for c in _categories(session, principal.tenant_id) if c.id == row.id)
 
 
 @router.put(
