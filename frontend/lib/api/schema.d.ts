@@ -5682,6 +5682,8 @@ export interface components {
             plantilla_sugerida: string | null;
             /** Capacidades Sugeridas */
             capacidades_sugeridas?: string[];
+            /** Aviso Politica */
+            aviso_politica?: string | null;
             /** Version */
             version: number | null;
             /** Reglas */

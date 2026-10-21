@@ -37,6 +37,27 @@ medir resultados de negocio (no solo "resoluciones"), un traspaso con contexto, 
 | Eventos de conversión a Meta (Lead, Compra) por la API de Conversiones: Meta dice que la optimización por compra no está disponible para WhatsApp (sí para Messenger); los proveedores dicen lo contrario | Registrar el clic del anuncio (`ctwa_clid`) y enviar eventos queda como mejora opcional, a verificar | [oficial vs proveedor, en conflicto] ([Meta](https://developers.secure.facebook.com/docs/marketing-api/conversions-api/business-messaging/)) |
 | Perú: Ley 29733 y su reglamento (DS 016-2024-JUS): consentimiento informado y finalidad; más estricto con mensajes comerciales | Registro de consentimiento y baja ya existen en campañas; el aprendizaje entre negocios requiere anonimizar y consentimiento | [oficial parcial] ([resumen](https://regulations.clym.io/law-for-personal-data-protection-lpdp-peru)); sin texto específico para IA |
 
+### 2.1 Lo que dice el texto oficial (política de mensajería de WhatsApp Business, actualizada el 23-sep-2026)
+
+Leída en [whatsappbusiness.com/policy](https://whatsappbusiness.com/policy/) (la política de comercio de Meta, enlazada desde ahí, no se leyó).
+
+* **Sección 4, prohibido** "a criterio de Meta": armas de fuego; alcohol y tabaco; drogas (con o sin receta); **productos médicos y de salud**;
+  divisas reales o virtuales; apuestas con dinero real; servicios para adultos y de citas; marketing multinivel; y
+  "préstamos de día, adelantos de sueldo, préstamos entre personas, cobranza y fianzas". Aplica aunque el negocio tenga licencia.
+* **Sección 5, excepciones por país, con licencia y solo para mayores de 18**: apuestas en línea (entre otros países, Perú),
+  medicamentos sin receta y alcohol (unos 90 países; **si Perú está en esas dos listas no se verificó**). Prohibido ofrecer una
+  experiencia de compra de esos bienes y prohibido mensajear sobre ellos desde la app WhatsApp Business.
+* **Sección 3, datos**: "no compartas ni pidas números completos de tarjeta, de cuenta ni **de documento de identidad** u otros
+  identificadores sensibles"; y no usar WhatsApp para telemedicina ni para enviar o pedir información de salud si la regulación lo
+  restringe.
+* **Sección 2, automatización**: se permite responder con automatización dentro de las 24 h, pero con una vía de escalamiento
+  "pronta, clara y directa" (traspaso en el chat, teléfono, correo, web, tienda o formulario).
+* **No dice nada** sobre IA ni sobre avisar que es un asistente virtual (eso estaría en otros documentos de Meta, no leídos), ni
+  si dar soporte antes o después de la venta de un bien restringido cuenta como "promover".
+
+Consecuencia para Leo: el aviso de cada rubro sale de aquí (migración 0053). **Hallazgo abierto:** la plantilla `certificaciones`
+pide el DNI en el chat, y la sección 3 pide no hacerlo; la decisión es de Giannier (datos personales), ver `clarifications.md` C-01.
+
 ## 3. Qué necesita cada rubro (capacidades observadas)
 
 | Rubro | Lo que el agente hace allí | Particularidades |

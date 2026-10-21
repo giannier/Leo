@@ -22,6 +22,7 @@ export default function CapabilitiesPage() {
   const [saved, setSaved] = useState<string[] | null>(null);
   const [draft, setDraft] = useState<string[]>([]);
   const [suggested, setSuggested] = useState<string[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +37,10 @@ export default function CapabilitiesPage() {
       .catch((caught) => setError(humanMessage(caught)));
     api.assistant
       .rubro()
-      .then((rubro) => setSuggested(rubro.capacidades_sugeridas ?? []))
+      .then((rubro) => {
+        setSuggested(rubro.capacidades_sugeridas ?? []);
+        setNotice(rubro.aviso_politica ?? null);
+      })
       .catch(() => setSuggested([]));
   }, []);
 
@@ -70,7 +74,7 @@ export default function CapabilitiesPage() {
       ) : (
         <Card>
           <div className="space-y-4">
-            <CapabilityPicker value={draft} onChange={setDraft} suggested={suggested} disabled={!canEdit} />
+            <CapabilityPicker value={draft} onChange={setDraft} suggested={suggested} notice={notice} disabled={!canEdit} />
             <HowItSells refreshKey={(saved ?? []).join(",")} />
             {canEdit ? (
               <Button type="button" loading={busy} disabled={!changed} onClick={() => void save()}>

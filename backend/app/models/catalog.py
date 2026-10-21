@@ -55,6 +55,8 @@ class Rubro(Base):
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     nombre: Mapped[str] = mapped_column(Text, nullable=False)
     plantilla_sugerida: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the owner should know before turning something on, from the WhatsApp policy (019).
+    aviso_politica: Mapped[str | None] = mapped_column(Text, nullable=True)
     # What the agents of this rubro usually do (feature 019): the first suggestion in the setup.
     capacidades_sugeridas: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("ARRAY['atender','vender']::text[]")
