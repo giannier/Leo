@@ -50,7 +50,7 @@ export default function CapabilitiesPage() {
     setBusy(true);
     setError(null);
     try {
-      const config = await api.agentConfig.save({ capacidades: draft as ("atender" | "vender" | "cotizar")[] });
+      const config = await api.agentConfig.save({ capacidades: draft as ("atender" | "vender" | "cotizar" | "agendar")[] });
       const current = config.capacidades ?? draft;
       setSaved(current);
       setDraft(current);

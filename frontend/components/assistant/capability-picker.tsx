@@ -12,7 +12,7 @@ import { Alert, Checkbox, cx } from "@/components/ui";
 import { api, type ProcessTemplate } from "@/lib/api/client";
 
 export interface CapabilityInfo {
-  key: "atender" | "vender" | "cotizar";
+  key: "atender" | "vender" | "cotizar" | "agendar";
   titulo: string;
   detalle: string;
   pide: string;
@@ -41,10 +41,16 @@ export const CAPABILITIES: readonly CapabilityInfo[] = [
       "Para servicios a medida: entiende lo que necesita el cliente, da el precio referencial si lo hay y pasa el caso a una persona con un resumen.",
     pide: "Te pediremos los servicios que se cotizan y un contacto.",
   },
+  {
+    key: "agendar",
+    titulo: "Agendar citas y visitas",
+    detalle:
+      "Ofrece horarios libres, agenda sin que dos clientes tomen la misma hora, y permite cambiar o cancelar desde el chat.",
+    pide: "Te pediremos qué se agenda, cuánto dura y tus horarios.",
+  },
 ] as const;
 
 const SOON = [
-  { titulo: "Agendar citas y visitas", detalle: "Reservas con calendario y recordatorios." },
   { titulo: "Captar y calificar clientes", detalle: "Preguntas de calificación y aviso a tu equipo." },
 ];
 

@@ -22,6 +22,7 @@ import { TrialBanner } from "@/components/trial-banner";
 import {
   BookIcon,
   BoxIcon,
+  CalendarIcon,
   ChartIcon,
   ChatIcon,
   HomeIcon,
@@ -57,6 +58,8 @@ const NAV: NavItem[] = [
   { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
   // Every role (Feature 012): working leads is the operator's job too; no money for them.
   { href: "/crm", label: "CRM", icon: KanbanIcon },
+  // Every role (feature 019, phase D): the day's appointments are the front desk's work.
+  { href: "/agenda", label: "Agenda", icon: CalendarIcon },
   { href: "/campanas", label: "Campañas", icon: MegaphoneIcon },
   // Every role (Feature 010); an operator sees it without money.
   { href: "/resultados", label: "Resultados", icon: ChartIcon },

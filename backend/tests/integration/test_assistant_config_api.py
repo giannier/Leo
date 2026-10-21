@@ -616,7 +616,7 @@ class TestCapabilities:
         _, headers = await _account(api, mail)
 
         refused = await api.put(
-            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["agendar"]}
+            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["captar"]}
         )
 
         assert refused.status_code == 400
@@ -629,7 +629,12 @@ class TestCapabilities:
 
         rubro = await api.get(f"{A}/rubro", headers=headers)
 
-        assert rubro.json()["capacidades_sugeridas"] == ["atender", "vender", "cotizar"]
+        assert rubro.json()["capacidades_sugeridas"] == [
+            "atender",
+            "vender",
+            "cotizar",
+            "agendar",
+        ]
 
     @pytest.mark.parametrize(("industry", "has_notice"), [("salud", True), ("otros", False)])
     async def test_the_rubro_carries_the_policy_notice_of_the_platform(

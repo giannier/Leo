@@ -31,6 +31,15 @@ LIBRARY: tuple[LibraryTemplate, ...] = (
         ),
     ),
     LibraryTemplate(
+        key="recordatorio_cita",
+        label="Recordatorio de cita",
+        category="utility",
+        body=(
+            "Hola {{nombre}}, te recordamos tu cita de {{servicio}} el {{fecha}} a las {{hora}} "
+            "en {{negocio}}. Responde a este mensaje para confirmarla o para cambiarla."
+        ),
+    ),
+    LibraryTemplate(
         key="aviso_promocion",
         label="Aviso de promoción",
         category="marketing",

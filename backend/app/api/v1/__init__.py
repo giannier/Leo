@@ -26,6 +26,7 @@ from app.api.v1 import (
     products,
     realtime,
     sandbox,
+    scheduling,
     team,
     tenant,
     wizard,
@@ -45,6 +46,7 @@ router.include_router(campaigns.router)
 router.include_router(connection.router)
 router.include_router(conversations.router)
 router.include_router(crm.router)
+router.include_router(scheduling.router)
 router.include_router(files.router)
 router.include_router(knowledge.router)
 router.include_router(metrics.router)

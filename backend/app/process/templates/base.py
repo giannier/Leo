@@ -70,6 +70,10 @@ TOOL_NAMES: tuple[str, ...] = (
     "derivar_a_humano",
 )
 
+# The tools of a business whose agent also books appointments (capability `agendar`, feature 019):
+# on top of the stage's own tools, in every stage that runs the model.
+SCHEDULING_TOOL_NAMES: tuple[str, ...] = ("consultar_horarios", "agendar_cita", "gestionar_cita")
+
 # Available in every stage that runs the model, on top of the stage's own tools.
 GLOBAL_TOOLS: tuple[str, ...] = (
     "consultar_conocimiento",
@@ -377,6 +381,8 @@ class EffectiveOptions:
     datos_requeridos: tuple[str, ...]
     link_pago_tarjeta: str | None
     variables: Mapping[str, str]
+    # The business turned on the capability to book appointments (feature 019).
+    agendar: bool = False
 
     @property
     def calificacion_activa(self) -> bool:

@@ -46,7 +46,7 @@ export function setAccessToken(token: string | null, tenantId?: string | null): 
   }
 }
 
-/** The live channel's address (Feature 007): the token goes in the query string. */
+/** The live channel's address (Feature 007); the token travels as a subprotocol, not in the URL. */
 /**
  * Where the inbox socket connects, and what it offers as subprotocols. The access token
  * travels as the second one: a browser cannot set headers on a WebSocket, and in the URL
@@ -312,7 +312,14 @@ export type Product = ProductPage["items"][number];
 type ProductCreate = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBody"]>;
 /** Fields the server fills in when omitted (TASK-406); the generated type lists
  * them as required because the schema is read from the response side. */
-type ProductServerDefaults = "modo_venta" | "es_digital" | "bundle_permite_libres" | "destacado" | "tags";
+type ProductServerDefaults =
+  | "modo_venta"
+  | "es_digital"
+  | "bundle_permite_libres"
+  | "destacado"
+  | "tags"
+  | "agendable"
+  | "buffer_min";
 export type ProductBody = Omit<ProductCreate, ProductServerDefaults> &
   Partial<Pick<ProductCreate, ProductServerDefaults>>;
 export type ImportPreview = Ok<Ops["/api/v1/tenant/products/import"]["post"]>;
@@ -589,6 +596,21 @@ export interface CampaignReport {
   monto_vendido?: Record<string, string>;
   costo_estimado_usd?: string | null;
 }
+// The agenda (feature 019, phase D).
+export type Scheduling = Ok<Ops["/api/v1/tenant/scheduling"]["get"]>;
+export type SchedulingSettings = Scheduling["ajustes"];
+export type SchedulingResource = Scheduling["recursos"][number];
+export type SchedulingBlock = Scheduling["bloqueos"][number];
+export type BookableService = Scheduling["servicios"][number];
+export type AppointmentList = Ok<Ops["/api/v1/tenant/appointments"]["get"]>;
+export type Appointment = AppointmentList["items"][number];
+export type FreeSlots = Ok<Ops["/api/v1/tenant/scheduling/availability"]["get"]>;
+export type ResourceBody = {
+  nombre: string;
+  horario: Record<string, string[][]> | null;
+  product_ids: string[];
+  is_active: boolean;
+};
 // CRM (Feature 012).
 export type Pipeline = Ok<Ops["/api/v1/tenant/pipeline"]["get"]>;
 export type PipelineStage = Pipeline["stages"][number];
@@ -691,6 +713,39 @@ export const api = {
     get: () => request<BusinessProfile>("/tenant/business-profile"),
     save: (body: BusinessProfilePatch) =>
       request<BusinessProfile>("/tenant/business-profile", { method: "PUT", body }),
+  },
+
+  scheduling: {
+    overview: () => request<Scheduling>("/tenant/scheduling"),
+    saveSettings: (body: Partial<Omit<SchedulingSettings, "plantilla_aprobada">>) =>
+      request<SchedulingSettings>("/tenant/scheduling/settings", { method: "PUT", body }),
+    createResource: (body: ResourceBody) =>
+      request<SchedulingResource>("/tenant/scheduling/resources", { method: "POST", body }),
+    saveResource: (id: string, body: ResourceBody) =>
+      request<SchedulingResource>(`/tenant/scheduling/resources/${id}`, { method: "PUT", body }),
+    deleteResource: (id: string) =>
+      request<void>(`/tenant/scheduling/resources/${id}`, { method: "DELETE" }),
+    createBlock: (body: { resource_id: string; desde: string; hasta: string; motivo?: string | null }) =>
+      request<SchedulingBlock>("/tenant/scheduling/blocks", { method: "POST", body }),
+    deleteBlock: (id: string) => request<void>(`/tenant/scheduling/blocks/${id}`, { method: "DELETE" }),
+    availability: (query: { servicio_id: string; desde?: string; ignore?: string }) =>
+      request<FreeSlots>("/tenant/scheduling/availability", { query }),
+    appointments: (query: { desde: string; hasta?: string; recurso_id?: string }) =>
+      request<AppointmentList>("/tenant/appointments", { query }),
+    book: (body: {
+      servicio_id: string;
+      inicio: string;
+      nombre_cliente: string;
+      telefono?: string | null;
+      notas?: string | null;
+    }) => request<Appointment>("/tenant/appointments", { method: "POST", body }),
+    act: (id: string, accion: "confirmar" | "completar" | "no_asistio" | "cancelar", motivo?: string) =>
+      request<Appointment>(`/tenant/appointments/${id}/action`, {
+        method: "POST",
+        body: { accion, motivo: motivo ?? null },
+      }),
+    reschedule: (id: string, inicio: string) =>
+      request<Appointment>(`/tenant/appointments/${id}/reschedule`, { method: "POST", body: { inicio } }),
   },
 
   agentConfig: {

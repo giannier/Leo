@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -138,10 +139,18 @@ class Filled:
 
 
 def fill(
-    session: Session, tenant_id: uuid.UUID, template: MessageTemplate, contact: Contact
+    session: Session,
+    tenant_id: uuid.UUID,
+    template: MessageTemplate,
+    contact: Contact,
+    extra: Mapping[str, str] | None = None,
 ) -> Filled:
-    known: dict[str, str | None] = {}
+    """The template's variables for one contact; `extra` carries what comes from the occasion
+    (the service, date and time of an appointment reminder)."""
+    known: dict[str, str | None] = dict(extra or {})
     for name in template.variables:
+        if name in known:
+            continue
         if name == "nombre":
             known[name] = first_name(contact)
         elif name == "negocio":

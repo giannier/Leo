@@ -41,6 +41,10 @@ interface Draft {
   tags: string[];
   /** What to ask before a quote is handed over: one question per line. */
   datos_a_pedir: string;
+  /** A service that can be booked (feature 019, phase D). */
+  agendable: boolean;
+  duracion_min: string;
+  buffer_min: string;
 }
 
 function draftOf(product: Product | null): Draft {
@@ -61,10 +65,15 @@ function draftOf(product: Product | null): Draft {
     is_active: product?.is_active ?? true,
     tags: product?.tags ?? [],
     datos_a_pedir: (product?.datos_a_pedir ?? []).join("\n"),
+    agendable: product?.agendable ?? false,
+    duracion_min: product?.duracion_min != null ? String(product.duracion_min) : "60",
+    buffer_min: product?.buffer_min != null ? String(product.buffer_min) : "0",
   };
 }
 
-type Errors = Partial<Record<"name" | "price" | "stock" | "bundle_size" | "datos_a_pedir", string>>;
+type Errors = Partial<
+  Record<"name" | "price" | "stock" | "bundle_size" | "datos_a_pedir" | "duracion_min" | "buffer_min", string>
+>;
 
 function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
   const errors: Errors = {};
@@ -81,6 +90,14 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
   const size = Number(draft.bundle_size);
   if (draft.isBundle && (!Number.isInteger(size) || size < 2 || size > 50)) {
     errors.bundle_size = "Un paquete lleva de 2 a 50 elecciones.";
+  }
+  const minutes = Number(draft.duracion_min);
+  if (draft.agendable && (!Number.isInteger(minutes) || minutes < 15 || minutes > 480)) {
+    errors.duracion_min = "Entre 15 y 480 minutos.";
+  }
+  const gap = Number(draft.buffer_min || "0");
+  if (draft.agendable && (!Number.isInteger(gap) || gap < 0 || gap > 120)) {
+    errors.buffer_min = "Entre 0 y 120 minutos.";
   }
   const ask = draft.datos_a_pedir
     .split("\n")
@@ -109,6 +126,9 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
       is_active: draft.is_active,
       tags: draft.tags,
       datos_a_pedir: ask,
+      agendable: draft.agendable,
+      duracion_min: draft.agendable ? minutes : null,
+      buffer_min: draft.agendable ? gap : 0,
     },
   };
 }
@@ -279,6 +299,35 @@ export function ProductEditor({
             </div>
 
             <TagInput tags={draft.tags} onChange={(tags) => set("tags", tags)} />
+
+            <fieldset className="space-y-3 rounded-lg border border-line p-3">
+              <legend className="px-1 text-sm font-medium text-ink">Agenda</legend>
+              <Checkbox
+                label="Se puede agendar (cita, visita o reunión)"
+                hint="El asistente ofrece horarios libres y agenda solo, sin que dos clientes tomen la misma hora."
+                checked={draft.agendable}
+                onChange={(e) => set("agendable", e.target.checked)}
+              />
+              {draft.agendable ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Cuánto dura (minutos)"
+                    inputMode="numeric"
+                    value={draft.duracion_min}
+                    error={errors.duracion_min}
+                    onChange={(e) => set("duracion_min", e.target.value)}
+                  />
+                  <Field
+                    label="Pausa después (minutos)"
+                    inputMode="numeric"
+                    value={draft.buffer_min}
+                    error={errors.buffer_min}
+                    hint="Para limpiar, preparar o desplazarte."
+                    onChange={(e) => set("buffer_min", e.target.value)}
+                  />
+                </div>
+              ) : null}
+            </fieldset>
 
             <fieldset className="space-y-3 rounded-lg border border-line p-3">
               <legend className="px-1 text-sm font-medium text-ink">Paquete</legend>

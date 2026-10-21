@@ -16,6 +16,7 @@ export const STEP_LABELS: Record<string, string> = {
   conocimiento: "Enséñale tu negocio (tu web o documentos)",
   informacion: "Cuéntale horarios, entregas y políticas",
   contacto: "Agrega un contacto para los casos que requieren una persona",
+  agenda: "Define qué se agenda y tus horarios",
   primera_situacion: "Activa tu primera situación",
   probar_simulador: "Prueba a tu asistente en el simulador",
   probar_situacion: "Prueba una situación en el simulador",

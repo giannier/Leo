@@ -28,6 +28,7 @@ from app.models.conversation_state import ConversationStageEvent
 from app.models.knowledge import KnowledgeSource
 from app.models.media import MediaAsset
 from app.models.sales_config import Faq, Promotion
+from app.models.scheduling import Resource
 from app.models.situation import Situation
 from app.process.capabilities import DEFAULT_CAPABILITIES, leads_to_a_sale, sells
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
@@ -54,6 +55,7 @@ STEP_ACTIONS = {
     "conocimiento": "/knowledge",
     "informacion": "/asistente/informacion",
     "contacto": "/asistente/informacion?bloque=contacto",
+    "agenda": "/asistente/agenda",
     "primera_situacion": "/asistente/situaciones",
     "probar_simulador": "/sandbox",
     "probar_situacion": "/asistente/situaciones",
@@ -142,6 +144,23 @@ def build_overview(session: Session, tenant_id: uuid.UUID) -> Overview:
         ),
     )
     connected = WhatsAppNumberRepository(session, tenant_id).has_connected()
+    has_bookable = _any(
+        session,
+        select(Product).where(
+            Product.tenant_id == tenant_id,
+            Product.deleted_at.is_(None),
+            Product.is_active.is_(True),
+            Product.agendable.is_(True),
+        ),
+    )
+    has_hours = bool(profile and profile.opening_hours) or _any(
+        session,
+        select(Resource).where(
+            Resource.tenant_id == tenant_id,
+            Resource.is_active.is_(True),
+            Resource.horario.is_not(None),
+        ),
+    )
 
     detail: dict[str, SectionState] = {
         "metodos_pago": "completa" if has_payment else "vacia",
@@ -188,6 +207,8 @@ def build_overview(session: Session, tenant_id: uuid.UUID) -> Overview:
         plan.append(("metodos_pago", has_payment, "probar", True))
     plan.append(("conocimiento", has_knowledge, "probar", False))
     plan.append(("informacion", info_state != "vacia", "probar", False))
+    if "agendar" in capabilities:
+        plan.append(("agenda", has_bookable and has_hours, "probar", True))
     if quotes:
         plan.append(("contacto", has_contact, "probar", False))
     plan += [

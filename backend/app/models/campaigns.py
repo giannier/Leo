@@ -44,7 +44,8 @@ RATE_CATEGORIES = (*TEMPLATE_CATEGORIES, "service")
 FREE_SERVICE_MESSAGES = 1000
 TEMPLATE_STATUSES = ("draft", "pending", "approved", "rejected", "paused", "disabled")
 # The variables a template may use (C-105), in the order the editor offers them.
-TEMPLATE_VARIABLES = ("nombre", "negocio", "producto")
+# `servicio`, `fecha` and `hora` only exist for an appointment reminder (feature 019, phase D).
+TEMPLATE_VARIABLES = ("nombre", "negocio", "producto", "servicio", "fecha", "hora")
 OPTIN_SOURCES = ("conversation", "import", "form")
 OPTIN_STATUSES = ("asked", "granted", "declined", "revoked")
 CAMPAIGN_STATUSES = ("draft", "scheduled", "sending", "paused", "completed", "canceled")

@@ -1,5 +1,21 @@
 # Spec + Plan + Tasks — Agendamiento de Citas
 
+> **Estado (2026-10-21): v1 construida dentro de la 019, fase D.** Lo que se hizo y en qué se aparta de este
+> documento (decisiones en `019/clarifications.md`, C-02):
+> * **Un servicio agendable es un producto del catálogo** (`products.agendable`, `duracion_min`, `buffer_min`), no una
+>   tabla aparte: una sola línea de configuración. La tabla `bookable_services` de abajo no existe.
+> * Los recursos (`resources`) sin horario propio **siguen el horario del negocio**; `product_ids` vacío = atienden todo.
+> * `appointments.ocupa_hasta` (fin + pausa) es lo que protege la restricción de exclusión; los estados son
+>   `agendada, confirmada, completada, cancelada, no_asistio` (el "sin confirmar" se deriva: recordatorio enviado y
+>   sin confirmar).
+> * Recordatorios: **apagados por defecto**, una sola plantilla aprobada para ambos, texto libre si la ventana de 24 h
+>   sigue abierta (`recordatorio_24h_en` y `recordatorio_2h_en` reclamados con la versión de la cita; sin jobs
+>   diferidos). Sin plantilla aprobada se omite y queda el evento.
+> * Sin Google Calendar ni FullCalendar (dependencias nuevas sin aprobar): agenda propia con vista de día y semana.
+> * En el simulador la cita **no se escribe**: se hacen las mismas comprobaciones.
+> * Hecho: TASK-1401 a 1405 y una versión de 1407. Pendiente: 1406 (Google Calendar), la carga de 100 reservas
+>   concurrentes (1408) y el piloto con un negocio real.
+
 **Feature ID:** 014 · **Módulo:** 14-scheduling · **Estado:** Draft para ratificación
 **Depende de:** 003 (agente), 011 (plantillas para recordatorios), 007 (bandeja)
 

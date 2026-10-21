@@ -84,6 +84,9 @@ def semantic_for(stage_key: str, facts: dict[str, Any], order: Order | None) -> 
     ):
         # Handed to an advisor to quote or advise: a qualified lead, not a complaint.
         return "interesado"
+    if facts.get("cita_agendada"):
+        # An appointment is evidence of interest whatever stage the conversation is in.
+        return "interesado"
     if stage_key == "IDENTIFICAR" and facts.get("vio_productos"):
         return "nuevo"
     return None
