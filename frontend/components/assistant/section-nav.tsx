@@ -22,6 +22,12 @@ import { api } from "@/lib/api/client";
 const SECTIONS = [
   { href: "/asistente", label: "Resumen", detail: "Qué falta para activarlo", clave: null },
   {
+    href: "/asistente/capacidades",
+    label: "Qué hará tu agente",
+    detail: "Atender, vender, cotizar",
+    clave: "comportamiento",
+  },
+  {
     href: "/asistente/informacion",
     label: "Información del negocio",
     detail: "Pagos, locales, entregas y políticas",
@@ -35,8 +41,8 @@ const SECTIONS = [
   },
   {
     href: "/asistente/proceso",
-    label: "Proceso y rubro",
-    detail: "Cómo vendes, paso a paso",
+    label: "Reglas y proceso",
+    detail: "Avanzado: plantilla y reglas",
     clave: "proceso_venta",
   },
   { href: "/catalog", label: "Productos", detail: "Catálogo, fotos y etiquetas", clave: "productos" },

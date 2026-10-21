@@ -26,8 +26,17 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +55,10 @@ class Rubro(Base):
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     nombre: Mapped[str] = mapped_column(Text, nullable=False)
     plantilla_sugerida: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the agents of this rubro usually do (feature 019): the first suggestion in the setup.
+    capacidades_sugeridas: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("ARRAY['atender','vender']::text[]")
+    )
 
 
 class CatalogVersion(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):

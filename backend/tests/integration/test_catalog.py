@@ -14,7 +14,21 @@ from app.process.templates import TEMPLATES
 from app.process.templates.base import Stage
 from app.repositories.catalog import CatalogRepository, VersionFrozen
 
-RUBROS = ("instituto", "otros", "restaurante", "retail", "salud", "servicios")
+RUBROS = (
+    "automotriz",
+    "b2b",
+    "belleza",
+    "hogar",
+    "inmobiliaria",
+    "instituto",
+    "otros",
+    "restaurante",
+    "retail",
+    "salud",
+    "servicios",
+    "tecnologia",
+    "turismo",
+)
 
 
 class TestTheSplit:
@@ -59,7 +73,7 @@ class TestVersionOne:
         assert rules.process_version == LATEST_PROCESS_VERSION
         assert texts == code
 
-    def test_six_rubros_with_content_and_a_suggested_template(self, db: Session) -> None:
+    def test_thirteen_rubros_with_content_and_a_suggested_template(self, db: Session) -> None:
         catalog = CatalogRepository(db)
 
         assert [r.key for r in catalog.rubros()] == list(RUBROS)

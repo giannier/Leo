@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.models.business import AgentConfig, BusinessProfile, Product
 from app.models.user import User
+from app.process.capabilities import DEFAULT_CAPABILITIES, leads_to_a_sale, sells
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
 from app.repositories.product import ProductRepository
@@ -55,11 +56,6 @@ SANDBOX_ITEMS: tuple[ChecklistKey, ...] = (
     "has_active_product",
     "has_payment_method",
 )
-
-# Objectives that make a payment method necessary. An agent that only answers
-# questions has nothing to charge for, so demanding payment instructions would
-# block a perfectly valid setup on a field it will never use.
-SELLING_OBJECTIVES = ("vender", "ambos")
 
 
 @dataclass(frozen=True)
@@ -129,8 +125,11 @@ def build_checklist(
 
     payments = PaymentMethodRepository(session, tenant_id)
 
-    objective = config.objective if config is not None else "ambos"
-    payment_required = objective in SELLING_OBJECTIVES
+    # What the agent does decides what it needs (feature 019): charging only if it sells, a
+    # catalogue only if it sells or quotes. An agent that only answers questions needs neither.
+    capabilities = config.capacidades if config is not None else DEFAULT_CAPABILITIES
+    payment_required = sells(capabilities)
+    product_required = leads_to_a_sale(capabilities)
 
     has_product = products.count(Product.deleted_at.is_(None), Product.is_active.is_(True)) > 0
     has_payment = payments.count_active() > 0
@@ -139,7 +138,9 @@ def build_checklist(
         ChecklistItem("email_verified", user.email_verified_at is not None),
         ChecklistItem("business_profile_complete", _profile_complete(profile)),
         ChecklistItem("agent_config_complete", _agent_complete(config)),
-        ChecklistItem("has_active_product", has_product),
+        ChecklistItem(
+            "has_active_product", has_product or not product_required, required=product_required
+        ),
         ChecklistItem(
             "has_payment_method",
             # An item that does not apply is reported done, so it neither

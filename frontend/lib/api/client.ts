@@ -1054,6 +1054,9 @@ export const api = {
     process: () => request<ProcessView>("/assistant/process"),
     saveProcess: (template_key: string, options: Record<string, unknown> = {}) =>
       request<ProcessView>("/assistant/process", { method: "PUT", body: { template_key, options } }),
+    /** Give the template back to the platform: it follows what the agent does again. */
+    automaticProcess: () =>
+      request<ProcessView>("/assistant/process/automatica", { method: "POST" }),
     switchRule: (kind: CatalogKind, ruleKey: string, apagada: boolean) =>
       request<RuleView>(`/assistant/rules/${kind}/${encodeURIComponent(ruleKey)}`, {
         method: "PUT",

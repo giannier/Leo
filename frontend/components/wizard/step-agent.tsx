@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Checkbox, Field, Select, Skeleton, TextArea } from "@/components/ui";
-import { api, type AgentConfig, type AgentConfigPatch, type ProcessTemplate } from "@/lib/api/client";
+import { CapabilityPicker, HowItSells } from "@/components/assistant/capability-picker";
+import { api, type AgentConfig, type AgentConfigPatch } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { useAutosave } from "@/lib/use-autosave";
 import { SaveStatus, StepIntro, type StepProps } from "./shared";
@@ -23,11 +24,6 @@ const TONES = [
   { value: "juvenil", label: "Juvenil - relajado, informal" },
 ] as const;
 
-const OBJECTIVES = [
-  { value: "ambos", label: "Atender y vender" },
-  { value: "vender", label: "Vender - cerrar pedidos" },
-  { value: "atender", label: "Atender - responder consultas" },
-] as const;
 
 /** Mirrors `DEFAULT_ESCALATION_RULES` in `app/models/business.py`. */
 const ESCALATIONS = [
@@ -52,6 +48,7 @@ type Form = {
   agent_name: string;
   tone: string;
   objective: string;
+  capacidades: string[];
   tratamiento: string;
   emojis: string;
   saludo: string;
@@ -59,62 +56,19 @@ type Form = {
   farewell_on_pause: string;
 };
 
-/**
- * How it sells (017, C-03): the rubro suggests a process template. A business
- * that never chose one gets the suggestion applied once, and can change it.
- */
-function ProcessChoice() {
-  const [templates, setTemplates] = useState<ProcessTemplate[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
-  const [applied, setApplied] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    Promise.all([api.assistant.templates(), api.assistant.process()])
-      .then(async ([list, process]) => {
-        setTemplates(list.items);
-        const suggested = list.items.find((t) => t.sugerida_por_rubro);
-        const untouched = Object.keys(process.options ?? {}).length === 0;
-        if (suggested && suggested.key !== process.template_key && untouched) {
-          const saved = await api.assistant.saveProcess(suggested.key);
-          setCurrent(saved.template_key);
-          setApplied(suggested.nombre);
-        } else {
-          setCurrent(process.template_key);
-        }
-      })
-      .catch((caught) => setError(humanMessage(caught)));
-  }, []);
-
-  if (error) return <p className="text-sm text-danger">{error}</p>;
-  if (!current) return null;
-  return (
-    <div className="space-y-1">
-      <Select
-        label="Cómo vendes"
-        name="template"
-        options={templates.map((t) => ({
-          value: t.key,
-          label: `${t.nombre}${t.sugerida_por_rubro ? " (sugerida para tu rubro)" : ""}`,
-        }))}
-        value={current}
-        onChange={async (e) => {
-          const saved = await api.assistant.saveProcess(e.target.value);
-          setCurrent(saved.template_key);
-          setApplied(null);
-        }}
-      />
-      {applied ? (
-        <p className="text-xs text-ink-faint">Elegimos «{applied}» por tu rubro. Puedes cambiarlo.</p>
-      ) : null}
-    </div>
-  );
-}
-
 export function StepAgent({ onSaved }: StepProps) {
   const [form, setForm] = useState<Form | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const seeded = useRef(false);
+  const [suggested, setSuggested] = useState<string[]>([]);
+
+  // What agents of the business's rubro usually do: a suggestion, never applied on its own.
+  useEffect(() => {
+    api.assistant
+      .rubro()
+      .then((rubro) => setSuggested(rubro.capacidades_sugeridas ?? []))
+      .catch(() => setSuggested([]));
+  }, []);
 
   const { state, schedule, seed } = useAutosave<Form, AgentConfig>({
     save: (values, expected) => {
@@ -122,6 +76,7 @@ export function StepAgent({ onSaved }: StepProps) {
         agent_name: values.agent_name.trim() || "Leo",
         tone: values.tone as AgentConfigPatch["tone"],
         objective: values.objective as AgentConfigPatch["objective"],
+        capacidades: values.capacidades as AgentConfigPatch["capacidades"],
         tratamiento: values.tratamiento as AgentConfigPatch["tratamiento"],
         emojis: values.emojis as AgentConfigPatch["emojis"],
         saludo: values.saludo.trim(),
@@ -146,6 +101,7 @@ export function StepAgent({ onSaved }: StepProps) {
           agent_name: config.agent_name ?? "Leo",
           tone: config.tone ?? "cercano",
           objective: config.objective ?? "ambos",
+          capacidades: config.capacidades ?? ["atender", "vender"],
           tratamiento: config.tratamiento ?? "tu",
           emojis: config.emojis ?? "pocos",
           saludo: config.saludo ?? "",
@@ -197,7 +153,15 @@ export function StepAgent({ onSaved }: StepProps) {
 
   return (
     <div className="space-y-4">
-      <StepIntro>Cómo habla tu agente y cuándo debe pasarle la conversación a una persona.</StepIntro>
+      <StepIntro>
+        Qué hará tu agente, cómo habla y cuándo debe pasarle la conversación a una persona.
+      </StepIntro>
+
+      <CapabilityPicker
+        value={form.capacidades}
+        suggested={suggested}
+        onChange={(capacidades) => set({ capacidades })}
+      />
 
       <Field
         label="¿Cómo se llama tu agente?"
@@ -216,16 +180,6 @@ export function StepAgent({ onSaved }: StepProps) {
           onChange={(e) => set({ tone: e.target.value })}
         />
         <Select
-          label="Para qué lo quieres"
-          name="objective"
-          options={OBJECTIVES}
-          value={form.objective}
-          onChange={(e) => set({ objective: e.target.value })}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Select
           label="Trato al cliente"
           name="tratamiento"
           options={[
@@ -235,6 +189,9 @@ export function StepAgent({ onSaved }: StepProps) {
           value={form.tratamiento}
           onChange={(e) => set({ tratamiento: e.target.value })}
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Select
           label="Emojis"
           name="emojis"
@@ -257,7 +214,7 @@ export function StepAgent({ onSaved }: StepProps) {
         onChange={(e) => set({ saludo: e.target.value })}
       />
 
-      <ProcessChoice />
+      <HowItSells refreshKey={form.capacidades.join(",")} />
 
       <p className="text-xs text-ink-faint">
         Lo que tu agente no debe hacer y tus reglas propias se escriben como situaciones, en el

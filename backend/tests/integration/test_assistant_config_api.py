@@ -489,12 +489,12 @@ class TestOverview:
         partial = (await api.get(f"{A}/overview", headers=headers)).json()
 
         steps = {s["paso"]: s["hecho"] for s in partial["activacion"]}
-        assert empty["siguiente_paso"] == "productos"
+        assert empty["siguiente_paso"] == "negocio"
         assert empty["progreso"] < partial["progreso"]
         assert steps["productos"] and steps["metodos_pago"] and steps["primera_situacion"]
         assert not steps["probar_simulador"] and not steps["conectar_whatsapp"]
-        # No agent configuration yet: choosing the sales process comes next.
-        assert partial["siguiente_paso"] == "proceso_venta"
+        # No business data nor an agent yet: those come first, before anything that improves it.
+        assert partial["siguiente_paso"] == "negocio"
         sections = {s["clave"]: s["estado"] for s in partial["secciones"]}
         assert sections["situaciones"] == "completa" and sections["multimedia"] == "opcional"
 
@@ -555,3 +555,135 @@ class TestCreatingACategory:
         assert created.status_code == 201 and created.json()["productos"] == 0
         assert again.status_code == 409 and again.json()["error"] == "category_exists"
         assert [c["nombre"] for c in listed.json()["items"]] == ["Hosting"]
+
+
+class TestCapabilities:
+    """What the agent does picks the template and the objective (feature 019)."""
+
+    async def test_the_defaults_are_attend_and_sell(self, api: AsyncClient, mail: Any) -> None:
+        _, headers = await _account(api, mail)
+
+        config = await api.get(f"{TENANT}/agent-config", headers=headers)
+
+        assert config.json()["capacidades"] == ["atender", "vender"]
+
+    async def test_choosing_to_quote_moves_the_template_and_keeps_attend(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        saved = await api.put(
+            f"{TENANT}/agent-config",
+            headers=headers,
+            json={"capacidades": ["vender", "cotizar"]},
+        )
+        process = await api.get(f"{A}/process", headers=headers)
+
+        assert saved.json()["capacidades"] == ["atender", "vender", "cotizar"]
+        assert saved.json()["objective"] == "ambos"
+        assert process.json()["template_key"] == "servicios"
+        assert process.json()["plantilla_automatica"] is True
+
+    async def test_only_attending_derives_the_objective_and_asks_nothing_to_sell(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        saved = await api.put(
+            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["atender"]}
+        )
+
+        assert saved.json()["objective"] == "atender"
+
+    async def test_a_template_chosen_by_hand_is_left_alone_until_given_back(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(f"{A}/process", headers=headers, json={"template_key": "certificaciones"})
+
+        await api.put(f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["cotizar"]})
+        manual = await api.get(f"{A}/process", headers=headers)
+        back = await api.post(f"{A}/process/automatica", headers=headers)
+
+        assert manual.json()["template_key"] == "certificaciones"
+        assert manual.json()["plantilla_automatica"] is False
+        assert back.json()["template_key"] == "servicios"
+        assert back.json()["plantilla_automatica"] is True
+
+    async def test_a_capability_that_does_not_exist_yet_is_refused(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        refused = await api.put(
+            f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["agendar"]}
+        )
+
+        assert refused.status_code == 400
+
+    async def test_the_rubro_suggests_what_its_agents_usually_do(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(f"{TENANT}/business-profile", headers=headers, json={"industry": "servicios"})
+
+        rubro = await api.get(f"{A}/rubro", headers=headers)
+
+        assert rubro.json()["capacidades_sugeridas"] == ["atender", "vender", "cotizar"]
+
+
+class TestOneListOfSteps:
+    """The setup is one list that depends on what the agent does (feature 019)."""
+
+    async def _steps(self, api: AsyncClient, headers: dict[str, str]) -> dict[str, dict[str, Any]]:
+        overview = (await api.get(f"{A}/overview", headers=headers)).json()
+        return {s["paso"]: s for s in overview["activacion"]}
+
+    async def test_an_agent_that_sells_asks_for_a_catalogue_and_a_payment_method(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+
+        steps = await self._steps(api, headers)
+
+        assert steps["productos"]["requerido"] and steps["metodos_pago"]["requerido"]
+        assert "contacto" not in steps
+        assert steps["conectar_whatsapp"]["grupo"] == "clientes"
+        assert steps["conocimiento"]["requerido"] is False
+
+    async def test_one_that_quotes_asks_for_a_contact_and_not_for_payments(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["cotizar"]})
+
+        steps = await self._steps(api, headers)
+
+        assert steps["productos"]["requerido"]
+        assert "metodos_pago" not in steps
+        assert steps["contacto"]["requerido"] is False
+
+    async def test_one_that_only_answers_asks_for_neither(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(f"{TENANT}/agent-config", headers=headers, json={"capacidades": ["atender"]})
+
+        steps = await self._steps(api, headers)
+
+        assert "productos" not in steps and "metodos_pago" not in steps
+
+    async def test_a_required_step_is_next_before_a_recommended_one(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        _, headers = await _account(api, mail)
+        await api.put(
+            f"{TENANT}/business-profile",
+            headers=headers,
+            json={"business_name": "Mi negocio", "industry": "servicios"},
+        )
+        await api.put(f"{TENANT}/agent-config", headers=headers, json={"agent_name": "Ana"})
+
+        overview = (await api.get(f"{A}/overview", headers=headers)).json()
+
+        assert overview["siguiente_paso"] == "productos"
