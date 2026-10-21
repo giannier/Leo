@@ -46,6 +46,7 @@ PREVIEW_SECONDS = 600
 ProductName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
 SaleMode = Literal["precio_fijo", "cotizacion"]
+PricePeriod = Literal["unico", "mes", "ano"]
 BundleSize = Annotated[int, Field(ge=BUNDLE_MIN_SIZE, le=BUNDLE_MAX_SIZE)]
 
 AUTH_RESPONSES = (
@@ -79,6 +80,7 @@ class ProductRequest(BaseModel):
     is_active: bool = True
     # Fit for sale (Feature 004). A bundle is a product with a `bundle_size`.
     modo_venta: SaleMode = "precio_fijo"
+    periodo: PricePeriod = "unico"
     es_digital: bool = False
     bundle_size: BundleSize | None = None
     bundle_permite_libres: bool = False
@@ -100,6 +102,7 @@ class ProductPatch(BaseModel):
     category: ShortText | None = None
     is_active: bool | None = None
     modo_venta: SaleMode | None = None
+    periodo: PricePeriod | None = None
     es_digital: bool | None = None
     # Unlike the other new fields, `bundle_size` may be sent as null: that turns
     # a package back into a single product.
@@ -115,7 +118,7 @@ class ProductPatch(BaseModel):
             raise ValueError("must not be null")
         return _clean(value)
 
-    @field_validator("modo_venta", "es_digital", "bundle_permite_libres", "destacado")
+    @field_validator("modo_venta", "periodo", "es_digital", "bundle_permite_libres", "destacado")
     @classmethod
     def _not_null(cls, value: Any) -> Any:
         """These columns are NOT NULL: omit the field to leave it as it is."""
@@ -133,6 +136,7 @@ class ProductResponse(BaseModel):
     category: str | None
     is_active: bool
     modo_venta: SaleMode
+    periodo: PricePeriod
     es_digital: bool
     bundle_size: int | None
     bundle_permite_libres: bool

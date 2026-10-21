@@ -226,6 +226,14 @@ function AddWeb({ onAdded }: { onAdded: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
+  // The web written once in the business profile: no need to type it again here.
+  useEffect(() => {
+    api.profile
+      .get()
+      .then((profile) => setUrl((current) => current || profile.website || ""))
+      .catch(() => undefined);
+  }, []);
+
   return (
     <Card>
       <form

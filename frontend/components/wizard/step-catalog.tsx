@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AlertIcon, BoxIcon, CloseIcon } from "@/components/icons";
-import { Alert, Button, Field, Skeleton, TextArea, cx } from "@/components/ui";
+import { Alert, Button, Field, Select, Skeleton, TextArea, cx } from "@/components/ui";
 import { ProductEditor } from "@/components/catalog/product-editor";
 import { api, type ImportPreview, type Product } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -77,7 +77,7 @@ export function StepCatalog({ onSaved }: StepProps) {
       ) : null}
 
       <ProductList products={products} onChanged={afterChange} onEdit={setEditing} />
-      <AddProduct onAdded={afterChange} />
+      <AddProduct onAdded={afterChange} categories={categories} />
       <ImportProducts onImported={afterChange} />
 
       {editing ? (
@@ -180,10 +180,21 @@ function ProductList({
 
 /* ------------------------------------------------------------- add one */
 
-function AddProduct({ onAdded }: { onAdded: () => Promise<void> }) {
+function AddProduct({
+  onAdded,
+  categories,
+}: {
+  onAdded: () => Promise<void>;
+  categories: string[];
+}) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  // How it is sold decides what the assistant does with it: a fixed price goes into an order, a quote is
+  // explained and handed to a person.
+  const [quoted, setQuoted] = useState(false);
+  const [period, setPeriod] = useState<"unico" | "mes" | "ano">("unico");
   const [errors, setErrors] = useState<{ name?: string; price?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -194,8 +205,8 @@ function AddProduct({ onAdded }: { onAdded: () => Promise<void> }) {
 
     const found: typeof errors = {};
     if (!name.trim()) found.name = "Ponle un nombre.";
-    const amount = Number(price.replace(",", "."));
-    if (!price.trim() || Number.isNaN(amount) || amount < 0) {
+    const amount = price.trim() ? Number(price.replace(",", ".")) : 0;
+    if ((!quoted && !price.trim()) || Number.isNaN(amount) || amount < 0) {
       found.price = "Escribe un precio válido, por ejemplo 12.50";
     }
     if (Object.keys(found).length > 0) {
@@ -212,11 +223,17 @@ function AddProduct({ onAdded }: { onAdded: () => Promise<void> }) {
         // Two decimals, as a string, because the column is NUMERIC(12,2) and
         // the whole codebase treats money as exact.
         price: amount.toFixed(2),
+        category: category.trim() || null,
+        modo_venta: quoted ? "cotizacion" : "precio_fijo",
+        periodo: period,
         is_active: true,
       });
       setName("");
       setPrice("");
       setDescription("");
+      setCategory("");
+      setQuoted(false);
+      setPeriod("unico");
       await onAdded();
     } catch (caught) {
       setFailure(humanMessage(caught));
@@ -236,21 +253,63 @@ function AddProduct({ onAdded }: { onAdded: () => Promise<void> }) {
           label="Nombre"
           name="product_name"
           required
+          placeholder="Ej.: Hosting básico, Corte de cabello o Zapatillas"
           value={name}
           error={errors.name}
           onChange={(e) => setName(e.target.value)}
         />
         <Field
-          label="Precio"
+          label={quoted ? "Precio referencial" : "Precio"}
           name="product_price"
-          required
+          required={!quoted}
           // `decimal`, so Android shows a keypad with a separator on it.
           inputMode="decimal"
           placeholder="12.50"
+          hint={quoted ? "Opcional: lo que se dice como \"desde\"." : undefined}
           value={price}
           error={errors.price}
           onChange={(e) => setPrice(e.target.value)}
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Select
+          label="Cómo se vende"
+          name="product_mode"
+          value={quoted ? "cotizacion" : "precio_fijo"}
+          onChange={(e) => setQuoted(e.target.value === "cotizacion")}
+          options={[
+            { value: "precio_fijo", label: "Precio fijo: se pide y se paga" },
+            { value: "cotizacion", label: "Se cotiza: lo ve una persona" },
+          ]}
+        />
+        <Select
+          label="El precio se cobra"
+          name="product_period"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as typeof period)}
+          options={[
+            { value: "unico", label: "Una sola vez" },
+            { value: "mes", label: "Cada mes" },
+            { value: "ano", label: "Cada año" },
+          ]}
+        />
+        <div>
+          <Field
+            label="Categoría"
+            name="product_category"
+            list="wizard-categories"
+            placeholder="Ej.: Servicios, Planes o Calzado"
+            hint="Opcional. Elige una o escribe una nueva."
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          />
+          <datalist id="wizard-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </div>
       </div>
 
       <TextArea

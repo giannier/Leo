@@ -56,6 +56,7 @@ CANONICAL_COLUMNS = (
     # Fit for sale (Feature 004). All optional: a file without them imports as
     # fixed-price, physical, single, not highlighted products.
     "modo_venta",
+    "periodo",
     "es_digital",
     "bundle_size",
     "bundle_permite_libres",
@@ -70,6 +71,19 @@ BUNDLE_MAX_SIZE = 50
 
 _TRUE_WORDS = frozenset({"si", "sí", "s", "yes", "y", "true", "verdadero", "1", "x"})
 _FALSE_WORDS = frozenset({"no", "n", "false", "falso", "0"})
+_PERIODS = {
+    "unico": "unico",
+    "único": "unico",
+    "pago unico": "unico",
+    "pago único": "unico",
+    "mes": "mes",
+    "mensual": "mes",
+    "al mes": "mes",
+    "ano": "ano",
+    "año": "ano",
+    "anual": "ano",
+    "al año": "ano",
+}
 _SALE_MODES = {
     "precio_fijo": "precio_fijo",
     "precio fijo": "precio_fijo",
@@ -100,6 +114,9 @@ _HEADER_ALIASES = {
     "modo_venta": "modo_venta",
     "modo de venta": "modo_venta",
     "modo": "modo_venta",
+    "periodo": "periodo",
+    "frecuencia": "periodo",
+    "periodicidad": "periodo",
     "es_digital": "es_digital",
     "digital": "es_digital",
     "bundle_size": "bundle_size",
@@ -371,6 +388,12 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
             return InvalidRow(row=number, reason="modo_venta_invalido")
         sale_mode = "precio_fijo"
 
+    period = _PERIODS.get((record.get("periodo") or "").strip().lower())
+    if period is None:
+        if (record.get("periodo") or "").strip():
+            return InvalidRow(row=number, reason="periodo_invalido")
+        period = "unico"
+
     bundle_size: int | None = None
     bundle_raw = (record.get("bundle_size") or "").strip()
     if bundle_raw:
@@ -405,6 +428,7 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         "stock": stock,
         "category": neutralise_formula(category) or None,
         "modo_venta": sale_mode,
+        "periodo": period,
         "bundle_size": bundle_size,
         "tags": tags,
         **flags,

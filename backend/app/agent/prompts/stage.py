@@ -61,6 +61,7 @@ from app.process.service import EffectiveProcessConfig
 from app.process.templates.base import PLACEHOLDER_PATTERN, Stage
 from app.process.turn import TurnContext
 from app.providers.llm.base import ToolSpec
+from app.services.website import normalize_website
 
 logger = logging.getLogger(__name__)
 
@@ -476,17 +477,18 @@ def _returns_line(config: EffectiveProcessConfig) -> str | None:
 
 def _contact_line(config: EffectiveProcessConfig) -> str | None:
     contact = config.info.contacto
-    if contact is None:
-        return None
     parts: list[str] = []
-    if contact.telefono_humano:
+    if contact is not None and contact.telefono_humano:
         parts.append(f"teléfono de una persona {contact.telefono_humano}")
-    if contact.correo:
+    if contact is not None and contact.correo:
         parts.append(f"correo {contact.correo}")
-    if contact.web:
-        parts.append(f"web {contact.web}")
-    for network, url in contact.redes.items():
-        parts.append(f"{network} {url}")
+    # The contact section's web, or the one written once in the business profile.
+    web = (contact.web if contact is not None else None) or normalize_website(config.website)
+    if web:
+        parts.append(f"web {web}")
+    if contact is not None:
+        for network, url in contact.redes.items():
+            parts.append(f"{network} {url}")
     return f"Contacto: {_join_capped(parts, '; ')}." if parts else None
 
 

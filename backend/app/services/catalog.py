@@ -124,6 +124,7 @@ class CatalogService:
             category=source.category,
             is_active=False,
             modo_venta=source.modo_venta,
+            periodo=source.periodo,
             es_digital=source.es_digital,
             bundle_size=source.bundle_size,
             bundle_permite_libres=source.bundle_permite_libres,
@@ -197,6 +198,7 @@ class CatalogService:
                 category=row["category"],
                 # Rows staged before the sale columns existed lack them.
                 modo_venta=row.get("modo_venta", "precio_fijo"),
+                periodo=row.get("periodo", "unico"),
                 es_digital=row.get("es_digital", False),
                 bundle_size=row.get("bundle_size"),
                 bundle_permite_libres=row.get("bundle_permite_libres", False),
