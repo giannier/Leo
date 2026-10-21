@@ -1,111 +1,117 @@
-# 019 · Leo como agente general: capacidades, oferta y canales (propuesta, 2026-10-21)
+# 019 · Leo como agente general: capacidades, oferta, rubros y canales
 
-Estado: **propuesta para ratificar**. Reemplaza la primera versión de esta página (2026-10-21), que corregía los
-síntomas de un negocio concreto y no el modelo.
+Estado: **dirección ratificada por Giannier (2026-10-21)**; el orden y los detalles se afinan fase a fase. Se apoya en
+`investigacion.md` (mercado, reglas de plataforma y rubros, con el respaldo de cada afirmación).
 
-## 0. La pregunta
-Giannier busca un agente que cualquier negocio configure para **atender, vender, cotizar, agendar visitas y citas
-en un calendario**, y que **canalice a todos los clientes que llegan por sus redes sociales**. ¿El proceso actual
-(plantillas por tipo de negocio y un asistente de inicio lineal) sirve para eso?
+## 0. El objetivo
+Un agente que cualquier negocio configure para **atender, vender, cotizar, agendar y captar clientes** que llegan por
+sus redes, y que sea mejor que lo que hay: capacidades que se componen según el rubro, traspaso a una persona con
+contexto, resultados de negocio medibles y un arranque que no exige ser técnico.
 
-## 1. Veredicto: no, por cuatro razones de diseño (no de implementación)
+## 1. Por qué el diseño actual no alcanza (resumen)
+1. El cerebro (`process/engine.py`) es un embudo de pedidos con una sola cadena de etapas; las tres plantillas solo
+   cambian textos y opciones. No hay cotización, cita, visita, captación ni soporte: lo que no es pedido se deriva.
+2. El comportamiento lo fija el tipo de negocio y debería fijarlo la oferta (cada ítem se vende, se cotiza, se agenda).
+3. Un solo canal, con la identidad atada al teléfono.
+4. La configuración sigue al tipo de negocio, no a lo que el agente hará: pide lo que no usa y arrastra ejemplos de un
+   rubro (cursos). Se conserva la base: aislamiento, puertos, reglas versionadas, conocimiento, bandeja, CRM, guardas,
+   idempotencia y evals.
 
-1. **El cerebro es un embudo de pedidos, no un agente general.** `process/engine.py` calcula la etapa con una sola
-   cadena fija (inicio → calificar → identificar → pedido → datos → cobro → verificación → cerrado, más "asesoría" y
-   "derivado"). Las tres plantillas "comparten las mismas reglas y solo difieren por opciones y textos" (comentario
-   del propio motor). No hay un concepto de cotización, cita, visita, captación de lead ni soporte: lo que no es
-   un pedido termina en "derivar a una persona".
-2. **El comportamiento lo decide el tipo de negocio, y debería decidirlo la oferta.** Un mismo negocio vende un
-   hosting (se compra ya), una web (se cotiza desde un precio de referencia), un sistema (se cotiza), y mañana un
-   plan SaaS y consultas con cita. La plataforma ya distingue `precio fijo` o `se cotiza` por producto, pero la
-   plantilla elegida para todo el negocio manda sobre eso.
-3. **Un solo canal con la identidad atada al teléfono.** `conversations.channel` admite `sandbox` y `whatsapp`; un
-   contacto se identifica por teléfono (o por el id de WhatsApp). Las redes sociales (Instagram, Messenger, web) no
-   caben sin generalizar el canal y la identidad.
-4. **La configuración sigue al tipo de negocio, no a lo que el agente hará.** Por eso pide cosas que no usa, no pide
-   las que sí necesita (categorías, periodo del precio, datos para cotizar, horarios para agendar) y arrastra
-   ejemplos del primer cliente (cursos y certificaciones).
-
-Lo que **sí está bien y se conserva**: aislamiento por negocio, puertos de proveedores, reglas versionadas (017),
-conocimiento con citas, bandeja y CRM, guardas contra inventar, idempotencia y evals. Es una base sólida. Lo que
-cambia es qué se construye encima y cómo se configura.
-
-## 2. El modelo correcto: núcleo + capacidades + oferta + canales
+## 2. El modelo
 
 ### 2.1 Núcleo (siempre activo)
-Conversación y memoria, contactos con identidad por canal, conocimiento del negocio, perfil y horarios,
-derivación a una persona, CRM y métricas, y las guardas (no inventar, no prometer, datos personales).
+Conversación y memoria, contactos con identidad por canal, conocimiento, perfil y horarios, **traspaso tibio a una
+persona**, CRM, métricas y guardas (no inventar, no prometer, declararse asistente virtual si preguntan, no salirse del
+negocio: la política de Meta solo permite IA **del negocio**).
 
-### 2.2 Capacidades (el negocio enciende las que necesita)
-Cada capacidad trae: **su configuración** (pasos del asistente), **sus datos**, **sus herramientas** para el modelo,
-**su objetivo de conversación** (qué es "cerrar" en ella) y **su efecto en el CRM**.
-
-| Capacidad | Cerrar significa | Datos y pasos | Estado hoy |
+### 2.2 Capacidades (las enciende el negocio)
+| Capacidad | Cerrar significa | Pasos de configuración | Estado |
 |---|---|---|---|
-| **Atender** (información) | resolver y dejar el siguiente paso | conocimiento, horarios, ubicación, preguntas frecuentes | hecho |
-| **Vender** (pedido y cobro) | pedido pagado | catálogo, pagos, entregas | hecho (plantillas) |
-| **Cotizar** | cotización pedida con datos completos, entregada a un asesor, seguimiento hasta aceptada | qué datos se piden por servicio, precio referencial, a quién se deriva | parcial: solo "derivar con resumen" |
-| **Agendar** (citas y visitas) | cita confirmada en el calendario | servicios agendables, duración, recursos, horarios, calendario | especificada (014), sin construir |
-| **Captar leads** | contacto calificado y siguiente paso acordado | preguntas de calificación, destino del lead | parcial (CRM) |
-| **Seguimiento y campañas** | respuesta o recompra | plantillas, reglas | hecho (011) |
+| **Atender** | resolver y dejar siguiente paso | conocimiento, horarios, ubicación, preguntas frecuentes | hecho |
+| **Vender** | pedido pagado | catálogo, pagos, entregas | hecho (plantillas) |
+| **Cotizar** | cotización con datos completos, enviada, seguida hasta aceptada | datos a pedir por servicio, precio referencial, a quién se deriva, plantilla de propuesta | parcial |
+| **Agendar** (citas, visitas, reservas, pruebas de manejo) | cita confirmada y recordada | servicios agendables, duración, recursos y capacidad, horarios, calendario | especificada (014) |
+| **Captar y calificar leads** | lead calificado (caliente, tibio, frío) con siguiente paso | preguntas de calificación del rubro, destino del lead | parcial (CRM) |
+| **Postventa** | pedido o trámite resuelto | estado del pedido, devoluciones, garantía | parcial (avisos de pedido) |
+| **Seguimiento y campañas** | respuesta o recompra | plantillas, cadencias | hecho (011) y por extender |
 
-El agente de cada negocio es la combinación: una cafetería = Atender + Vender (+ Agendar reservas); una agencia =
-Atender + Vender (hosting) + Cotizar (webs, sistemas) + Agendar (reunión); una inmobiliaria = Atender + Captar +
-Agendar (visita).
+Cada capacidad trae: pasos de configuración, datos, herramientas para el modelo, **su cierre**, su efecto en el CRM y
+sus **comprobaciones de calidad** (evals).
 
-### 2.3 Oferta: el tipo de venta lo lleva cada ítem
-Un ítem del catálogo tiene tipo (producto, servicio, plan, curso…) y **cómo se vende**: pedido directo, cotización
-(con o sin precio referencial "desde S/ X"), cita, o solo informativo. Más: periodo del precio (único, mes, año),
-categoría, y los datos que hay que pedir para cotizar o agendar. El agente se comporta según el ítem del que se
-habla; el negocio no elige una "plantilla" para todo.
+### 2.3 Motores transversales (sirven a varias capacidades)
+1. **Recordatorios y confirmaciones**: 24 h y 2 h antes (configurable), con confirmar, reprogramar o cancelar; varios
+   mejor que uno; plantilla aprobada fuera de 24 h. Sirve a citas, reservas, reuniones, pagos pendientes.
+2. **Seguimiento con cadencia**: cotizaciones, leads y pedidos sin pagar; día 2 a 3, 7, 14 y cierre a los 21 a 25; cada
+   toque aporta algo; mensaje de cierre cortés; respeta opt-out y la ventana.
+3. **Traspaso tibio**: resumen estructurado (qué quiere, qué se le ofreció, datos recogidos, ánimo, motivo), petición
+   explícita atendida de inmediato, fuera de horario ofrece llamada de vuelta, tiempo hasta respuesta humana medido.
+4. **Calificación y puntaje** (caliente, tibio, frío) por reglas del rubro; el agente pregunta, no adivina.
+5. **Calidad y piloto**: conjunto de prueba generado del negocio como requisito para encender; **modo piloto** (una
+   persona aprueba las primeras respuestas o solo un porcentaje de conversaciones va al agente); muestreo semanal de
+   transcripciones; contención medida junto con exactitud, escalamiento apropiado y contactos repetidos.
+6. **Atribución de origen**: anuncio o enlace de red social (clic de anuncio guardado), para medir costo por resultado.
 
-Las tres plantillas actuales pasan a ser **presets de arranque** ("Tienda", "Servicios", "Educación"), no el
-concepto central.
+### 2.4 Oferta (cada ítem lleva su forma de venderse)
+Tipo (producto, servicio, plan, curso, reserva…) y **cómo se vende**: pedido directo, cotización (con o sin precio
+referencial), cita o solo informativo. Más: periodo del precio (único, mes, año), categoría, duración y recursos (para
+agendar), **los datos que hay que pedir** (para cotizar o agendar) y fotos. El agente se comporta según el ítem del que
+se habla. Las tres plantillas actuales pasan a ser **presets**.
 
-### 2.4 Canales
-Un puerto de canal (WhatsApp ya existe) y una tabla de identidades por contacto (`canal`, `id externo`). Orden
-realista: (1) **WhatsApp**, con atribución de origen cuando el cliente llega desde un anuncio o enlace de una
-red social (la forma más común hoy, y ya hay `entrada_anuncio`); (2) **chat web**; (3) **Instagram y Messenger** por
-la API de Meta (requiere revisión de la app, semanas de plazo externo). TikTok y otras redes sin API de mensajes
-entran por enlace a WhatsApp. Una sola bandeja y un solo CRM para todos.
+### 2.5 Paquetes de rubro (datos, no código)
+Un paquete trae: capacidades sugeridas, preguntas de calificación, objeciones y preguntas frecuentes, situaciones,
+mensajes de recordatorio, campos de oferta típicos, ejemplos y **avisos de política** (qué no se puede vender por
+WhatsApp). Rubros a cubrir (de `investigacion.md`): restaurante y café, tienda y comercio electrónico, salud y
+bienestar, belleza y fitness, educación, inmobiliaria, automotriz, servicios del hogar y técnicos, servicios
+profesionales, turismo y hotelería, B2B y distribución, tecnología y software, y "otro" con ejemplos neutros.
 
-### 2.5 El motor
-El cerebro deja de ser una cadena fija y pasa a ser **un objetivo por conversación**, que se deduce de la oferta
-de la que se habla (vender, cotizar, agendar, informar). Las etapas se vuelven un subflujo de cada capacidad: la de
-pedidos (la actual) se mantiene tal cual, y cotizar y agendar tienen las suyas. El **bloque de venta** que ya se
-escribió (sondear, recomendar, objeciones, siguiente paso) se generaliza: cada capacidad trae su cierre.
+### 2.6 Canales
+Puerto de canal con identidad por contacto (`canal`, `id externo`), y una sola bandeja y CRM. Orden: (1) WhatsApp con
+atribución de origen; (2) chat web; (3) Instagram y Messenger (24 h como límite duro; la etiqueta de agente humano solo
+para respuestas manuales; revisión de Meta). Redes sin API de mensajes entran por enlace a WhatsApp. Varias sedes:
+número único que pregunta la sede, o un número por sede, con conocimiento y calendario **por sede**.
+
+### 2.7 El motor: enrutador y subflujos
+Siguiendo el consejo de usar flujos predefinidos donde los pasos son fijos y un agente donde es abierto:
+- un **enrutador** deduce el objetivo de la conversación (vender, cotizar, agendar, calificar, informar, postventa) de la
+  oferta de la que se habla y del mensaje (clasificación barata, posible modelo menor);
+- cada capacidad es un **subflujo con sus etapas y herramientas**: el de pedidos (el actual) se mantiene sin cambios; las
+  transacciones (reservar un horario, registrar una cotización) son **flujos fijos con bloqueo y validación**, no
+  decisiones libres del modelo;
+- el bloque de venta ya escrito (sondear, recomendar, objeciones, siguiente paso) se generaliza: cada capacidad aporta su
+  propio cierre.
 
 ## 3. La configuración que sale de ahí
-Un solo recorrido, compuesto:
-
-1. **Tu negocio**: nombre, rubro, web (una vez, con "leer mi web"), moneda, zona.
-2. **Qué hará tu agente**: Atender, Vender, Cotizar, Agendar, Captar leads (se pueden marcar varias) y **por dónde te
-   escriben tus clientes** (WhatsApp, y los canales que haya).
-3. **Tu oferta**: catálogo con tipo y cómo se vende cada ítem, categorías, descripciones.
-4. **Pasos de cada capacidad encendida**: cobros (Vender), datos a pedir y a quién derivar (Cotizar), servicios,
-   horarios y calendario (Agendar).
+1. **Tu negocio**: nombre, rubro, **web (una vez, con "leer mi web")**, moneda, zona.
+2. **Qué hará tu agente** (capacidades) y **por dónde te escriben** (canales).
+3. **Tu oferta**: ítems con tipo y cómo se venden, categorías (con "crear"), descripciones.
+4. **Pasos de cada capacidad encendida**: cobros; datos a pedir al cotizar; servicios, horarios y calendario al agendar;
+   preguntas de calificación.
 5. **Tu agente**: nombre, tono, saludo, objetivo.
-6. **Pruébalo y enciéndelo**: simulador y una lista de progreso **calculada** de lo que las capacidades piden.
+6. **Pruébalo y enciéndelo**: preguntas de prueba, modo piloto, una sola lista de progreso calculada.
+Cada dato tiene un solo dueño. El Asistente es el mismo recorrido como menú. Los ejemplos salen del rubro elegido.
 
-Cada dato se pide una vez y su dueño es único (la web, la descripción, el contacto, la oferta). El Asistente es el
-mismo recorrido como menú. Los ejemplos salen del rubro elegido; sin rubro, neutros.
-
-## 4. Hoja de ruta (cada fase deja algo usable)
-
-| Fase | Contenido | Por qué en este orden |
+## 4. Hoja de ruta
+| Fase | Contenido | Plazos externos |
 |---|---|---|
-| **A · Oferta y capacidades** | tipo y "cómo se vende" por ítem; periodo del precio; categorías con pantalla; capacidades como interruptores; web una sola vez; ejemplos neutros; una sola lista de progreso; presets en lugar de plantillas | es lo que desbloquea todo lo demás y cambia poco el motor |
-| **B · Cotizar de verdad** | datos a pedir por servicio, resumen estructurado, estado de la cotización en el CRM, plazo de respuesta y seguimiento | caso inmediato; reutiliza derivación y CRM |
-| **C · Agendar** | la 014: servicios agendables, disponibilidad con bloqueo anti doble reserva, recordatorios con plantilla, calendario propio y Google Calendar | la capacidad más pedida; necesita OAuth y plantillas aprobadas |
-| **D · Canales** | identidades por canal, chat web, atribución de origen, luego Instagram y Messenger | depende de aprobaciones externas, se empieza a tramitar antes |
-| **E · Aprender** | resultados por capacidad y rubro, y mejora de las instrucciones con revisión humana (017, fases 3 y 4) | necesita datos reales de varios negocios |
+| **A · Oferta y capacidades** (en curso) | oferta con tipo y forma de venta; periodo del precio; categorías con pantalla y creación; web una vez; ejemplos neutros; capacidades como interruptores y lista de progreso única; presets en lugar de plantillas; avisos de política por rubro; rubros nuevos | ninguno |
+| **B · Cotizar de verdad** | datos a pedir por servicio, resumen estructurado, estado de la cotización en el CRM, seguimiento con cadencia | ninguno |
+| **C · Traspaso, calidad y piloto** | traspaso tibio, tiempo de respuesta humana, conjunto de prueba, modo piloto, muestreo | ninguno |
+| **D · Agendar y recordar** | 014: calendario propio con bloqueo anti doble reserva, recursos y capacidad, recordatorios; adaptadores Cal.com y Google Calendar | plantillas de WhatsApp para recordatorios; verificación de Google |
+| **E · Captar y calificar** | preguntas por rubro, puntaje, destino del lead, reunión | ninguno |
+| **F · Canales** | identidades por canal, chat web, atribución de origen, luego Instagram y Messenger; sedes | revisión de Meta (semanas) |
+| **G · Postventa y B2B** | estado de pedido, devoluciones, repetir pedido, documentos | integraciones |
+| **H · Aprender** | resultados por capacidad y rubro; mejora de instrucciones con revisión humana (017, fases 3 y 4) | consentimiento, Ley 29733 |
 
-Riesgos honestos: Google Calendar con acceso a eventos exige verificar la aplicación; Instagram y Messenger exigen
-revisión de Meta; el recordatorio de citas fuera de las 24 horas exige plantilla aprobada de WhatsApp; el cambio
-del motor (2.5) es lo más grande y se hace por capas, con los evals actuales como red de seguridad.
+## 5. Riesgos
+- Cambiar el motor es lo más grande: se hace por capas y con los evals actuales (24 flujos y calidad de venta) como red.
+- Agendar necesita un calendario confiable: bloqueo para no duplicar reservas y reglas de zona horaria.
+- Recordatorios fuera de 24 h exigen plantillas aprobadas; Instagram y Messenger exigen revisión de Meta; Google exige
+  verificar el permiso sensible.
+- La política de Meta sobre IA: Leo debe seguir siendo del negocio y no un asistente abierto.
+- Costos de mensajes de Meta desde el 1-oct-2026: mostrar costo estimado por resultado.
 
-## 5. Decisiones que se piden
-1. ¿Se ratifica el modelo (núcleo + capacidades + oferta + canales) como dirección de Leo?
-2. Orden de las fases: ¿A, B, C, D como arriba?
-3. Agendar: ¿agenda propia primero y Google Calendar después, o Google desde el inicio?
-4. Canales: ¿se empieza ya el trámite de Instagram y Messenger con Meta mientras se construye lo demás?
+## 6. Decisiones
+1. **Ratificada:** el modelo (núcleo, capacidades, oferta, canales).
+2. **Ratificada:** orden A, B, C, D, E, F, G, H (con C antes de D por ser de calidad).
+3. Agendar: calendario propio primero; Cal.com y Google como adaptadores (por la verificación de Google).
+4. Canales: iniciar el trámite con Meta cuando termine la fase C.
