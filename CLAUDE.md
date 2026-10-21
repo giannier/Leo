@@ -85,6 +85,10 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
 - **Calificación**: el asistente anota el interés (`calificar_cliente`) y el lead queda `caliente`, `tibio` o `frio`.
 - **Modo piloto**: `agent_configs.piloto_pct`, el porcentaje de clientes (por persona) que atiende el asistente; el resto, el equipo.
 - **Chat web**: canal `web` sin número de WhatsApp (página pública y widget); `REAL_CHANNELS` agrupa los canales reales.
+- **Origen**: de dónde llegó el cliente (`contacts.origen`, `leads.origen`): el enlace con `?o=` o el texto «te escribo desde
+  Instagram»; sin dato, «Directo». Resultados lo cuenta con los ganados.
+- **Revisión semanal**: muestra de conversaciones reales que el revisor marca bien, regular o mal (`conversation_reviews`); no usa el modelo.
+- **Destino del lead**: persona del equipo a quien se asigna y avisa un lead caliente (`agent_configs.destino_leads`).
 - **Operador de plataforma (Zentek360)**: mantiene y publica plantillas y rubros, con evals obligatorios.
 - `consultar_catalogo`: nombre viejo de la tool de catálogo (agente previo a la 004). En el registry por
   etapa es solo un **alias** de `buscar_productos` (no aparece en las tools que ve el modelo); el
