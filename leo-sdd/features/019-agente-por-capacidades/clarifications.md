@@ -167,3 +167,46 @@ documento de Google tras un inicio de sesión que no se pudo leer): el modo de i
    mientras la ruta sea la de pruebas. *Antes de usarla con clientes reales hace falta esa prueba: el adaptador no se ha
    ejecutado contra el servicio real.*
 
+## C-10: la fase de aprendizaje (017 fases 2 a 4; 019 fase H)
+**Pedido de Giannier (2026-10-21), con sus respuestas:** audios con tope por importación; entre negocios solo el texto de la
+regla y con su revisión; costo apagado hasta activarlo y con tope semanal. Se ratifican así C-06 a C-08 de la 017.
+1. **El agente propone y una persona decide.** Todo lo aprendido es una *sugerencia* (`suggestions`): una situación, un ejemplo real,
+   un dato para el conocimiento o una forma de escribir. Entra en vigor al aprobarla (tal cual o editada), deja una línea en el
+   historial con cómo estaba antes y se puede **deshacer** (`config_history`: situaciones, interruptores de reglas, perfil, preguntas
+   frecuentes, ejemplos y estilo). Una rechazada no vuelve a proponerse igual (la huella es única por negocio). Un dato exige que el
+   revisor escriba la respuesta: el asistente no inventa lo que el negocio contesta.
+2. **Costo (decisión de Giannier).** `learning_settings.activo` empieza **apagado**; encendido, hay un **tope semanal de llamadas al
+   modelo** (20 por defecto, editable por el dueño; la semana empieza el lunes) y cada análisis lo descuenta antes de hacerse. Una
+   importación necesita 5 y se rechaza antes de empezar si no alcanzan. Las preguntas sin respuesta se cuentan sin llamar al modelo.
+3. **Importar chats.** El archivo exportado (.txt, o .zip con los audios) se lee **en memoria**; el original espera en un almacén
+   temporal para el worker (2 h como máximo) y se **borra en un `finally`**, también si falla; no se guarda ni su texto ni los nombres.
+   El negocio **autoriza** el uso (quién y cuándo en `chat_imports` y en la bitácora). Los nombres de quien escribe se vuelven
+   «cliente» y «vendedor» al leer; los datos dentro de los mensajes pasan por reglas (correo, teléfono, DNI, RUC, tarjeta, enlace,
+   dirección con número, «me llamo …») y luego por una pasada del modelo para nombres y direcciones sin número; **una conversación que
+   no vuelve limpia de esa pasada se descarta**, no se guarda a medias. Solo se analizan 14 conversaciones elegidas por
+   utilidad. Salen: el estilo (solo de mensajes escritos), hasta 8 ejemplos reales y hasta 5 reglas sobre objeciones (aquí cuentan
+   los audios). *No probado aún con un chat real de un negocio.*
+4. **Audios.** Se transcriben solo los de las conversaciones elegidas, los más nuevos primero, con tope de **30 minutos por
+   importación** (unos US$ 0,18 con `whisper-1` a US$ 0,006 por minuto; precio de referencia, a confirmar en la factura de OpenAI) y se
+   descarta cualquiera de más de 2 MB. Si una falla se omite. *El adaptador sigue la documentación pública y no se ha probado con una
+   nota de voz real.*
+5. **Ejemplos reales** (`example_conversations`): anonimizados, con embedding de «de qué trata»; en cada turno el asistente busca el más
+   parecido (si está cerca, distancia < 0,45) y lo ve con la orden de guiarse por su enfoque **sin copiar datos, precios ni promesas**.
+   Un negocio sin ejemplos no paga nada (ni consulta ni embedding). Se aprueban en lote, como pidió el brief.
+6. **Estilo del vendedor** (`agent_configs.estilo_vendedor`, 600 letras): una línea más en «ESTILO» del prompt, solo si se aprobó.
+7. **Fuentes.** *Una persona tomó la conversación*: una llamada pregunta qué regla general habría seguido el asistente; se guarda la
+   regla, no la conversación. *Venta confirmada*: hasta 3 por corrida, anonimizadas, como ejemplos. *Venta perdida*: los lunes, una
+   llamada sobre los pedidos descartados sin confirmar (hace falta al menos 2). *Pregunta sin respuesta*: una pregunta hecha 2 veces
+   sin que el conocimiento la responda. Cada conversación se analiza una vez (`learning_marks`). Todo corre en una pasada diaria
+   (`learning_sweep`, 10:35 UTC).
+8. **El rubro aprende (fase 4).** Solo con el permiso del negocio (`compartir_con_rubro`, **apagado por defecto**, que el dueño
+   enciende sabiendo que se comparte el texto de sus situaciones aprobadas, nunca chats ni datos de clientes). El operador ve, por
+   rubro, las situaciones que **al menos dos negocios** escribieron con el mismo sentido (distancia < 0,2), la lee y la **ofrece**: pasa al
+   borrador de la siguiente versión del rubro como situación sugerida y **sigue pasando por los evals** antes de publicarse. Una tarjeta
+   en la que las reglas aún encuentran datos personales queda marcada y no se puede ofrecer.
+9. **Redactor asistido.** El dueño escribe la regla con sus palabras; una llamada la convierte en tarjeta y la compara con sus otras
+   situaciones y con las reglas de su rubro y de su plantilla; además se busca por significado una situación que diga lo mismo. Avisa,
+   no guarda; descuenta del mismo tope.
+**Fuera, por decisión:** reentrenar el modelo, aprendizaje sin aprobación, transcribir mensajes en vivo, volver a pasar conversaciones
+antiguas por la configuración nueva (así lo dice el brief).
+

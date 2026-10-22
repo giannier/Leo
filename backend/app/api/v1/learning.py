@@ -9,6 +9,7 @@
     POST /assistant/suggestions/{id}/reject        discard it (it is not proposed again)
     GET  /assistant/history                        what changed, with what it was before
     POST /assistant/history/{id}/undo              put the "before" back
+    POST /assistant/situations/redactar            a card from free text, warning of clashes
     POST /assistant/imports/inspect                who wrote in an exported chat (stores nothing)
     POST /assistant/imports                        hand the chat over to learn from it (authorised)
     GET  /assistant/imports                        the chats handed over and what came out
@@ -32,6 +33,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from app.api.deps import (
     ConfigurationManagerDep,
     JobQueueDep,
+    PlatformLLMDep,
     RedisDep,
     ReviewerDep,
     SessionDep,
@@ -40,6 +42,7 @@ from app.api.errors import ApiError, error_responses
 from app.api.v1.assistant import _embed_later
 from app.api.v1.reviews import Line, _lines, _who
 from app.learning.budget import LearningBudget
+from app.learning.drafter import DraftError, as_dict, draft_card
 from app.learning.history import ConfigHistoryService, HistoryError
 from app.learning.importer import CALLS_NEEDED
 from app.learning.suggestions import SuggestionError, SuggestionService
@@ -761,3 +764,49 @@ def delete_example(example_id: uuid.UUID, principal: ReviewerDep, session: Sessi
         raise ApiError(status_code=404, error="not_found", message="Not found.")
     session.delete(example)
     session.commit()
+
+
+# ------------------------------------------------------------ the assisted writer
+
+
+class DraftIn(BaseModel):
+    texto: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
+class DraftClash(BaseModel):
+    con: str
+    tipo: str
+    motivo: str
+
+
+class CardDraft(BaseModel):
+    titulo: str
+    cuando_aplica: str
+    que_hace: str
+    derivar: bool
+    siempre: bool
+    choques: list[DraftClash]
+    avisos: list[str]
+    quedan: int
+
+
+@router.post(
+    "/situations/redactar",
+    summary="Turn a rule written in free words into a card, warning of what it clashes with",
+    responses=error_responses(
+        (409, "`learning_off`, `budget`"),
+        (422, "`too_short`, `too_long`, `unreadable`"),
+        *AUTH,
+    ),
+)
+async def redact_situation(
+    body: DraftIn, principal: ConfigurationManagerDep, session: SessionDep, llm: PlatformLLMDep
+) -> CardDraft:
+    """Nothing is saved: the card goes back to the form for the owner to read and save."""
+    try:
+        draft = await draft_card(session, principal.tenant_id, llm, body.texto)
+    except DraftError as exc:
+        status_code = 409 if exc.code in ("learning_off", "budget") else 422
+        raise ApiError(status_code=status_code, error=exc.code, message=str(exc)) from exc
+    session.commit()
+    return CardDraft(**as_dict(draft), quedan=LearningBudget(session, principal.tenant_id).left)
