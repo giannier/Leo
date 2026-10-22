@@ -86,3 +86,31 @@ class SituationRepository(BaseRepository[Situation]):
         if exclude:
             statement = statement.where(Situation.id.not_in(exclude))
         return [(row, float(d)) for row, d in self._session.execute(statement).all()]
+
+    def similar(
+        self,
+        vector: Sequence[float],
+        *,
+        model: str,
+        max_distance: float,
+        limit: int = 3,
+        exclude: Sequence[uuid.UUID] = (),
+    ) -> list[tuple[Situation, float]]:
+        """The situations (active or draft, any stage) whose "cuándo aplica" is close to a text:
+        what a new card could clash with."""
+        distance = Situation.embedding.cosine_distance(list(vector))
+        statement = (
+            select(Situation, distance)
+            .where(
+                self._tenant_predicate,
+                Situation.estado.in_(("activa", "borrador")),
+                Situation.embedding_model == model,
+                Situation.embedding.is_not(None),
+                distance < max_distance,
+            )
+            .order_by(distance)
+            .limit(limit)
+        )
+        if exclude:
+            statement = statement.where(Situation.id.not_in(exclude))
+        return [(row, float(d)) for row, d in self._session.execute(statement).all()]

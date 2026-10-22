@@ -58,6 +58,13 @@ from app.models.crm import Lead, LeadEvent, LostReason, PipelineStage
 from app.models.feedback import ConversationReview, SandboxFeedback
 from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
+from app.models.learning import (
+    ConfigHistory,
+    LearningSettings,
+    LearningUsage,
+    Suggestion,
+    UnansweredQuestion,
+)
 from app.models.llm_settings import TenantLLMSettings
 from app.models.media import MediaAsset
 from app.models.metrics import DashboardSettings, MetricsDaily, ModelCost
@@ -94,7 +101,12 @@ __all__ = [
     "MetaRate",
     "OptinImport",
     "ConversationNote",
+    "ConfigHistory",
     "ConversationReview",
+    "LearningSettings",
+    "LearningUsage",
+    "Suggestion",
+    "UnansweredQuestion",
     "InvoicingSettings",
     "OrderDocument",
     "OrderReturn",

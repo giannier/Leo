@@ -24,6 +24,8 @@ from app.agent.prompts.stage import build_stage_prompt
 from app.agent.tools.definitions import registry_for_stage
 from app.api.deps import ConfigurationManagerDep, JobQueueDep, ReviewerDep, SessionDep
 from app.api.errors import ApiError, error_responses
+from app.learning.history import ConfigHistoryService, situation_snapshot
+from app.models.catalog import TenantRuleSwitch
 from app.models.situation import SITUATION_ORIGINS, SITUATION_STATES, Situation
 from app.process.facts import Facts
 from app.process.layers import LayerResolver, LayerRule, News, UnknownRule
@@ -151,6 +153,10 @@ def _not_found() -> ApiError:
     return ApiError(status_code=404, error="situation_not_found", message="Situation not found.")
 
 
+def _history(session: Session, principal: Any) -> ConfigHistoryService:
+    return ConfigHistoryService(session, principal.tenant_id, principal.user_id)
+
+
 async def _embed_later(queue: JobQueueDep, tenant_id: uuid.UUID) -> None:
     """Ask the worker for the embedding. A lost job is picked up by the hourly sweep."""
     try:
@@ -202,6 +208,13 @@ async def create_situation(
         situation = service.create(body.to_input(), by=principal.user_id)
     except SituationError as exc:
         raise _invalid(exc) from exc
+    _history(session, principal).record(
+        "situacion",
+        "crear",
+        f"Creó la situación «{situation.titulo}»",
+        entidad_id=situation.id,
+        despues=situation_snapshot(situation),
+    )
     session.commit()
     await _embed_later(queue, principal.tenant_id)
     return _response(situation)
@@ -231,6 +244,13 @@ async def create_from_suggested(
         )
     except SituationError as exc:
         raise _invalid(exc) from exc
+    _history(session, principal).record(
+        "situacion",
+        "crear",
+        f"Creó la situación «{situation.titulo}» desde las sugeridas de su rubro",
+        entidad_id=situation.id,
+        despues=situation_snapshot(situation),
+    )
     session.commit()
     await _embed_later(queue, principal.tenant_id)
     return _response(situation)
@@ -265,10 +285,19 @@ async def update_situation(
 ) -> SituationResponse:
     service = SituationService(session, principal.tenant_id)
     situation = _load(service, situation_id)
+    before = situation_snapshot(situation)
     try:
         service.update(situation, body.to_input())
     except SituationError as exc:
         raise _invalid(exc) from exc
+    _history(session, principal).record(
+        "situacion",
+        "editar",
+        f"Editó la situación «{situation.titulo}»",
+        entidad_id=situation.id,
+        antes=before,
+        despues=situation_snapshot(situation),
+    )
     session.commit()
     if situation.embedding is None:
         await _embed_later(queue, principal.tenant_id)
@@ -284,7 +313,17 @@ def delete_situation(
     situation_id: uuid.UUID, principal: ConfigurationManagerDep, session: SessionDep
 ) -> Response:
     service = SituationService(session, principal.tenant_id)
-    service.delete(_load(service, situation_id))
+    situation = _load(service, situation_id)
+    before = situation_snapshot(situation)
+    title = situation.titulo
+    service.delete(situation)
+    _history(session, principal).record(
+        "situacion",
+        "borrar",
+        f"Borró la situación «{title}»",
+        entidad_id=situation_id,
+        antes=before,
+    )
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -293,7 +332,18 @@ def _set_state(
     situation_id: uuid.UUID, principal: ConfigurationManagerDep, session: SessionDep, estado: str
 ) -> SituationResponse:
     service = SituationService(session, principal.tenant_id)
-    situation = service.set_state(_load(service, situation_id), estado)
+    situation = _load(service, situation_id)
+    before = situation_snapshot(situation)
+    service.set_state(situation, estado)
+    if before["estado"] != estado:
+        _history(session, principal).record(
+            "situacion",
+            "estado",
+            f"{'Activó' if estado == 'activa' else 'Desactivó'} la situación «{situation.titulo}»",
+            entidad_id=situation.id,
+            antes=before,
+            despues=situation_snapshot(situation),
+        )
     session.commit()
     return _response(situation)
 
@@ -542,16 +592,27 @@ def switch_rule(
 ) -> RuleView:
     """Switch a template or rubro rule on or off. Its text is never editable (C-01)."""
     template_key, rubro_key = _keys(session, principal.tenant_id)
+    key = template_key if kind == "proceso" else rubro_key
+    previous = session.get(TenantRuleSwitch, (principal.tenant_id, kind, rule_key))
+    was_off = bool(previous.apagada) if previous is not None else False
     try:
         rule = LayerResolver(session, principal.tenant_id).switch(
             kind,
-            template_key if kind == "proceso" else rubro_key,
+            key,
             rule_key,
             apagada=body.apagada,
             by=principal.user_id,
         )
     except UnknownRule as exc:
         raise ApiError(status_code=404, error="unknown_rule", message=rule_key) from exc
+    if was_off != body.apagada:
+        _history(session, principal).record(
+            "interruptor",
+            "estado",
+            f"{'Apagó' if body.apagada else 'Encendió'} la regla «{rule.texto[:70]}»",
+            antes={"kind": kind, "key": key, "rule_key": rule_key, "apagada": was_off},
+            despues={"kind": kind, "key": key, "rule_key": rule_key, "apagada": body.apagada},
+        )
     session.commit()
     return RuleView(rule_key=rule.rule_key, texto=rule.texto, apagada=rule.apagada)
 

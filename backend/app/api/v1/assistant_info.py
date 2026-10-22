@@ -11,7 +11,6 @@ turn already sees it.
 
 from __future__ import annotations
 
-import contextlib
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -37,12 +36,11 @@ from app.repositories.business import AgentConfigRepository
 from app.repositories.product import ProductCategoryRepository, ProductRepository
 from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import SECTION_SCHEMAS
+from app.services.faqs import index_faq, unindex_faq
 from app.services.knowledge import (
     IndexingUnavailableError,
     KnowledgeError,
-    KnowledgeService,
     RagLimitExceededError,
-    SourceNotFoundError,
 )
 from app.services.overview import build_overview
 from app.services.website import mirror_contact_website_into_profile
@@ -190,20 +188,11 @@ def _knowledge_error(exc: KnowledgeError) -> ApiError:
 
 async def _index(session: SessionDep, tenant_id: uuid.UUID, queue: JobQueueDep, faq: Faq) -> None:
     """Index the FAQ as knowledge (`consultar_conocimiento` answers from it)."""
-    service = KnowledgeService(session, tenant_id, queue=queue)
-    result = await service.ingest_text(
-        source_type="faq", title=faq.pregunta, content=f"{faq.pregunta}\n{faq.respuesta}"
-    )
-    faq.knowledge_source_id = result.id
-    session.commit()
+    await index_faq(session, tenant_id, queue, faq)
 
 
 def _unindex(session: SessionDep, tenant_id: uuid.UUID, faq: Faq) -> None:
-    if faq.knowledge_source_id is None:
-        return
-    with contextlib.suppress(SourceNotFoundError):
-        KnowledgeService(session, tenant_id).delete(faq.knowledge_source_id)
-    faq.knowledge_source_id = None
+    unindex_faq(session, tenant_id, faq)
 
 
 def _faq_row(session: SessionDep, tenant_id: uuid.UUID, faq_id: uuid.UUID) -> Faq:

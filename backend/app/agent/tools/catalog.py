@@ -34,6 +34,7 @@ from app.agent.tools.shared import (
     describe_promotion,
     price_text,
 )
+from app.learning.questions import record_unanswered
 from app.models.business import Product
 from app.models.media import MediaAsset
 from app.models.sales_config import Promotion
@@ -135,6 +136,8 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
         embedding_model=context.llm.embedding_model,
     )
     if not chunks and not guidance:
+        if not context.sandbox:
+            record_unanswered(context.session, context.tenant_id, query, context.conversation_id)
         return ToolResult.no_disponible(
             texto=(
                 "No hay información sobre eso en los documentos del negocio. No inventes una "
