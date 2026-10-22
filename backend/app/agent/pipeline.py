@@ -52,6 +52,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.budget import TurnBudget
 from app.agent.core import AgentCore, AgentReply, TurnTrace
+from app.agent.examples import select_examples
 from app.agent.formatter import to_bubbles
 from app.agent.model_policy import allowed_levels, effective_level
 from app.agent.outbound import TurnOutbound
@@ -295,6 +296,9 @@ class TurnPipeline:
             max_situaciones=config.behavior.max_situaciones,
             drafts=self._situation_drafts,
         )
+        examples = await select_examples(
+            self._session, self._tenant_id, message=inbound.text, llm=self._llm
+        )
         prompt = build_stage_prompt(
             config,
             facts,
@@ -303,6 +307,7 @@ class TurnPipeline:
             turn=turn,
             tool_specs=registry.specs(),
             situations=situations,
+            examples=examples,
         )
 
         # 10. model

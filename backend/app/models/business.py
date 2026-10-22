@@ -144,6 +144,10 @@ class AgentConfig(Base):
         ),
         CheckConstraint("max_situaciones BETWEEN 1 AND 10", name="max_situaciones"),
         CheckConstraint(
+            "estilo_vendedor IS NULL OR char_length(estilo_vendedor) <= 600",
+            name="estilo_vendedor_length",
+        ),
+        CheckConstraint(
             "capacidades <@ ARRAY['atender','vender','cotizar','agendar','captar']::text[] "
             "AND 'atender' = ANY(capacidades)",
             name="capacidades",
@@ -182,6 +186,9 @@ class AgentConfig(Base):
     )
     # Sent when the trial quota runs out mid-conversation (Clarification 004).
     farewell_on_pause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # How the business's own sellers write, learned from their chats and approved by a person
+    # (feature 017, phase 2): added to the style of the prompt.
+    estilo_vendedor: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Sent when somebody writes something this version cannot read - a voice
     # note, a video, a location (Feature 002, C-001). Configurable because the
     # right answer differs by business: a bakery asks for text, a clinic may

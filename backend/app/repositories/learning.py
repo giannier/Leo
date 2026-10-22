@@ -7,11 +7,13 @@ from collections.abc import Collection, Sequence
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.models.learning import (
+    ChatImport,
     ConfigHistory,
+    ExampleConversation,
     LearningSettings,
     LearningUsage,
     Suggestion,
@@ -179,3 +181,70 @@ class UnansweredQuestionRepository(BaseRepository[UnansweredQuestion]):
             .scalars()
             .all()
         )
+
+
+class ExampleRepository(BaseRepository[ExampleConversation]):
+    model = ExampleConversation
+
+    def listing(self, *, estado: str | None = None) -> Sequence[ExampleConversation]:
+        statement = self._scoped().order_by(ExampleConversation.created_at.desc())
+        if estado is not None:
+            statement = statement.where(ExampleConversation.estado == estado)
+        return self._session.execute(statement).scalars().all()
+
+    def needing_embedding(self, model: str) -> Sequence[ExampleConversation]:
+        statement = self._scoped().where(
+            or_(
+                ExampleConversation.embedding.is_(None),
+                ExampleConversation.embedding_model != model,
+            )
+        )
+        return self._session.execute(statement).scalars().all()
+
+    def any_active(self, model: str) -> bool:
+        return (
+            self._session.execute(
+                select(ExampleConversation.id)
+                .where(
+                    self._tenant_predicate,
+                    ExampleConversation.estado == "activo",
+                    ExampleConversation.embedding_model == model,
+                )
+                .limit(1)
+            ).first()
+            is not None
+        )
+
+    def closest(
+        self, vector: Sequence[float], *, model: str, max_distance: float, limit: int = 1
+    ) -> list[tuple[ExampleConversation, float]]:
+        distance = ExampleConversation.embedding.cosine_distance(list(vector))
+        statement = (
+            select(ExampleConversation, distance)
+            .where(
+                self._tenant_predicate,
+                ExampleConversation.estado == "activo",
+                ExampleConversation.embedding_model == model,
+                ExampleConversation.embedding.is_not(None),
+                distance < max_distance,
+            )
+            .order_by(distance)
+            .limit(limit)
+        )
+        return [(row, float(d)) for row, d in self._session.execute(statement).all()]
+
+
+class ChatImportRepository(BaseRepository[ChatImport]):
+    model = ChatImport
+
+    def listing(self, limit: int = 20) -> Sequence[ChatImport]:
+        return (
+            self._session.execute(self._scoped().order_by(ChatImport.creada_en.desc()).limit(limit))
+            .scalars()
+            .all()
+        )
+
+    def running(self) -> ChatImport | None:
+        return self._session.execute(
+            self._scoped().where(ChatImport.estado == "procesando").limit(1)
+        ).scalar_one_or_none()

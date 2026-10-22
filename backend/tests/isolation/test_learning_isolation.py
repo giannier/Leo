@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.repositories.base import TenantScopeError
 from app.repositories.learning import (
+    ChatImportRepository,
     ConfigHistoryRepository,
+    ExampleRepository,
     LearningSettingsRepository,
     LearningUsageRepository,
     SuggestionRepository,
@@ -104,3 +106,39 @@ class TestTheCeiling:
         assert theirs.spend_calls(WEEK, 1, ceiling=2) is True
         assert LearningSettingsRepository(db, tenant_b.tenant_id).ensure().activo is False
         assert (mine.week(WEEK) or object()).llamadas == 2  # type: ignore[attr-defined]
+
+
+class TestImportsAndExamples:
+    def test_each_business_sees_only_its_own_chats_and_examples(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        for fixture, label in ((tenant_a, "a"), (tenant_b, "b")):
+            ChatImportRepository(db, fixture.tenant_id).add()
+            ExampleRepository(db, fixture.tenant_id).add(
+                titulo=f"de {label}", tema="tema", mensajes=[], origen="importacion"
+            )
+
+        imports = ChatImportRepository(db, tenant_a.tenant_id)
+        examples = ExampleRepository(db, tenant_a.tenant_id)
+        theirs = ExampleRepository(db, tenant_b.tenant_id).listing()[0]
+
+        assert len(imports.listing()) == 1 and imports.running() is not None
+        assert [e.titulo for e in examples.listing()] == ["de a"]
+        assert examples.get(theirs.id) is None
+
+    def test_the_closest_example_is_always_the_businesss_own(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        vector = [1.0] + [0.0] * 1023
+        for fixture, label in ((tenant_a, "a"), (tenant_b, "b")):
+            row = ExampleRepository(db, fixture.tenant_id).add(
+                titulo=f"de {label}", tema="tema", mensajes=[], origen="importacion"
+            )
+            row.embedding, row.embedding_model = vector, "m"
+        db.flush()
+
+        found = ExampleRepository(db, tenant_a.tenant_id).closest(
+            vector, model="m", max_distance=1.0, limit=5
+        )
+
+        assert [example.titulo for example, _ in found] == ["de a"]

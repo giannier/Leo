@@ -47,6 +47,7 @@ from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from app.agent.examples import SelectedExample
 from app.agent.prompts.builder import (
     _TONE_GUIDANCE,
     DEFAULT_TONE,
@@ -82,6 +83,7 @@ SECTION_CAPS: Mapping[str, int] = {
     "situaciones": 1000,
     # 1 400 for the ten tools of the sales engine, 700 more for those of the agenda, the leads and
     # after the sale (a business with every capability on; the whole prompt still fits 6 000).
+    "ejemplos": 350,
     "herramientas": 2100,
 }
 
@@ -388,6 +390,11 @@ def _style_block(config: EffectiveProcessConfig) -> str:
         lines.append(
             f"Saludo del negocio, para tu primer mensaje: «{_one_line(behavior.saludo, MAX_SALUDO)}»"
         )
+    if behavior.estilo_vendedor:
+        lines.append(
+            "Así escriben los vendedores del negocio (imita el tono, no los datos): "
+            + _one_line(behavior.estilo_vendedor, 600)
+        )
     return "\n".join(lines)
 
 
@@ -408,6 +415,31 @@ def _clip(text: str, chars: int) -> str:
     """One line, cut with "…" so the model knows there was more."""
     flat = " ".join(text.split())
     return flat if len(flat) <= chars else flat[: chars - 1].rstrip() + "…"
+
+
+EXAMPLE_HEAD = (
+    "EJEMPLO REAL de cómo respondió el equipo del negocio en un caso parecido. Guíate por su enfoque "
+    "y su tono; NO copies datos, precios ni promesas de aquí: usa solo tus herramientas y el bloque "
+    "NEGOCIO."
+)
+_EXAMPLE_TURN_CHARS = 220
+_EXAMPLE_CHARS = 1100
+
+
+def _examples_block(examples: Sequence[SelectedExample]) -> str:
+    """The closest real conversation, cut to its share of the budget; nothing when there is none."""
+    if not examples:
+        return ""
+    lines = [EXAMPLE_HEAD]
+    used = len(EXAMPLE_HEAD)
+    for example in examples[:1]:
+        for role, text in example.mensajes:
+            line = f"{'Cliente' if role == 'cliente' else 'Vendedor'}: {_clip(text, _EXAMPLE_TURN_CHARS)}"
+            if used + len(line) > _EXAMPLE_CHARS:
+                break
+            lines.append(line)
+            used += len(line)
+    return "\n".join(lines) if len(lines) > 1 else ""
 
 
 def _situation_text(situation: SelectedSituation, chars: int) -> str:
@@ -788,6 +820,7 @@ def build_stage_prompt(
     turn: TurnContext | None = None,
     tool_specs: Sequence[ToolSpec] = (),
     situations: Sequence[SelectedSituation] = (),
+    examples: Sequence[SelectedExample] = (),
 ) -> StagePrompt:
     """The system prompt for `stage`, section by section.
 
@@ -820,6 +853,9 @@ def build_stage_prompt(
         parts["rubro"] = rubro
     parts["negocio"] = _business_block(config)
     parts["situaciones"] = _situations_block(situations)
+    shown = _examples_block(examples)
+    if shown:
+        parts["ejemplos"] = shown
     text = "\n\n".join(parts.values())
     sections = {name: estimate_tokens(part) for name, part in parts.items()}
     sections["herramientas"] = _tools_tokens(tool_specs)

@@ -709,9 +709,9 @@ class TestTheDailySweep:
             def __call__(self) -> Any:
                 return _Borrowed(db)
 
-        result = await learning_sweep({"session_factory": Factory()})
+        result = await learning_sweep({"session_factory": Factory(), "llm": MockLLMProvider()})
 
-        assert result == {"preguntas": 1}
+        assert result["preguntas"] == 1 and sum(result.values()) == 1
         assert [s.tenant_id for s in db.execute(select(Suggestion)).scalars()] == [on.id]
 
 
