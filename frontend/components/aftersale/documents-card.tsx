@@ -27,7 +27,16 @@ function size(bytes: number): string {
   return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
-export function DocumentsCard({ orderId, sold }: { orderId: string; sold: boolean }) {
+export function DocumentsCard({
+  orderId,
+  sold,
+  refreshKey = 0,
+}: {
+  orderId: string;
+  sold: boolean;
+  /** Changes when something outside (a receipt issued) added or voided a document. */
+  refreshKey?: number;
+}) {
   const toast = useToast();
   const [items, setItems] = useState<OrderDocumentRow[] | null>(null);
   const [tipo, setTipo] = useState("boleta");
@@ -49,7 +58,7 @@ export function DocumentsCard({ orderId, sold }: { orderId: string; sold: boolea
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   async function run(name: string, action: () => Promise<unknown>, done?: string) {
     setBusy(name);
@@ -113,7 +122,7 @@ export function DocumentsCard({ orderId, sold }: { orderId: string; sold: boolea
                 <Button type="button" variant="secondary" onClick={() => void open(doc.id)}>
                   Abrir
                 </Button>
-                {doc.estado === "emitido" ? (
+                {doc.estado === "emitido" && doc.origen !== "electronico" ? (
                   <Button
                     type="button"
                     variant="ghost"

@@ -645,6 +645,12 @@ export type ReturnDecisionBody = JsonBody<
 export type ReturnDecision = Ok<Ops["/api/v1/tenant/returns/{return_id}/decision"]["post"]>;
 export type OrderDocumentList = Ok<Ops["/api/v1/tenant/orders/{order_id}/documents"]["get"]>;
 export type OrderDocumentRow = OrderDocumentList["items"][number];
+export type Invoicing = Ok<Ops["/api/v1/tenant/invoicing"]["get"]>;
+export type InvoicingPatch = JsonBody<Ops["/api/v1/tenant/invoicing"]["put"]["requestBody"]>;
+export type InvoiceInfo = Ok<Ops["/api/v1/tenant/orders/{order_id}/invoice"]["get"]>;
+export type InvoiceBody = JsonBody<Ops["/api/v1/tenant/orders/{order_id}/invoice"]["post"]["requestBody"]>;
+export type InvoicePreview = Ok<Ops["/api/v1/tenant/orders/{order_id}/invoice/preview"]["post"]>;
+export type Buyer = InvoiceBody["cliente"];
 export type ResourceBody = {
   nombre: string;
   horario: Record<string, string[][]> | null;
@@ -1299,6 +1305,19 @@ export const api = {
         body: form,
       });
     },
+    invoicing: () => request<Invoicing>("/tenant/invoicing"),
+    saveInvoicing: (body: InvoicingPatch) =>
+      request<Invoicing>("/tenant/invoicing", { method: "PUT", body }),
+    invoiceInfo: (orderId: string) => request<InvoiceInfo>(`/tenant/orders/${orderId}/invoice`),
+    previewInvoice: (orderId: string, body: InvoiceBody) =>
+      request<InvoicePreview>(`/tenant/orders/${orderId}/invoice/preview`, { method: "POST", body }),
+    issueInvoice: (orderId: string, body: InvoiceBody) =>
+      request<OrderDocumentRow>(`/tenant/orders/${orderId}/invoice`, { method: "POST", body }),
+    voidInvoice: (orderId: string, motivo: string) =>
+      request<OrderDocumentRow>(`/tenant/orders/${orderId}/invoice/void`, {
+        method: "POST",
+        body: { motivo },
+      }),
     makeSummary: (orderId: string) =>
       request<OrderDocumentRow>(`/tenant/orders/${orderId}/documents/summary`, { method: "POST" }),
     documentLink: (orderId: string, documentId: string) =>
