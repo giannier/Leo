@@ -26,20 +26,44 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from pydantic import BaseModel, Field, StringConstraints
 
 from app.aftersale.documents import DocumentError, DocumentService, label_of
+from app.aftersale.invoicing import (
+    BuyerInput,
+    InvoicingError,
+    InvoicingService,
+    suggested_buyer,
+)
 from app.aftersale.returns import ReturnError, ReturnService, customer_notice
-from app.api.deps import MemberDep, SessionDep, WhatsAppProviderDep, get_storage_provider
+from app.api.deps import (
+    ConfigurationManagerDep,
+    InvoiceProviderDep,
+    MemberDep,
+    SessionDep,
+    WhatsAppProviderDep,
+    get_storage_provider,
+)
 from app.api.errors import ApiError, error_responses
 from app.api.v1.orders import mask_phone, short_name
 from app.core.config import get_settings
-from app.models.aftersale import DOCUMENT_TYPES, RETURN_STATES, OrderDocument, OrderReturn
+from app.core.crypto import encrypt_secret
+from app.models.aftersale import (
+    DOCUMENT_TYPES,
+    RETURN_STATES,
+    InvoicingSettings,
+    OrderDocument,
+    OrderReturn,
+)
 from app.models.channel import Contact
-from app.models.orders import Order
+from app.models.orders import Order, OrderItem
+from app.providers.invoicing.base import InvoiceError
+from app.providers.invoicing.nubefact import check_route
 from app.providers.storage.base import StorageProvider
 from app.repositories.aftersale import (
     DocumentRepository,
+    InvoicingSettingsRepository,
     ReturnEventRepository,
     ReturnRepository,
 )
+from app.repositories.audit import AuditLogRepository
 from app.repositories.channel import ContactRepository
 from app.repositories.orders import OrderItemRepository, OrderRepository
 from app.services.crm_report import contact_name
@@ -48,6 +72,7 @@ from app.services.order_notices import CustomerNotice, CustomerNotifier
 from app.services.tenant_alerts import TenantAlerts
 
 router = APIRouter(prefix="/tenant", tags=["aftersale"])
+
 
 StorageDep = Annotated[StorageProvider, Depends(get_storage_provider)]
 
@@ -534,6 +559,354 @@ def void_document(
 ) -> DocumentOut:
     order = _own_order(session, principal.tenant_id, order_id)
     document = _own_document(session, principal.tenant_id, order, document_id)
+    if document.origen == "electronico":
+        raise ApiError(
+            status_code=409,
+            error="electronic",
+            message="Un comprobante electrónico se anula con «Anular comprobante».",
+        )
     DocumentService(session, principal.tenant_id, storage).void(document)
+    session.commit()
+    return _document_out(document)
+
+
+# --------------------------------------------------- electronic invoicing
+
+INVOICING_RESPONSES = (
+    (409, "`not_configured`, `disabled`, `order_not_sold`, `already_issued`, `sandbox`"),
+    (
+        422,
+        "`invalid_ruc`, `invalid_dni`, `ruc_required`, `document_required`, `name_required`, "
+        "`total_mismatch`, `only_soles` or `provider_refused` (the provider's own text)",
+    ),
+    (502, "`unknown_outcome`: the answer was lost; check the provider's account"),
+)
+
+
+class InvoicingOut(BaseModel):
+    proveedor: str
+    ruta: str | None
+    tiene_token: bool
+    serie_boleta: str
+    serie_factura: str
+    siguiente_boleta: int
+    siguiente_factura: int
+    tratamiento_igv: str
+    igv_pct: Decimal
+    activo: bool
+    # The route points to the provider's demo environment: receipts there are not real.
+    es_demo: bool
+    listo: bool
+
+
+class InvoicingIn(BaseModel):
+    ruta: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    # Sent only when the owner types a new one; never returned.
+    token: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=8, max_length=200)]
+        | None
+    ) = None
+    serie_boleta: Annotated[str, StringConstraints(pattern=r"^B[A-Z0-9]{3}$")] | None = None
+    serie_factura: Annotated[str, StringConstraints(pattern=r"^F[A-Z0-9]{3}$")] | None = None
+    siguiente_boleta: Annotated[int, Field(ge=1, le=99_999_999)] | None = None
+    siguiente_factura: Annotated[int, Field(ge=1, le=99_999_999)] | None = None
+    tratamiento_igv: Literal["gravado", "exonerado", "inafecto"] | None = None
+    igv_pct: Annotated[Decimal, Field(ge=0, le=30, decimal_places=2)] | None = None
+    activo: bool | None = None
+
+
+class BuyerIO(BaseModel):
+    documento_tipo: Literal["dni", "ruc", "ninguno"] = "ninguno"
+    documento_numero: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)] = ""
+    nombre: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = ""
+    direccion: Annotated[str, StringConstraints(strip_whitespace=True, max_length=250)] = ""
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)] = ""
+
+
+class InvoiceInfo(BaseModel):
+    disponible: bool
+    solo_prueba: bool
+    sugerido: BuyerIO
+    siguiente_boleta: str
+    siguiente_factura: str
+    comprobante: DocumentOut | None
+
+
+class InvoiceIn(BaseModel):
+    tipo: Literal["boleta", "factura"]
+    cliente: BuyerIO
+
+
+class InvoiceLineOut(BaseModel):
+    descripcion: str
+    cantidad: Decimal
+    total: Decimal
+
+
+class InvoicePreview(BaseModel):
+    tipo: str
+    serie: str
+    numero: int
+    comprobante: str
+    cliente: str
+    documento: str
+    lineas: list[InvoiceLineOut]
+    base: Decimal
+    igv: Decimal
+    descuento: Decimal
+    total: Decimal
+    moneda: str
+
+
+class VoidIn(BaseModel):
+    motivo: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=200)]
+
+
+def _invoicing_out(settings: InvoicingSettings) -> InvoicingOut:
+    return InvoicingOut(
+        proveedor=settings.proveedor,
+        ruta=settings.ruta,
+        tiene_token=settings.token_enc is not None,
+        serie_boleta=settings.serie_boleta,
+        serie_factura=settings.serie_factura,
+        siguiente_boleta=settings.siguiente_boleta,
+        siguiente_factura=settings.siguiente_factura,
+        tratamiento_igv=settings.tratamiento_igv,
+        igv_pct=settings.igv_pct,
+        activo=settings.activo,
+        es_demo=bool(settings.ruta and "//demo." in settings.ruta.lower()),
+        listo=bool(settings.ruta and settings.token_enc),
+    )
+
+
+def _invoicing_error(exc: InvoicingError) -> ApiError:
+    status_code = {
+        "not_configured": 409,
+        "disabled": 409,
+        "order_not_sold": 409,
+        "already_issued": 409,
+        "already_void": 409,
+        "sandbox": 409,
+        "not_electronic": 409,
+        "unknown_outcome": 502,
+        "issued_not_saved": 502,
+    }.get(exc.code, 422)
+    return ApiError(
+        status_code=status_code,
+        error=exc.code,
+        message=str(exc),
+        fields={"proveedor": exc.provider_code} if exc.provider_code else None,
+    )
+
+
+def _buyer(body: BuyerIO) -> BuyerInput:
+    return BuyerInput(
+        document_type=body.documento_tipo,
+        document_number=body.documento_numero,
+        name=body.nombre,
+        address=body.direccion,
+        email=body.email,
+    )
+
+
+@router.get(
+    "/invoicing",
+    summary="How this business issues electronic receipts",
+    responses=error_responses(*AUTH),
+)
+def get_invoicing(principal: ConfigurationManagerDep, session: SessionDep) -> InvoicingOut:
+    return _invoicing_out(InvoicingSettingsRepository(session, principal.tenant_id).ensure())
+
+
+@router.put(
+    "/invoicing",
+    summary="Connect the account of the provider and set the series",
+    responses=error_responses(
+        (400, "`validation_error`"),
+        (409, "`not_configured`: turn it on only with a route and a token"),
+        *AUTH,
+    ),
+)
+def put_invoicing(
+    body: InvoicingIn, principal: ConfigurationManagerDep, session: SessionDep
+) -> InvoicingOut:
+    settings = InvoicingSettingsRepository(session, principal.tenant_id).locked()
+    changed: list[str] = []
+    values = body.model_dump(exclude_unset=True)
+    if "ruta" in values:
+        try:
+            settings.ruta = check_route(values.pop("ruta") or "")
+        except InvoiceError as exc:
+            raise ApiError(
+                status_code=400,
+                error="validation_error",
+                message=str(exc),
+                fields={"ruta": "invalid"},
+            ) from exc
+        changed.append("ruta")
+    if "token" in values:
+        settings.token_enc = encrypt_secret(values.pop("token"))
+        changed.append("token")
+    for name, value in values.items():
+        if value is not None and getattr(settings, name) != value:
+            setattr(settings, name, value)
+            changed.append(name)
+    if settings.activo and not (settings.ruta and settings.token_enc):
+        raise ApiError(
+            status_code=409,
+            error="not_configured",
+            message="Escribe la ruta y el token de tu proveedor antes de encenderla.",
+        )
+    session.flush()
+    if changed:
+        # What changed, never the token: the log is read far more widely than this table.
+        AuditLogRepository(session, principal.tenant_id).record(
+            actor_id=principal.user_id, action="invoicing.updated", detail={"campos": changed}
+        )
+    session.commit()
+    return _invoicing_out(settings)
+
+
+def _lines_of(session: SessionDep, tenant_id: uuid.UUID, order: Order) -> list[OrderItem]:
+    return list(OrderItemRepository(session, tenant_id).for_orders([order.id])[order.id])
+
+
+@router.get(
+    "/orders/{order_id}/invoice",
+    summary="Can this order be invoiced, and to whom",
+    responses=error_responses(NOT_FOUND, *AUTH),
+)
+def invoice_info(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) -> InvoiceInfo:
+    order = _own_order(session, principal.tenant_id, order_id)
+    settings = InvoicingSettingsRepository(session, principal.tenant_id).ensure()
+    standing = DocumentRepository(session, principal.tenant_id).live_electronic(order.id)
+    suggestion = suggested_buyer(order.datos_cliente)
+    return InvoiceInfo(
+        disponible=settings.activo and bool(settings.ruta and settings.token_enc),
+        solo_prueba=bool(settings.ruta and "//demo." in settings.ruta.lower()),
+        sugerido=BuyerIO(
+            documento_tipo=suggestion.document_type,
+            documento_numero=suggestion.document_number,
+            nombre=suggestion.name,
+            direccion=suggestion.address,
+            email=suggestion.email,
+        ),
+        siguiente_boleta=f"{settings.serie_boleta}-{settings.siguiente_boleta}",
+        siguiente_factura=f"{settings.serie_factura}-{settings.siguiente_factura}",
+        comprobante=_document_out(standing) if standing else None,
+    )
+
+
+@router.post(
+    "/orders/{order_id}/invoice/preview",
+    summary="What would be issued, without issuing it",
+    responses=error_responses(NOT_FOUND, *INVOICING_RESPONSES, *AUTH),
+)
+def preview_invoice(
+    order_id: uuid.UUID,
+    body: InvoiceIn,
+    principal: MemberDep,
+    session: SessionDep,
+    storage: StorageDep,
+    provider: InvoiceProviderDep,
+) -> InvoicePreview:
+    order = _own_order(session, principal.tenant_id, order_id)
+    service = InvoicingService(session, principal.tenant_id, storage, provider)
+    try:
+        request = service.preview(
+            order, _lines_of(session, principal.tenant_id, order), body.tipo, _buyer(body.cliente)
+        )
+    except InvoicingError as exc:
+        raise _invoicing_error(exc) from exc
+    shown = request.customer.document_number
+    return InvoicePreview(
+        tipo=request.kind,
+        serie=request.series,
+        numero=request.number,
+        comprobante=f"{request.series}-{request.number}",
+        cliente=request.customer.name,
+        documento=shown if shown != "-" else "Sin documento",
+        lineas=[
+            InvoiceLineOut(descripcion=line.description, cantidad=line.quantity, total=line.total)
+            for line in request.lines
+        ],
+        base=request.taxed + request.exonerated + request.unaffected,
+        igv=request.igv,
+        descuento=request.global_discount,
+        total=request.total,
+        moneda=order.moneda,
+    )
+
+
+@router.post(
+    "/orders/{order_id}/invoice",
+    status_code=status.HTTP_201_CREATED,
+    summary="Issue the electronic receipt of an order",
+    responses=error_responses(NOT_FOUND, *INVOICING_RESPONSES, *AUTH),
+)
+async def issue_invoice(
+    order_id: uuid.UUID,
+    body: InvoiceIn,
+    principal: MemberDep,
+    session: SessionDep,
+    storage: StorageDep,
+    provider: InvoiceProviderDep,
+) -> DocumentOut:
+    """A person's click: the receipt is a tax document and the business answers for it."""
+    order = _own_order(session, principal.tenant_id, order_id)
+    service = InvoicingService(session, principal.tenant_id, storage, provider)
+    try:
+        document = await service.issue(
+            order,
+            _lines_of(session, principal.tenant_id, order),
+            body.tipo,
+            _buyer(body.cliente),
+            user_id=principal.user_id,
+        )
+    except InvoicingError as exc:
+        raise _invoicing_error(exc) from exc
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id,
+        action="order.invoice_issued",
+        detail={
+            "order_id": str(order.id),
+            "tipo": document.tipo,
+            "comprobante": f"{document.serie}-{document.numero}",
+        },
+    )
+    session.commit()
+    return _document_out(document)
+
+
+@router.post(
+    "/orders/{order_id}/invoice/void",
+    summary="Void the electronic receipt of an order with the provider",
+    responses=error_responses(NOT_FOUND, *INVOICING_RESPONSES, *AUTH),
+)
+async def void_invoice(
+    order_id: uuid.UUID,
+    body: VoidIn,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    storage: StorageDep,
+    provider: InvoiceProviderDep,
+) -> DocumentOut:
+    order = _own_order(session, principal.tenant_id, order_id)
+    standing = DocumentRepository(session, principal.tenant_id).live_electronic(order.id)
+    if standing is None:
+        raise _not_found()
+    service = InvoicingService(session, principal.tenant_id, storage, provider)
+    try:
+        document = await service.void(standing, body.motivo)
+    except InvoicingError as exc:
+        raise _invoicing_error(exc) from exc
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id,
+        action="order.invoice_voided",
+        detail={
+            "order_id": str(order.id),
+            "comprobante": f"{document.serie}-{document.numero}",
+        },
+    )
     session.commit()
     return _document_out(document)

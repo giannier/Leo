@@ -16,7 +16,12 @@ from sqlalchemy.orm import Session
 
 from app.models.aftersale import OrderDocument, OrderReturn
 from app.models.orders import Order
-from app.repositories.aftersale import DocumentRepository, ReturnEventRepository, ReturnRepository
+from app.repositories.aftersale import (
+    DocumentRepository,
+    InvoicingSettingsRepository,
+    ReturnEventRepository,
+    ReturnRepository,
+)
 from app.repositories.base import TenantScopeError
 from app.repositories.orders import OrderRepository
 from tests.isolation.conftest import TenantFixture
@@ -153,3 +158,23 @@ class TestDocuments:
         assert mine.get(seeded["b"][2].id) is None
         assert mine.of_order(seeded["b"][0].id) == []
         assert mine.of_orders([seeded["b"][0].id]) == {}
+
+
+class TestInvoicingSettings:
+    def test_each_business_has_its_own_account_and_numbers(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        mine = InvoicingSettingsRepository(db, tenant_a.tenant_id).ensure()
+        theirs = InvoicingSettingsRepository(db, tenant_b.tenant_id).ensure()
+        mine.ruta = "https://demo.nubefact.com/api/v1/a"
+        mine.siguiente_boleta = 41
+        db.flush()
+
+        assert InvoicingSettingsRepository(db, tenant_a.tenant_id).current() is mine
+        assert (theirs.ruta, theirs.siguiente_boleta) == (None, 1)
+        assert theirs.tenant_id == tenant_b.tenant_id
+
+    def test_asking_twice_finds_the_same_row(self, db: Session, tenant_a: TenantFixture) -> None:
+        repo = InvoicingSettingsRepository(db, tenant_a.tenant_id)
+
+        assert repo.ensure() is repo.ensure() is repo.locked()

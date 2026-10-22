@@ -135,3 +135,35 @@ enviar los del negocio, y también emitir boleta/factura electrónica con un pro
 6. **Costo del prompt:** las dos herramientas y su bloque «POSTVENTA» suman unos 350 tokens por turno a los negocios que venden
    (tope de herramientas 1 900 → 2 100; total de la mayor configuración ~5 250 de 6 000).
 
+## C-09: facturación electrónica (fase G, «documentos»: ambos)
+**Pedido de Giannier:** emitir boleta y factura electrónicas, además de adjuntar los documentos del negocio.
+**Qué se encontró (2026-10-21).** Para emitir un comprobante electrónico, el negocio necesita ser emisor electrónico ante la
+SUNAT (RUC y clave SOL), y desde un sistema propio debe usar un OSE o un PSE; la SUNAT también ofrece una emisión gratuita desde
+su portal para boletas. **Nubefact** es un PSE/OSE con una API REST en JSON (ruta y token por cuenta, y un entorno de pruebas en
+`demo.nubefact.com`). **Verificado** con sus archivos de ejemplo y su código PHP, descargados de nubefact.com/integracion: el
+formato del cuerpo (los 48 campos y los 15 del ítem, que la prueba compara uno a uno), los códigos de comprobante, de documento,
+de IGV y de unidad, la cabecera `Authorization: Token token="…"`, y los campos de la respuesta. **No verificado** (el manual es un
+documento de Google tras un inicio de sesión que no se pudo leer): el modo de identificar a un comprador sin documento
+(`"-"`), el umbral de S/ 700 para una boleta sin documento (regla general de la SUNAT, no leída aquí) y la respuesta exacta de
+`consultar_comprobante`. Si alguno falla, el proveedor lo dice con su propio texto y el panel lo muestra tal cual.
+**Decisiones (lectura conservadora, para ratificar):**
+1. **Nunca emite el asistente.** Lo emite una persona del equipo con un clic, en dos pasos (ver cómo quedaría, emitir). Un
+   comprobante es un documento tributario y el negocio responde por él. Anular lo hacen solo el dueño y los administradores.
+2. **La cuenta es del negocio**: su ruta y su token, escritos en el panel (nunca por el chat), cifrados, jamás devueltos, y el
+   cambio queda en la bitácora sin el token. La ruta solo puede ser https y de `nubefact.com` o `pse.pe` (si no, un negocio haría
+   que nuestro servidor llame a la dirección que quiera). Apagada hasta que el dueño la encienda.
+3. **Los números de una serie son seguidos**: Leo lleva el siguiente número de cada serie bajo un candado y lo mueve solo cuando
+   el proveedor acepta; si rechaza, el número se devuelve. Si la respuesta se pierde después de enviar, se consulta el número
+   antes de hacer nada más (nunca dos comprobantes). Un pedido tiene un solo comprobante vivo (índice único).
+4. **Importes:** los precios incluyen el impuesto; la base de cada línea es el total entre 1,18 (o sin impuesto si el negocio es
+   exonerado o inafecto); el comprobante suma el total del pedido al céntimo, y si no suma se rechaza en vez de emitir algo
+   aproximado; el descuento del pedido es el descuento global del comprobante; el envío es una línea de servicio. Probado con
+   500 pedidos al azar y con los dos ejemplos oficiales (708 con base 600 e IGV 108; con descuento global de 300, base 300, IGV 54).
+5. **Por ahora:** solo soles; boleta (DNI, RUC o sin documento hasta S/ 700) y factura (RUC válido con su dígito de control).
+   **No se hacen notas de crédito**: una devolución con reembolso se anula (si procede) o se resuelve con tu contador.
+6. **El DNI no se pide por el chat** (política de WhatsApp, C-01): se toma del pedido si el cliente ya lo dio, o lo escribe una
+   persona que lo pidió por teléfono o en persona.
+7. **Para probar:** abre una cuenta de pruebas en Nubefact, pega su ruta y su token, emite una boleta y revísala. El panel avisa
+   mientras la ruta sea la de pruebas. *Antes de usarla con clientes reales hace falta esa prueba: el adaptador no se ha
+   ejecutado contra el servicio real.*
+

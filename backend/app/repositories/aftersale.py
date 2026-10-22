@@ -8,10 +8,12 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import and_, func, select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.aftersale import (
     OPEN_RETURN_STATES,
     RETURNS_SEQUENCE,
+    InvoicingSettings,
     OrderDocument,
     OrderReturn,
     OrderReturnEvent,
@@ -168,3 +170,43 @@ class DocumentRepository(BaseRepository[OrderDocument]):
         for row in self._session.execute(statement).scalars():
             grouped.setdefault(row.order_id, []).append(row)
         return grouped
+
+    def live_electronic(self, order_id: uuid.UUID) -> OrderDocument | None:
+        """The electronic receipt that stands for this order, if one was issued."""
+        statement = self._scoped().where(
+            OrderDocument.order_id == order_id,
+            OrderDocument.origen == "electronico",
+            OrderDocument.estado == "emitido",
+            OrderDocument.tipo.in_(("boleta", "factura")),
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
+
+class InvoicingSettingsRepository(BaseRepository[InvoicingSettings]):
+    model = InvoicingSettings
+
+    def current(self) -> InvoicingSettings | None:
+        return self._session.execute(self._scoped()).scalar_one_or_none()
+
+    def ensure(self) -> InvoicingSettings:
+        """The row of this business, created with the defaults the first time it is needed."""
+        existing = self.current()
+        if existing is not None:
+            return existing
+        self._session.execute(
+            insert(InvoicingSettings)
+            .values(tenant_id=self._tenant_id)
+            .on_conflict_do_nothing(index_elements=["tenant_id"])
+        )
+        self._session.flush()
+        row = self.current()
+        if row is None:  # pragma: no cover - the insert or a concurrent one just created it
+            raise RuntimeError("invoicing settings could not be created")
+        return row
+
+    def locked(self) -> InvoicingSettings:
+        """The row, locked until the end of the transaction: issuing receipts is one at a time per
+        business, because the numbers of a series are consecutive."""
+        self.ensure()
+        statement = self._scoped().with_for_update()
+        return self._session.execute(statement).scalar_one()
