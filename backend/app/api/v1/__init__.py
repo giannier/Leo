@@ -25,6 +25,7 @@ from app.api.v1 import (
     platform_admin,
     platform_billing,
     platform_catalog,
+    platform_learning,
     products,
     public_chat,
     realtime,
@@ -61,6 +62,7 @@ router.include_router(aftersale.router)
 router.include_router(platform_admin.router)
 router.include_router(platform_billing.router)
 router.include_router(platform_catalog.router)
+router.include_router(platform_learning.router)
 router.include_router(team.router)
 router.include_router(products.router)
 router.include_router(realtime.router)

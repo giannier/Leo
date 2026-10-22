@@ -89,6 +89,12 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
   Instagram»; sin dato, «Directo». Resultados lo cuenta con los ganados.
 - **Revisión semanal**: muestra de conversaciones reales que el revisor marca bien, regular o mal (`conversation_reviews`); no usa el modelo.
 - **Destino del lead**: persona del equipo a quien se asigna y avisa un lead caliente (`agent_configs.destino_leads`).
+- **Devolución / reclamo**: una solicitud sobre un pedido ya hecho (`order_returns`: devolución, cambio, garantía, reclamo). El asistente
+  solo la registra; una persona la aprueba, rechaza o resuelve y el cliente lee su respuesta. Nunca se promete un reembolso.
+- **Documento del pedido**: boleta, factura, guía o garantía de un pedido (`order_documents`), aparte de la biblioteca de archivos.
+  El asistente solo envía los del propio cliente. La **facturación electrónica** (Nubefact) la emite una persona, nunca el asistente.
+- **Tope semanal de aprendizaje**: llamadas al modelo que el aprendizaje puede hacer por semana (`learning_settings`); apagado por defecto.
+- **Ejemplo real**: conversación anonimizada que el asistente consulta cuando llega un caso parecido (`example_conversations`).
 - **Operador de plataforma (Zentek360)**: mantiene y publica plantillas y rubros, con evals obligatorios.
 - `consultar_catalogo`: nombre viejo de la tool de catálogo (agente previo a la 004). En el registry por
   etapa es solo un **alias** de `buscar_productos` (no aparece en las tools que ve el modelo); el
