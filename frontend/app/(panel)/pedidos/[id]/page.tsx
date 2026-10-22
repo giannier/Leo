@@ -16,6 +16,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { DocumentsCard } from "@/components/aftersale/documents-card";
+import { InvoiceForm } from "@/components/aftersale/invoice-form";
 import { OrderReturns } from "@/components/aftersale/order-returns";
 import {
   HistoryCard,
@@ -46,6 +47,8 @@ export default function PedidoPage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome>(null);
+  // Bumped when a receipt is issued or voided, so the list of documents reads again.
+  const [documentsVersion, setDocumentsVersion] = useState(0);
 
   const loadImage = useCallback(
     async (proofId: string) => {
@@ -157,7 +160,12 @@ export default function PedidoPage() {
               />
               <OrderItems order={order} />
               <CustomerCard order={order} />
-              <DocumentsCard orderId={order.id} sold={SOLD.has(order.estado)} />
+              <InvoiceForm
+                orderId={order.id}
+                sold={SOLD.has(order.estado)}
+                onChanged={() => setDocumentsVersion((n) => n + 1)}
+              />
+              <DocumentsCard orderId={order.id} sold={SOLD.has(order.estado)} refreshKey={documentsVersion} />
               <OrderReturns orderId={order.id} sold={SOLD.has(order.estado)} />
             </div>
             <div className="min-w-0 space-y-5">

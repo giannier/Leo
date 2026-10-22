@@ -2565,6 +2565,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/invoicing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How this business issues electronic receipts */
+        get: operations["get_invoicing_api_v1_tenant_invoicing_get"];
+        /** Connect the account of the provider and set the series */
+        put: operations["put_invoicing_api_v1_tenant_invoicing_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Can this order be invoiced, and to whom */
+        get: operations["invoice_info_api_v1_tenant_orders__order_id__invoice_get"];
+        put?: never;
+        /**
+         * Issue the electronic receipt of an order
+         * @description A person's click: the receipt is a tax document and the business answers for it.
+         */
+        post: operations["issue_invoice_api_v1_tenant_orders__order_id__invoice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/invoice/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What would be issued, without issuing it */
+        post: operations["preview_invoice_api_v1_tenant_orders__order_id__invoice_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenant/orders/{order_id}/invoice/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void the electronic receipt of an order with the provider */
+        post: operations["void_invoice_api_v1_tenant_orders__order_id__invoice_void_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-admin/connection-requests": {
         parameters: {
             query?: never;
@@ -4099,6 +4172,35 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** BuyerIO */
+        BuyerIO: {
+            /**
+             * Documento Tipo
+             * @default ninguno
+             * @enum {string}
+             */
+            documento_tipo: "dni" | "ruc" | "ninguno";
+            /**
+             * Documento Numero
+             * @default
+             */
+            documento_numero: string;
+            /**
+             * Nombre
+             * @default
+             */
+            nombre: string;
+            /**
+             * Direccion
+             * @default
+             */
+            direccion: string;
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+        };
         /** CampaignIn */
         CampaignIn: {
             /** Name */
@@ -5155,6 +5257,112 @@ export interface components {
              * @enum {string}
              */
             role: "tenant_admin" | "operator";
+        };
+        /** InvoiceIn */
+        InvoiceIn: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "boleta" | "factura";
+            cliente: components["schemas"]["BuyerIO"];
+        };
+        /** InvoiceInfo */
+        InvoiceInfo: {
+            /** Disponible */
+            disponible: boolean;
+            /** Solo Prueba */
+            solo_prueba: boolean;
+            sugerido: components["schemas"]["BuyerIO"];
+            /** Siguiente Boleta */
+            siguiente_boleta: string;
+            /** Siguiente Factura */
+            siguiente_factura: string;
+            comprobante: components["schemas"]["DocumentOut"] | null;
+        };
+        /** InvoiceLineOut */
+        InvoiceLineOut: {
+            /** Descripcion */
+            descripcion: string;
+            /** Cantidad */
+            cantidad: string;
+            /** Total */
+            total: string;
+        };
+        /** InvoicePreview */
+        InvoicePreview: {
+            /** Tipo */
+            tipo: string;
+            /** Serie */
+            serie: string;
+            /** Numero */
+            numero: number;
+            /** Comprobante */
+            comprobante: string;
+            /** Cliente */
+            cliente: string;
+            /** Documento */
+            documento: string;
+            /** Lineas */
+            lineas: components["schemas"]["InvoiceLineOut"][];
+            /** Base */
+            base: string;
+            /** Igv */
+            igv: string;
+            /** Descuento */
+            descuento: string;
+            /** Total */
+            total: string;
+            /** Moneda */
+            moneda: string;
+        };
+        /** InvoicingIn */
+        InvoicingIn: {
+            /** Ruta */
+            ruta?: string | null;
+            /** Token */
+            token?: string | null;
+            /** Serie Boleta */
+            serie_boleta?: string | null;
+            /** Serie Factura */
+            serie_factura?: string | null;
+            /** Siguiente Boleta */
+            siguiente_boleta?: number | null;
+            /** Siguiente Factura */
+            siguiente_factura?: number | null;
+            /** Tratamiento Igv */
+            tratamiento_igv?: ("gravado" | "exonerado" | "inafecto") | null;
+            /** Igv Pct */
+            igv_pct?: number | string | null;
+            /** Activo */
+            activo?: boolean | null;
+        };
+        /** InvoicingOut */
+        InvoicingOut: {
+            /** Proveedor */
+            proveedor: string;
+            /** Ruta */
+            ruta: string | null;
+            /** Tiene Token */
+            tiene_token: boolean;
+            /** Serie Boleta */
+            serie_boleta: string;
+            /** Serie Factura */
+            serie_factura: string;
+            /** Siguiente Boleta */
+            siguiente_boleta: number;
+            /** Siguiente Factura */
+            siguiente_factura: number;
+            /** Tratamiento Igv */
+            tratamiento_igv: string;
+            /** Igv Pct */
+            igv_pct: string;
+            /** Activo */
+            activo: boolean;
+            /** Es Demo */
+            es_demo: boolean;
+            /** Listo */
+            listo: boolean;
         };
         /** KnowledgeListResponse */
         KnowledgeListResponse: {
@@ -7745,6 +7953,11 @@ export interface components {
             evals_vigentes: boolean;
             /** Publicada En */
             publicada_en: string | null;
+        };
+        /** VoidIn */
+        VoidIn: {
+            /** Motivo */
+            motivo: string;
         };
         /** WebChatIn */
         WebChatIn: {
@@ -15857,6 +16070,366 @@ export interface operations {
             };
             /** @description `not_found` */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_invoicing_api_v1_tenant_invoicing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicingOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_invoicing_api_v1_tenant_invoicing_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoicingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicingOut"];
+                };
+            };
+            /** @description `validation_error` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_configured`: turn it on only with a route and a token */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    invoice_info_api_v1_tenant_orders__order_id__invoice_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceInfo"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    issue_invoice_api_v1_tenant_orders__order_id__invoice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_configured`, `disabled`, `order_not_sold`, `already_issued`, `sandbox` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_outcome`: the answer was lost; check the provider's account */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    preview_invoice_api_v1_tenant_orders__order_id__invoice_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoicePreview"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_configured`, `disabled`, `order_not_sold`, `already_issued`, `sandbox` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_outcome`: the answer was lost; check the provider's account */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    void_invoice_api_v1_tenant_orders__order_id__invoice_void_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VoidIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_configured`, `disabled`, `order_not_sold`, `already_issued`, `sandbox` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_outcome`: the answer was lost; check the provider's account */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

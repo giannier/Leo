@@ -31,12 +31,14 @@ import {
 import { OrderSummaryCards, PeriodSwitch, type Period } from "@/components/orders/order-summary";
 import { api, type OrderPage, type OrderSummary } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
+import { MANAGES_CONFIGURATION, useHasRole } from "@/lib/session";
 
 const PAGE_SIZE = 20;
 /** Pause after the last keystroke before searching. */
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function PedidosPage() {
+  const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
   const [period, setPeriod] = useState<Period>("hoy");
   const [summary, setSummary] = useState<OrderSummary | null>(null);
   // Requests to return or exchange that wait for a person; the badge of the link.
@@ -125,6 +127,14 @@ export default function PedidosPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {canConfigure ? (
+            <Link
+              href="/pedidos/facturacion"
+              className="inline-flex min-h-10 items-center rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-muted"
+            >
+              Facturación electrónica
+            </Link>
+          ) : null}
           <Link
             href="/pedidos/devoluciones"
             className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-muted"
