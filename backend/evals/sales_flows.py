@@ -328,40 +328,78 @@ def _case(
     )
 
 
-def _a_past_order(session: Session, tenant: Tenant, contact: Contact, _now: Conversation) -> None:
-    """The customer bought two polos last week; the order is on its way."""
-    from app.repositories.orders import OrderRepository
+def _past_order(
+    estado: str = "en_curso",
+    *,
+    days_ago: int = 0,
+    document: tuple[str, str, str] | None = None,
+    policy: dict[str, object] | None = None,
+) -> Callable[[Session, Tenant, Contact, Conversation], None]:
+    """The customer bought two polos in an earlier conversation.
 
-    earlier = Conversation(
-        tenant_id=tenant.id, channel="sandbox", contact_id=contact.id, status="closed"
-    )
-    session.add(earlier)
-    session.flush()
-    order = OrderRepository(session, tenant.id).add_numbered(
-        conversation_id=earlier.id,
-        contact_id=contact.id,
-        moneda="PEN",
-        subtotal=Decimal("70.00"),
-        total=Decimal("70.00"),
-        estado="en_curso",
-        is_sandbox=True,
-        tipo_entrega="delivery",
-        zona_envio="Miraflores",
-        confirmed_at=datetime.now(UTC),
-    )
-    polo = next(p for p in ProductRepository(session, tenant.id).list() if p.name == "Polo básico")
-    session.add(
-        OrderItem(
-            tenant_id=tenant.id,
-            order_id=order.id,
-            product_id=polo.id,
-            nombre=polo.name,
-            precio_unitario=Decimal("35.00"),
-            cantidad=2,
-            subtotal=Decimal("70.00"),
+    `document`: (type, series, number) of a document the business attached to it. `policy`: what
+    the business wrote about returns.
+    """
+
+    def prelude(session: Session, tenant: Tenant, contact: Contact, _now: Conversation) -> None:
+        from app.models.aftersale import OrderDocument
+        from app.repositories.orders import OrderRepository
+
+        earlier = Conversation(
+            tenant_id=tenant.id, channel="sandbox", contact_id=contact.id, status="closed"
         )
-    )
-    session.flush()
+        session.add(earlier)
+        session.flush()
+        order = OrderRepository(session, tenant.id).add_numbered(
+            conversation_id=earlier.id,
+            contact_id=contact.id,
+            moneda="PEN",
+            subtotal=Decimal("70.00"),
+            total=Decimal("70.00"),
+            estado=estado,
+            is_sandbox=True,
+            tipo_entrega="delivery",
+            zona_envio="Miraflores",
+            confirmed_at=datetime.now(UTC) - timedelta(days=days_ago),
+        )
+        polo = next(
+            p for p in ProductRepository(session, tenant.id).list() if p.name == "Polo básico"
+        )
+        session.add(
+            OrderItem(
+                tenant_id=tenant.id,
+                order_id=order.id,
+                product_id=polo.id,
+                nombre=polo.name,
+                precio_unitario=Decimal("35.00"),
+                cantidad=2,
+                subtotal=Decimal("70.00"),
+            )
+        )
+        if document is not None:
+            kind, series, number = document
+            session.add(
+                OrderDocument(
+                    tenant_id=tenant.id,
+                    order_id=order.id,
+                    tipo=kind,
+                    titulo=kind.capitalize(),
+                    serie=series,
+                    numero=number,
+                    storage_key=f"tenants/{tenant.id}/orders/{order.id}/{kind}.pdf",
+                    filename=f"{kind}.pdf",
+                    mime_type="application/pdf",
+                    size_bytes=100,
+                )
+            )
+        if policy is not None:
+            BusinessInfoRepository(session, tenant.id).upsert("devoluciones", dict(policy))
+        session.flush()
+
+    return prelude
+
+
+_a_past_order = _past_order()
 
 
 SHOP_DATA = (
@@ -459,6 +497,44 @@ FLOW_CASES: tuple[FlowCase, ...] = (
         ["consultar_pedidos"],
         mentions_any=["polo"],
         prelude=_a_past_order,
+    ),
+    _case(
+        "productos",
+        "pide cambiar un producto defectuoso",
+        ["Hola, el polo que me llegó tiene la costura abierta, quiero cambiarlo"],
+        ["INICIO", "IDENTIFICAR", "DERIVADO"],
+        ["solicitar_devolucion"],
+        never=["te devolveremos", "te devolvemos el dinero", "ya aprobamos", "fue aprobad"],
+        prelude=_past_order("completado"),
+    ),
+    _case(
+        "productos",
+        "pide la boleta y está adjunta",
+        ["Hola, me puedes enviar la boleta de mi pedido?"],
+        ["INICIO", "IDENTIFICAR"],
+        ["enviar_documento"],
+        prelude=_past_order("completado", document=("boleta", "B001", "123")),
+    ),
+    _case(
+        "productos",
+        "pide la factura y no está adjunta",
+        ["Hola, necesito la factura de mi pedido"],
+        ["INICIO", "IDENTIFICAR", "DERIVADO"],
+        ["enviar_documento"],
+        never=["aquí tienes tu factura", "te la envié", "ya te la envié", "adjunto tu factura"],
+        prelude=_past_order("completado"),
+    ),
+    _case(
+        "productos",
+        "quiere devolver por arrepentimiento fuera de plazo",
+        ["Hola, quiero devolver el polo que compré, ya no lo quiero"],
+        ["INICIO", "IDENTIFICAR", "DERIVADO"],
+        never=["te devolvemos", "te devolveremos", "ya registré tu devolución"],
+        prelude=_past_order(
+            "completado",
+            days_ago=30,
+            policy={"acepta_cambios": True, "acepta_devoluciones": True, "plazo_dias": 7},
+        ),
     ),
     _case(
         "productos",

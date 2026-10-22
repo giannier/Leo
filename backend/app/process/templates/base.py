@@ -77,8 +77,13 @@ SCHEDULING_TOOL_NAMES: tuple[str, ...] = ("consultar_horarios", "agendar_cita", 
 # The tool of a business whose agent also qualifies leads (capability `captar`, feature 019, phase E).
 LEAD_TOOL_NAMES: tuple[str, ...] = ("calificar_cliente",)
 
-# The tool of a business that sells: what happened to an order already made (feature 019, phase G).
-POSTSALE_TOOL_NAMES: tuple[str, ...] = ("consultar_pedidos",)
+# The tools of a business that sells, for after the sale (feature 019, phase G): what happened to an
+# order already made, a return or a claim about it, and the documents of the order.
+POSTSALE_TOOL_NAMES: tuple[str, ...] = (
+    "consultar_pedidos",
+    "solicitar_devolucion",
+    "enviar_documento",
+)
 
 # Available in every stage that runs the model, on top of the stage's own tools.
 GLOBAL_TOOLS: tuple[str, ...] = (

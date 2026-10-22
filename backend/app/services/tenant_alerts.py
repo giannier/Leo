@@ -35,10 +35,12 @@ from app.models.orders import Order, PaymentProof
 from app.models.tenant import (
     CASH_ORDER,
     CUSTOMER_UNREACHED,
+    DOCUMENT_REQUESTED,
     HANDOFF,
     HOT_LEAD,
     LLM_DOWN,
     NEW_RECEIPT,
+    RETURN_REQUESTED,
     UNATTENDED,
     Tenant,
 )
@@ -49,10 +51,12 @@ from app.repositories.notification import TenantNotificationRepository
 from app.services.activation import owner_of
 from app.services.emails import (
     build_cash_order_email,
+    build_document_requested_email,
     build_handoff_email,
     build_hot_lead_email,
     build_llm_down_email,
     build_new_receipt_email,
+    build_return_requested_email,
     build_unattended_email,
 )
 
@@ -199,6 +203,59 @@ class TenantAlerts:
         tenant = self._session.get(Tenant, self._tenant_id)
         if destination is not None and (owner is None or destination.id != owner.id):
             self.pending_emails.append(build(destination.email, tenant.name if tenant else ""))
+
+    def return_requested(self, order: Order, *, numero: int, tipo: str, motivo: str) -> None:
+        """A customer asked to return, exchange or claim something: a person decides."""
+        if order.is_sandbox:
+            return
+        self._notices.record(
+            RETURN_REQUESTED,
+            {
+                "order_id": str(order.id),
+                "pedido": order.numero,
+                "numero": numero,
+                "tipo": tipo,
+                "motivo": motivo,
+            },
+        )
+        what = {
+            "devolucion": "una devolución",
+            "cambio": "un cambio",
+            "garantia": "la garantía",
+            "reclamo": "atender un reclamo",
+        }.get(tipo, "una solicitud")
+        self._email(
+            lambda to, name: build_return_requested_email(
+                to=to,
+                tenant_name=name,
+                pedido=order.numero,
+                que=what,
+                panel_url=self._panel("pedidos/devoluciones"),
+            )
+        )
+
+    def document_requested(self, order: Order, *, tipo: str | None) -> None:
+        """A customer asked for a document that is not attached to their order yet."""
+        if order.is_sandbox:
+            return
+        self._notices.record(
+            DOCUMENT_REQUESTED, {"order_id": str(order.id), "pedido": order.numero, "tipo": tipo}
+        )
+        what = {
+            "boleta": "la boleta",
+            "factura": "la factura",
+            "guia": "la guía de remisión",
+            "garantia": "la garantía",
+        }.get(tipo or "", "un documento")
+        self._email(
+            lambda to, name: build_document_requested_email(
+                to=to,
+                tenant_name=name,
+                pedido=order.numero,
+                que=what,
+                panel_url=self._panel("pedidos"),
+            )
+        )
 
     def unattended(
         self, conversation_id: uuid.UUID, *, motivo: str, resumen: str | None, minutes: int

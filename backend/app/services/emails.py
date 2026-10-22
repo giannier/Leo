@@ -671,6 +671,43 @@ def build_hot_lead_email(
     )
 
 
+RETURN_REQUESTED_SUBJECT = "Un cliente pidió una devolución o un cambio"
+DOCUMENT_REQUESTED_SUBJECT = "Un cliente pidió un documento de su pedido"
+
+
+def build_return_requested_email(
+    *, to: str, tenant_name: str, pedido: int, que: str, panel_url: str
+) -> EmailMessage:
+    """A customer of the business asked for a return: money may be owed, so a person decides."""
+    return _alert_email(
+        to=to,
+        subject=RETURN_REQUESTED_SUBJECT,
+        lines=[
+            f"Un cliente de {tenant_name} pidió {que} del pedido #{pedido}.",
+            "El asistente la registró y le dijo que una persona la revisa. Decide tú: apruébala, "
+            "recházala o resuélvela, y el cliente recibe tu respuesta en su chat.",
+        ],
+        panel_url=panel_url,
+        link_label="Ver la solicitud",
+    )
+
+
+def build_document_requested_email(
+    *, to: str, tenant_name: str, pedido: int, que: str, panel_url: str
+) -> EmailMessage:
+    return _alert_email(
+        to=to,
+        subject=DOCUMENT_REQUESTED_SUBJECT,
+        lines=[
+            f"Un cliente de {tenant_name} pidió {que} del pedido #{pedido} y todavía no está "
+            "adjunto.",
+            "Adjúntalo al pedido y el asistente podrá enviarlo cuando el cliente lo pida.",
+        ],
+        panel_url=panel_url,
+        link_label="Abrir el pedido",
+    )
+
+
 def build_llm_down_email(*, to: str, tenant_name: str, panel_url: str) -> EmailMessage:
     """The model failed several times in a row and the assistant stopped answering for a
     few minutes. Sent at most once an hour."""

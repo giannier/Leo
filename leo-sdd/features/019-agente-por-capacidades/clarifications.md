@@ -112,3 +112,26 @@ sus redes": el **enlace del chat** va en la biografía de Instagram o TikTok y e
 Giannier lo dejó para después), Google Calendar y Cal.com (verificación y cuentas externas), la fase H de aprendizaje (consentimiento
 y Ley 29733), el calificado automático de preguntas de prueba (costo del modelo) y el DNI (C-01).
 
+## C-08: devoluciones y documentos de postventa (fase G)
+**Pedido de Giannier (2026-10-21):** «devoluciones y documentos de post venta», y en documentos eligió **ambos**: adjuntar y
+enviar los del negocio, y también emitir boleta/factura electrónica con un proveedor.
+1. **El asistente registra, una persona decide.** `solicitar_devolucion` crea una solicitud (`order_returns`: devolución,
+   cambio, garantía o reclamo; motivo; lo que dijo el cliente; las fotos que mandó en las últimas 3 h) y avisa al equipo por el
+   panel y por correo. **Nunca** promete reembolso, cambio, recojo ni fechas: devolver dinero es del negocio. La decide una
+   persona del equipo (aprobar o rechazar con el texto que leerá el cliente, resolver, cancelar), y el cliente lo lee en su
+   chat dentro de la ventana de 24 h (si está cerrada, el panel avisa). Cada paso deja un evento (`order_return_events`).
+2. **La política del negocio** (sección «cambios y devoluciones») la respeta la herramienta **solo para un cambio de
+   opinión** (`no_conforme` u `otro`): si el negocio no hace devoluciones, o el pedido pasó su plazo, no se registra y el
+   asistente explica la política y pregunta si quiere que una persona evalúe su caso (entonces deriva). Un producto
+   defectuoso, equivocado o incompleto, una garantía y un reclamo **se registran siempre**: no son culpa del cliente.
+   *Lectura conservadora, para ratificar.* Una persona del equipo puede registrar cualquier excepción desde el panel.
+3. **Una solicitud abierta por tipo y pedido** (índice único parcial): pedirla dos veces encuentra la primera.
+4. **Los documentos no son biblioteca.** `order_documents` vive aparte de `media_assets`: la biblioteca es el catálogo de
+   archivos del negocio y se alcanza por una clave que el modelo puede nombrar; la boleta de un cliente no. El asistente solo
+   envía un documento del pedido **del propio cliente** (se comprueba por la conversación), nunca uno anulado, y si no está
+   adjunto no lo inventa: avisa al equipo (`documento_solicitado`) y le dice al cliente que se lo harán llegar.
+5. **Resumen del pedido en PDF** hecho por Leo (sin librería nueva: `aftersale/pdf_writer.py`), que dice que **no es un
+   comprobante de pago**. Emitir un comprobante electrónico es otra cosa (ver C-09).
+6. **Costo del prompt:** las dos herramientas y su bloque «POSTVENTA» suman unos 350 tokens por turno a los negocios que venden
+   (tope de herramientas 1 900 → 2 100; total de la mayor configuración ~5 250 de 6 000).
+

@@ -38,3 +38,11 @@ class OrderNotices(Protocol):
     def hot_lead(self, conversation_id: uuid.UUID, *, resumen: str | None) -> None:
         """The assistant judged a customer hot (`calificar_cliente`, feature 019, phase E)."""
         ...
+
+    def return_requested(self, order: Order, *, numero: int, tipo: str, motivo: str) -> None:
+        """A customer asked for a return, an exchange, a warranty or made a complaint."""
+        ...
+
+    def document_requested(self, order: Order, *, tipo: str | None) -> None:
+        """A customer asked for a document of their order that is not attached yet."""
+        ...

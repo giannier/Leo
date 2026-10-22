@@ -73,15 +73,16 @@ SECTION_CAPS: Mapping[str, int] = {
     "venta": 540,
     "agenda": 200,
     "captacion": 220,
+    "postventa": 170,
     "estilo": 300,
     "estado": 500,
     "etapa": 700,
     "rubro": 350,
     "negocio": 1300,
     "situaciones": 1000,
-    # 1 400 for the ten tools of the sales engine, 500 more for those of the agenda, the leads and the
-    # orders already made (a business with every capability on; the whole prompt still fits 6 000).
-    "herramientas": 1900,
+    # 1 400 for the ten tools of the sales engine, 700 more for those of the agenda, the leads and
+    # after the sale (a business with every capability on; the whole prompt still fits 6 000).
+    "herramientas": 2100,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are
@@ -176,6 +177,16 @@ solo las que falten y no repitas lo que ya dijo: {preguntas}.
 Con 2 respuestas, o apenas muestre interés claro, llama a calificar_cliente (nota interna: no la
 menciones). Interés ALTO: necesidad concreta y plazo corto, o pide precio, cita o propuesta. MEDIO:
 interés con plazo o presupuesto sin definir. BAJO: solo curiosidad. No pidas tarjeta ni documentos."""
+
+
+AFTERSALE_RULES = """\
+POSTVENTA: si pregunta por un pedido ya hecho, usa consultar_pedidos. Si quiere devolver, cambiar o
+reclamar algo, usa solicitar_devolucion: solo registra la solicitud; NUNCA prometas reembolso, cambio,
+recojo ni fechas, lo decide una persona. Si pide su boleta, factura o garantía, usa enviar_documento."""
+
+
+def _aftersale_block(config: EffectiveProcessConfig) -> str:
+    return AFTERSALE_RULES if config.options.postventa else ""
 
 
 def _lead_block(config: EffectiveProcessConfig) -> str:
@@ -795,6 +806,9 @@ def build_stage_prompt(
     leads = _lead_block(config)
     if leads:
         parts["captacion"] = leads
+    aftersale = _aftersale_block(config)
+    if aftersale:
+        parts["postventa"] = aftersale
     parts |= {
         "estilo": _style_block(config),
         "estado": _state_block(config, facts, stage, turn or TurnContext(), now),

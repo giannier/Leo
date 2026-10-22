@@ -26,7 +26,7 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from app.models.channel import Contact
-from app.models.conversation import Message
+from app.models.conversation import Conversation, Message
 from app.models.orders import Order
 from app.orders.notices import OrderNotices
 from app.orders.review import NoticeKind
@@ -127,7 +127,27 @@ class CustomerNotifier:
         text = self.text_for(
             order, kind, contact=contact, siguiente_paso=siguiente_paso, motivo=motivo
         )
+        return self._stage(order, conversation, contact, text, promotions=kind == "pago_confirmado")
 
+    def prepare_text(self, order: Order, text: str) -> PreparedNotice:
+        """The same path for a notice the business wrote itself (a return's decision)."""
+        conversation = ConversationRepository(self._session, self._tenant_id).get(
+            order.conversation_id
+        )
+        contact = ContactRepository(self._session, self._tenant_id).get(order.contact_id)
+        if conversation is None or contact is None:
+            return PreparedNotice(order, "no_enviado")
+        return self._stage(order, conversation, contact, text, promotions=False)
+
+    def _stage(
+        self,
+        order: Order,
+        conversation: Conversation,
+        contact: Contact,
+        text: str,
+        *,
+        promotions: bool,
+    ) -> PreparedNotice:
         if order.is_sandbox:
             self._messages.append(
                 conversation_id=conversation.id,
@@ -153,7 +173,7 @@ class CustomerNotifier:
             OptinService(self._session, self._tenant_id).prepare_question(
                 conversation, contact, now=datetime.now(UTC)
             )
-            if kind == "pago_confirmado"
+            if promotions
             else None
         )
         return PreparedNotice(order, "enviado", message, extra)

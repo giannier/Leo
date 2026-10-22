@@ -92,3 +92,39 @@ class TestWhatItDid:
         assert done["cotizaciones"] == {"pedidas": 1, "enviadas": 1}
         assert done["calificados"] == {"total": 1, "calientes": 1, "tibios": 0, "frios": 0}
         assert "citas" not in done
+
+    async def test_returns_are_counted_by_how_they_were_decided(self, db: Session) -> None:
+        from decimal import Decimal
+
+        from app.agent.tools.aftersale import solicitar_devolucion
+        from app.agent.tools.registry import ToolContext
+        from app.models.business import Product
+        from app.providers.llm import MockLLMProvider
+        from tests.integration.test_postsale_tool import _order
+        from tests.integration.test_turn_pipeline import _conversation, _tenant
+
+        tenant = _tenant(db, template="productos")
+        conversation = _conversation(db, tenant, channel="whatsapp")
+        polo = Product(tenant_id=tenant.id, name="Polo", price=Decimal("35"))
+        db.add(polo)
+        db.flush()
+        _order(db, tenant.id, conversation, "completado", lines=(("Polo", 1, polo),))
+        await solicitar_devolucion(
+            ToolContext(
+                session=db,
+                tenant_id=tenant.id,
+                llm=MockLLMProvider(),
+                conversation_id=conversation.id,
+            ),
+            {"tipo": "cambio", "motivo": "defectuoso", "detalle": "Roto"},
+        )
+        start, end = _range()
+
+        done = what_it_did(db, tenant.id, start.date(), end.date())
+
+        assert done["devoluciones"] == {
+            "solicitadas": 1,
+            "aprobadas": 0,
+            "rechazadas": 0,
+            "pendientes": 1,
+        }
