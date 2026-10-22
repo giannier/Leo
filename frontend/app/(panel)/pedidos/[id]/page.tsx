@@ -15,6 +15,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { DocumentsCard } from "@/components/aftersale/documents-card";
+import { OrderReturns } from "@/components/aftersale/order-returns";
 import {
   HistoryCard,
   CustomerCard,
@@ -31,6 +33,9 @@ import { api, type CustomerNotice, type OperatorState, type OrderDetail } from "
 import { ApiError, humanMessage } from "@/lib/api/errors";
 
 type Outcome = { text: string; tone: "success" | "warning" } | null;
+
+/** The order is a sale made: documents can be attached and a return can be asked for. */
+const SOLD = new Set(["confirmado", "en_curso", "completado"]);
 
 export default function PedidoPage() {
   const { id } = useParams<{ id: string }>();
@@ -152,6 +157,8 @@ export default function PedidoPage() {
               />
               <OrderItems order={order} />
               <CustomerCard order={order} />
+              <DocumentsCard orderId={order.id} sold={SOLD.has(order.estado)} />
+              <OrderReturns orderId={order.id} sold={SOLD.has(order.estado)} />
             </div>
             <div className="min-w-0 space-y-5">
               <ReviewPanel

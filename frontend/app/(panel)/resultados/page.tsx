@@ -211,6 +211,24 @@ function Resumen() {
                 testid="kpi-quotes"
               />
             ) : null}
+            {report.actividad?.devoluciones ? (
+              <Tile
+                label="Devoluciones y reclamos"
+                value={String(report.actividad.devoluciones.solicitadas)}
+                note={[
+                  report.actividad.devoluciones.pendientes
+                    ? `${report.actividad.devoluciones.pendientes} por revisar`
+                    : null,
+                  `${report.actividad.devoluciones.aprobadas} aprobadas`,
+                  report.actividad.devoluciones.rechazadas
+                    ? `${report.actividad.devoluciones.rechazadas} rechazadas`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                testid="kpi-returns"
+              />
+            ) : null}
             {report.actividad?.calificados ? (
               <Tile
                 label="Clientes calificados"

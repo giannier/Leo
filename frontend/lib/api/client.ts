@@ -371,6 +371,7 @@ export interface MetricsReport {
     citas?: { agendadas: number; por_el_asistente: number; completadas: number; faltas: number };
     cotizaciones?: { pedidas: number; enviadas: number };
     calificados?: { total: number; calientes: number; tibios: number; frios: number };
+    devoluciones?: { solicitadas: number; aprobadas: number; rechazadas: number; pendientes: number };
   };
   minutos_por_conversacion: number;
   total: MetricsSummary;
@@ -633,6 +634,17 @@ export type ReviewItem = ReviewPage["items"][number];
 export type ReviewMark = NonNullable<ReviewItem["revision"]>;
 export type ReviewBody = JsonBody<Ops["/api/v1/assistant/review/{conversation_id}"]["put"]["requestBody"]>;
 export type TestQuestions = Ok<Ops["/api/v1/assistant/test-questions"]["get"]>;
+// After the sale: returns and the documents of an order (feature 019, phase G).
+export type ReturnList = Ok<Ops["/api/v1/tenant/returns"]["get"]>;
+export type ReturnRow = ReturnList["items"][number];
+export type ReturnDetail = Ok<Ops["/api/v1/tenant/returns/{return_id}"]["get"]>;
+export type ReturnBody = JsonBody<Ops["/api/v1/tenant/returns"]["post"]["requestBody"]>;
+export type ReturnDecisionBody = JsonBody<
+  Ops["/api/v1/tenant/returns/{return_id}/decision"]["post"]["requestBody"]
+>;
+export type ReturnDecision = Ok<Ops["/api/v1/tenant/returns/{return_id}/decision"]["post"]>;
+export type OrderDocumentList = Ok<Ops["/api/v1/tenant/orders/{order_id}/documents"]["get"]>;
+export type OrderDocumentRow = OrderDocumentList["items"][number];
 export type ResourceBody = {
   nombre: string;
   horario: Record<string, string[][]> | null;
@@ -1262,6 +1274,43 @@ export const api = {
     saveSettings: (body: InboxSettings) =>
       request<InboxSettings>("/tenant/notification-settings", { method: "PUT", body }),
   },
+  aftersale: {
+    returns: (query: { estado?: string[]; page?: number }) =>
+      request<ReturnList>("/tenant/returns", { query }),
+    ret: (id: string) => request<ReturnDetail>(`/tenant/returns/${id}`),
+    returnsOfOrder: (orderId: string) =>
+      request<ReturnList>("/tenant/returns", { query: { pedido_id: orderId } }),
+    openReturn: (body: ReturnBody) =>
+      request<ReturnDetail>("/tenant/returns", { method: "POST", body }),
+    decide: (id: string, body: ReturnDecisionBody) =>
+      request<ReturnDecision>(`/tenant/returns/${id}/decision`, { method: "POST", body }),
+    documents: (orderId: string) =>
+      request<OrderDocumentList>(`/tenant/orders/${orderId}/documents`),
+    attach: (
+      orderId: string,
+      file: File,
+      fields: { tipo: string; serie?: string; numero?: string; titulo?: string },
+    ) => {
+      const form = new FormData();
+      form.set("file", file);
+      for (const [key, value] of Object.entries(fields)) if (value) form.set(key, value);
+      return request<OrderDocumentRow>(`/tenant/orders/${orderId}/documents`, {
+        method: "POST",
+        body: form,
+      });
+    },
+    makeSummary: (orderId: string) =>
+      request<OrderDocumentRow>(`/tenant/orders/${orderId}/documents/summary`, { method: "POST" }),
+    documentLink: (orderId: string, documentId: string) =>
+      request<{ url: string }>(`/tenant/orders/${orderId}/documents/${documentId}/link`),
+    voidDocument: (orderId: string, documentId: string) =>
+      request<OrderDocumentRow>(`/tenant/orders/${orderId}/documents/${documentId}/void`, {
+        method: "POST",
+      }),
+    removeDocument: (orderId: string, documentId: string) =>
+      request<void>(`/tenant/orders/${orderId}/documents/${documentId}`, { method: "DELETE" }),
+  },
+
   orders: {
     list: (query: OrderListQuery, signal?: AbortSignal) =>
       request<OrderPage>("/tenant/orders", { query, signal }),
