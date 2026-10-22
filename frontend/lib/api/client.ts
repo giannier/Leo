@@ -651,6 +651,15 @@ export type InvoiceInfo = Ok<Ops["/api/v1/tenant/orders/{order_id}/invoice"]["ge
 export type InvoiceBody = JsonBody<Ops["/api/v1/tenant/orders/{order_id}/invoice"]["post"]["requestBody"]>;
 export type InvoicePreview = Ok<Ops["/api/v1/tenant/orders/{order_id}/invoice/preview"]["post"]>;
 export type Buyer = InvoiceBody["cliente"];
+// The agent proposes, a person decides (feature 017, phase 3; 019, phase H).
+export type Learning = Ok<Ops["/api/v1/assistant/learning"]["get"]>;
+export type LearningPatch = JsonBody<Ops["/api/v1/assistant/learning"]["put"]["requestBody"]>;
+export type SuggestionList = Ok<Ops["/api/v1/assistant/suggestions"]["get"]>;
+export type SuggestionRow = SuggestionList["items"][number];
+export type SuggestionDetail = Ok<Ops["/api/v1/assistant/suggestions/{suggestion_id}"]["get"]>;
+export type SuggestionDecision = Ok<Ops["/api/v1/assistant/suggestions/{suggestion_id}/approve"]["post"]>;
+export type HistoryList = Ok<Ops["/api/v1/assistant/history"]["get"]>;
+export type HistoryRow = HistoryList["items"][number];
 export type ResourceBody = {
   nombre: string;
   horario: Record<string, string[][]> | null;
@@ -1143,6 +1152,23 @@ export const api = {
   assistant: {
     overview: () => request<Overview>("/assistant/overview"),
     review: () => request<ReviewPage>("/assistant/review"),
+    learning: () => request<Learning>("/assistant/learning"),
+    saveLearning: (body: LearningPatch) =>
+      request<Learning>("/assistant/learning", { method: "PUT", body }),
+    suggestions: (query: { estado?: string; tipo?: string }) =>
+      request<SuggestionList>("/assistant/suggestions", { query }),
+    suggestion: (id: string) => request<SuggestionDetail>(`/assistant/suggestions/${id}`),
+    draftSuggestion: (id: string) =>
+      request<{ situation_id: string }>(`/assistant/suggestions/${id}/draft`, { method: "POST" }),
+    approveSuggestion: (id: string, body: { editado?: Record<string, unknown> | null; respuesta?: string | null }) =>
+      request<SuggestionDecision>(`/assistant/suggestions/${id}/approve`, { method: "POST", body }),
+    rejectSuggestion: (id: string, nota?: string) =>
+      request<SuggestionDetail>(`/assistant/suggestions/${id}/reject`, {
+        method: "POST",
+        body: { nota: nota ?? null },
+      }),
+    history: () => request<HistoryList>("/assistant/history"),
+    undoChange: (id: string) => request<HistoryRow>(`/assistant/history/${id}/undo`, { method: "POST" }),
     rateReview: (conversationId: string, body: ReviewBody) =>
       request<ReviewMark>(`/assistant/review/${conversationId}`, { method: "PUT", body }),
     testQuestions: () => request<TestQuestions>("/assistant/test-questions"),

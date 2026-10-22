@@ -2177,6 +2177,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/learning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Learning: on or off, what it spent, what waits */
+        get: operations["get_learning_api_v1_assistant_learning_get"];
+        /** Turn learning on, set its weekly ceiling, share with the rubro */
+        put: operations["put_learning_api_v1_assistant_learning_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The inbox of suggestions */
+        get: operations["list_suggestions_api_v1_assistant_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/suggestions/{suggestion_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One suggestion with the conversations that gave rise to it */
+        get: operations["get_suggestion_api_v1_assistant_suggestions__suggestion_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/suggestions/{suggestion_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Try a suggested situation in the simulator without putting it in force */
+        post: operations["draft_suggestion_api_v1_assistant_suggestions__suggestion_id__draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/suggestions/{suggestion_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a suggestion in force, as it is or edited */
+        post: operations["approve_suggestion_api_v1_assistant_suggestions__suggestion_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/suggestions/{suggestion_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discard a suggestion: it is not proposed again */
+        post: operations["reject_suggestion_api_v1_assistant_suggestions__suggestion_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What changed, with what it was before */
+        get: operations["list_history_api_v1_assistant_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/history/{entry_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put the «before» of a change back */
+        post: operations["undo_change_api_v1_assistant_history__entry_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/metrics": {
         parameters: {
             query?: never;
@@ -3896,6 +4033,15 @@ export interface components {
              */
             faltas: number;
         };
+        /** ApproveIn */
+        ApproveIn: {
+            /** Editado */
+            editado?: {
+                [key: string]: unknown;
+            } | null;
+            /** Respuesta */
+            respuesta?: string | null;
+        };
         /** AssignIn */
         AssignIn: {
             /** User Id */
@@ -4490,6 +4636,17 @@ export interface components {
             /** Chunks */
             chunks: string[];
         };
+        /** Clash */
+        Clash: {
+            /** Tipo */
+            tipo: string;
+            /** Id */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Motivo */
+            motivo: string;
+        };
         /** ConfirmRequest */
         ConfirmRequest: {
             /** Siguiente Paso */
@@ -4881,12 +5038,6 @@ export interface components {
             /** Resolucion */
             resolucion?: string | null;
         };
-        /** DecisionOut */
-        DecisionOut: {
-            solicitud: components["schemas"]["ReturnDetail"];
-            /** Aviso Cliente */
-            aviso_cliente: ("enviado" | "ventana_cerrada" | "no_enviado") | null;
-        };
         /** DecisionResponse */
         DecisionResponse: {
             /** Estado */
@@ -4934,6 +5085,14 @@ export interface components {
             creado: string;
             /** Enviado */
             enviado: string | null;
+        };
+        /** DraftOut */
+        DraftOut: {
+            /**
+             * Situation Id
+             * Format: uuid
+             */
+            situation_id: string;
         };
         /**
          * ErrorResponse
@@ -5157,6 +5316,11 @@ export interface components {
             /** Usuario Id */
             usuario_id?: string | null;
         };
+        /** HistoryList */
+        HistoryList: {
+            /** Items */
+            items: components["schemas"]["HistoryRow"][];
+        };
         /** HistoryResponse */
         HistoryResponse: {
             /** Items */
@@ -5167,6 +5331,31 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** HistoryRow */
+        HistoryRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Entidad */
+            entidad: string;
+            /** Accion */
+            accion: string;
+            /** Resumen */
+            resumen: string;
+            /**
+             * Cuando
+             * Format: date-time
+             */
+            cuando: string;
+            /** Por Sugerencia */
+            por_sugerencia: boolean;
+            /** Deshecho */
+            deshecho: boolean;
+            /** Se Puede Deshacer */
+            se_puede_deshacer: boolean;
         };
         /** Holder */
         Holder: {
@@ -5562,6 +5751,36 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** LearningIn */
+        LearningIn: {
+            /** Activo */
+            activo?: boolean | null;
+            /** Tope Semanal */
+            tope_semanal?: number | null;
+            /** Compartir Con Rubro */
+            compartir_con_rubro?: boolean | null;
+        };
+        /** LearningOut */
+        LearningOut: {
+            /** Activo */
+            activo: boolean;
+            /** Tope Semanal */
+            tope_semanal: number;
+            /** Usadas */
+            usadas: number;
+            /** Quedan */
+            quedan: number;
+            /** Minutos Audio */
+            minutos_audio: number;
+            /** Compartir Con Rubro */
+            compartir_con_rubro: boolean;
+            /** Pendientes */
+            pendientes: {
+                [key: string]: number;
+            };
+            /** Total Pendientes */
+            total_pendientes: number;
         };
         /** LibraryOut */
         LibraryOut: {
@@ -6094,6 +6313,20 @@ export interface components {
             };
             /** Pendientes Revision */
             pendientes_revision: number;
+        };
+        /** Origin */
+        Origin: {
+            /**
+             * Conversation Id
+             * Format: uuid
+             */
+            conversation_id: string;
+            /** Cliente */
+            cliente: string;
+            /** Canal */
+            canal: string;
+            /** Mensajes */
+            mensajes: components["schemas"]["Line"][];
         };
         /** OverviewResponse */
         OverviewResponse: {
@@ -6781,6 +7014,11 @@ export interface components {
             tenant_id: string;
             /** Verification Email Sent */
             verification_email_sent: boolean;
+        };
+        /** RejectIn */
+        RejectIn: {
+            /** Nota */
+            nota?: string | null;
         };
         /** RejectRequest */
         RejectRequest: {
@@ -7532,6 +7770,71 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** SuggestionDetail */
+        SuggestionDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Tipo */
+            tipo: string;
+            /** Fuente */
+            fuente: string;
+            /** Estado */
+            estado: string;
+            /** Resumen */
+            resumen: string;
+            /** Choques */
+            choques: number;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            creada: string;
+            /** Propuesta */
+            propuesta: {
+                [key: string]: unknown;
+            };
+            /** Choques Detalle */
+            choques_detalle: components["schemas"]["Clash"][];
+            /** Origen */
+            origen: components["schemas"]["Origin"][];
+            /** Nota */
+            nota: string | null;
+            /** Decidida */
+            decidida: string | null;
+            /** Situation Id */
+            situation_id: string | null;
+        };
+        /** SuggestionList */
+        SuggestionList: {
+            /** Items */
+            items: components["schemas"]["SuggestionRow"][];
+        };
+        /** SuggestionRow */
+        SuggestionRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Tipo */
+            tipo: string;
+            /** Fuente */
+            fuente: string;
+            /** Estado */
+            estado: string;
+            /** Resumen */
+            resumen: string;
+            /** Choques */
+            choques: number;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            creada: string;
+        };
         /** Summary */
         Summary: {
             /** Total */
@@ -8026,6 +8329,12 @@ export interface components {
             /** Por Cerrar */
             por_cerrar: boolean;
         };
+        /** DecisionOut */
+        app__api__v1__aftersale__DecisionOut: {
+            solicitud: components["schemas"]["ReturnDetail"];
+            /** Aviso Cliente */
+            aviso_cliente: ("enviado" | "ventana_cerrada" | "no_enviado") | null;
+        };
         /** ContactOut */
         app__api__v1__campaigns__ContactOut: {
             /**
@@ -8117,6 +8426,15 @@ export interface components {
             unattended_queue_minutes: number;
             /** Auto Return Minutes */
             auto_return_minutes?: number | null;
+        };
+        /** DecisionOut */
+        app__api__v1__learning__DecisionOut: {
+            sugerencia: components["schemas"]["SuggestionDetail"];
+            /**
+             * Indexada
+             * @default true
+             */
+            indexada: boolean;
         };
         /** SettingsIn */
         app__api__v1__scheduling__SettingsIn: {
@@ -14948,6 +15266,457 @@ export interface operations {
             };
         };
     };
+    get_learning_api_v1_assistant_learning_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_learning_api_v1_assistant_learning_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LearningIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LearningOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_suggestions_api_v1_assistant_suggestions_get: {
+        parameters: {
+            query?: {
+                estado?: ("pendiente" | "aprobada" | "rechazada") | null;
+                tipo?: ("situacion" | "ejemplo" | "dato" | "estilo") | null;
+                fuente?: ("toma_de_control" | "venta_confirmada" | "venta_perdida" | "pregunta_sin_respuesta" | "importacion") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_suggestion_api_v1_assistant_suggestions__suggestion_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    draft_suggestion_api_v1_assistant_suggestions__suggestion_id__draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_pending`: it was decided already */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_suggestion_api_v1_assistant_suggestions__suggestion_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__api__v1__learning__DecisionOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_pending`: it was decided already */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    reject_suggestion_api_v1_assistant_suggestions__suggestion_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestion_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionDetail"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_pending` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_history_api_v1_assistant_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    undo_change_api_v1_assistant_history__entry_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryRow"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_undone` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     metrics_api_v1_tenant_metrics_get: {
         parameters: {
             query?: {
@@ -15712,7 +16481,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionOut"];
+                    "application/json": components["schemas"]["app__api__v1__aftersale__DecisionOut"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */

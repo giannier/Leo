@@ -66,6 +66,12 @@ const SECTIONS = [
   },
   { href: "/knowledge", label: "Conocimiento", detail: "Documentos y tu web", clave: "conocimiento" },
   {
+    href: "/asistente/aprendizaje",
+    label: "Aprendizaje",
+    detail: "Lo que propone aprender, tú decides",
+    clave: null,
+  },
+  {
     href: "/asistente/revision",
     label: "Revisión semanal",
     detail: "Conversaciones reales: ¿lo hizo bien?",
