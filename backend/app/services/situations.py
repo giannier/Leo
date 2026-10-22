@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.learning import ExampleConversation
 from app.models.situation import Situation
 from app.process.templates.base import Stage
 from app.providers.llm.base import LLMProvider
@@ -211,13 +212,19 @@ class SituationService:
 
 
 async def embed_pending(session: Session, tenant_id: uuid.UUID, llm: LLMProvider) -> int:
-    """Embed the "cuándo aplica" of every situation of the tenant that lacks it."""
+    """Embed what the tenant has saved without it: the "cuándo aplica" of its situations and the
+    "tema" of its real examples."""
+    from app.repositories.learning import ExampleRepository
+
     pending = SituationRepository(session, tenant_id).needing_embedding(llm.embedding_model)
-    if not pending:
+    examples = ExampleRepository(session, tenant_id).needing_embedding(llm.embedding_model)
+    if not pending and not examples:
         return 0
-    vectors = await llm.embed([s.cuando_aplica for s in pending], input_type="passage")
-    for situation, vector in zip(pending, vectors, strict=True):
-        situation.embedding = list(vector)
-        situation.embedding_model = llm.embedding_model
+    texts = [s.cuando_aplica for s in pending] + [e.tema for e in examples]
+    vectors = await llm.embed(texts, input_type="passage")
+    rows: list[Situation | ExampleConversation] = [*pending, *examples]
+    for row, vector in zip(rows, vectors, strict=True):
+        row.embedding = list(vector)
+        row.embedding_model = llm.embedding_model
     session.flush()
-    return len(pending)
+    return len(pending) + len(examples)

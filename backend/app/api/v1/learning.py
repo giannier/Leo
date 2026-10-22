@@ -9,6 +9,10 @@
     POST /assistant/suggestions/{id}/reject        discard it (it is not proposed again)
     GET  /assistant/history                        what changed, with what it was before
     POST /assistant/history/{id}/undo              put the "before" back
+    POST /assistant/imports/inspect                who wrote in an exported chat (stores nothing)
+    POST /assistant/imports                        hand the chat over to learn from it (authorised)
+    GET  /assistant/imports                        the chats handed over and what came out
+    GET  /assistant/examples                       the real conversations the assistant consults
 
 The reviewers of the business (the owner, the admins and whoever has the permission) read and
 decide; turning learning on and its ceiling are for the owner and the admins: every analysis costs.
@@ -16,25 +20,46 @@ decide; turning learning on and its ceiling are for the owner and the admins: ev
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, File, Form, Query, UploadFile
 from pydantic import BaseModel, Field, StringConstraints
 
-from app.api.deps import ConfigurationManagerDep, JobQueueDep, ReviewerDep, SessionDep
+from app.api.deps import (
+    ConfigurationManagerDep,
+    JobQueueDep,
+    RedisDep,
+    ReviewerDep,
+    SessionDep,
+)
 from app.api.errors import ApiError, error_responses
 from app.api.v1.assistant import _embed_later
 from app.api.v1.reviews import Line, _lines, _who
 from app.learning.budget import LearningBudget
 from app.learning.history import ConfigHistoryService, HistoryError
+from app.learning.importer import CALLS_NEEDED
 from app.learning.suggestions import SuggestionError, SuggestionService
+from app.learning.whatsapp_export import ExportError, conversations, participants, read_upload
 from app.models.learning import SUGGESTION_SOURCES, SUGGESTION_STATES, SUGGESTION_TYPES, Suggestion
-from app.repositories.learning import ConfigHistoryRepository, SuggestionRepository
+from app.repositories.audit import AuditLogRepository
+from app.repositories.learning import (
+    ChatImportRepository,
+    ConfigHistoryRepository,
+    ExampleRepository,
+    SuggestionRepository,
+)
 from app.services import reviews
 from app.services.faqs import index_faq
+from app.workers.chat_import import (
+    IMPORT_JOB,
+    ORIGINAL_TTL_SECONDS,
+    original_key,
+    sellers_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -342,7 +367,7 @@ async def approve_suggestion(
             logger.warning("a learned fact could not be indexed", exc_info=True)
             session.rollback()
             indexed = False
-    if suggestion.aplicada.get("situation_id"):
+    if suggestion.aplicada.get("situation_id") or suggestion.aplicada.get("example_id"):
         await _embed_later(queue, principal.tenant_id)
     return DecisionOut(
         sugerencia=_detail(session, principal.tenant_id, suggestion), indexada=indexed
@@ -391,7 +416,7 @@ def list_history(
                 deshecho=r.deshecho_por is not None,
                 se_puede_deshacer=r.deshecho_por is None
                 and r.accion != "deshacer"
-                and r.entidad in ("situacion", "interruptor", "perfil", "faq"),
+                and r.entidad in ("situacion", "interruptor", "perfil", "faq", "ejemplo", "estilo"),
             )
             for r in rows
         ]
@@ -429,3 +454,310 @@ async def undo_change(
         deshecho=False,
         se_puede_deshacer=False,
     )
+
+
+# ---------------------------------------------------------- batch approval
+
+
+class BatchIn(BaseModel):
+    ids: Annotated[list[uuid.UUID], Field(min_length=1, max_length=100)]
+
+
+class BatchOut(BaseModel):
+    aprobadas: int
+
+
+@router.post(
+    "/suggestions/approve-batch",
+    summary="Approve several real examples at once",
+    responses=error_responses(*AUTH),
+)
+async def approve_batch(
+    body: BatchIn, principal: ReviewerDep, session: SessionDep, queue: JobQueueDep
+) -> BatchOut:
+    """Examples are many and low-risk, so they are approved together; anything else in the list
+    (a situation, a fact) is left for a person to read."""
+    repo = SuggestionRepository(session, principal.tenant_id)
+    rows = repo.many(body.ids)
+    service = SuggestionService(session, principal.tenant_id, principal.user_id)
+    done = service.approve_many(rows)
+    session.commit()
+    if done:
+        await _embed_later(queue, principal.tenant_id)
+    return BatchOut(aprobadas=len(done))
+
+
+# ----------------------------------------------------------------- imports
+
+MAX_CHAT_BYTES = 40 * 1024 * 1024
+
+
+class Participant(BaseModel):
+    nombre: str
+    mensajes: int
+
+
+class Inspection(BaseModel):
+    participantes: list[Participant]
+    mensajes: int
+    conversaciones: int
+    audios: int
+    desde: datetime
+    hasta: datetime
+    # How many analyses the week still has against what this chat needs.
+    analisis_necesarios: int
+    analisis_disponibles: int
+
+
+class ImportRow(BaseModel):
+    id: uuid.UUID
+    estado: str
+    mensajes: int
+    conversaciones: int
+    audios: int
+    audios_transcritos: int
+    minutos_audio: float
+    sugerencias: int
+    error: str | None
+    creada: datetime
+    terminada: datetime | None
+
+
+class ImportList(BaseModel):
+    items: list[ImportRow]
+
+
+def _import_row(record: Any) -> ImportRow:
+    return ImportRow(
+        id=record.id,
+        estado=record.estado,
+        mensajes=record.mensajes,
+        conversaciones=record.conversaciones,
+        audios=record.audios,
+        audios_transcritos=record.audios_transcritos,
+        minutos_audio=float(record.minutos_audio),
+        sugerencias=record.sugerencias,
+        error=record.error,
+        creada=record.creada_en,
+        terminada=record.terminada_en,
+    )
+
+
+async def _chat(file: UploadFile) -> bytes:
+    data = await file.read(MAX_CHAT_BYTES + 1)
+    if len(data) > MAX_CHAT_BYTES:
+        raise ApiError(
+            status_code=422,
+            error="file_too_large",
+            message="El chat pesa más de 40 MB: exporta uno más corto o sin archivos.",
+        )
+    return data
+
+
+@router.post(
+    "/imports/inspect",
+    summary="Who wrote in an exported chat (nothing is stored)",
+    responses=error_responses(
+        (409, "`learning_off`"),
+        (422, "`empty_file`, `no_messages`, `bad_zip`, `no_chat`, `zip_too_big`, `file_too_large`"),
+        *AUTH,
+    ),
+)
+async def inspect_chat(
+    principal: ConfigurationManagerDep, session: SessionDep, file: Annotated[UploadFile, File()]
+) -> Inspection:
+    """Read in memory and forgotten: the business picks who the sellers are first."""
+    budget = LearningBudget(session, principal.tenant_id)
+    if not budget.enabled:
+        raise ApiError(
+            status_code=409,
+            error="learning_off",
+            message="Enciende el aprendizaje antes de importar un chat.",
+        )
+    try:
+        upload = read_upload(await _chat(file))
+    except ExportError as exc:
+        raise ApiError(status_code=422, error=exc.code, message=str(exc)) from exc
+    return Inspection(
+        participantes=[Participant(nombre=n, mensajes=c) for n, c in participants(upload.messages)],
+        mensajes=len(upload.messages),
+        conversaciones=len(conversations(upload.messages)),
+        audios=sum(1 for m in upload.messages if m.kind == "audio"),
+        desde=min(m.when for m in upload.messages),
+        hasta=max(m.when for m in upload.messages),
+        analisis_necesarios=CALLS_NEEDED,
+        analisis_disponibles=budget.left,
+    )
+
+
+@router.post(
+    "/imports",
+    summary="Hand a chat over to learn from it",
+    responses=error_responses(
+        (409, "`learning_off`, `budget`, `already_running`"),
+        (422, "`authorization_required`, `sellers_required`, `file_too_large`, or the file's own"),
+        *AUTH,
+    ),
+)
+async def start_import(
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    queue: JobQueueDep,
+    redis: RedisDep,
+    file: Annotated[UploadFile, File()],
+    vendedores: Annotated[str, Form()],
+    autorizo: Annotated[bool, Form()],
+) -> ImportRow:
+    """The business authorises the use of the chat (recorded with who and when). The original waits
+    in a temporary store for the worker and is deleted when it is processed, also if that fails."""
+    if not autorizo:
+        raise ApiError(
+            status_code=422,
+            error="authorization_required",
+            message="Debes autorizar el uso de estos chats para que el asistente aprenda de ellos.",
+        )
+    try:
+        sellers = [str(n) for n in json.loads(vendedores) if str(n).strip()]
+    except ValueError:
+        sellers = []
+    if not sellers:
+        raise ApiError(
+            status_code=422, error="sellers_required", message="Elige quién es el vendedor."
+        )
+    budget = LearningBudget(session, principal.tenant_id)
+    if not budget.enabled:
+        raise ApiError(
+            status_code=409, error="learning_off", message="El aprendizaje está apagado."
+        )
+    if budget.left < CALLS_NEEDED:
+        raise ApiError(
+            status_code=409,
+            error="budget",
+            message=(
+                f"Este chat necesita {CALLS_NEEDED} análisis y esta semana quedan {budget.left}."
+            ),
+        )
+    imports = ChatImportRepository(session, principal.tenant_id)
+    if imports.running() is not None:
+        raise ApiError(
+            status_code=409, error="already_running", message="Ya hay un chat procesándose."
+        )
+    data = await _chat(file)
+    try:
+        read_upload(data)  # refuse a file that is not a chat before anything is kept
+    except ExportError as exc:
+        raise ApiError(status_code=422, error=exc.code, message=str(exc)) from exc
+
+    record = imports.add(autorizado_por=principal.user_id)
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id,
+        action="learning.import_authorized",
+        detail={"import_id": str(record.id)},
+    )
+    session.commit()
+    await redis.set(original_key(record.id), data, ex=ORIGINAL_TTL_SECONDS)
+    await redis.set(sellers_key(record.id), json.dumps(sellers), ex=ORIGINAL_TTL_SECONDS)
+    try:
+        await queue.enqueue(IMPORT_JOB, str(record.id), str(principal.tenant_id))
+    except Exception as exc:  # noqa: BLE001 - nothing is processing: do not leave the original around
+        await redis.delete(original_key(record.id), sellers_key(record.id))
+        record.estado = "fallido"
+        record.error = "No se pudo poner en marcha el proceso. Inténtalo de nuevo."
+        session.commit()
+        raise ApiError(
+            status_code=503, error="queue_unavailable", message="No se pudo iniciar el proceso."
+        ) from exc
+    return _import_row(record)
+
+
+@router.get("/imports", summary="The chats handed over", responses=error_responses(*AUTH))
+def list_imports(principal: ConfigurationManagerDep, session: SessionDep) -> ImportList:
+    rows = ChatImportRepository(session, principal.tenant_id).listing()
+    return ImportList(items=[_import_row(r) for r in rows])
+
+
+@router.get(
+    "/imports/{import_id}",
+    summary="One chat handed over (to follow it while it is processed)",
+    responses=error_responses(NOT_FOUND, *AUTH),
+)
+def get_import(
+    import_id: uuid.UUID, principal: ConfigurationManagerDep, session: SessionDep
+) -> ImportRow:
+    record = ChatImportRepository(session, principal.tenant_id).get(import_id)
+    if record is None:
+        raise ApiError(status_code=404, error="not_found", message="Not found.")
+    return _import_row(record)
+
+
+# ---------------------------------------------------------------- examples
+
+
+class ExampleOut(BaseModel):
+    id: uuid.UUID
+    titulo: str
+    tema: str
+    origen: str
+    estado: str
+    mensajes: list[dict[str, str]]
+    creado: datetime
+
+
+class ExampleList(BaseModel):
+    items: list[ExampleOut]
+
+
+class ExampleState(BaseModel):
+    activo: bool
+
+
+def _example_out(example: Any) -> ExampleOut:
+    return ExampleOut(
+        id=example.id,
+        titulo=example.titulo,
+        tema=example.tema,
+        origen=example.origen,
+        estado=example.estado,
+        mensajes=[{"de": str(m.get("de")), "texto": str(m.get("texto"))} for m in example.mensajes],
+        creado=example.created_at,
+    )
+
+
+@router.get(
+    "/examples",
+    summary="The real conversations the assistant consults",
+    responses=error_responses(*AUTH),
+)
+def list_examples(principal: ReviewerDep, session: SessionDep) -> ExampleList:
+    rows = ExampleRepository(session, principal.tenant_id).listing()
+    return ExampleList(items=[_example_out(r) for r in rows])
+
+
+@router.put(
+    "/examples/{example_id}/estado",
+    summary="Turn a real example on or off",
+    responses=error_responses(NOT_FOUND, *AUTH),
+)
+def set_example_state(
+    example_id: uuid.UUID, body: ExampleState, principal: ReviewerDep, session: SessionDep
+) -> ExampleOut:
+    example = ExampleRepository(session, principal.tenant_id).get(example_id)
+    if example is None:
+        raise ApiError(status_code=404, error="not_found", message="Not found.")
+    example.estado = "activo" if body.activo else "inactivo"
+    session.commit()
+    return _example_out(example)
+
+
+@router.delete(
+    "/examples/{example_id}",
+    status_code=204,
+    summary="Remove a real example",
+    responses=error_responses(NOT_FOUND, *AUTH),
+)
+def delete_example(example_id: uuid.UUID, principal: ReviewerDep, session: SessionDep) -> None:
+    example = ExampleRepository(session, principal.tenant_id).get(example_id)
+    if example is None:
+        raise ApiError(status_code=404, error="not_found", message="Not found.")
+    session.delete(example)
+    session.commit()

@@ -84,6 +84,8 @@ class Behavior:
     politica_descuentos: str = "solo_promociones"
     descuento_maximo_pct: Decimal | None = None
     max_situaciones: int = 5
+    # How the business's own sellers write, approved by a person (feature 017, phase 2).
+    estilo_vendedor: str | None = None
 
 
 @dataclass(frozen=True)
@@ -332,4 +334,5 @@ def _behavior(agent: AgentConfig | None) -> Behavior:
         politica_descuentos=agent.politica_descuentos or "solo_promociones",
         descuento_maximo_pct=agent.descuento_maximo_pct,
         max_situaciones=agent.max_situaciones or 5,
+        estilo_vendedor=agent.estilo_vendedor or None,
     )

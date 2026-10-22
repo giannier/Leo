@@ -2314,6 +2314,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/suggestions/approve-batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve several real examples at once
+         * @description Examples are many and low-risk, so they are approved together; anything else in the list
+         *     (a situation, a fact) is left for a person to read.
+         */
+        post: operations["approve_batch_api_v1_assistant_suggestions_approve_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/imports/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Who wrote in an exported chat (nothing is stored)
+         * @description Read in memory and forgotten: the business picks who the sellers are first.
+         */
+        post: operations["inspect_chat_api_v1_assistant_imports_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The chats handed over */
+        get: operations["list_imports_api_v1_assistant_imports_get"];
+        put?: never;
+        /**
+         * Hand a chat over to learn from it
+         * @description The business authorises the use of the chat (recorded with who and when). The original waits
+         *     in a temporary store for the worker and is deleted when it is processed, also if that fails.
+         */
+        post: operations["start_import_api_v1_assistant_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/imports/{import_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One chat handed over (to follow it while it is processed) */
+        get: operations["get_import_api_v1_assistant_imports__import_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The real conversations the assistant consults */
+        get: operations["list_examples_api_v1_assistant_examples_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/examples/{example_id}/estado": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Turn a real example on or off */
+        put: operations["set_example_state_api_v1_assistant_examples__example_id__estado_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/examples/{example_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a real example */
+        delete: operations["delete_example_api_v1_assistant_examples__example_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/metrics": {
         parameters: {
             query?: never;
@@ -4052,6 +4183,16 @@ export interface components {
             /** Items */
             items: components["schemas"]["SlotOut"][];
         };
+        /** BatchIn */
+        BatchIn: {
+            /** Ids */
+            ids: string[];
+        };
+        /** BatchOut */
+        BatchOut: {
+            /** Aprobadas */
+            aprobadas: number;
+        };
         /** BehaviorRequest */
         BehaviorRequest: {
             /** Agent Name */
@@ -4234,10 +4375,24 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_inspect_chat_api_v1_assistant_imports_inspect_post */
+        Body_inspect_chat_api_v1_assistant_imports_inspect_post: {
+            /** File */
+            file: string;
+        };
         /** Body_replace_media_file_api_v1_assistant_media__asset_id__file_post */
         Body_replace_media_file_api_v1_assistant_media__asset_id__file_post: {
             /** File */
             file: string;
+        };
+        /** Body_start_import_api_v1_assistant_imports_post */
+        Body_start_import_api_v1_assistant_imports_post: {
+            /** File */
+            file: string;
+            /** Vendedores */
+            vendedores: string;
+            /** Autorizo */
+            autorizo: boolean;
         };
         /** Body_upload_media_api_v1_assistant_media_post */
         Body_upload_media_api_v1_assistant_media_post: {
@@ -5159,6 +5314,41 @@ export interface components {
              */
             created_at: string;
         };
+        /** ExampleList */
+        ExampleList: {
+            /** Items */
+            items: components["schemas"]["ExampleOut"][];
+        };
+        /** ExampleOut */
+        ExampleOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Titulo */
+            titulo: string;
+            /** Tema */
+            tema: string;
+            /** Origen */
+            origen: string;
+            /** Estado */
+            estado: string;
+            /** Mensajes */
+            mensajes: {
+                [key: string]: string;
+            }[];
+            /**
+             * Creado
+             * Format: date-time
+             */
+            creado: string;
+        };
+        /** ExampleState */
+        ExampleState: {
+            /** Activo */
+            activo: boolean;
+        };
         /** ExtendBody */
         ExtendBody: {
             /** Dias */
@@ -5388,6 +5578,11 @@ export interface components {
             /** Disponibles */
             disponibles: number;
         };
+        /** ImportList */
+        ImportList: {
+            /** Items */
+            items: components["schemas"]["ImportRow"][];
+        };
         /** ImportOut */
         ImportOut: {
             /** Importados */
@@ -5412,6 +5607,62 @@ export interface components {
             valid_rows: number;
             /** Invalid Rows */
             invalid_rows: components["schemas"]["InvalidRowResponse"][];
+        };
+        /** ImportRow */
+        ImportRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Estado */
+            estado: string;
+            /** Mensajes */
+            mensajes: number;
+            /** Conversaciones */
+            conversaciones: number;
+            /** Audios */
+            audios: number;
+            /** Audios Transcritos */
+            audios_transcritos: number;
+            /** Minutos Audio */
+            minutos_audio: number;
+            /** Sugerencias */
+            sugerencias: number;
+            /** Error */
+            error: string | null;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            creada: string;
+            /** Terminada */
+            terminada: string | null;
+        };
+        /** Inspection */
+        Inspection: {
+            /** Participantes */
+            participantes: components["schemas"]["Participant"][];
+            /** Mensajes */
+            mensajes: number;
+            /** Conversaciones */
+            conversaciones: number;
+            /** Audios */
+            audios: number;
+            /**
+             * Desde
+             * Format: date-time
+             */
+            desde: string;
+            /**
+             * Hasta
+             * Format: date-time
+             */
+            hasta: string;
+            /** Analisis Necesarios */
+            analisis_necesarios: number;
+            /** Analisis Disponibles */
+            analisis_disponibles: number;
         };
         /** InvalidRowResponse */
         InvalidRowResponse: {
@@ -6368,6 +6619,13 @@ export interface components {
              * @default true
              */
             requerido: boolean;
+        };
+        /** Participant */
+        Participant: {
+            /** Nombre */
+            nombre: string;
+            /** Mensajes */
+            mensajes: number;
         };
         /** PaymentMethodPatch */
         PaymentMethodPatch: {
@@ -15708,6 +15966,375 @@ export interface operations {
             };
             /** @description `already_undone` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    approve_batch_api_v1_assistant_suggestions_approve_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    inspect_chat_api_v1_assistant_imports_inspect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_inspect_chat_api_v1_assistant_imports_inspect_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Inspection"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `learning_off` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_imports_api_v1_assistant_imports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    start_import_api_v1_assistant_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_start_import_api_v1_assistant_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRow"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `learning_off`, `budget`, `already_running` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_import_api_v1_assistant_imports__import_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportRow"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_examples_api_v1_assistant_examples_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExampleList"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    set_example_state_api_v1_assistant_examples__example_id__estado_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                example_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExampleState"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExampleOut"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_example_api_v1_assistant_examples__example_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                example_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

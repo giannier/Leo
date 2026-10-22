@@ -15,6 +15,7 @@ from app.services.catalog_knowledge import INDEX_CATALOG_JOB
 from app.services.knowledge import INDEX_JOB
 from app.services.situations import EMBED_JOB
 from app.workers.channel import ANSWER_JOB, PROCESS_EVENT_JOB
+from app.workers.chat_import import IMPORT_JOB
 from app.workers.settings import WorkerSettings
 
 # Every name anything enqueues by - the API, or a worker booking follow-up
@@ -28,6 +29,7 @@ ENQUEUED_BY_THE_API = {
     INDEX_CATALOG_JOB,
     EMBED_JOB,
     EVALS_JOB,
+    IMPORT_JOB,
 }
 
 

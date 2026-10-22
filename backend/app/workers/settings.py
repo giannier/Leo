@@ -27,6 +27,7 @@ from app.providers.email.factory import build_email_provider
 from app.providers.llm.factory import platform_provider
 from app.providers.pdf.pypdf_extractor import PypdfTextExtractor
 from app.providers.storage.factory import build_storage_provider
+from app.providers.transcription.factory import build_transcription_provider
 from app.providers.web.httpx_fetcher import HttpxWebFetcher
 from app.providers.whatsapp.ycloud import YCloudProvider
 from app.workers.analytics import CSAT_JOB, REPORT_JOB, run_csat, send_monthly_reports
@@ -39,6 +40,7 @@ from app.workers.channel import (
     process_webhook_event,
     retry_stranded_replies,
 )
+from app.workers.chat_import import process_chat_import
 from app.workers.followups import (
     DISCARD_JOB,
     FOLLOW_UP_JOB,
@@ -83,6 +85,7 @@ async def startup(ctx: dict[str, Any]) -> None:
     # Embeddings are always platform-funded, never the tenant's own key -
     # see `app/models/llm_settings.py` for why that is not configurable.
     ctx["llm"] = platform_provider(settings)
+    ctx["transcriber"] = build_transcription_provider(settings)
     # The lifecycle jobs write to customers. `None` when no provider is
     # configured, which the jobs treat as "do the state change, skip the
     # email" rather than as a reason to fail.
@@ -100,6 +103,7 @@ async def startup(ctx: dict[str, Any]) -> None:
 
 async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("llm", None)
+    ctx.pop("transcriber", None)
     ctx.pop("storage", None)
     ctx.pop("pdf_extractor", None)
     ctx.pop("web_fetcher", None)
@@ -117,6 +121,7 @@ class WorkerSettings:
         index_catalog_knowledge,
         embed_situations,
         run_catalog_evals,
+        process_chat_import,
     ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS

@@ -20,10 +20,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.learning.history import ConfigHistoryService, situation_snapshot
-from app.models.learning import Suggestion
+from app.models.learning import ExampleConversation, Suggestion
 from app.models.sales_config import Faq
 from app.models.situation import Situation
 from app.providers.llm.base import LLMError, LLMProvider
+from app.repositories.business import AgentConfigRepository
 from app.repositories.learning import SuggestionRepository
 from app.repositories.situation import SituationRepository
 from app.services.situations import SituationError, SituationInput, SituationService
@@ -33,6 +34,7 @@ CLASH_DISTANCE = 0.22
 MAX_CLASHES = 3
 MAX_RESUMEN = 200
 MAX_ANSWER = 2000
+MAX_STYLE = 600
 
 
 class SuggestionError(Exception):
@@ -165,13 +167,26 @@ class SuggestionService:
             self._apply_situation(suggestion, proposal)
         elif suggestion.tipo == "dato":
             self._apply_fact(suggestion, proposal, answer)
-        else:  # pragma: no cover - the other kinds are applied by their own phase
+        elif suggestion.tipo == "ejemplo":
+            self._apply_example(suggestion, proposal)
+        elif suggestion.tipo == "estilo":
+            self._apply_style(suggestion, proposal)
+        else:  # pragma: no cover - the kinds are all handled above
             raise SuggestionError("unsupported", "Ese tipo de sugerencia aún no se aplica aquí.")
         suggestion.estado = "aprobada"
         suggestion.decidida_por = self._actor
         suggestion.decidida_en = datetime.now(UTC)
         self._session.flush()
         return suggestion
+
+    def approve_many(self, suggestions: Sequence[Suggestion]) -> list[Suggestion]:
+        """Several real examples at once: they are many and low-risk (the brief asks for it).
+        Anything that is not a pending example is left alone."""
+        done: list[Suggestion] = []
+        for suggestion in suggestions:
+            if suggestion.tipo == "ejemplo" and suggestion.estado == "pendiente":
+                done.append(self.approve(suggestion))
+        return done
 
     def reject(self, suggestion: Suggestion, note: str | None = None) -> Suggestion:
         self._pending(suggestion)
@@ -266,5 +281,57 @@ class SuggestionService:
             f"Aprendió una respuesta: {question[:80]}",
             entidad_id=faq.id,
             despues={"pregunta": faq.pregunta, "respuesta": faq.respuesta},
+            sugerencia_id=suggestion.id,
+        )
+
+    def _apply_example(self, suggestion: Suggestion, proposal: Mapping[str, Any]) -> None:
+        title = str(proposal.get("titulo") or "").strip()
+        theme = str(proposal.get("tema") or "").strip()
+        turns = proposal.get("mensajes")
+        if not title or not theme or not isinstance(turns, list) or not turns:
+            raise SuggestionError("invalid_edit", "Un ejemplo necesita título, tema y mensajes.")
+        if len(title) > 80 or len(theme) > 300:
+            raise SuggestionError("invalid_edit", "El título admite 80 letras y el tema, 300.")
+        example = ExampleConversation(
+            tenant_id=self._tenant_id,
+            titulo=title,
+            tema=theme,
+            mensajes=[
+                {"de": str(t.get("de")), "texto": str(t.get("texto"))[:600]}
+                for t in turns
+                if isinstance(t, dict) and t.get("texto")
+            ],
+            origen="venta_confirmada" if suggestion.fuente == "venta_confirmada" else "importacion",
+            estado="activo",
+            sugerencia_id=suggestion.id,
+        )
+        self._session.add(example)
+        self._session.flush()
+        suggestion.aplicada = {**suggestion.aplicada, "example_id": str(example.id)}
+        self._history.record(
+            "ejemplo",
+            "crear",
+            f"Aprendió un ejemplo real: {title}",
+            entidad_id=example.id,
+            despues={"titulo": title, "tema": theme},
+            sugerencia_id=suggestion.id,
+        )
+
+    def _apply_style(self, suggestion: Suggestion, proposal: Mapping[str, Any]) -> None:
+        style = " ".join(str(proposal.get("estilo") or "").split())
+        if len(style) < 10:
+            raise SuggestionError("invalid_edit", "Describe cómo escriben, en una frase.")
+        if len(style) > MAX_STYLE:
+            raise SuggestionError("invalid_edit", f"El estilo admite hasta {MAX_STYLE} letras.")
+        agents = AgentConfigRepository(self._session, self._tenant_id)
+        current = agents.current()
+        before = current.estilo_vendedor if current is not None else None
+        agents.upsert(estilo_vendedor=style)
+        self._history.record(
+            "estilo",
+            "editar",
+            "Aprendió cómo escriben tus vendedores",
+            antes={"estilo_vendedor": before},
+            despues={"estilo_vendedor": style},
             sugerencia_id=suggestion.id,
         )

@@ -658,6 +658,11 @@ export type SuggestionList = Ok<Ops["/api/v1/assistant/suggestions"]["get"]>;
 export type SuggestionRow = SuggestionList["items"][number];
 export type SuggestionDetail = Ok<Ops["/api/v1/assistant/suggestions/{suggestion_id}"]["get"]>;
 export type SuggestionDecision = Ok<Ops["/api/v1/assistant/suggestions/{suggestion_id}/approve"]["post"]>;
+export type ChatInspection = Ok<Ops["/api/v1/assistant/imports/inspect"]["post"]>;
+export type ChatImportRow = Ok<Ops["/api/v1/assistant/imports/{import_id}"]["get"]>;
+export type ChatImportList = Ok<Ops["/api/v1/assistant/imports"]["get"]>;
+export type ExampleList = Ok<Ops["/api/v1/assistant/examples"]["get"]>;
+export type ExampleRow = ExampleList["items"][number];
 export type HistoryList = Ok<Ops["/api/v1/assistant/history"]["get"]>;
 export type HistoryRow = HistoryList["items"][number];
 export type ResourceBody = {
@@ -1166,6 +1171,29 @@ export const api = {
       request<SuggestionDetail>(`/assistant/suggestions/${id}/reject`, {
         method: "POST",
         body: { nota: nota ?? null },
+      }),
+    inspectChat: (file: File) => {
+      const form = new FormData();
+      form.set("file", file);
+      return request<ChatInspection>("/assistant/imports/inspect", { method: "POST", body: form });
+    },
+    startImport: (file: File, sellers: string[]) => {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("vendedores", JSON.stringify(sellers));
+      form.set("autorizo", "true");
+      return request<ChatImportRow>("/assistant/imports", { method: "POST", body: form });
+    },
+    imports: () => request<ChatImportList>("/assistant/imports"),
+    importStatus: (id: string) => request<ChatImportRow>(`/assistant/imports/${id}`),
+    examples: () => request<ExampleList>("/assistant/examples"),
+    setExample: (id: string, activo: boolean) =>
+      request<ExampleRow>(`/assistant/examples/${id}/estado`, { method: "PUT", body: { activo } }),
+    deleteExample: (id: string) => request<void>(`/assistant/examples/${id}`, { method: "DELETE" }),
+    approveBatch: (ids: string[]) =>
+      request<{ aprobadas: number }>("/assistant/suggestions/approve-batch", {
+        method: "POST",
+        body: { ids },
       }),
     history: () => request<HistoryList>("/assistant/history"),
     undoChange: (id: string) => request<HistoryRow>(`/assistant/history/${id}/undo`, { method: "POST" }),

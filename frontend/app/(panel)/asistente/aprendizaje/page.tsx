@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { AssistantHeader } from "@/components/assistant/section-nav";
+import { ChatImport } from "@/components/learning/chat-import";
+import { ExamplesList } from "@/components/learning/examples-list";
 import { ENTITY_LABELS, FILTERS } from "@/components/learning/labels";
 import { SuggestionCard } from "@/components/learning/suggestion-card";
 import { useToast } from "@/components/toast";
@@ -167,6 +169,9 @@ export default function LearningPage() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("pendiente");
   const [list, setList] = useState<SuggestionList | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when a chat finishes or examples are approved, so the examples are read again.
+  const [examplesVersion, setExamplesVersion] = useState(0);
+  const [batching, setBatching] = useState(false);
 
   const loadLearning = useCallback(async () => {
     try {
@@ -197,7 +202,22 @@ export default function LearningPage() {
   const decided = () => {
     void loadList();
     void loadLearning();
+    setExamplesVersion((n) => n + 1);
   };
+
+  const pendingExamples = list?.items.filter((row) => row.tipo === "ejemplo" && row.estado === "pendiente") ?? [];
+
+  async function approveExamples() {
+    setBatching(true);
+    try {
+      await api.assistant.approveBatch(pendingExamples.map((row) => row.id));
+      decided();
+    } catch (caught) {
+      setError(humanMessage(caught));
+    } finally {
+      setBatching(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -207,6 +227,7 @@ export default function LearningPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {learning ? <Settings learning={learning} onChanged={setLearning} /> : <Skeleton className="h-48 w-full" />}
+      <ChatImport enabled={Boolean(learning?.activo)} onFinished={decided} />
 
       <section className="space-y-3" aria-label="Sugerencias">
         <div className="flex flex-wrap items-center gap-2">
@@ -244,6 +265,14 @@ export default function LearningPage() {
             </p>
           </div>
         ) : null}
+        {pendingExamples.length > 1 ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 text-sm">
+            <span className="text-ink-soft">Hay {pendingExamples.length} ejemplos reales por revisar.</span>
+            <Button type="button" variant="secondary" loading={batching} onClick={() => void approveExamples()}>
+              Aprobar los {pendingExamples.length} ejemplos
+            </Button>
+          </div>
+        ) : null}
         {list && list.items.length > 0 ? (
           <ul className="space-y-3">
             {list.items.map((row) => (
@@ -252,6 +281,8 @@ export default function LearningPage() {
           </ul>
         ) : null}
       </section>
+
+      <ExamplesList refreshKey={examplesVersion} />
 
       <History />
     </div>

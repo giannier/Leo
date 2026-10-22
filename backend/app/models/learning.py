@@ -14,6 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -33,6 +34,7 @@ from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, CreatedAtMixin, TimestampMixin, UUIDPrimaryKeyMixin, enum_check
+from app.models.knowledge import EMBEDDING_DIMENSIONS
 
 SUGGESTION_TYPES = ("situacion", "ejemplo", "dato", "estilo")
 SUGGESTION_SOURCES = (
@@ -46,6 +48,9 @@ SUGGESTION_STATES = ("pendiente", "aprobada", "rechazada")
 HISTORY_ENTITIES = ("situacion", "interruptor", "perfil", "faq", "ejemplo", "estilo")
 HISTORY_ACTIONS = ("crear", "editar", "estado", "borrar", "deshacer")
 QUESTION_STATES = ("abierta", "sugerida", "descartada")
+IMPORT_STATES = ("procesando", "listo", "fallido")
+EXAMPLE_ORIGINS = ("importacion", "venta_confirmada")
+EXAMPLE_STATES = ("activo", "inactivo")
 
 
 class LearningSettings(Base):
@@ -197,3 +202,94 @@ class UnansweredQuestion(Base, UUIDPrimaryKeyMixin):
     ultima_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ChatImport(Base, UUIDPrimaryKeyMixin):
+    """A WhatsApp chat a business exported and handed over so the assistant learns from it.
+
+    **Only the result is kept.** The original (the text, the audios, the names in it) lives for the
+    time of the processing in a temporary store and is deleted when it ends, also if it fails; what
+    stays here is the authorisation of the business, the counts and what came out as suggestions.
+    """
+
+    __tablename__ = "chat_imports"
+    __table_args__ = (enum_check("estado", IMPORT_STATES, "estado"),)
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    estado: Mapped[str] = mapped_column(Text, nullable=False, server_default="procesando")
+    # Who authorised the use of these chats, and when (Ley 29733).
+    autorizado_por: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    autorizado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    mensajes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    conversaciones: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    audios: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    audios_transcritos: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    minutos_audio: Mapped[Decimal] = mapped_column(
+        Numeric(8, 2), nullable=False, server_default="0"
+    )
+    sugerencias: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # Why it failed, in words that carry nothing of the chat.
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    creada_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    terminada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ExampleConversation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """A real conversation, anonymised, the assistant consults when a similar case comes up."""
+
+    __tablename__ = "example_conversations"
+    __table_args__ = (
+        enum_check("origen", EXAMPLE_ORIGINS, "origen"),
+        enum_check("estado", EXAMPLE_STATES, "estado"),
+        CheckConstraint("char_length(titulo) BETWEEN 1 AND 80", name="titulo_length"),
+        CheckConstraint("char_length(tema) BETWEEN 1 AND 300", name="tema_length"),
+    )
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True
+    )
+    titulo: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the case is about, in a sentence: this is what is matched against the customer's message.
+    tema: Mapped[str] = mapped_column(Text, nullable=False)
+    # `[{de: "cliente" | "vendedor", texto}]`, with the personal data already taken out.
+    mensajes: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    origen: Mapped[str] = mapped_column(Text, nullable=False)
+    estado: Mapped[str] = mapped_column(Text, nullable=False, server_default="activo")
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSIONS), nullable=True
+    )
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sugerencia_id: Mapped[uuid.UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("suggestions.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class LearningMark(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
+    """A conversation the learning already looked at for a source, so it is not analysed twice
+    (and not paid for twice), whether it gave a suggestion or not."""
+
+    __tablename__ = "learning_marks"
+    __table_args__ = (
+        enum_check("fuente", SUGGESTION_SOURCES, "fuente"),
+        UniqueConstraint(
+            "tenant_id", "conversation_id", "fuente", name="uq_learning_marks_tenant_conv_source"
+        ),
+    )
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    fuente: Mapped[str] = mapped_column(Text, nullable=False)

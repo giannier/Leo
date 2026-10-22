@@ -14,6 +14,7 @@ from typing import Any
 
 from sqlalchemy import distinct, or_, select
 
+from app.models.learning import ExampleConversation
 from app.models.situation import Situation
 from app.services.situations import EMBED_JOB, embed_pending
 
@@ -29,16 +30,19 @@ async def embed_situations(ctx: dict[str, Any], tenant_id: str | None = None) ->
         if tenant_id is not None:
             tenants = [uuid.UUID(tenant_id)]
         else:
-            tenants = list(
-                session.execute(
-                    select(distinct(Situation.tenant_id)).where(
-                        or_(
-                            Situation.embedding.is_(None),
-                            Situation.embedding_model != llm.embedding_model,
-                        )
-                    )
-                ).scalars()
+            lacking_situation = select(distinct(Situation.tenant_id)).where(
+                or_(
+                    Situation.embedding.is_(None),
+                    Situation.embedding_model != llm.embedding_model,
+                )
             )
+            lacking_example = select(distinct(ExampleConversation.tenant_id)).where(
+                or_(
+                    ExampleConversation.embedding.is_(None),
+                    ExampleConversation.embedding_model != llm.embedding_model,
+                )
+            )
+            tenants = list(session.execute(lacking_situation.union(lacking_example)).scalars())
         done = 0
         for tenant in tenants:
             try:

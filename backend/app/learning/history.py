@@ -92,6 +92,8 @@ class ConfigHistoryService:
             "interruptor": self._undo_switch,
             "perfil": self._undo_profile,
             "faq": self._undo_faq,
+            "ejemplo": self._undo_example,
+            "estilo": self._undo_style,
         }.get(entry.entidad)
         if handler is None:
             raise HistoryError("not_undoable", "Ese cambio no se puede deshacer desde aquí.")
@@ -178,4 +180,26 @@ class ConfigHistoryService:
                     KnowledgeService(self._session, self._tenant_id).delete(faq.knowledge_source_id)
             self._session.delete(faq)
             self._session.flush()
+        return entry.resumen
+
+    def _undo_example(self, entry: ConfigHistory) -> str:
+        from app.models.learning import ExampleConversation
+
+        if entry.accion != "crear" or entry.entidad_id is None:
+            raise HistoryError("not_undoable", "Ese cambio no se puede deshacer desde aquí.")
+        example = self._session.get(ExampleConversation, entry.entidad_id)
+        if example is not None and example.tenant_id == self._tenant_id:
+            self._session.delete(example)
+            self._session.flush()
+        return entry.resumen
+
+    def _undo_style(self, entry: ConfigHistory) -> str:
+        from app.repositories.business import AgentConfigRepository
+
+        before = entry.antes or {}
+        if "estilo_vendedor" not in before:
+            raise HistoryError("not_undoable", "No quedó guardado cómo era antes.")
+        AgentConfigRepository(self._session, self._tenant_id).upsert(
+            estilo_vendedor=before["estilo_vendedor"]
+        )
         return entry.resumen

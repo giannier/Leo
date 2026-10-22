@@ -59,7 +59,10 @@ from app.models.feedback import ConversationReview, SandboxFeedback
 from app.models.inbox import ConversationNote, NotificationSettings
 from app.models.knowledge import KnowledgeChunk, KnowledgeSource
 from app.models.learning import (
+    ChatImport,
     ConfigHistory,
+    ExampleConversation,
+    LearningMark,
     LearningSettings,
     LearningUsage,
     Suggestion,
@@ -101,8 +104,11 @@ __all__ = [
     "MetaRate",
     "OptinImport",
     "ConversationNote",
+    "ChatImport",
     "ConfigHistory",
+    "ExampleConversation",
     "ConversationReview",
+    "LearningMark",
     "LearningSettings",
     "LearningUsage",
     "Suggestion",

@@ -61,6 +61,9 @@ export function SuggestionCard({ row, onDecided }: { row: SuggestionRow; onDecid
 
   const isSituation = row.tipo === "situacion";
   const isFact = row.tipo === "dato";
+  const isExample = row.tipo === "ejemplo";
+  const isStyle = row.tipo === "estilo";
+  const turns = Array.isArray(card.mensajes) ? (card.mensajes as { de: string; texto: string }[]) : [];
 
   return (
     <li className="rounded-xl border border-line bg-surface" data-testid="suggestion-card">
@@ -163,10 +166,44 @@ export function SuggestionCard({ row, onDecided }: { row: SuggestionRow; onDecid
                 </div>
               ) : null}
 
-              {!isSituation && !isFact ? (
-                <pre className="whitespace-pre-wrap rounded-lg bg-surface-muted p-3 text-xs text-ink">
-                  {JSON.stringify(detail.propuesta, null, 2)}
-                </pre>
+              {isStyle ? (
+                <TextArea
+                  label="Cómo escriben tus vendedores"
+                  rows={3}
+                  maxLength={600}
+                  value={text(card.estilo)}
+                  disabled={!pending}
+                  onChange={(e) => setCard({ ...card, estilo: e.target.value })}
+                  hint="El asistente imitará este tono. No cambia lo que dice ni sus precios."
+                />
+              ) : null}
+
+              {isExample ? (
+                <div className="space-y-3">
+                  <Field
+                    label="Título"
+                    value={text(card.titulo)}
+                    maxLength={80}
+                    disabled={!pending}
+                    onChange={(e) => setCard({ ...card, titulo: e.target.value })}
+                  />
+                  <TextArea
+                    label="De qué trata (así lo reconoce el asistente)"
+                    rows={2}
+                    maxLength={300}
+                    value={text(card.tema)}
+                    disabled={!pending}
+                    onChange={(e) => setCard({ ...card, tema: e.target.value })}
+                  />
+                  <ol className="space-y-0.5 rounded-lg bg-surface-muted p-3 text-xs">
+                    {turns.map((line, index) => (
+                      <li key={index} className="text-ink-soft">
+                        <span className="font-semibold text-ink">{line.de === "cliente" ? "Cliente" : "Vendedor"}:</span> {line.texto}
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="text-xs text-ink-faint">Los nombres, teléfonos y direcciones ya fueron quitados. Si ves alguno que quedó, rechaza el ejemplo.</p>
+                </div>
               ) : null}
 
               {detail.origen.length > 0 ? (
@@ -240,7 +277,7 @@ export function SuggestionCard({ row, onDecided }: { row: SuggestionRow; onDecid
                       onClick={() =>
                         void run("approve", async () => {
                           const result = await api.assistant.approveSuggestion(row.id, {
-                            editado: isSituation ? card : null,
+                            editado: isSituation || isExample || isStyle ? card : null,
                             respuesta: isFact ? answer.trim() : null,
                           });
                           toast.success(
