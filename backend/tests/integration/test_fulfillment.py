@@ -157,7 +157,10 @@ class TestTheStages:
         ]
         assert trail == [("order.stage_changed", "preparando")]
         audit = db.execute(
-            select(AuditLog).where(AuditLog.action == "order.stage_changed")
+            select(AuditLog).where(
+                AuditLog.action == "order.stage_changed",
+                AuditLog.detail["order_id"].astext == str(order.id),
+            )
         ).scalar_one()
         assert audit.detail["etapa_de"] is None and audit.detail["etapa_a"] == "preparando"
 
@@ -540,7 +543,10 @@ class TestTheRefundOwed:
         detail = (await api.get(f"{ORDERS}/{order.id}", headers=headers)).json()
         assert detail["devolucion_pendiente"] is False
         audit = db.execute(
-            select(AuditLog).where(AuditLog.action == "order.refund_resolved")
+            select(AuditLog).where(
+                AuditLog.action == "order.refund_resolved",
+                AuditLog.detail["order_id"].astext == str(order.id),
+            )
         ).scalar_one()
         assert audit.detail["order_id"] == str(order.id)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.agent.tools.postsale import consultar_pedidos
@@ -25,6 +26,8 @@ def _order(
     total: str = "95.00",
     sandbox: bool = False,
     next_step: str | None = None,
+    etapa: str | None = None,
+    tipo_entrega: str = "delivery",
     lines: tuple[tuple[str, int, Product | None], ...] = (),
 ):  # type: ignore[no-untyped-def]
     order = OrderRepository(db, tenant_id).add_numbered(
@@ -35,8 +38,9 @@ def _order(
         total=Decimal(total),
         estado=estado,
         is_sandbox=sandbox,
-        tipo_entrega="delivery",
-        zona_envio="Miraflores",
+        etapa=etapa,
+        tipo_entrega=tipo_entrega,
+        zona_envio="Miraflores" if tipo_entrega == "delivery" else None,
         siguiente_paso=next_step,
         confirmed_at=datetime.now(UTC) if estado != "borrador" else None,
     )
@@ -67,6 +71,28 @@ def _context(db: Session, tenant, conversation, **extra) -> ToolContext:  # type
 
 
 class TestTheCustomerAsksAboutAnOrder:
+    @pytest.mark.parametrize(
+        ("etapa", "tipo", "says"),
+        [
+            ("preparando", "delivery", "en preparación"),
+            (None, "delivery", "en preparación"),
+            ("listo", "delivery", "listo, a punto de salir"),
+            ("listo", "recojo", "listo para recoger en el local"),
+            ("en_camino", "delivery", "en camino"),
+        ],
+    )
+    async def test_it_says_the_exact_stage_the_business_recorded(
+        self, db: Session, etapa: str | None, tipo: str, says: str
+    ) -> None:
+        """Feature 016: not "en preparación o en camino" for everything in progress."""
+        tenant = _tenant(db, template="productos")
+        conversation = _conversation(db, tenant, channel="whatsapp")
+        _order(db, tenant.id, conversation, "en_curso", etapa=etapa, tipo_entrega=tipo)
+
+        result = await consultar_pedidos(_context(db, tenant, conversation), {})
+
+        assert result.texto is not None and f"{says}. Total" in result.texto
+
     async def test_the_state_the_lines_and_what_the_business_wrote(self, db: Session) -> None:
         tenant = _tenant(db, template="productos")
         conversation = _conversation(db, tenant, channel="whatsapp")
@@ -85,7 +111,7 @@ class TestTheCustomerAsksAboutAnOrder:
         result = await consultar_pedidos(_context(db, tenant, conversation), {})
 
         assert result.status == "hecho" and result.texto is not None
-        assert "en preparación o en camino" in result.texto
+        assert "en preparación" in result.texto
         assert "2 × Polo básico" in result.texto and f"producto_id: {polo.id}" in result.texto
         assert (
             "1 × Gorra libre" in result.texto
