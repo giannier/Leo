@@ -92,6 +92,43 @@ export const ClockIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const MapPinIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 12 3.5 6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z" />
+    <circle cx="12" cy="10" r="2.25" />
+  </Svg>
+);
+
+export const TruckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 6.5h10.5V16H3z" />
+    <path d="M13.5 9.5H17l3.5 3.5V16h-7" />
+    <circle cx="7.5" cy="17.5" r="1.75" />
+    <circle cx="17" cy="17.5" r="1.75" />
+  </Svg>
+);
+
+export const BagIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 8h14l-1 12H6L5 8Z" />
+    <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
+  </Svg>
+);
+
+export const VolumeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" />
+    <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+  </Svg>
+);
+
+export const VolumeOffIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z" />
+    <path d="M16 9.5 21 14.5M21 9.5 16 14.5" />
+  </Svg>
+);
+
 export const HomeIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="m3 10 9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />

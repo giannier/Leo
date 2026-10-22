@@ -9,6 +9,8 @@
 import type { CustomerNotice } from "@/lib/api/client";
 import { cx } from "@/components/ui";
 
+import { STAGE_LABELS } from "./stages";
+
 export const STATE_LABELS: Record<string, string> = {
   borrador: "Borrador",
   por_confirmar: "Por confirmar",
@@ -37,7 +39,9 @@ const STATE_STYLES: Record<string, string> = {
   descartado: "bg-danger-soft text-danger",
 };
 
-export function StateBadge({ state }: { state: string }) {
+/** An order in progress says where the business is (`Preparando`), not just `En curso`. */
+export function StateBadge({ state, etapa }: { state: string; etapa?: string | null }) {
+  const label = state === "en_curso" && etapa ? (STAGE_LABELS[etapa] ?? STATE_LABELS[state]) : STATE_LABELS[state];
   return (
     <span
       className={cx(
@@ -45,7 +49,7 @@ export function StateBadge({ state }: { state: string }) {
         STATE_STYLES[state] ?? "bg-surface-muted text-ink-soft",
       )}
     >
-      {STATE_LABELS[state] ?? state}
+      {label ?? state}
     </span>
   );
 }
@@ -168,5 +172,7 @@ export const HISTORY_LABELS: Record<string, string> = {
   "order.confirmed": "Pedido confirmado",
   "order.rejected": "Pedido rechazado",
   "order.status_changed": "Cambio de estado",
+  "order.stage_changed": "Avance del pedido",
+  "order.refund_resolved": "Devolución del dinero registrada",
   imagen_no_reconocida: "Imagen no reconocida como comprobante",
 };

@@ -54,57 +54,63 @@ export default function BusinessInfoPage() {
         title="Información del negocio"
         description="Lo que tu asistente sabe de tu negocio. Cada dato sale de aquí: no inventa precios, zonas ni horarios."
       />
-      <div className="space-y-3">
-        {BLOCKS.map((block) => {
-          const expanded = open === block.key;
-          const justSaved = done.has(block.key) && !expanded;
-          return (
-            <section key={block.key} className="rounded-xl border border-line bg-surface">
-              <h2>
-                <button
-                  type="button"
-                  aria-expanded={expanded}
-                  onClick={() => {
-                    setOpen(expanded ? "" : block.key);
-                    // Opening it again is editing again: the mark no longer holds.
-                    if (!expanded) setDone((d) => new Set([...d].filter((k) => k !== block.key)));
-                  }}
-                  className={cx(
-                    "flex min-h-12 w-full cursor-pointer items-center justify-between px-5 text-left",
-                    "text-base font-semibold text-ink",
-                  )}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    {block.title}
-                    {justSaved ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
-                        <CheckIcon className="size-3.5" />
-                        Guardado
+      {/* Two stacks, not one grid of rows: opening a block pushes down only its own column, never
+          leaves a hole beside it. */}
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        {[BLOCKS.slice(0, Math.ceil(BLOCKS.length / 2)), BLOCKS.slice(Math.ceil(BLOCKS.length / 2))].map((half, column) => (
+          <div key={column} className="space-y-4">
+            {half.map((block) => {
+              const expanded = open === block.key;
+              const justSaved = done.has(block.key) && !expanded;
+              return (
+                <section key={block.key} className="rounded-xl border border-line bg-surface">
+                  <h2>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => {
+                        setOpen(expanded ? "" : block.key);
+                        // Opening it again is editing again: the mark no longer holds.
+                        if (!expanded) setDone((d) => new Set([...d].filter((k) => k !== block.key)));
+                      }}
+                      className={cx(
+                        "flex min-h-12 w-full cursor-pointer items-center justify-between px-5 text-left",
+                        "text-base font-semibold text-ink",
+                      )}
+                    >
+                      <span className="flex flex-wrap items-center gap-2">
+                        {block.title}
+                        {justSaved ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success">
+                            <CheckIcon className="size-3.5" />
+                            Guardado
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
-                  </span>
-                  <span aria-hidden="true" className="text-ink-faint">
-                    {expanded ? "−" : "+"}
-                  </span>
-                </button>
-              </h2>
-              {expanded ? (
-                <div className="border-t border-line p-5">
-                  <BlockContext.Provider
-                    value={{
-                      saved: () => {
-                        setOpen("");
-                        setDone((d) => new Set(d).add(block.key));
-                      },
-                    }}
-                  >
-                    {block.key === "faqs" ? <Faqs key={question} seedQuestion={question} /> : block.body}
-                  </BlockContext.Provider>
-                </div>
-              ) : null}
-            </section>
-          );
-        })}
+                      <span aria-hidden="true" className="text-ink-faint">
+                        {expanded ? "−" : "+"}
+                      </span>
+                    </button>
+                  </h2>
+                  {expanded ? (
+                    <div className="border-t border-line p-5">
+                      <BlockContext.Provider
+                        value={{
+                          saved: () => {
+                            setOpen("");
+                            setDone((d) => new Set(d).add(block.key));
+                          },
+                        }}
+                      >
+                        {block.key === "faqs" ? <Faqs key={question} seedQuestion={question} /> : block.body}
+                      </BlockContext.Provider>
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

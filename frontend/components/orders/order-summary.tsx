@@ -6,6 +6,7 @@ import { Skeleton, cx } from "@/components/ui";
 import type { OrderSummary } from "@/lib/api/client";
 
 import { formatMoney } from "./labels";
+import { waitText } from "./comanda";
 
 export type Period = "hoy" | "7d" | "30d";
 
@@ -60,15 +61,15 @@ function StatCard({
   return (
     <div
       className={cx(
-        "rounded-xl border p-4",
+        "rounded-xl border p-4 sm:p-5",
         highlight ? "border-warning/40 bg-warning-soft" : "border-line bg-surface",
       )}
     >
-      <p className="text-xs font-medium text-ink-faint">{label}</p>
-      <p data-testid={testId} className="tabular mt-1 text-2xl font-semibold text-ink">
+      <p className="text-sm text-ink-soft">{label}</p>
+      <p data-testid={testId} className="tabular mt-1 whitespace-nowrap font-heading text-2xl font-semibold text-ink sm:text-3xl">
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-xs text-ink-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
     </div>
   );
 }
@@ -76,8 +77,8 @@ function StatCard({
 export function OrderSummaryCards({ summary }: { summary: OrderSummary | null }) {
   if (summary === null) {
     return (
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+        {[0, 1, 2, 3, 4].map((i) => (
           <Skeleton key={i} className="h-24 w-full" />
         ))}
       </div>
@@ -91,7 +92,7 @@ export function OrderSummaryCards({ summary }: { summary: OrderSummary | null })
         .join(" · ")}`
     : undefined;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
       <StatCard
         testId="stat-conversiones"
         label="Ventas confirmadas"
@@ -115,6 +116,16 @@ export function OrderSummaryCards({ summary }: { summary: OrderSummary | null })
         value={String(summary.pendientes_revision)}
         hint={summary.pendientes_revision > 0 ? "Esperan tu confirmación" : "Nada pendiente"}
         highlight={summary.pendientes_revision > 0}
+      />
+      <StatCard
+        testId="stat-entrega"
+        label="Tiempo de entrega"
+        value={summary.tiempo_medio_entrega_min === null ? "—" : waitText(summary.tiempo_medio_entrega_min)}
+        hint={
+          summary.tiempo_medio_entrega_min === null
+            ? "Aún no hay pedidos entregados"
+            : "Desde que confirmas hasta que entregas"
+        }
       />
     </div>
   );

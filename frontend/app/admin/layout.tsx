@@ -84,7 +84,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </a>
 
       <header className="bg-brand text-brand-fg">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1760px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 xl:px-10">
           <div className="flex items-baseline gap-2">
             <span className="font-heading text-lg font-bold tracking-tight">Leo</span>
             <span className="rounded-full bg-brand-fg/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
@@ -130,7 +130,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
 
-      <main id="contenido" className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+      <main id="contenido" className="mx-auto w-full max-w-[1760px] px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
         {children}
       </main>
     </div>

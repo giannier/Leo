@@ -190,7 +190,7 @@ export default function ProcessPage() {
       ) : null}
 
       {process && tab === "proceso" ? (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {process.novedades ? <News kind="proceso" news={process.novedades} onSeen={() => void load()} /> : null}
           {canConfigure && templates.length ? (
             <Card
@@ -252,65 +252,68 @@ export default function ProcessPage() {
               </div>
             </Card>
           ) : null}
-          <Card
-            title="Etapas y sus reglas"
-            description={`Versión ${process.template_version ?? "—"} de la plataforma. Apaga una regla y deja de llegar al asistente desde el siguiente mensaje.`}
-          >
-            <ol className="space-y-4">
-              {process.etapas
-                .filter((stage) => stage.reglas.length)
-                .map((stage, index) => (
-                  <li key={stage.key} className="rounded-lg border border-line p-4">
-                    <p className="text-sm font-semibold text-ink">
-                      {index + 1}. {STAGES[stage.key] ?? stage.key}{" "}
-                      <span className="font-normal text-ink-faint">· embudo {stage.embudo.toLowerCase()}</span>
-                    </p>
-                    <ul className="mt-2 divide-y divide-line">
-                      {stage.reglas.map((rule) => (
-                        <Switch key={rule.rule_key} kind="proceso" rule={rule} onChange={replaceRule} />
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-            </ol>
-          </Card>
-          {canConfigure ? (
-            <Card title="Vista previa del prompt" description="Lo que recibe el modelo en una etapa, con datos de ejemplo.">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="w-56">
-                  <Select
-                    label="Etapa"
-                    options={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
-                    value={previewStage}
-                    onChange={(e) => setPreviewStage(e.target.value)}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={async () => setPreview(await api.assistant.preview(previewStage))}
-                >
-                  Ver prompt
-                </Button>
-              </div>
-              {preview ? (
-                <div className="mt-4">
-                  <p className="text-xs text-ink-faint">≈ {preview.tokens_estimados} tokens</p>
-                  <pre
-                    data-testid="prompt-preview"
-                    className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-3 text-xs text-ink"
-                  >
-                    {preview.prompt}
-                  </pre>
-                </div>
-              ) : null}
+          {/* The rules by stage on the left and what the model receives on the right, side by side. */}
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+            <Card
+              title="Etapas y sus reglas"
+              description={`Versión ${process.template_version ?? "—"} de la plataforma. Apaga una regla y deja de llegar al asistente desde el siguiente mensaje.`}
+            >
+              <ol className="space-y-4">
+                {process.etapas
+                  .filter((stage) => stage.reglas.length)
+                  .map((stage, index) => (
+                    <li key={stage.key} className="rounded-lg border border-line p-4">
+                      <p className="text-sm font-semibold text-ink">
+                        {index + 1}. {STAGES[stage.key] ?? stage.key}{" "}
+                        <span className="font-normal text-ink-faint">· embudo {stage.embudo.toLowerCase()}</span>
+                      </p>
+                      <ul className="mt-2 divide-y divide-line">
+                        {stage.reglas.map((rule) => (
+                          <Switch key={rule.rule_key} kind="proceso" rule={rule} onChange={replaceRule} />
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+              </ol>
             </Card>
-          ) : null}
+            {canConfigure ? (
+              <Card title="Vista previa del prompt" description="Lo que recibe el modelo en una etapa, con datos de ejemplo.">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-56">
+                    <Select
+                      label="Etapa"
+                      options={Object.entries(STAGES).map(([value, label]) => ({ value, label }))}
+                      value={previewStage}
+                      onChange={(e) => setPreviewStage(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={async () => setPreview(await api.assistant.preview(previewStage))}
+                  >
+                    Ver prompt
+                  </Button>
+                </div>
+                {preview ? (
+                  <div className="mt-4">
+                    <p className="text-xs text-ink-faint">≈ {preview.tokens_estimados} tokens</p>
+                    <pre
+                      data-testid="prompt-preview"
+                      className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-3 text-xs text-ink"
+                    >
+                      {preview.prompt}
+                    </pre>
+                  </div>
+                ) : null}
+              </Card>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       {rubro && tab === "rubro" ? (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {!rubro.key ? (
             <Alert tone="warning">
               Tu negocio no tiene rubro. Elígelo en la <Link href="/onboarding" className="underline">configuración</Link>.

@@ -55,7 +55,7 @@ export function OrderFilterBar({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 rounded-xl border border-line bg-surface p-4 sm:p-5">
       <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -84,7 +84,7 @@ export function OrderFilterBar({
         })}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+      <div className="grid items-end gap-4 sm:grid-cols-[minmax(0,1fr)_11rem_11rem] xl:grid-cols-[minmax(0,1fr)_11rem_11rem_auto]">
         <Field
           label="Buscar"
           type="search"
@@ -106,14 +106,15 @@ export function OrderFilterBar({
           min={filters.desde || undefined}
           onChange={(event) => onChange({ ...filters, hasta: event.target.value })}
         />
+        <div className="sm:col-span-3 xl:col-span-1 xl:pb-2.5">
+          <Checkbox
+            label="Incluir pedidos de prueba"
+            hint="No son ventas reales."
+            checked={filters.sandbox}
+            onChange={(event) => onChange({ ...filters, sandbox: event.target.checked })}
+          />
+        </div>
       </div>
-
-      <Checkbox
-        label="Incluir pedidos de prueba"
-        hint="Los que salen del modo prueba. No son ventas reales."
-        checked={filters.sandbox}
-        onChange={(event) => onChange({ ...filters, sandbox: event.target.checked })}
-      />
     </div>
   );
 }
@@ -175,6 +176,7 @@ export function OrderTable({
             <th className="px-4 py-2.5">Pedido</th>
             <th className="px-4 py-2.5">Cliente</th>
             <th className="px-4 py-2.5">Detalle</th>
+            <th className="px-4 py-2.5">Entrega</th>
             <th className="px-4 py-2.5 text-right">Total</th>
             <th className="px-4 py-2.5">Estado</th>
             <th className="px-4 py-2.5">Fecha</th>
@@ -192,17 +194,24 @@ export function OrderTable({
                 <p className="text-ink">{order.cliente.nombre ?? "Sin nombre"}</p>
                 <p className="text-xs text-ink-faint">{order.cliente.telefono ?? "—"}</p>
               </td>
-              <td className="max-w-xs px-4 py-3 text-ink-soft">
+              <td className="max-w-md px-4 py-3 text-ink-soft">
                 <p className="truncate" title={order.items_resumen}>
                   {order.items_resumen || "—"}
                 </p>
                 <Flags order={order} />
               </td>
+              <td className="whitespace-nowrap px-4 py-3 text-ink-soft">
+                {order.tipo_entrega === "delivery"
+                  ? "Delivery"
+                  : order.tipo_entrega === "recojo"
+                    ? "Recojo en tienda"
+                    : "—"}
+              </td>
               <td className="tabular px-4 py-3 text-right font-medium text-ink">
                 {formatMoney(order.total, order.moneda)}
               </td>
               <td className="px-4 py-3">
-                <StateBadge state={order.estado} />
+                <StateBadge state={order.estado} etapa={order.etapa} />
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-xs text-ink-faint">
                 {formatDateTime(order.creado)}
@@ -218,7 +227,7 @@ export function OrderTable({
             <Link href={`/pedidos/${order.id}`} className="block space-y-1.5 px-4 py-3 hover:bg-surface-muted/60">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-accent">#{order.numero}</span>
-                <StateBadge state={order.estado} />
+                <StateBadge state={order.estado} etapa={order.etapa} />
               </div>
               <p className="text-sm text-ink">
                 {order.cliente.nombre ?? "Sin nombre"}{" "}

@@ -16,7 +16,6 @@
  *   is why the toggle exists and why it is off by default.
  */
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui";
@@ -28,28 +27,18 @@ import {
   hasFilters,
   type OrderFilters,
 } from "@/components/orders/order-list";
+import { OrdersNav } from "@/components/orders/orders-nav";
 import { OrderSummaryCards, PeriodSwitch, type Period } from "@/components/orders/order-summary";
 import { api, type OrderPage, type OrderSummary } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
-import { MANAGES_CONFIGURATION, useHasRole } from "@/lib/session";
 
 const PAGE_SIZE = 20;
 /** Pause after the last keystroke before searching. */
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function PedidosPage() {
-  const canConfigure = useHasRole(...MANAGES_CONFIGURATION);
   const [period, setPeriod] = useState<Period>("hoy");
   const [summary, setSummary] = useState<OrderSummary | null>(null);
-  // Requests to return or exchange that wait for a person; the badge of the link.
-  const [waitingReturns, setWaitingReturns] = useState(0);
-
-  useEffect(() => {
-    api.aftersale
-      .returns({ estado: ["solicitada"] })
-      .then((list) => setWaitingReturns(list.pendientes))
-      .catch(() => setWaitingReturns(0));
-  }, []);
 
   const [filters, setFilters] = useState<OrderFilters>(NO_FILTERS);
   const [query, setQuery] = useState(filters);
@@ -126,29 +115,10 @@ export default function PedidosPage() {
             Lo que tus clientes han pedido y los pagos que esperan tu confirmación.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {canConfigure ? (
-            <Link
-              href="/pedidos/facturacion"
-              className="inline-flex min-h-10 items-center rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-muted"
-            >
-              Facturación electrónica
-            </Link>
-          ) : null}
-          <Link
-            href="/pedidos/devoluciones"
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-muted"
-          >
-            Devoluciones
-            {waitingReturns ? (
-              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
-                {waitingReturns} por revisar
-              </span>
-            ) : null}
-          </Link>
-          <PeriodSwitch value={period} onChange={setPeriod} />
-        </div>
+        <PeriodSwitch value={period} onChange={setPeriod} />
       </header>
+
+      <OrdersNav />
 
       <OrderSummaryCards summary={summary} />
 

@@ -54,7 +54,7 @@ export default function TarifasPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Tarifas de Meta</h1>
         <p className="text-sm text-ink-soft">
@@ -62,52 +62,55 @@ export default function TarifasPage() {
         </p>
       </header>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <Card title="Agregar o corregir una tarifa">
-        <div className="grid gap-3 sm:grid-cols-4">
-          <Field label="País" value={country} maxLength={2} onChange={(e) => setCountry(e.target.value)} />
-          <Select
-            label="Categoría"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as "marketing" | "utility" | "service")}
-            options={[
-              { value: "marketing", label: "Marketing" },
-              { value: "utility", label: "Utilidad" },
-              { value: "service", label: "Servicio (respuestas en 24 h)" },
-            ]}
-          />
-          <Field label="Vigente desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Field label="US$ por mensaje" inputMode="decimal" value={rate} placeholder="0.07030" onChange={(e) => setRate(e.target.value)} />
-        </div>
-        <div className="mt-4">
-          <Button type="button" loading={busy} disabled={!rate} onClick={() => void save()}>
-            Guardar tarifa
-          </Button>
-        </div>
-      </Card>
-      {!rates ? (
-        <Skeleton className="h-24 w-full" />
-      ) : (
-        <table className="w-full text-left text-sm" data-testid="meta-rates">
-          <thead className="text-xs text-ink-faint">
-            <tr>
-              <th className="py-2">País</th>
-              <th>Categoría</th>
-              <th>Desde</th>
-              <th>US$</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {rates.map((r) => (
-              <tr key={`${r.country}-${r.category}-${r.valid_from}`}>
-                <td className="py-2">{r.country}</td>
-                <td>{{ marketing: "Marketing", utility: "Utilidad", service: "Servicio" }[r.category] ?? r.category}</td>
-                <td>{r.valid_from}</td>
-                <td>{r.rate_usd}</td>
+      {/* The form to the left, the tariffs it changes beside it. */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,40rem)_minmax(0,1fr)]">
+        <Card title="Agregar o corregir una tarifa">
+          <div className="grid gap-3 sm:grid-cols-4">
+            <Field label="País" value={country} maxLength={2} onChange={(e) => setCountry(e.target.value)} />
+            <Select
+              label="Categoría"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as "marketing" | "utility" | "service")}
+              options={[
+                { value: "marketing", label: "Marketing" },
+                { value: "utility", label: "Utilidad" },
+                { value: "service", label: "Servicio (respuestas en 24 h)" },
+              ]}
+            />
+            <Field label="Vigente desde" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Field label="US$ por mensaje" inputMode="decimal" value={rate} placeholder="0.07030" onChange={(e) => setRate(e.target.value)} />
+          </div>
+          <div className="mt-4">
+            <Button type="button" loading={busy} disabled={!rate} onClick={() => void save()}>
+              Guardar tarifa
+            </Button>
+          </div>
+        </Card>
+        {!rates ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <table className="w-full text-left text-sm" data-testid="meta-rates">
+            <thead className="text-xs text-ink-faint">
+              <tr>
+                <th className="py-2">País</th>
+                <th>Categoría</th>
+                <th>Desde</th>
+                <th>US$</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody className="divide-y divide-line">
+              {rates.map((r) => (
+                <tr key={`${r.country}-${r.category}-${r.valid_from}`}>
+                  <td className="py-2">{r.country}</td>
+                  <td>{{ marketing: "Marketing", utility: "Utilidad", service: "Servicio" }[r.category] ?? r.category}</td>
+                  <td>{r.valid_from}</td>
+                  <td>{r.rate_usd}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

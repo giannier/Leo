@@ -333,19 +333,21 @@ export default function SituationsPage() {
       ) : null}
 
       {!editing ? (
-        <Writer
-          onCard={(card) => {
-            setSeed({
-              titulo: card.titulo,
-              cuando_aplica: card.cuando_aplica,
-              que_hace: card.que_hace,
-              derivar: card.derivar,
-              siempre: card.siempre,
-            });
-            setWarnings(card);
-            setEditing("new");
-          }}
-        />
+        <div className="max-w-4xl">
+          <Writer
+            onCard={(card) => {
+              setSeed({
+                titulo: card.titulo,
+                cuando_aplica: card.cuando_aplica,
+                que_hace: card.que_hace,
+                derivar: card.derivar,
+                siempre: card.siempre,
+              });
+              setWarnings(card);
+              setEditing("new");
+            }}
+          />
+        </div>
       ) : null}
 
       {editing && warnings && (warnings.choques.length > 0 || warnings.avisos.length > 0) ? (
@@ -364,24 +366,26 @@ export default function SituationsPage() {
       ) : null}
 
       {editing ? (
-        <Card title={editing === "new" ? "Nueva situación" : "Editar situación"}>
-          <SituationForm
-            initial={editing === "new" ? null : editing}
-            seed={editing === "new" ? seed : null}
-            media={media}
-            onCancel={() => {
-              setEditing(null);
-              setSeed(null);
-              setWarnings(null);
-            }}
-            onSaved={() => {
-              setEditing(null);
-              setSeed(null);
-              setWarnings(null);
-              void load();
-            }}
-          />
-        </Card>
+        <div className="max-w-4xl">
+          <Card title={editing === "new" ? "Nueva situación" : "Editar situación"}>
+            <SituationForm
+              initial={editing === "new" ? null : editing}
+              seed={editing === "new" ? seed : null}
+              media={media}
+              onCancel={() => {
+                setEditing(null);
+                setSeed(null);
+                setWarnings(null);
+              }}
+              onSaved={() => {
+                setEditing(null);
+                setSeed(null);
+                setWarnings(null);
+                void load();
+              }}
+            />
+          </Card>
+        </div>
       ) : (
         <div className="flex flex-wrap items-end gap-3">
           <Button type="button" onClick={() => setEditing("new")}>
@@ -416,7 +420,7 @@ export default function SituationsPage() {
         </Alert>
       ) : null}
 
-      <ul className="grid gap-3 md:grid-cols-2">
+      <ul className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {shown.map((situation) => {
           const state = STATE[situation.estado];
           return (

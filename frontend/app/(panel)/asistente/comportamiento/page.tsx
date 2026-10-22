@@ -134,157 +134,161 @@ export default function BehaviorPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <form
-        className="space-y-5"
+        className="space-y-6"
         onSubmit={(event) => {
           event.preventDefault();
           void save();
         }}
       >
-        <Card title="Estilo">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nombre del asistente" value={draft.agent_name} onChange={(e) => set({ agent_name: e.target.value })} />
-            <Select label="Tono" options={TONES} value={draft.tone} onChange={(e) => set({ tone: e.target.value })} />
-            <Select label="Ritmo" options={PACES} value={draft.ritmo} onChange={(e) => set({ ritmo: e.target.value })} />
-            <Select label="Detalle" options={DETAILS} value={draft.detalle} onChange={(e) => set({ detalle: e.target.value })} />
-            <Select
-              label="Trato al cliente"
-              options={[
-                { value: "tu", label: "De tú" },
-                { value: "usted", label: "De usted" },
-              ]}
-              value={draft.tratamiento}
-              onChange={(e) => set({ tratamiento: e.target.value })}
-            />
-            <Select
-              label="Emojis"
-              options={[
-                { value: "no", label: "Ninguno" },
-                { value: "pocos", label: "Pocos (uno de vez en cuando)" },
-                { value: "si", label: "Con naturalidad" },
-              ]}
-              value={draft.emojis}
-              onChange={(e) => set({ emojis: e.target.value })}
-            />
-          </div>
-          <div className="mt-4">
-            <Field
-              label="Saludo (opcional)"
-              maxLength={400}
-              placeholder="¡Hola! Bienvenido a ..."
-              hint="Lo usa en su primer mensaje."
-              value={draft.saludo ?? ""}
-              onChange={(e) => set({ saludo: e.target.value })}
-            />
-          </div>
-        </Card>
-
-        <Card title="Cuándo pasa a una persona">
-          <p className="text-sm text-ink-soft">
-            Si vende, cotiza o solo atiende lo eliges en{" "}
-            <Link href="/asistente/capacidades" className="font-semibold text-accent underline">
-              Qué hará tu agente
-            </Link>
-            .
-          </p>
-          <fieldset className="mt-4 space-y-3">
-            <legend className="text-sm font-medium text-ink">Pasa la conversación a una persona cuando…</legend>
-            {ESCALATIONS.map((rule) => (
-              <Checkbox
-                key={rule.value}
-                label={rule.label}
-                checked={draft.escalation_rules.includes(rule.value)}
-                onChange={(e) =>
-                  set({
-                    escalation_rules: e.target.checked
-                      ? [...draft.escalation_rules, rule.value]
-                      : draft.escalation_rules.filter((r) => r !== rule.value),
-                  })
-                }
+        {/* Four independent cards: two columns on a wide screen, so the page is read across
+            instead of being a long strip down the middle. */}
+        <div className="grid items-start gap-6 xl:grid-cols-2">
+          <Card title="Estilo">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nombre del asistente" value={draft.agent_name} onChange={(e) => set({ agent_name: e.target.value })} />
+              <Select label="Tono" options={TONES} value={draft.tone} onChange={(e) => set({ tone: e.target.value })} />
+              <Select label="Ritmo" options={PACES} value={draft.ritmo} onChange={(e) => set({ ritmo: e.target.value })} />
+              <Select label="Detalle" options={DETAILS} value={draft.detalle} onChange={(e) => set({ detalle: e.target.value })} />
+              <Select
+                label="Trato al cliente"
+                options={[
+                  { value: "tu", label: "De tú" },
+                  { value: "usted", label: "De usted" },
+                ]}
+                value={draft.tratamiento}
+                onChange={(e) => set({ tratamiento: e.target.value })}
               />
-            ))}
-          </fieldset>
-        </Card>
+              <Select
+                label="Emojis"
+                options={[
+                  { value: "no", label: "Ninguno" },
+                  { value: "pocos", label: "Pocos (uno de vez en cuando)" },
+                  { value: "si", label: "Con naturalidad" },
+                ]}
+                value={draft.emojis}
+                onChange={(e) => set({ emojis: e.target.value })}
+              />
+            </div>
+            <div className="mt-4">
+              <Field
+                label="Saludo (opcional)"
+                maxLength={400}
+                placeholder="¡Hola! Bienvenido a ..."
+                hint="Lo usa en su primer mensaje."
+                value={draft.saludo ?? ""}
+                onChange={(e) => set({ saludo: e.target.value })}
+              />
+            </div>
+          </Card>
 
-        <Card title="Inteligencia y seguimiento">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Nivel de inteligencia"
-              options={draft.niveles_permitidos.map((level) => ({ value: level, label: LEVELS[level] ?? level }))}
-              value={draft.nivel_inteligencia}
-              onChange={(e) => set({ nivel_inteligencia: e.target.value })}
-            />
-            <Field
-              label="Situaciones por mensaje"
-              type="number"
-              min={1}
-              max={10}
-              value={draft.max_situaciones}
-              onChange={(e) => set({ max_situaciones: Number(e.target.value) })}
-              hint="Cuántas de tus situaciones puede tener en cuenta a la vez."
-            />
-            <Field
-              label="Pausa al pasar a una persona (horas)"
-              type="number"
-              min={1}
-              max={72}
-              value={draft.derivacion_pausa_horas}
-              onChange={(e) => set({ derivacion_pausa_horas: Number(e.target.value) })}
-            />
-            <Select
-              label="A quiénes atiende el asistente"
-              options={PILOT}
-              value={String(draft.piloto_pct)}
-              onChange={(e) => set({ piloto_pct: Number(e.target.value) })}
-              hint="Para empezar con calma: el asistente atiende solo a una parte de tus clientes y tu equipo al resto. Cada cliente es siempre de un mismo lado."
-            />
-          </div>
-          <div className="mt-4 space-y-3">
-            <Checkbox
-              label="Hacer seguimiento si el cliente deja de responder"
-              checked={draft.seguimiento.activo}
-              onChange={(e) => set({ seguimiento: { ...draft.seguimiento, activo: e.target.checked } })}
-            />
-            {draft.seguimiento.activo ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field
-                  label="Horas de espera"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={draft.seguimiento.horas}
-                  onChange={(e) => set({ seguimiento: { ...draft.seguimiento, horas: Number(e.target.value) } })}
-                />
-                <Field
-                  label="Intentos como máximo"
-                  type="number"
-                  min={1}
-                  max={3}
-                  value={draft.seguimiento.max_intentos}
+          <Card title="Cuándo pasa a una persona">
+            <p className="text-sm text-ink-soft">
+              Si vende, cotiza o solo atiende lo eliges en{" "}
+              <Link href="/asistente/capacidades" className="font-semibold text-accent underline">
+                Qué hará tu agente
+              </Link>
+              .
+            </p>
+            <fieldset className="mt-4 space-y-3">
+              <legend className="text-sm font-medium text-ink">Pasa la conversación a una persona cuando…</legend>
+              {ESCALATIONS.map((rule) => (
+                <Checkbox
+                  key={rule.value}
+                  label={rule.label}
+                  checked={draft.escalation_rules.includes(rule.value)}
                   onChange={(e) =>
-                    set({ seguimiento: { ...draft.seguimiento, max_intentos: Number(e.target.value) } })
+                    set({
+                      escalation_rules: e.target.checked
+                        ? [...draft.escalation_rules, rule.value]
+                        : draft.escalation_rules.filter((r) => r !== rule.value),
+                    })
                   }
                 />
-              </div>
-            ) : null}
-          </div>
-        </Card>
+              ))}
+            </fieldset>
+          </Card>
 
-        <Card
-          title="Mensajes del sistema"
-          description="Los envía el sistema, no el modelo. Puedes usar {nombre_cliente}, {numero}, {motivo} y {siguiente_paso}. Déjalo vacío para volver al texto por defecto."
-        >
-          <div className="space-y-4">
-            {Object.entries(draft.mensajes_sistema).map(([key, text]) => (
-              <TextArea
-                key={key}
-                label={MESSAGES[key] ?? key}
-                rows={2}
-                value={text}
-                onChange={(e) => set({ mensajes_sistema: { ...draft.mensajes_sistema, [key]: e.target.value } })}
+          <Card title="Inteligencia y seguimiento">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="Nivel de inteligencia"
+                options={draft.niveles_permitidos.map((level) => ({ value: level, label: LEVELS[level] ?? level }))}
+                value={draft.nivel_inteligencia}
+                onChange={(e) => set({ nivel_inteligencia: e.target.value })}
               />
-            ))}
-          </div>
-        </Card>
+              <Field
+                label="Situaciones por mensaje"
+                type="number"
+                min={1}
+                max={10}
+                value={draft.max_situaciones}
+                onChange={(e) => set({ max_situaciones: Number(e.target.value) })}
+                hint="Cuántas de tus situaciones puede tener en cuenta a la vez."
+              />
+              <Field
+                label="Pausa al pasar a una persona (horas)"
+                type="number"
+                min={1}
+                max={72}
+                value={draft.derivacion_pausa_horas}
+                onChange={(e) => set({ derivacion_pausa_horas: Number(e.target.value) })}
+              />
+              <Select
+                label="A quiénes atiende el asistente"
+                options={PILOT}
+                value={String(draft.piloto_pct)}
+                onChange={(e) => set({ piloto_pct: Number(e.target.value) })}
+                hint="Para empezar con calma: el asistente atiende solo a una parte de tus clientes y tu equipo al resto. Cada cliente es siempre de un mismo lado."
+              />
+            </div>
+            <div className="mt-4 space-y-3">
+              <Checkbox
+                label="Hacer seguimiento si el cliente deja de responder"
+                checked={draft.seguimiento.activo}
+                onChange={(e) => set({ seguimiento: { ...draft.seguimiento, activo: e.target.checked } })}
+              />
+              {draft.seguimiento.activo ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Horas de espera"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={draft.seguimiento.horas}
+                    onChange={(e) => set({ seguimiento: { ...draft.seguimiento, horas: Number(e.target.value) } })}
+                  />
+                  <Field
+                    label="Intentos como máximo"
+                    type="number"
+                    min={1}
+                    max={3}
+                    value={draft.seguimiento.max_intentos}
+                    onChange={(e) =>
+                      set({ seguimiento: { ...draft.seguimiento, max_intentos: Number(e.target.value) } })
+                    }
+                  />
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
+          <Card
+            title="Mensajes del sistema"
+            description="Los envía el sistema, no el modelo. Puedes usar {nombre_cliente}, {numero}, {motivo} y {siguiente_paso}. Déjalo vacío para volver al texto por defecto."
+          >
+            <div className="space-y-4">
+              {Object.entries(draft.mensajes_sistema).map(([key, text]) => (
+                <TextArea
+                  key={key}
+                  label={MESSAGES[key] ?? key}
+                  rows={2}
+                  value={text}
+                  onChange={(e) => set({ mensajes_sistema: { ...draft.mensajes_sistema, [key]: e.target.value } })}
+                />
+              ))}
+            </div>
+          </Card>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button type="submit" loading={saving}>

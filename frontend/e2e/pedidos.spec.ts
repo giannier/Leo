@@ -243,13 +243,15 @@ test.describe("Pedidos", () => {
     await expect(page.getByText("Te enviamos tus certificados en 48 h").first()).toBeVisible();
     await expect(page.getByText("Pedido confirmado", { exact: true })).toBeVisible();
 
-    // And it can be moved along, but not confirmed twice.
+    // And it can be moved along, stage by stage (feature 016), but not confirmed twice.
     await expect(page.getByRole("button", { name: "Confirmar", exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: "Marcar en curso" }).click();
-    await expect(page.getByTestId("order-state")).toHaveText("En curso");
-    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await page.getByRole("button", { name: "Empezar a preparar" }).click();
+    await expect(page.getByTestId("order-state")).toHaveText("Preparando");
+    await page.getByRole("button", { name: "Marcar listo" }).click();
+    await expect(page.getByTestId("order-state")).toHaveText("Listo");
+    await page.getByRole("button", { name: "Marcar entregado" }).click();
     await expect(page.getByTestId("order-state")).toHaveText("Completado");
-    await expect(page.getByRole("button", { name: "Marcar en curso" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Empezar a preparar" })).toHaveCount(0);
   });
 
   test("rechazar pide el motivo y devuelve el pedido a borrador", async ({ page }) => {

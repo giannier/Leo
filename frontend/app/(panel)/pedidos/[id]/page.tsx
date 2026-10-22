@@ -29,8 +29,14 @@ import {
 import { HandoverBanner } from "@/components/orders/handover-banner";
 import { StateBadge, formatDateTime, noticeMessage } from "@/components/orders/labels";
 import { ReviewPanel } from "@/components/orders/review-panel";
-import { Alert, Skeleton } from "@/components/ui";
-import { api, type CustomerNotice, type OperatorState, type OrderDetail } from "@/lib/api/client";
+import { Alert, Button, Skeleton } from "@/components/ui";
+import {
+  api,
+  type CustomerNotice,
+  type OperatorState,
+  type OrderDetail,
+  type OrderStage,
+} from "@/lib/api/client";
 import { ApiError, humanMessage } from "@/lib/api/errors";
 
 type Outcome = { text: string; tone: "success" | "warning" } | null;
@@ -110,7 +116,7 @@ export default function PedidoPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <Link href="/pedidos" className="inline-flex min-h-10 items-center text-sm font-medium text-accent hover:underline">
         ← Volver a pedidos
       </Link>
@@ -133,7 +139,7 @@ export default function PedidoPage() {
           <header className="flex flex-wrap items-center gap-3">
             <h1 className="font-heading text-2xl font-semibold text-ink">Pedido #{order.numero}</h1>
             <span data-testid="order-state">
-              <StateBadge state={order.estado} />
+              <StateBadge state={order.estado} etapa={order.etapa} />
             </span>
             <span className="text-sm text-ink-faint">{formatDateTime(order.creado)}</span>
           </header>
@@ -144,31 +150,61 @@ export default function PedidoPage() {
             </Alert>
           ) : null}
 
+          {order.devolucion_pendiente ? (
+            <Alert
+              tone="warning"
+              title="Hay que devolverle el dinero a este cliente"
+              action={
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() =>
+                    void act(
+                      () => api.orders.refundResolved(order.id),
+                      "Anotamos que ya le devolviste el dinero.",
+                    )
+                  }
+                >
+                  Ya le devolví el dinero
+                </Button>
+              }
+            >
+              El pedido se anuló después de confirmar su pago. Hazle la devolución por el mismo medio y
+              márcalo aquí para que deje de aparecer como pendiente.
+            </Alert>
+          ) : null}
+
           <HandoverBanner conversationId={order.conversation_id} />
 
           <OrderNotes order={order} />
 
-          <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
-            <div className="min-w-0 space-y-5">
-              <ProofsCard
-                order={order}
-                images={images}
-                onLoadImage={(proofId) => void loadImage(proofId)}
-                onImageBroken={(proofId) =>
-                  setImages((current) => ({ ...current, [proofId]: { status: "failed" } }))
-                }
-              />
-              <OrderItems order={order} />
-              <CustomerCard order={order} />
-              <InvoiceForm
-                orderId={order.id}
-                sold={SOLD.has(order.estado)}
-                onChanged={() => setDocumentsVersion((n) => n + 1)}
-              />
-              <DocumentsCard orderId={order.id} sold={SOLD.has(order.estado)} refreshKey={documentsVersion} />
-              <OrderReturns orderId={order.id} sold={SOLD.has(order.estado)} />
+          {/* Three columns on a wide screen: the payment and the products, the customer and the paperwork,
+              and the decision with its history, which stays in sight while the rest scrolls. */}
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className="min-w-0 space-y-6 2xl:grid 2xl:grid-cols-2 2xl:items-start 2xl:gap-6 2xl:space-y-0">
+              <div className="min-w-0 space-y-6">
+                <ProofsCard
+                  order={order}
+                  images={images}
+                  onLoadImage={(proofId) => void loadImage(proofId)}
+                  onImageBroken={(proofId) =>
+                    setImages((current) => ({ ...current, [proofId]: { status: "failed" } }))
+                  }
+                />
+                <OrderItems order={order} />
+              </div>
+              <div className="min-w-0 space-y-6">
+                <CustomerCard order={order} />
+                <InvoiceForm
+                  orderId={order.id}
+                  sold={SOLD.has(order.estado)}
+                  onChanged={() => setDocumentsVersion((n) => n + 1)}
+                />
+                <DocumentsCard orderId={order.id} sold={SOLD.has(order.estado)} refreshKey={documentsVersion} />
+                <OrderReturns orderId={order.id} sold={SOLD.has(order.estado)} />
+              </div>
             </div>
-            <div className="min-w-0 space-y-5">
+            <div className="min-w-0 space-y-6 xl:sticky xl:top-6">
               <ReviewPanel
                 order={order}
                 busy={busy}
@@ -184,6 +220,9 @@ export default function PedidoPage() {
                     () => api.orders.setStatus(order.id, estado, motivo),
                     motivo ? "Pedido anulado." : "Estado actualizado.",
                   )
+                }
+                onStage={(etapa: OrderStage) =>
+                  void act(() => api.orders.setStage(order.id, etapa), "Avance anotado.")
                 }
               />
               <HistoryCard order={order} />

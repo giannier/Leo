@@ -7,10 +7,10 @@
  * decides here, and the customer is told in their own chat. Those waiting come first.
  */
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { ReturnCard } from "@/components/aftersale/return-card";
+import { OrdersNav } from "@/components/orders/orders-nav";
 import { Alert, Skeleton, cx } from "@/components/ui";
 import { api, type ReturnList } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
@@ -44,9 +44,6 @@ export default function DevolucionesPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/pedidos" className="inline-flex min-h-10 items-center text-sm font-medium text-accent hover:underline">
-        ← Volver a pedidos
-      </Link>
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Devoluciones y reclamos</h1>
         <p className="mt-1 text-sm text-ink-soft">
@@ -54,6 +51,8 @@ export default function DevolucionesPage() {
           lee tu respuesta en su chat.
         </p>
       </header>
+
+      <OrdersNav />
 
       <nav aria-label="Filtro" className="flex flex-wrap gap-2">
         {FILTERS.map((option) => (
@@ -88,7 +87,7 @@ export default function DevolucionesPage() {
         </div>
       ) : null}
       {list && list.items.length > 0 ? (
-        <ul className="space-y-3">
+        <ul className="grid items-start gap-4 xl:grid-cols-2">
           {list.items.map((row) => (
             <ReturnCard key={row.id} row={row} />
           ))}

@@ -54,7 +54,7 @@ export function ConversationList({
   onMore: () => void;
 }) {
   return (
-    <section className="flex min-h-0 flex-col gap-3" aria-label="Conversaciones">
+    <section className="flex h-full min-h-0 flex-col gap-3" aria-label="Conversaciones">
       <input
         type="search"
         aria-label="Buscar conversaciones"

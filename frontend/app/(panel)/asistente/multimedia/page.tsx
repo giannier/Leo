@@ -83,78 +83,80 @@ export default function MediaPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Card title="Subir un archivo">
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void upload();
-          }}
-        >
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragging(true);
+      <div className="max-w-4xl">
+        <Card title="Subir un archivo">
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void upload();
             }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragging(false);
-              const dropped = e.dataTransfer.files[0];
-              if (dropped) setFile(dropped);
-            }}
-            className={cx(
-              "flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-center text-sm",
-              dragging ? "border-accent bg-accent/5" : "border-line-strong",
-            )}
           >
-            <p className="text-ink-soft">
-              {file ? `${file.name} · ${size(file.size)}` : "Arrastra aquí el archivo"}
-            </p>
-            <Button type="button" variant="secondary" onClick={() => picker.current?.click()}>
-              Elegir archivo
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const dropped = e.dataTransfer.files[0];
+                if (dropped) setFile(dropped);
+              }}
+              className={cx(
+                "flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 text-center text-sm",
+                dragging ? "border-accent bg-accent/5" : "border-line-strong",
+              )}
+            >
+              <p className="text-ink-soft">
+                {file ? `${file.name} · ${size(file.size)}` : "Arrastra aquí el archivo"}
+              </p>
+              <Button type="button" variant="secondary" onClick={() => picker.current?.click()}>
+                Elegir archivo
+              </Button>
+              <input
+                ref={picker}
+                type="file"
+                className="sr-only"
+                accept="image/jpeg,image/png,application/pdf,video/mp4,audio/*"
+                data-testid="media-file"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-xs text-ink-faint">JPG o PNG hasta 5 MB · MP4 y audio hasta 16 MB · PDF hasta 100 MB</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Título"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (!keyTouched) setKey(suggestKey(e.target.value));
+                }}
+              />
+              <Field
+                label="Clave"
+                hint="Minúsculas, números y guion bajo."
+                value={key}
+                onChange={(e) => {
+                  setKeyTouched(true);
+                  setKey(e.target.value);
+                }}
+              />
+            </div>
+            <TextArea
+              label="Cuándo usarlo"
+              rows={2}
+              placeholder="Cuando el cliente pregunta por los paquetes"
+              value={when}
+              onChange={(e) => setWhen(e.target.value)}
+            />
+            <Button type="submit" loading={uploading} disabled={!file || !title.trim() || key.length < 2 || when.trim().length < 5}>
+              Subir
             </Button>
-            <input
-              ref={picker}
-              type="file"
-              className="sr-only"
-              accept="image/jpeg,image/png,application/pdf,video/mp4,audio/*"
-              data-testid="media-file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-            <p className="text-xs text-ink-faint">JPG o PNG hasta 5 MB · MP4 y audio hasta 16 MB · PDF hasta 100 MB</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Título"
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (!keyTouched) setKey(suggestKey(e.target.value));
-              }}
-            />
-            <Field
-              label="Clave"
-              hint="Minúsculas, números y guion bajo."
-              value={key}
-              onChange={(e) => {
-                setKeyTouched(true);
-                setKey(e.target.value);
-              }}
-            />
-          </div>
-          <TextArea
-            label="Cuándo usarlo"
-            rows={2}
-            placeholder="Cuando el cliente pregunta por los paquetes"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
-          />
-          <Button type="submit" loading={uploading} disabled={!file || !title.trim() || key.length < 2 || when.trim().length < 5}>
-            Subir
-          </Button>
-        </form>
-      </Card>
+          </form>
+        </Card>
+      </div>
 
       <input
         ref={replacer}
@@ -177,7 +179,7 @@ export default function MediaPage() {
       />
 
       {!items ? <Skeleton className="h-32 w-full" /> : null}
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {items?.map((asset) => (
           <li key={asset.id} className="overflow-hidden rounded-xl border border-line bg-surface" data-testid="media-card">
             {asset.tipo === "imagen" && asset.preview_url ? (

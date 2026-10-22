@@ -67,7 +67,7 @@ export default function TeamPage() {
   }, [load]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Equipo</h1>
         <p className="mt-1 text-sm text-ink-soft">
@@ -91,17 +91,22 @@ export default function TeamPage() {
       {team === null && !error ? <Skeleton className="h-48 w-full" /> : null}
 
       {team ? (
-        <>
-          <Seats seats={team.seats} />
-          <Members
-            members={team.members}
-            currentUserId={user?.id ?? ""}
-            canManage={isOwner}
-            onChanged={load}
-          />
-          <Invitations invitations={team.invitations} canManage={isOwner} onChanged={load} />
-          {isOwner ? <InviteForm seats={team.seats} onInvited={load} /> : null}
-        </>
+        // The people on the left; on the right the seats left and the form to add one.
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="space-y-6">
+            <Members
+              members={team.members}
+              currentUserId={user?.id ?? ""}
+              canManage={isOwner}
+              onChanged={load}
+            />
+            <Invitations invitations={team.invitations} canManage={isOwner} onChanged={load} />
+          </div>
+          <div className="space-y-6">
+            <Seats seats={team.seats} />
+            {isOwner ? <InviteForm seats={team.seats} onInvited={load} /> : null}
+          </div>
+        </div>
       ) : null}
     </div>
   );

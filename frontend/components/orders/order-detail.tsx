@@ -2,11 +2,14 @@
 
 /** The body of one order (presentational): items, customer, receipts, history. */
 
+import { useState } from "react";
+
 import { AlertIcon } from "@/components/icons";
 import { Alert, Button, Card, Skeleton, cx } from "@/components/ui";
 import { api } from "@/lib/api/client";
 import type { OrderDetail, PaymentProof } from "@/lib/api/client";
 
+import { STAGE_LABELS } from "./stages";
 import {
   HISTORY_LABELS,
   OBSERVATION_LABELS,
@@ -79,7 +82,42 @@ function Row({ label, value }: { label: string; value: string }) {
 
 /* ---------------------------------------------------------------- customer */
 
+/** The delivery data as text a courier can read on a phone: pasted into a chat, or a note. */
+export function deliveryText(order: OrderDetail): string {
+  const data = order.datos_cliente as Record<string, unknown>;
+  const text = (key: string) => (typeof data[key] === "string" && data[key] ? String(data[key]) : null);
+  const who = [text("nombres"), text("apellidos")].filter(Boolean).join(" ");
+  const where = [text("direccion"), text("distrito")].filter(Boolean).join(", ");
+  const how =
+    order.tipo_entrega === "recojo"
+      ? "Recojo en tienda"
+      : `Delivery${order.zona_envio ? ` · ${order.zona_envio}` : ""}`;
+  return [
+    `Pedido #${order.numero} · ${how}`,
+    [who, text("telefono")].filter(Boolean).join(" · "),
+    where,
+    text("referencia") ? `Ref: ${text("referencia")}` : null,
+    order.ubicacion ? `Mapa: ${order.ubicacion.enlace}` : null,
+    order.modalidad_pago === "contra_entrega"
+      ? `Cobrar ${formatMoney(order.total, order.moneda)} al entregar`
+      : null,
+    ...order.items.map((line) => `- ${line.cantidad} × ${line.nombre}`),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function CustomerCard({ order }: { order: OrderDetail }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(deliveryText(order));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // No clipboard (an insecure page): the data is still on screen.
+    }
+  }
   const entries = Object.entries(order.datos_cliente).filter(
     ([, value]) => value !== null && value !== "" && typeof value !== "object",
   );
@@ -110,7 +148,40 @@ export function CustomerCard({ order }: { order: OrderDetail }) {
             {order.modalidad_pago === "contra_entrega" ? "Contra entrega" : "Pago previo"}
           </dd>
         </div>
+        {order.ubicacion ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs text-ink-faint">Ubicación que compartió por WhatsApp</dt>
+            <dd className="text-ink">
+              <a
+                href={order.ubicacion.enlace}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-accent underline"
+              >
+                Abrir en el mapa
+              </a>
+              {order.ubicacion.nombre || order.ubicacion.direccion ? (
+                <span className="text-ink-soft">
+                  {" "}
+                  · {[order.ubicacion.nombre, order.ubicacion.direccion].filter(Boolean).join(" · ")}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
       </dl>
+      {order.tipo_entrega ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+          <Button variant="secondary" onClick={() => void copy()}>
+            Copiar datos de entrega
+          </Button>
+          {copied ? (
+            <span role="status" className="text-sm font-semibold text-success">
+              Copiado
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {entries.length === 0 ? (
         <p className="text-sm text-ink-soft">El cliente aún no dejó sus datos.</p>
       ) : null}
@@ -290,6 +361,9 @@ export function HistoryCard({ order }: { order: OrderDetail }) {
               {HISTORY_LABELS[entry.evento] ?? entry.evento}
               {entry.estado && entry.evento === "order.status_changed" ? (
                 <span className="text-ink-soft"> → {STATE_LABELS[entry.estado] ?? entry.estado}</span>
+              ) : null}
+              {entry.estado && entry.evento === "order.stage_changed" ? (
+                <span className="text-ink-soft"> → {STAGE_LABELS[entry.estado] ?? entry.estado}</span>
               ) : null}
             </span>
             <span className="shrink-0 text-xs text-ink-faint">{formatDateTime(entry.en)}</span>
