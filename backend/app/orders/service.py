@@ -29,7 +29,7 @@ import logging
 import re
 import uuid
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -39,9 +39,12 @@ from sqlalchemy.orm import Session
 from app.models.business import Product
 from app.models.channel import Contact
 from app.models.conversation import Conversation
-from app.models.orders import Order, OrderItem
+from app.models.orders import FULFILLMENT_STAGES, Order, OrderItem
 from app.orders.pricing import Delivery, Line, Rule, Totales, Zone, cents, price
+from app.process.inbound import location_of
+from app.providers.whatsapp.base import InboundLocation
 from app.repositories.base import TenantScopeError
+from app.repositories.conversation import MessageRepository
 from app.repositories.orders import OrderItemRepository, OrderRepository
 from app.repositories.product import ProductRepository
 from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
@@ -60,6 +63,12 @@ TRANSITIONS: Mapping[str, frozenset[str]] = {
 }
 # An order in one of these states is the sale already made (`pago_estado = confirmado`).
 SALE_MADE = frozenset({"confirmado", "en_curso", "completado"})
+# The states in which the business can still be working the order, and in which a pin the customer
+# shares is for it (feature 016).
+WORKABLE = frozenset({"confirmado", "en_curso"})
+LOCATABLE = frozenset({"borrador", "por_confirmar", "confirmado", "en_curso"})
+# A pin shared before the order was submitted still belongs to it for this long.
+PIN_LIFETIME = timedelta(hours=12)
 
 MAX_QUANTITY = 999
 # `orders.notas`: how long one note may be and how many an order keeps.
@@ -131,6 +140,10 @@ class InvalidDelivery(OrderError):
 
 class NotReady(OrderError):
     """The order is not complete enough for the step asked."""
+
+
+class InvalidStage(OrderError):
+    """The stage does not exist, or does not fit how this order is delivered."""
 
 
 # ------------------------------------------------------------------ service
@@ -293,6 +306,18 @@ class OrderService:
         elif target == "confirmado":
             order.confirmed_at = self.now
             order.confirmed_by = user_id
+        elif target == "en_curso":
+            # Starting the work is the first stage; a stage already set (a move forward from
+            # `confirmado` through `set_stage`) is kept.
+            if order.etapa is None:
+                order.etapa = "preparando"
+                order.etapa_at = self.now
+        elif target == "completado":
+            order.completado_at = self.now
+            order.etapa = None
+            order.etapa_at = self.now
+        elif target == "descartado":
+            order.etapa = None
         elif target == "borrador":
             order.motivo_rechazo = motivo
             order.rechazo_vigente = rechazo_vigente
@@ -300,6 +325,38 @@ class OrderService:
         order.last_activity_at = self.now
         self._session.flush()
         return order
+
+    def set_stage(self, order: Order, etapa: str) -> Order:
+        """Where the business is in its work on a confirmed order (feature 016).
+
+        From `confirmado` the first stage starts the work (`en_curso`). Any stage may follow any
+        other, because an operator taps the wrong one; only `en_camino` is bound to how the
+        order is delivered: a pickup is never on its way.
+        """
+        self._own(order)
+        if etapa not in FULFILLMENT_STAGES:
+            raise InvalidStage(f"{etapa!r} is not a stage of the work")
+        if order.estado not in WORKABLE:
+            raise InvalidTransition(order.estado, "en_curso")
+        if etapa == "en_camino" and order.tipo_entrega != "delivery":
+            raise InvalidStage("only an order that is delivered can be on its way")
+        if order.estado == "confirmado":
+            self.transition(order, "en_curso")
+        if order.etapa != etapa:
+            order.etapa = etapa
+            order.etapa_at = self.now
+        order.last_activity_at = self.now
+        self._session.flush()
+        return order
+
+    def attach_location(self, order: Order, location: Mapping[str, Any]) -> bool:
+        """Keep the pin the customer shared for the order it is about; False if it is closed."""
+        self._own(order)
+        if order.estado not in LOCATABLE:
+            return False
+        order.ubicacion_entrega = dict(location)
+        self._session.flush()
+        return True
 
     def submit(self, order: Order, contact: Contact) -> Order:
         """`borrador` -> `por_confirmar` with a snapshot of the customer's data.
@@ -309,7 +366,18 @@ class OrderService:
         """
         if order.estado == "borrador" and not self.is_complete(order):
             raise NotReady("the order is not complete")
+        if order.ubicacion_entrega is None:
+            self._adopt_recent_pin(order)
         return self.transition(order, "por_confirmar", datos_cliente=customer_snapshot(contact))
+
+    def _adopt_recent_pin(self, order: Order) -> None:
+        """The customer sent the pin before the order existed: it is theirs if it is recent."""
+        pins = MessageRepository(self._session, self._tenant_id).latest_location(
+            order.conversation_id, since=self.now - PIN_LIFETIME
+        )
+        found = location_of(pins.payload) if pins is not None else None
+        if found is not None and pins is not None:
+            order.ubicacion_entrega = pin_of(found, pins.created_at)
 
     # ----------------------------------------------------------------- lines
 
@@ -638,6 +706,17 @@ class OrderService:
                 f"Conversation {conversation.id!s} belongs to tenant "
                 f"{conversation.tenant_id!s}, not to {self._tenant_id!s}"
             )
+
+
+def pin_of(location: InboundLocation, at: datetime) -> dict[str, Any]:
+    """A shared pin as the order keeps it."""
+    return {
+        "lat": location.lat,
+        "lng": location.lng,
+        "nombre": location.nombre,
+        "direccion": location.direccion,
+        "en": at.isoformat(),
+    }
 
 
 def customer_snapshot(contact: Contact) -> dict[str, Any]:

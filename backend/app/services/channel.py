@@ -37,7 +37,16 @@ from app.models.tenant import QUOTA_80, QUOTA_WARNING_RATIO, Tenant
 from app.models.whatsapp import WhatsAppNumber
 from app.orders.notices import OrderNotices
 from app.orders.proofs import InboundImage, ProofPipeline
-from app.process.inbound import interactive_of, media_of, payload_of, referral_of, stored_image_of
+from app.orders.service import OrderService, pin_of
+from app.process.inbound import (
+    interactive_of,
+    location_line,
+    location_of,
+    media_of,
+    payload_of,
+    referral_of,
+    stored_image_of,
+)
 from app.providers.email.base import EmailMessage
 from app.providers.llm.base import LLMProvider
 from app.providers.storage.base import StorageProvider
@@ -232,7 +241,11 @@ class ChannelEventProcessor:
                 is_new=False,
             )
 
-        content = message.text or MEDIA_PLACEHOLDERS.get(message.msg_type, "[mensaje]")
+        if message.msg_type == "location" and message.location is not None:
+            # A pin reads as what a person would have typed, not as a placeholder (feature 016).
+            content = location_line(message.location)
+        else:
+            content = message.text or MEDIA_PLACEHOLDERS.get(message.msg_type, "[mensaje]")
         try:
             with self._session.begin_nested():
                 stored = messages.append(
@@ -261,6 +274,8 @@ class ChannelEventProcessor:
                 is_new=False,
             )
 
+        if message.location is not None:
+            self._share_location(tenant_id, conversation, message)
         reply = answer_to_question(
             self._session,
             tenant_id,
@@ -296,6 +311,22 @@ class ChannelEventProcessor:
             system_reply_id=reply.id if reply is not None else None,
             assistant_too=assistant_too,
         )
+
+    def _share_location(
+        self, tenant_id: uuid.UUID, conversation: Conversation, message: InboundMessage
+    ) -> None:
+        """Keep the pin for the order the conversation is working on, if one is open.
+
+        A pin sent before any order exists is picked up when the order is submitted
+        (`OrderService.submit`), so the order of the two does not matter.
+        """
+        location = message.location
+        if location is None:
+            return
+        service = OrderService(self._session, tenant_id)
+        order = service.active_for(conversation.id)
+        if order is not None:
+            service.attach_location(order, pin_of(location, message.sent_at))
 
     def _apply_opt_out(
         self, tenant_id: uuid.UUID, contact: Contact, message: InboundMessage
@@ -645,10 +676,16 @@ class ConversationResponder:
         `[imagen]` in the prompt teaches the model to talk about a placeholder it
         cannot see. A photo is told to the model as context instead (step 4).
         """
+        # A pin counts as words: "[Ubicación compartida por WhatsApp]" is what a customer who
+        # typed their address would have said (feature 016).
         texts = [
             message.content.strip()
             for message in burst
-            if message.msg_type == "text" and message.content.strip()
+            if message.content.strip()
+            and (
+                message.msg_type == "text"
+                or (message.msg_type == "location" and location_of(message.payload) is not None)
+            )
         ]
         taps = tuple(
             tap for message in burst if (tap := interactive_of(message.payload)) is not None

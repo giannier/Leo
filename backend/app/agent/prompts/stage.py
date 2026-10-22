@@ -82,9 +82,10 @@ SECTION_CAPS: Mapping[str, int] = {
     "negocio": 1300,
     "situaciones": 1000,
     # 1 400 for the ten tools of the sales engine, 700 more for those of the agenda, the leads and
-    # after the sale (a business with every capability on; the whole prompt still fits 6 000).
+    # after the sale (a business with every capability on; the whole prompt still fits 6 000),
+    # and 20 for telling the model what a shared pin means as an address (feature 016).
     "ejemplos": 350,
-    "herramientas": 2100,
+    "herramientas": 2120,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are

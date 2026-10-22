@@ -1,0 +1,20 @@
+{
+  "id": "evt_01J8Q7Z9X00000000000LOCATE",
+  "type": "whatsapp.inbound_message.received",
+  "apiVersion": "v2",
+  "createTime": "2026-08-04T14:41:02.108Z",
+  "whatsappInboundMessage": {
+    "id": "wamid.HBgLNTE5ODc2NTQzMjEVAgASGBRBM0M0RDVFNkY3ODkwMTIzNDU2NwB=",
+    "wabaId": "102290129340398",
+    "from": "+51987654321",
+    "to": "+51912345678",
+    "sendTime": "2026-08-04T14:41:01.000Z",
+    "type": "location",
+    "location": {
+      "latitude": -12.046374,
+      "longitude": -77.042793,
+      "name": "Plaza Mayor",
+      "address": "Jr. de la Unión s/n, Lima"
+    }
+  }
+}

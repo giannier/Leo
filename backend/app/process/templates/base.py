@@ -340,6 +340,13 @@ DEFAULT_SYSTEM_MESSAGES: Mapping[str, str] = MappingProxyType(
             "{nombre_cliente}, tu pedido #{numero} fue anulado: {motivo}. Si ya realizaste "
             "el pago, nos comunicaremos contigo para la devolución."
         ),
+        # Feature 016: the stage that tells the customer the work moved. Each business can edit them.
+        "pedido_listo": (
+            "{nombre_cliente}, tu pedido #{numero} ya está listo para que lo recojas. {siguiente_paso}"
+        ),
+        "pedido_en_camino": (
+            "{nombre_cliente}, tu pedido #{numero} ya va en camino. {siguiente_paso}"
+        ),
         # Giannier, Milestone B, decision 19. Each business can edit it.
         "derivacion": (
             "Listo 🙌 Ya le pasé a nuestro equipo lo que necesitas, para que no tengas que "

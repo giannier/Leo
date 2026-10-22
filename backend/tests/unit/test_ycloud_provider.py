@@ -28,6 +28,7 @@ import pytest
 
 from app.providers.whatsapp import (
     Button,
+    InboundLocation,
     InboundMedia,
     InboundMessage,
     InteractiveReply,
@@ -320,6 +321,50 @@ class TestReadingAnInboundMessage:
 
         assert isinstance(parsed, InboundMessage)
         assert parsed.msg_type == "image" and parsed.media is None
+
+    def test_a_shared_pin_keeps_its_coordinates_and_its_place(self) -> None:
+        """The shape is Meta's (`location.latitude/longitude/name/address`), which YCloud
+        forwards; it has not been checked against a real webhook."""
+        parsed = YCloudProvider().parse_event(load("ycloud/inbound_location.json"))
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.msg_type == "location" and parsed.text is None
+        assert parsed.location == InboundLocation(
+            lat=-12.046374,
+            lng=-77.042793,
+            nombre="Plaza Mayor",
+            direccion="Jr. de la Unión s/n, Lima",
+        )
+
+    def test_a_bare_pin_has_no_name_nor_address(self) -> None:
+        payload = load("ycloud/inbound_location.json")
+        pin = payload["whatsappInboundMessage"]["location"]
+        del pin["name"], pin["address"]
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.location == InboundLocation(lat=-12.046374, lng=-77.042793)
+
+    @pytest.mark.parametrize(
+        "pin",
+        [
+            {},
+            {"latitude": "north", "longitude": -77.0},
+            {"latitude": 91.0, "longitude": -77.0},
+            {"latitude": -12.0, "longitude": 181.0},
+            {"latitude": -12.0},
+        ],
+    )
+    def test_a_pin_that_is_not_on_the_globe_is_no_location(self, pin: dict[str, Any]) -> None:
+        """A wrong pin would send a courier to the wrong place: better none."""
+        payload = load("ycloud/inbound_location.json")
+        payload["whatsappInboundMessage"]["location"] = pin
+
+        parsed = YCloudProvider().parse_event(payload)
+
+        assert isinstance(parsed, InboundMessage)
+        assert parsed.msg_type == "location" and parsed.location is None
 
     def test_a_type_this_version_cannot_read_becomes_unsupported(self) -> None:
         """C-001: stored, answered with the tenant's fallback, and counted as

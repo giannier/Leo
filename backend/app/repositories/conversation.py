@@ -152,6 +152,21 @@ class MessageRepository(BaseRepository[Message]):
         )
         return self._session.execute(statement).scalar_one_or_none()
 
+    def latest_location(self, conversation_id: uuid.UUID, *, since: datetime) -> Message | None:
+        """The newest pin the customer shared in a thread since `since`, if any."""
+        statement = (
+            self._scoped()
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.direction == "inbound",
+                Message.msg_type == "location",
+                Message.created_at >= since,
+            )
+            .order_by(Message.created_at.desc())
+            .limit(1)
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
     def outbound_after(
         self, conversation_id: uuid.UUID, after_id: uuid.UUID | None = None
     ) -> Sequence[Message]:

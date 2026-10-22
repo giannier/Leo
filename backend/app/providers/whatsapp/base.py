@@ -219,6 +219,16 @@ class InboundMedia:
 
 
 @dataclass(frozen=True)
+class InboundLocation:
+    """The pin a customer shared: coordinates, and the name or address when it is a saved place."""
+
+    lat: float
+    lng: float
+    nombre: str | None = None
+    direccion: str | None = None
+
+
+@dataclass(frozen=True)
 class DownloadedMedia:
     """A customer's file, fetched."""
 
@@ -265,6 +275,8 @@ class InboundMessage:
     referral: Referral | None = None
     # The image of an `image` message, when the provider sent a reference to it.
     media: InboundMedia | None = None
+    # The pin of a `location` message.
+    location: InboundLocation | None = None
 
 
 @dataclass(frozen=True)

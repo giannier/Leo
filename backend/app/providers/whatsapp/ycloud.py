@@ -64,6 +64,7 @@ from app.providers.whatsapp.base import (
     Button,
     DiscoveredNumber,
     DownloadedMedia,
+    InboundLocation,
     InboundMedia,
     InboundMessage,
     InteractiveReply,
@@ -699,6 +700,7 @@ class YCloudProvider:
             interactive=interactive,
             referral=_parse_referral(message.get("referral")),
             media=_parse_image(message) if msg_type == "image" else None,
+            location=_parse_location(message) if msg_type == "location" else None,
             # `sendTime` is what the webhook examples carry and `timestamp`
             # is what the schema calls it. Both are accepted rather than
             # betting the 24-hour window on which one turns up.
@@ -794,6 +796,27 @@ def _parse_interactive(message: dict[str, Any]) -> InteractiveReply | None:
         id=reply_id,
         title=str(reply.get("title") or ""),
         description=str(reply.get("description") or "") or None,
+    )
+
+
+def _parse_location(message: dict[str, Any]) -> InboundLocation | None:
+    """The `location` object of an inbound pin: `{latitude, longitude, name?, address?}`.
+
+    The shape is Meta's, which YCloud forwards. Coordinates that are not numbers, or are outside
+    the globe, make the whole pin unusable: a wrong pin sends a courier to the wrong place.
+    """
+    raw = _as_dict(message.get("location"))
+    try:
+        lat, lng = float(raw["latitude"]), float(raw["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return InboundLocation(
+        lat=lat,
+        lng=lng,
+        nombre=str(raw.get("name") or "").strip()[:150] or None,
+        direccion=str(raw.get("address") or "").strip()[:250] or None,
     )
 
 

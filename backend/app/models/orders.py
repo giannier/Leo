@@ -43,6 +43,9 @@ from app.models.base import Base, CreatedAtMixin, TimestampMixin, UUIDPrimaryKey
 ORDER_STATES = ("borrador", "por_confirmar", "confirmado", "en_curso", "completado", "descartado")
 PAYMENT_MODES = ("previo", "contra_entrega")
 DELIVERY_TYPES = ("delivery", "recojo")
+# Where a confirmed order is in the business's own work (feature 016): only meaningful while the
+# order is `en_curso`. `en_camino` exists for deliveries; a pickup goes from `listo` to done.
+FULFILLMENT_STAGES = ("preparando", "listo", "en_camino")
 # `anulado`: the proof of an order the operator discarded (Milestone B, E-2).
 PROOF_STATES = ("por_verificar", "aprobado", "rechazado", "anulado")
 # What a proof can be flagged for. Observations are never an automatic rejection
@@ -89,6 +92,8 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         enum_check("modalidad_pago", PAYMENT_MODES, "modalidad_pago"),
         # NULL passes: an order that needs no delivery has no delivery type.
         enum_check("tipo_entrega", DELIVERY_TYPES, "tipo_entrega"),
+        # NULL passes: before the business starts, and after it finished, there is no stage.
+        enum_check("etapa", FULFILLMENT_STAGES, "etapa"),
         # Not in data-model.md: no total can be negative.
         CheckConstraint(
             "subtotal >= 0 AND descuento >= 0 AND envio >= 0 AND total >= 0",
@@ -130,6 +135,14 @@ class Order(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     promotion_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     tipo_entrega: Mapped[str | None] = mapped_column(Text, nullable=True)
     zona_envio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The stage of the business's work while `en_curso`, and since when (the comanda shows how long
+    # an order has been waiting there).
+    etapa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    etapa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The pin the customer shared on WhatsApp: `{lat, lng, nombre, direccion, en}`. Personal data,
+    # like the address: members of the business see it, logs and traces do not (C-20).
+    ubicacion_entrega: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     # Copy of the customer's data when the order moves to `por_confirmar`.
     datos_cliente: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     motivo_rechazo: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -248,4 +261,24 @@ class PaymentProof(Base, UUIDPrimaryKeyMixin):
     # under `now()` (same reasoning as `messages` and the stage events).
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.clock_timestamp()
+    )
+
+
+class OrderSettings(Base):
+    """What the business tells its customers while it works their order (feature 016).
+
+    One row per business, created with the defaults the first time it is needed. A pickup order is
+    told it is ready; a delivery is told it is on its way: the other stage says nothing to the
+    customer, who would otherwise get two messages for one handover.
+    """
+
+    __tablename__ = "order_settings"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    avisar_listo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    avisar_en_camino: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )

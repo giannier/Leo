@@ -22,6 +22,7 @@ from app.models.orders import (
     ORDERS_SEQUENCE,
     Order,
     OrderItem,
+    OrderSettings,
     PaymentProof,
     TenantSequence,
 )
@@ -193,6 +194,44 @@ class OrderRepository(BaseRepository[Order]):
             criteria.append(or_(*matches))
         return criteria
 
+    def board(self, *, finished_since: datetime) -> list[tuple[Order, Contact]]:
+        """The orders the business is working on, oldest first, plus the ones finished since
+        `finished_since`: what the comanda shows. The simulator's orders never show."""
+        statement = (
+            select(Order, Contact)
+            .join(
+                Contact, and_(Contact.id == Order.contact_id, Contact.tenant_id == self._tenant_id)
+            )
+            .where(
+                Order.tenant_id == self._tenant_id,
+                Order.is_sandbox.is_(False),
+                or_(
+                    Order.estado.in_(("por_confirmar", "confirmado", "en_curso")),
+                    and_(Order.estado == "completado", Order.completado_at >= finished_since),
+                ),
+            )
+            .order_by(
+                func.coalesce(Order.etapa_at, Order.confirmed_at, Order.created_at), Order.numero
+            )
+        )
+        return [(order, contact) for order, contact in self._session.execute(statement).all()]
+
+    def fulfillment_minutes(self, *, since: datetime, until: datetime | None = None) -> int | None:
+        """The average minutes from confirmed to finished, of the real orders finished in the
+        period; None when none was."""
+        seconds = func.extract("epoch", Order.completado_at - Order.confirmed_at)
+        statement = select(func.avg(seconds)).where(
+            Order.tenant_id == self._tenant_id,
+            Order.is_sandbox.is_(False),
+            Order.estado == "completado",
+            Order.confirmed_at.is_not(None),
+            Order.completado_at >= since,
+        )
+        if until is not None:
+            statement = statement.where(Order.completado_at < until)
+        average = self._session.execute(statement).scalar_one()
+        return None if average is None else round(float(average) / 60)
+
     def by_numero(self, numero: int) -> Order | None:
         statement = self._scoped().where(Order.numero == numero)
         return self._session.execute(statement).scalar_one_or_none()
@@ -324,3 +363,28 @@ class PaymentProofRepository(BaseRepository[PaymentProof]):
         if exclude_id is not None:
             statement = statement.where(PaymentProof.id != exclude_id)
         return self._session.execute(statement).first() is not None
+
+
+class OrderSettingsRepository(BaseRepository[OrderSettings]):
+    """The one settings row of a business's orders."""
+
+    model = OrderSettings
+
+    def current(self) -> OrderSettings | None:
+        return self._session.execute(self._scoped()).scalar_one_or_none()
+
+    def ensure(self) -> OrderSettings:
+        """The row of this business, created with the defaults the first time it is needed."""
+        existing = self.current()
+        if existing is not None:
+            return existing
+        self._session.execute(
+            pg_insert(OrderSettings)
+            .values(tenant_id=self._tenant_id)
+            .on_conflict_do_nothing(index_elements=["tenant_id"])
+        )
+        self._session.flush()
+        row = self.current()
+        if row is None:  # pragma: no cover - the insert or a concurrent one just created it
+            raise RuntimeError("order settings could not be created")
+        return row

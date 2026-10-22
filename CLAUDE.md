@@ -64,6 +64,9 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
   `business_info`, `payment_methods_business`, `promotions`). Nunca texto libre de reglas.
 - **Situación**: regla propia de un negocio, una tarjeta (`situations`): cuándo aplica, qué hace el
   agente y opcionales (archivos, derivar, ejemplo, etapas, "siempre"). Estados borrador, activa, inactiva.
+- **Etapa del pedido** (`orders.etapa`: `preparando`, `listo`, `en_camino`): dónde está el trabajo del negocio sobre un pedido
+  confirmado; solo vale en `en_curso` (feature 016). No es la «etapa» de la conversación (INICIO, IDENTIFICAR…).
+  La **comanda** (`/pedidos/comanda`) las muestra por columnas.
 - **Regla** (de plantilla o de rubro): una instrucción con id estable (`rule_key`). El negocio la
   **apaga** (`tenant_rule_switches`), nunca la edita.
 - **Prioridad entre capas**: situación > perfil del negocio > rubro > plantilla de proceso.

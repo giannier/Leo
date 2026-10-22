@@ -23,6 +23,7 @@ from pydantic import BaseModel, StringConstraints
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    ConfigurationManagerDep,
     EmailProviderDep,
     MemberDep,
     SessionDep,
@@ -32,7 +33,12 @@ from app.api.deps import (
 from app.api.errors import ApiError, error_responses
 from app.core.config import get_settings
 from app.models.channel import Contact
-from app.models.orders import ORDER_STATES, Order, OrderItem, PaymentProof
+from app.models.orders import (
+    ORDER_STATES,
+    Order,
+    OrderItem,
+    PaymentProof,
+)
 from app.orders.review import (
     OPERATOR_STATES,
     AlreadyReviewed,
@@ -40,13 +46,18 @@ from app.orders.review import (
     OrderReviewService,
     ReasonRequired,
 )
-from app.orders.service import InvalidTransition, customer_snapshot
+from app.orders.service import InvalidStage, InvalidTransition, OrderError, customer_snapshot
 from app.providers.storage.base import StorageProvider
 from app.providers.whatsapp.base import WhatsAppProvider
 from app.repositories.audit import AuditLogRepository
 from app.repositories.business import BusinessProfileRepository
 from app.repositories.channel import ContactRepository, session_window_is_open
-from app.repositories.orders import OrderItemRepository, OrderRepository, PaymentProofRepository
+from app.repositories.orders import (
+    OrderItemRepository,
+    OrderRepository,
+    OrderSettingsRepository,
+    PaymentProofRepository,
+)
 from app.services.order_notices import CustomerNotice, CustomerNotifier
 from app.services.tenant_alerts import TenantAlerts, send_emails
 
@@ -59,7 +70,7 @@ AUTH_RESPONSES = (
     (403, "`email_not_verified`, `no_active_tenant` or `tenant_access_denied`"),
 )
 NOT_FOUND = (404, "`not_found`: the order does not exist or is another business's")
-CONFLICT = (409, "`invalid_transition` or `already_reviewed`")
+CONFLICT = (409, "`invalid_transition`, `invalid_stage`, `no_refund_owed` or `already_reviewed`")
 VALIDATION = (400, "`validation_error`: discarding an order with a payment proof needs `motivo`")
 
 MAX_PAGE_SIZE = 50
@@ -84,6 +95,9 @@ class OrderListItem(BaseModel):
     id: uuid.UUID
     numero: int
     estado: str
+    # Where the business is in its work while the order is `en_curso` (feature 016).
+    etapa: str | None
+    tipo_entrega: str | None
     cliente: CustomerBrief
     total: Decimal
     moneda: str
@@ -119,6 +133,8 @@ class OrderSummary(BaseModel):
     por_moneda: list[CurrencySales]
     por_estado: dict[str, int]
     pendientes_revision: int
+    # Average minutes from confirmed to finished, of the orders finished in the period.
+    tiempo_medio_entrega_min: int | None
 
 
 class LineOut(BaseModel):
@@ -166,10 +182,25 @@ class OrderNote(BaseModel):
     imagen_id: str | None = None
 
 
+class OrderPin(BaseModel):
+    """The pin the customer shared on WhatsApp, with a link a courier can open."""
+
+    lat: float
+    lng: float
+    nombre: str | None
+    direccion: str | None
+    enlace: str
+    compartida: datetime | None
+
+
 class OrderDetail(BaseModel):
     id: uuid.UUID
     numero: int
     estado: str
+    etapa: str | None
+    etapa_desde: datetime | None
+    completado: datetime | None
+    ubicacion: OrderPin | None
     modalidad_pago: str
     moneda: str
     items: list[LineOut]
@@ -214,6 +245,63 @@ class StatusRequest(BaseModel):
     estado: Literal["en_curso", "completado", "descartado"]
     # Required to discard an order with a payment proof: the customer is told why.
     motivo: Motivo | None = None
+
+
+class StageRequest(BaseModel):
+    etapa: Literal["preparando", "listo", "en_camino"]
+
+
+class StageResponse(BaseModel):
+    estado: str
+    etapa: str | None
+    # Only when the stage tells the customer (a pickup that is ready, a delivery on its way).
+    aviso_cliente: CustomerNotice | None = None
+
+
+class OrderSettingsOut(BaseModel):
+    avisar_listo: bool
+    avisar_en_camino: bool
+
+
+class BoardItem(BaseModel):
+    nombre: str
+    cantidad: int
+    selecciones: list[str]
+
+
+class BoardDelivery(BaseModel):
+    """Where and to whom: what the courier needs. Members of the business only."""
+
+    receptor: str | None
+    telefono: str | None
+    direccion: str | None
+    distrito: str | None
+    referencia: str | None
+    # The pin the customer shared, as a link the courier opens on the phone.
+    ubicacion_enlace: str | None
+
+
+class BoardOrder(BaseModel):
+    id: uuid.UUID
+    numero: int
+    estado: str
+    etapa: str | None
+    # Since when the order is in this column.
+    desde: datetime
+    tipo_entrega: str | None
+    zona_envio: str | None
+    cliente: str | None
+    items: list[BoardItem]
+    total: Decimal
+    moneda: str
+    # Cash on delivery: whoever hands the order over collects the money.
+    cobrar_al_entregar: bool
+    notas: int
+    entrega: BoardDelivery | None
+
+
+class Board(BaseModel):
+    ordenes: list[BoardOrder]
 
 
 class DecisionResponse(BaseModel):
@@ -330,6 +418,30 @@ def _day_start(day: date, *, end: bool = False) -> datetime:
     return start + timedelta(days=1) if end else start
 
 
+def _history_state(detail: dict[str, Any]) -> str | None:
+    """What a history line moved to: the stage if the business moved its work, else the state."""
+    moved = detail.get("etapa_a") or detail.get("a")
+    return str(moved) if moved else None
+
+
+def _pin_out(raw: dict[str, Any] | None) -> OrderPin | None:
+    if not raw:
+        return None
+    try:
+        lat, lng = float(raw["lat"]), float(raw["lng"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    shared = raw.get("en")
+    return OrderPin(
+        lat=lat,
+        lng=lng,
+        nombre=raw.get("nombre"),
+        direccion=raw.get("direccion"),
+        enlace=f"https://www.google.com/maps?q={lat:.6f},{lng:.6f}",
+        compartida=datetime.fromisoformat(shared) if isinstance(shared, str) else None,
+    )
+
+
 def _currency(session: Session, tenant_id: uuid.UUID) -> str:
     profile = BusinessProfileRepository(session, tenant_id).current()
     return (profile.currency if profile else None) or "PEN"
@@ -381,6 +493,8 @@ def list_orders(
             id=order.id,
             numero=order.numero,
             estado=order.estado,
+            etapa=order.etapa,
+            tipo_entrega=order.tipo_entrega,
             cliente=CustomerBrief(
                 nombre=short_name(contact, order), telefono=mask_phone(contact.phone_e164)
             ),
@@ -428,6 +542,7 @@ def orders_summary(
         por_moneda=[own, *rows.values()] if own.conversiones else list(rows.values()),
         por_estado={state: by_state.get(state, 0) for state in ORDER_STATES},
         pendientes_revision=by_state.get("por_confirmar", 0),
+        tiempo_medio_entrega_min=orders.fulfillment_minutes(since=since),
     )
 
 
@@ -439,6 +554,103 @@ def _currency_sales(moneda: str, count: int, total: Decimal) -> CurrencySales:
         valor_total=total.quantize(Decimal("0.01")),
         ticket_promedio=ticket,
     )
+
+
+@router.get(
+    "/board",
+    summary="The comanda: what the business is working on, and what it finished today",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def orders_board(principal: MemberDep, session: SessionDep) -> Board:
+    """Oldest first, so the order that waits longest is the first one in its column."""
+    orders = OrderRepository(session, principal.tenant_id)
+    rows = orders.board(finished_since=_period_start("hoy", session, principal.tenant_id))
+    lines = OrderItemRepository(session, principal.tenant_id).for_orders(
+        [order.id for order, _ in rows]
+    )
+    return Board(ordenes=[_board_order(order, contact, lines[order.id]) for order, contact in rows])
+
+
+def _board_order(order: Order, contact: Contact, lines: list[OrderItem]) -> BoardOrder:
+    data = dict(order.datos_cliente) if order.datos_cliente else customer_snapshot(contact)
+    since = {
+        "completado": order.completado_at,
+        "en_curso": order.etapa_at,
+        "confirmado": order.confirmed_at,
+        "por_confirmar": order.last_activity_at,
+    }.get(order.estado)
+    full_name = " ".join(
+        str(data[key]) for key in ("nombres", "apellidos") if isinstance(data.get(key), str)
+    )
+    return BoardOrder(
+        id=order.id,
+        numero=order.numero,
+        estado=order.estado,
+        etapa=order.etapa,
+        desde=since or order.created_at,
+        tipo_entrega=order.tipo_entrega,
+        zona_envio=order.zona_envio,
+        cliente=short_name(contact, order),
+        items=[
+            BoardItem(
+                nombre=item.nombre,
+                cantidad=item.cantidad,
+                selecciones=[str(chosen.get("nombre", "")) for chosen in item.bundle_selections],
+            )
+            for item in lines
+        ],
+        total=order.total,
+        moneda=order.moneda,
+        cobrar_al_entregar=order.modalidad_pago == "contra_entrega",
+        notas=len(order.notas or []),
+        entrega=(
+            BoardDelivery(
+                receptor=full_name or None,
+                telefono=str(data.get("telefono") or contact.phone_e164 or "") or None,
+                direccion=_text_of(data.get("direccion")),
+                distrito=_text_of(data.get("distrito")),
+                referencia=_text_of(data.get("referencia")),
+                ubicacion_enlace=pin.enlace if (pin := _pin_out(order.ubicacion_entrega)) else None,
+            )
+            if order.tipo_entrega is not None
+            else None
+        ),
+    )
+
+
+def _text_of(value: object) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+@router.get(
+    "/settings",
+    summary="What the business tells its customers while it works their order",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def get_order_settings(principal: MemberDep, session: SessionDep) -> OrderSettingsOut:
+    row = OrderSettingsRepository(session, principal.tenant_id).ensure()
+    session.commit()
+    return OrderSettingsOut(avisar_listo=row.avisar_listo, avisar_en_camino=row.avisar_en_camino)
+
+
+@router.put(
+    "/settings",
+    summary="Choose which stages tell the customer",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def put_order_settings(
+    body: OrderSettingsOut, principal: ConfigurationManagerDep, session: SessionDep
+) -> OrderSettingsOut:
+    row = OrderSettingsRepository(session, principal.tenant_id).ensure()
+    row.avisar_listo = body.avisar_listo
+    row.avisar_en_camino = body.avisar_en_camino
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id,
+        action="order_settings.updated",
+        detail=body.model_dump(),
+    )
+    session.commit()
+    return body
 
 
 @router.get(
@@ -471,7 +683,7 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         *[
             HistoryEntry(
                 evento=entry.action,
-                estado=str(entry.detail.get("a")) if entry.detail.get("a") else None,
+                estado=_history_state(entry.detail),
                 en=entry.created_at,
                 usuario_id=entry.actor_id,
             )
@@ -482,6 +694,10 @@ def get_order(order_id: uuid.UUID, principal: MemberDep, session: SessionDep) ->
         id=order.id,
         numero=order.numero,
         estado=order.estado,
+        etapa=order.etapa,
+        etapa_desde=order.etapa_at,
+        completado=order.completado_at,
+        ubicacion=_pin_out(order.ubicacion_entrega),
         modalidad_pago=order.modalidad_pago,
         moneda=order.moneda,
         items=[line_out(item) for item in lines],
@@ -664,6 +880,58 @@ async def set_order_status(
         aviso_cliente=notice,
         devolucion_pendiente=result.order.devolucion_pendiente,
     )
+
+
+@router.post(
+    "/{order_id}/stage",
+    summary="Move the business's work on a confirmed order: preparing, ready, on its way",
+    responses=error_responses(NOT_FOUND, CONFLICT, VALIDATION, *AUTH_RESPONSES),
+)
+async def set_order_stage(
+    order_id: uuid.UUID,
+    body: StageRequest,
+    principal: MemberDep,
+    session: SessionDep,
+    provider: WhatsAppProviderDep,
+    email: EmailProviderDep,
+) -> StageResponse:
+    """A pickup that is ready, or a delivery that is on its way, tells the customer (unless the
+    business turned that off); the other stages say nothing."""
+    alerts = TenantAlerts(session, principal.tenant_id)
+    notifier = _notifier(session, principal.tenant_id, provider, alerts)
+    review = OrderReviewService(session, principal.tenant_id, notifier=notifier)
+    try:
+        result = review.set_stage(order_id, principal.user_id, body.etapa)
+    except OrderNotFound as exc:
+        raise _not_found() from exc
+    except InvalidTransition as exc:
+        raise _conflict("invalid_transition", exc) from exc
+    except InvalidStage as exc:
+        raise _conflict("invalid_stage", exc) from exc
+
+    notice: CustomerNotice | None = None
+    if result.prepared is not None:
+        notice = await notifier.deliver(result.prepared)
+        await send_emails(email, alerts.pending_emails)
+    return StageResponse(estado=result.order.estado, etapa=result.order.etapa, aviso_cliente=notice)
+
+
+@router.post(
+    "/{order_id}/refund-resolved",
+    summary="The business paid the money back",
+    responses=error_responses(NOT_FOUND, CONFLICT, *AUTH_RESPONSES),
+)
+def resolve_refund(
+    order_id: uuid.UUID, principal: MemberDep, session: SessionDep
+) -> StatusResponse:
+    review = OrderReviewService(session, principal.tenant_id)
+    try:
+        order = review.resolve_refund(order_id, principal.user_id)
+    except OrderNotFound as exc:
+        raise _not_found() from exc
+    except OrderError as exc:
+        raise _conflict("no_refund_owed", exc) from exc
+    return StatusResponse(estado=order.estado, devolucion_pendiente=order.devolucion_pendiente)
 
 
 def _notifier(

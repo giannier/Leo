@@ -3,6 +3,7 @@
 from app.providers.whatsapp.base import (
     Button,
     DownloadedMedia,
+    InboundLocation,
     InboundMedia,
     InboundMessage,
     InteractiveReply,
@@ -33,6 +34,7 @@ from app.providers.whatsapp.ycloud import YCloudProvider
 __all__ = [
     "Button",
     "DownloadedMedia",
+    "InboundLocation",
     "InboundMedia",
     "InboundMessage",
     "InteractiveReply",

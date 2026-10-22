@@ -32,10 +32,21 @@ from app.orders.service import (
 from app.process.recompute import REASON_CONFIRM, REASON_REJECT, REASON_STATUS, recompute_stage
 from app.repositories.audit import AuditLogRepository
 from app.repositories.conversation import ConversationRepository
-from app.repositories.orders import OrderRepository, PaymentProofRepository
+from app.repositories.orders import (
+    OrderRepository,
+    OrderSettingsRepository,
+    PaymentProofRepository,
+)
 
 # The system message that tells the customer (`DEFAULT_SYSTEM_MESSAGES`), if any.
-NoticeKind = Literal["pago_confirmado", "pago_rechazado", "pedido_rechazado", "pedido_anulado"]
+NoticeKind = Literal[
+    "pago_confirmado",
+    "pago_rechazado",
+    "pedido_rechazado",
+    "pedido_anulado",
+    "pedido_listo",
+    "pedido_en_camino",
+]
 
 # What `POST .../status` may set: the operator moves a confirmed order along or drops it.
 OPERATOR_STATES = ("en_curso", "completado", "descartado")
@@ -48,6 +59,8 @@ REFUND_STATES = frozenset({"confirmado", "en_curso"})
 ACTION_CONFIRMED = "order.confirmed"
 ACTION_REJECTED = "order.rejected"
 ACTION_STATUS = "order.status_changed"
+ACTION_STAGE = "order.stage_changed"
+ACTION_REFUND_RESOLVED = "order.refund_resolved"
 
 
 class OrderNotFound(OrderError):
@@ -209,6 +222,68 @@ class OrderReviewService:
         self._session.commit()
         return ReviewResult(
             order, "pedido_anulado" if live else None, live[0] if live else None, prepared
+        )
+
+    # ----------------------------------------------------------------- stage
+
+    def set_stage(self, order_id: uuid.UUID, user_id: uuid.UUID, etapa: str) -> ReviewResult:
+        """Move the business's work on a confirmed order (feature 016).
+
+        Starting the work moves the order to `en_curso`, so the conversation's stage is
+        recomputed; moving between stages is the business's own business. The customer is told
+        when a pickup is ready or a delivery is on its way, if the business wants that.
+        """
+        order = self._lock(order_id)
+        before, stage_before = order.estado, order.etapa
+        self._service.set_stage(order, etapa)
+        self._audit_stage(user_id, order, before, stage_before)
+        if order.estado != before:
+            self._restage(order, REASON_STATUS)
+        kind = self._stage_notice(order)
+        prepared = self._prepare(order, kind) if kind is not None else None
+        self._session.commit()
+        return ReviewResult(order, kind, None, prepared)
+
+    def resolve_refund(self, order_id: uuid.UUID, user_id: uuid.UUID) -> Order:
+        """The business paid the money back: the order stops being owed (Milestone B, E-2)."""
+        order = self._lock(order_id)
+        if not order.devolucion_pendiente:
+            raise OrderError("this order owes no refund")
+        order.devolucion_pendiente = False
+        AuditLogRepository(self._session, self._tenant_id).record(
+            actor_id=user_id,
+            action=ACTION_REFUND_RESOLVED,
+            detail={"order_id": str(order.id), "numero": order.numero},
+        )
+        self._session.commit()
+        return order
+
+    def _stage_notice(self, order: Order) -> NoticeKind | None:
+        """The notice a stage sends, if this order's way of delivery and the settings want it."""
+        settings = OrderSettingsRepository(self._session, self._tenant_id).ensure()
+        if order.etapa == "listo" and order.tipo_entrega == "recojo" and settings.avisar_listo:
+            return "pedido_listo"
+        if (
+            order.etapa == "en_camino"
+            and order.tipo_entrega == "delivery"
+            and settings.avisar_en_camino
+        ):
+            return "pedido_en_camino"
+        return None
+
+    def _audit_stage(
+        self, user_id: uuid.UUID, order: Order, before: str, stage_before: str | None
+    ) -> None:
+        detail: dict[str, object] = {
+            "order_id": str(order.id),
+            "numero": order.numero,
+            "de": before,
+            "a": order.estado,
+            "etapa_de": stage_before,
+            "etapa_a": order.etapa,
+        }
+        AuditLogRepository(self._session, self._tenant_id).record(
+            actor_id=user_id, action=ACTION_STAGE, detail=detail
         )
 
     # --------------------------------------------------------------- helpers

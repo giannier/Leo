@@ -12,8 +12,19 @@ from typing import Any
 
 import pytest
 
-from app.process.inbound import interactive_of, payload_of, referral_of
-from app.providers.whatsapp.base import InboundMessage, InteractiveReply, Referral
+from app.process.inbound import (
+    interactive_of,
+    location_line,
+    location_of,
+    payload_of,
+    referral_of,
+)
+from app.providers.whatsapp.base import (
+    InboundLocation,
+    InboundMessage,
+    InteractiveReply,
+    Referral,
+)
 
 
 def _inbound(**extra: Any) -> InboundMessage:
@@ -86,3 +97,37 @@ class TestReadingIsDefensive:
         ad = referral_of({"referral": {"source_id": 5, "headline": "ok", "body": ""}})
 
         assert ad == Referral(headline="ok")
+
+
+class TestAPinThePayloadKeeps:
+    def test_a_pin_round_trips(self) -> None:
+        pin = InboundLocation(lat=-12.0464, lng=-77.0428, nombre="Plaza Mayor")
+
+        stored = payload_of(_inbound(location=pin))
+
+        assert stored == {"location": {"lat": -12.0464, "lng": -77.0428, "nombre": "Plaza Mayor"}}
+        assert location_of(stored) == pin
+
+    @pytest.mark.parametrize(
+        "stored",
+        [
+            None,
+            {},
+            {"location": "somewhere"},
+            {"location": {"lat": "north", "lng": 1}},
+            {"location": {"lat": 95, "lng": 1}},
+            {"location": {"lat": 1}},
+        ],
+    )
+    def test_what_is_not_a_pin_on_the_globe_reads_back_as_none(self, stored: Any) -> None:
+        assert location_of(stored) is None
+
+    def test_the_conversation_reads_it_as_words_never_as_coordinates(self) -> None:
+        bare = location_line(InboundLocation(lat=-12.0, lng=-77.0))
+        named = location_line(
+            InboundLocation(lat=-12.0, lng=-77.0, nombre="Casa", direccion="Av. Perú 123")
+        )
+
+        assert bare == "[Ubicación compartida por WhatsApp]"
+        assert named == "[Ubicación compartida por WhatsApp] Casa · Av. Perú 123"
+        assert "12.0" not in bare + named
