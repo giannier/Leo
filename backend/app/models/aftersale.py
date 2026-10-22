@@ -12,16 +12,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
+    Numeric,
     Text,
     UniqueConstraint,
+    func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -43,6 +48,9 @@ RETURNS_SEQUENCE = "devoluciones"
 DOCUMENT_TYPES = ("boleta", "factura", "guia", "proforma", "garantia", "nota_credito", "otro")
 DOCUMENT_ORIGINS = ("subido", "generado", "electronico")
 DOCUMENT_STATES = ("emitido", "anulado")
+
+INVOICE_PROVIDERS = ("nubefact",)
+TAX_TREATMENTS = ("gravado", "exonerado", "inafecto")
 
 MAX_DETAIL = 1000
 MAX_RESOLUTION = 500
@@ -139,6 +147,15 @@ class OrderDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         enum_check("estado", DOCUMENT_STATES, "estado"),
         CheckConstraint("size_bytes >= 0", name="size_non_negative"),
         Index("ix_order_documents_order_id", "order_id", "created_at"),
+        # One electronic receipt standing per order: a double click cannot issue two.
+        Index(
+            "uq_order_documents_one_electronic",
+            "order_id",
+            unique=True,
+            postgresql_where=text(
+                "origen = 'electronico' AND estado = 'emitido' AND tipo IN ('boleta', 'factura')"
+            ),
+        ),
         Index("ix_order_documents_tenant_id_created_at", "tenant_id", text("created_at DESC")),
     )
 
@@ -173,3 +190,40 @@ class OrderDocument(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # The last time the customer was sent this document.
     enviado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class InvoicingSettings(Base):
+    """How a business issues electronic receipts, through its own account with a provider.
+
+    The route and the token are the business's: they come from its provider account, are typed in
+    the panel (never sent through a chat) and the token is stored encrypted. The counters are the
+    next number of each series, because the receipts of a series are consecutive.
+    """
+
+    __tablename__ = "invoicing_settings"
+    __table_args__ = (
+        enum_check("proveedor", INVOICE_PROVIDERS, "proveedor"),
+        enum_check("tratamiento_igv", TAX_TREATMENTS, "tratamiento_igv"),
+        CheckConstraint("igv_pct >= 0 AND igv_pct <= 30", name="igv_range"),
+        CheckConstraint("siguiente_boleta >= 1 AND siguiente_factura >= 1", name="next_positive"),
+        CheckConstraint("serie_boleta ~ '^B[A-Z0-9]{3}$'", name="serie_boleta_format"),
+        CheckConstraint("serie_factura ~ '^F[A-Z0-9]{3}$'", name="serie_factura_format"),
+    )
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    proveedor: Mapped[str] = mapped_column(Text, nullable=False, server_default="nubefact")
+    ruta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_enc: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    serie_boleta: Mapped[str] = mapped_column(Text, nullable=False, server_default="B001")
+    serie_factura: Mapped[str] = mapped_column(Text, nullable=False, server_default="F001")
+    siguiente_boleta: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    siguiente_factura: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    tratamiento_igv: Mapped[str] = mapped_column(Text, nullable=False, server_default="gravado")
+    igv_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="18.00")
+    # Off until the owner turns it on, after connecting the account.
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

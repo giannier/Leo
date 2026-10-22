@@ -65,6 +65,8 @@ from app.core.tokens import (
 from app.models.user import User
 from app.providers.email.base import EmailConfigurationError, EmailProvider
 from app.providers.email.factory import build_email_provider
+from app.providers.invoicing.base import InvoiceProvider
+from app.providers.invoicing.nubefact import NubefactProvider
 from app.providers.llm.base import LLMProvider
 from app.providers.llm.factory import platform_provider
 from app.providers.otp.base import OtpSender
@@ -277,6 +279,13 @@ def get_platform_llm() -> LLMProvider:
 
 
 @lru_cache
+def get_invoice_provider() -> InvoiceProvider:
+    """The electronic invoicing provider. The business's own route and token travel with each
+    call, so one instance serves every tenant."""
+    return NubefactProvider()
+
+
+@lru_cache
 def get_whatsapp_provider() -> WhatsAppProvider:
     """The one way in or out of WhatsApp.
 
@@ -380,6 +389,7 @@ SandboxLimiterDep = Annotated[RateLimiter, Depends(get_sandbox_limiter)]
 # real provider - which is exactly what happened before this was a Depends.
 PlatformLLMDep = Annotated[LLMProvider, Depends(get_platform_llm)]
 WhatsAppProviderDep = Annotated[WhatsAppProvider, Depends(get_whatsapp_provider)]
+InvoiceProviderDep = Annotated[InvoiceProvider, Depends(get_invoice_provider)]
 JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)]
 

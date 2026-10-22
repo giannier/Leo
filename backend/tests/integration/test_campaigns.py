@@ -367,7 +367,7 @@ class TestTheAnswer:
         message = payload["whatsappInboundMessage"]
         message.update(id=uuid.uuid4().hex, to=number.phone_e164, **{"from": contact.phone_e164})
         message["text"]["body"] = "¡Sí! ¿Cuánto cuesta?"
-        message["sendTime"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        message["sendTime"] = (NOON + timedelta(hours=2)).isoformat().replace("+00:00", "Z")
         event = WebhookEventRepository(db).record(
             provider="ycloud", provider_event_id=f"evt_{uuid.uuid4().hex}", payload=payload
         )
