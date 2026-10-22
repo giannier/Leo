@@ -40,10 +40,21 @@ import { api, type TenantSummary } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useSession, type Role } from "@/lib/session";
 
+/** The headings of the side menu: a long flat list is read item by item; three groups are scanned. */
+type NavGroup = "work" | "agent" | "business";
+
+const GROUP_LABELS: Record<NavGroup, string | null> = {
+  work: null,
+  agent: "Tu agente",
+  business: "Tu negocio",
+};
+
 interface NavItem {
   href: string;
   label: string;
   icon: typeof HomeIcon;
+  /** Where it sits in the side menu; the first group has no heading. */
+  group: NavGroup;
   /** Omitted means every role sees it. */
   roles?: Role[];
   /** Shown in the bottom bar on phones. Material caps that at five. */
@@ -51,31 +62,38 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Inicio", icon: HomeIcon, primary: true },
+  { href: "/", group: "work", label: "Inicio", icon: HomeIcon, primary: true },
   // Every role: confirming a payment is exactly the work an operator is here for.
-  { href: "/pedidos", label: "Pedidos", icon: ReceiptIcon, primary: true },
+  { href: "/pedidos", group: "work", label: "Pedidos", icon: ReceiptIcon, primary: true },
   // Every role: answering customers is the operator's job (Feature 007).
-  { href: "/bandeja", label: "Bandeja", icon: InboxIcon, primary: true },
+  { href: "/bandeja", group: "work", label: "Bandeja", icon: InboxIcon, primary: true },
   // Every role (Feature 012): working leads is the operator's job too; no money for them.
-  { href: "/crm", label: "CRM", icon: KanbanIcon },
+  { href: "/crm", group: "work", label: "CRM", icon: KanbanIcon },
   // Every role (feature 019, phase D): the day's appointments are the front desk's work.
-  { href: "/agenda", label: "Agenda", icon: CalendarIcon },
-  { href: "/campanas", label: "Campañas", icon: MegaphoneIcon },
+  { href: "/agenda", group: "work", label: "Agenda", icon: CalendarIcon },
+  { href: "/campanas", group: "work", label: "Campañas", icon: MegaphoneIcon },
   // Every role (Feature 010); an operator sees it without money.
-  { href: "/resultados", label: "Resultados", icon: ChartIcon },
-  { href: "/asistente", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
-  { href: "/onboarding", label: "Configuración inicial", icon: SparkIcon, roles: MANAGES_CONFIGURATION },
-  { href: "/sandbox", label: "Modo prueba", icon: ChatIcon, primary: true },
-  { href: "/catalog", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION },
-  { href: "/channel", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
-  { href: "/knowledge", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
-  { href: "/team", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/resultados", group: "work", label: "Resultados", icon: ChartIcon },
+  { href: "/asistente", group: "agent", label: "Asistente", icon: SparkIcon, roles: MANAGES_CONFIGURATION, primary: true },
+  { href: "/onboarding", group: "agent", label: "Configuración inicial", icon: SparkIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/sandbox", group: "agent", label: "Modo prueba", icon: ChatIcon, primary: true },
+  { href: "/catalog", group: "agent", label: "Catálogo", icon: BoxIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/channel", group: "business", label: "Mi número", icon: PhoneIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/knowledge", group: "agent", label: "Conocimiento", icon: BookIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/team", group: "business", label: "Equipo", icon: UsersIcon, roles: MANAGES_CONFIGURATION },
   // Feature 009: money is for the owner and the admins; operators work the inbox.
-  { href: "/plans", label: "Mi plan", icon: ReceiptIcon, roles: MANAGES_CONFIGURATION },
+  { href: "/plans", group: "business", label: "Mi plan", icon: ReceiptIcon, roles: MANAGES_CONFIGURATION },
 ];
 
 function visibleTo(role: Role | null): NavItem[] {
   return NAV.filter((item) => !item.roles || (role !== null && item.roles.includes(role)));
+}
+
+/** The visible items in their groups, in menu order; a group nobody may see is left out. */
+function grouped(items: NavItem[]): { group: NavGroup; items: NavItem[] }[] {
+  return (Object.keys(GROUP_LABELS) as NavGroup[])
+    .map((group) => ({ group, items: items.filter((item) => item.group === group) }))
+    .filter((entry) => entry.items.length > 0);
 }
 
 function isCurrent(pathname: string, href: string): boolean {
@@ -115,11 +133,14 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  // A platform operator who also runs a business has one to load: only the one with no business of
+  // their own (who is sent to `/admin`) has nothing here. Skipping every operator left the banner's
+  // placeholder grey for good and the business's name out of the menu.
   useEffect(() => {
-    if (status === "authenticated" && !isPlatformAdmin) {
+    if (status === "authenticated" && !onlyPlatformAdmin) {
       void loadTenant();
     }
-  }, [status, isPlatformAdmin, loadTenant]);
+  }, [status, onlyPlatformAdmin, loadTenant]);
 
   // `loading` is not `anonymous`. Rendering the login redirect here would
   // bounce every returning user out for a frame before the refresh lands.
@@ -150,8 +171,9 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
 
       <div className="lg:flex">
         {/* Sidebar: large screens only. */}
-        <aside className="hidden w-64 shrink-0 border-r border-line bg-surface lg:flex lg:min-h-dvh lg:flex-col">
-          <div className="px-6 py-5">
+        {/* Pinned to the screen: the menu and "Cerrar sesión" stay in reach however long the page is. */}
+        <aside className="hidden w-64 shrink-0 border-r border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
+          <div className="px-6 py-4">
             <span className="font-heading text-xl font-bold tracking-tight text-brand">Leo</span>
             {tenant ? (
               <p className="mt-0.5 truncate text-sm text-ink-faint" title={tenant.name}>
@@ -160,31 +182,40 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             ) : null}
           </div>
 
-          <nav aria-label="Principal" className="flex-1 px-3">
-            <ul className="space-y-0.5">
-              {items.map((item) => {
-                const current = isCurrent(pathname, item.href);
-                const Icon = item.icon;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      // The one thing a nav must always answer: where am I?
-                      aria-current={current ? "page" : undefined}
-                      className={cx(
-                        "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150",
-                        current
-                          ? "bg-surface-muted font-semibold text-ink"
-                          : "text-ink-soft hover:bg-surface-muted hover:text-ink",
-                      )}
-                    >
-                      <Icon className="size-5 shrink-0" />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+          <nav aria-label="Principal" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+            {grouped(items).map(({ group, items: inGroup }) => (
+              <div key={group} className={group === "work" ? undefined : "mt-4"}>
+                {GROUP_LABELS[group] ? (
+                  <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                    {GROUP_LABELS[group]}
+                  </p>
+                ) : null}
+                <ul className="space-y-0.5">
+                  {inGroup.map((item) => {
+                    const current = isCurrent(pathname, item.href);
+                    const Icon = item.icon;
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          // The one thing a nav must always answer: where am I?
+                          aria-current={current ? "page" : undefined}
+                          className={cx(
+                            "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors duration-150",
+                            current
+                              ? "bg-accent/10 font-semibold text-accent"
+                              : "text-ink-soft hover:bg-surface-muted hover:text-ink",
+                          )}
+                        >
+                          <Icon className="size-5 shrink-0" />
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
           </nav>
 
           <div className="border-t border-line p-3">
@@ -206,7 +237,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             <button
               type="button"
               onClick={() => void signOut()}
-              className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm text-ink-soft transition-colors duration-150 hover:bg-surface-muted hover:text-ink"
+              className="flex min-h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-sm text-ink-soft transition-colors duration-150 hover:bg-surface-muted hover:text-ink"
             >
               <LogOutIcon className="size-5 shrink-0" />
               Cerrar sesión
@@ -251,7 +282,10 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
             id="contenido"
             // Bottom padding clears the fixed nav bar on phones, so the last
             // row of content is never hidden underneath it.
-            className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 pb-24 pt-4 sm:px-6 lg:pb-10 lg:pt-6"
+            // As wide as the screen allows (up to a very large monitor), with room at the sides that
+            // grows with it: a column of 1 000 px on a 1 900 px screen leaves the information crowded
+            // in the middle and the rest empty. Pages decide how to use the width (grids, tables).
+            className="mx-auto w-full min-w-0 max-w-[1760px] flex-1 px-4 pb-24 pt-4 sm:px-6 lg:px-8 lg:pb-10 lg:pt-6 xl:px-10"
           >
             {tenantError ? (
               <div className="mb-4">

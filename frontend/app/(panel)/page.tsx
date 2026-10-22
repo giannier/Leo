@@ -11,6 +11,7 @@
  */
 
 import { NpsCard } from "@/components/analytics/nps-card";
+import { TodayStrip } from "@/components/home/today";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -74,22 +75,15 @@ export default function PanelHome() {
   const firstName = user?.full_name?.split(" ")[0] ?? "";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">
           {firstName ? `Hola, ${firstName}` : "Hola"}
         </h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          Esto es lo que falta para que tu agente empiece a atender.
-        </p>
+        <p className="mt-1 text-sm text-ink-soft">Esto es lo que pasa hoy en tu negocio y lo que falta para tu agente.</p>
       </header>
 
-      {/* Above the checklist on purpose: once the agent is live, "how many
-          messages have I got left" is the question somebody opens this page
-          to answer, and the checklist below it is finished. */}
-      <UsageMeter />
-
-      <NpsCard />
+      <TodayStrip />
 
       {error ? (
         <Alert tone="danger" title="No pudimos cargar tu configuración">
@@ -104,20 +98,28 @@ export default function PanelHome() {
         </Alert>
       ) : null}
 
-      {!checklist && !error ? (
-        <Card>
-          <div className="space-y-3">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-          </div>
-        </Card>
-      ) : null}
-
-      {checklist ? <ChecklistCard checklist={checklist} canConfigure={canConfigure} /> : null}
-
-      {canConfigure ? <AssistantWidget /> : null}
+      {/* Three columns on a wide screen: what is left before going live, how the assistant is set up,
+          and the figures somebody opens the page to read once it is live. */}
+      <div className="grid items-start gap-6 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="space-y-6">
+          {!checklist && !error ? (
+            <Card>
+              <div className="space-y-3">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+            </Card>
+          ) : null}
+          {checklist ? <ChecklistCard checklist={checklist} canConfigure={canConfigure} /> : null}
+        </div>
+        {canConfigure ? <AssistantWidget /> : null}
+        <div className="space-y-6 lg:col-span-2 2xl:col-span-1">
+          <UsageMeter />
+          <NpsCard />
+        </div>
+      </div>
     </div>
   );
 }

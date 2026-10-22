@@ -15,25 +15,20 @@
 import { useState } from "react";
 
 import { Alert, Button, Card, TextArea } from "@/components/ui";
-import type { OperatorState, OrderDetail } from "@/lib/api/client";
+import type { OperatorState, OrderDetail, OrderStage } from "@/lib/api/client";
 
 import { STATE_LABELS } from "./labels";
+import { StageStepper, nextAction, stepOf, type NextAction } from "./stages";
 
 const MAX_NEXT_STEP = 300;
 const MIN_REASON = 5;
 const MAX_REASON = 300;
 
-/** Where an operator can take a confirmed order next (mirrors the API's transitions). */
+/** Where an operator can take an order next, besides the steps of the work (mirrors the API). */
 const NEXT_STATES: Record<string, OperatorState[]> = {
   borrador: ["descartado"],
-  confirmado: ["en_curso", "descartado"],
-  en_curso: ["completado", "descartado"],
-};
-
-const MOVE_LABELS: Record<OperatorState, string> = {
-  en_curso: "Marcar en curso",
-  completado: "Marcar completado",
-  descartado: "Descartar pedido",
+  confirmado: ["descartado"],
+  en_curso: ["descartado"],
 };
 
 type Mode = "idle" | "confirm" | "reject" | "discard";
@@ -48,6 +43,7 @@ export function ReviewPanel({
   onConfirm,
   onReject,
   onMove,
+  onStage,
 }: {
   order: OrderDetail;
   busy: boolean;
@@ -55,6 +51,8 @@ export function ReviewPanel({
   onConfirm: (siguientePaso: string) => void;
   onReject: (motivo: string) => void;
   onMove: (estado: OperatorState, motivo?: string) => void;
+  /** A move inside the business's work: preparing, ready, on its way. */
+  onStage: (etapa: OrderStage) => void;
 }) {
   const [mode, setMode] = useState<Mode>("idle");
   const [nextStep, setNextStep] = useState("");
@@ -62,7 +60,8 @@ export function ReviewPanel({
   const [reasonError, setReasonError] = useState<string | null>(null);
 
   const moves = NEXT_STATES[order.estado] ?? [];
-  if (order.estado !== "por_confirmar" && moves.length === 0) {
+  const action = nextAction(order.estado, order.etapa, order.tipo_entrega);
+  if (order.estado !== "por_confirmar" && moves.length === 0 && action === null) {
     return null;
   }
   const paid = order.comprobantes.some((proof) => LIVE_PROOF_STATES.has(proof.estado));
@@ -85,6 +84,11 @@ export function ReviewPanel({
   function submitDiscard() {
     const trimmed = validReason();
     if (trimmed) onMove("descartado", trimmed);
+  }
+
+  function advance(next: NextAction) {
+    if (next.stage) onStage(next.stage);
+    else onMove("completado");
   }
 
   function move(state: OperatorState) {
@@ -180,9 +184,13 @@ export function ReviewPanel({
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-ink-soft">
-            Estado actual: <span className="font-semibold text-ink">{STATE_LABELS[order.estado]}</span>.
-          </p>
+          {stepOf(order.estado, order.etapa) ? (
+            <StageStepper tipo={order.tipo_entrega} estado={order.estado} etapa={order.etapa} />
+          ) : (
+            <p className="text-sm text-ink-soft">
+              Estado actual: <span className="font-semibold text-ink">{STATE_LABELS[order.estado]}</span>.
+            </p>
+          )}
           {mode === "discard" ? (
             <form
               className="space-y-3"
@@ -215,18 +223,25 @@ export function ReviewPanel({
               </div>
             </form>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {moves.map((state) => (
-                <Button
-                  key={state}
-                  variant={state === "descartado" ? "secondary" : "primary"}
-                  onClick={() => move(state)}
-                  disabled={busy}
-                >
-                  {MOVE_LABELS[state]}
-                </Button>
-              ))}
-            </div>
+            <>
+              <div className="flex flex-wrap gap-2">
+                {action ? (
+                  <Button onClick={() => advance(action)} loading={busy}>
+                    {action.label}
+                  </Button>
+                ) : null}
+                {moves.map((state) => (
+                  <Button key={state} variant="secondary" onClick={() => move(state)} disabled={busy}>
+                    Descartar pedido
+                  </Button>
+                ))}
+              </div>
+              {action?.tells ? (
+                <p className="text-xs text-ink-faint">
+                  Si tienes activado el aviso, el cliente lo recibe por WhatsApp.
+                </p>
+              ) : null}
+            </>
           )}
         </div>
       )}

@@ -511,6 +511,15 @@ export type OrderDecision = Ok<Ops["/api/v1/tenant/orders/{order_id}/confirm"]["
 export type OrderStatusResult = Ok<Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]>;
 /** What the customer was told: sent, window closed (no WhatsApp), or not sent. */
 export type CustomerNotice = OrderDecision["aviso_cliente"];
+// ------------------------------------------------- orders and deliveries (016)
+export type OrderBoard = Ok<Ops["/api/v1/tenant/orders/board"]["get"]>;
+export type BoardOrder = OrderBoard["ordenes"][number];
+export type OrderStageResult = Ok<Ops["/api/v1/tenant/orders/{order_id}/stage"]["post"]>;
+/** Where the business is in its work on a confirmed order. */
+export type OrderStage = JsonBody<
+  Ops["/api/v1/tenant/orders/{order_id}/stage"]["post"]["requestBody"]
+>["etapa"];
+export type OrderSettings = Ok<Ops["/api/v1/tenant/orders/settings"]["get"]>;
 /** The states an operator can move a confirmed order to. */
 export type OperatorState = JsonBody<
   Ops["/api/v1/tenant/orders/{order_id}/status"]["post"]["requestBody"]
@@ -1421,5 +1430,14 @@ export const api = {
         method: "POST",
         body: motivo ? { estado, motivo } : { estado },
       }),
+    /** The comanda: what the business is working on and what it finished today. */
+    board: (signal?: AbortSignal) => request<OrderBoard>("/tenant/orders/board", { signal }),
+    setStage: (id: string, etapa: OrderStage) =>
+      request<OrderStageResult>(`/tenant/orders/${id}/stage`, { method: "POST", body: { etapa } }),
+    refundResolved: (id: string) =>
+      request<OrderStatusResult>(`/tenant/orders/${id}/refund-resolved`, { method: "POST" }),
+    settings: () => request<OrderSettings>("/tenant/orders/settings"),
+    saveSettings: (body: OrderSettings) =>
+      request<OrderSettings>("/tenant/orders/settings", { method: "PUT", body }),
   },
 };

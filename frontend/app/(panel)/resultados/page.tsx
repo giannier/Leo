@@ -59,10 +59,10 @@ function Tile({
   testid?: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4" data-testid={testid}>
-      <p className="text-xs text-ink-soft">{label}</p>
-      <p className="mt-1 font-heading text-2xl font-semibold text-ink">{value}</p>
-      {note ? <p className="mt-0.5 text-xs text-ink-faint">{note}</p> : null}
+    <div className="rounded-xl border border-line bg-surface p-4 sm:p-5" data-testid={testid}>
+      <p className="text-sm text-ink-soft">{label}</p>
+      <p className="mt-1 break-words font-heading text-2xl font-semibold text-ink sm:text-3xl">{value}</p>
+      {note ? <p className="mt-1 text-xs text-ink-faint">{note}</p> : null}
     </div>
   );
 }
@@ -153,7 +153,7 @@ function Resumen() {
         <Skeleton className="h-72 w-full" />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             <Tile
               label="Conversaciones"
               value={total.conversations.toLocaleString("es-PE")}
@@ -253,10 +253,13 @@ function Resumen() {
             <Tile label="Mensajes recibidos" value={total.messages_in.toLocaleString("es-PE")} />
           </div>
 
+          {/* The chart takes the wide column and the breakdowns stack beside it, so the figures and
+              the rankings are read together instead of one screen below the other. */}
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <ConversationsChart days={report.por_dia} />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-xl border border-line bg-surface p-4" aria-label="Motivos de derivación">
+          <div className="space-y-4">
+            <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-label="Motivos de derivación">
               <h2 className="font-semibold text-ink">Por qué pasaron a una persona</h2>
               {Object.keys(total.derivaciones_por_motivo).length ? (
                 <ul className="mt-2 space-y-1 text-sm">
@@ -272,7 +275,7 @@ function Resumen() {
               )}
             </section>
             {report.origenes?.length ? (
-              <section className="rounded-xl border border-line bg-surface p-4" aria-label="De dónde llegan" data-testid="lead-origins">
+              <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-label="De dónde llegan" data-testid="lead-origins">
                 <h2 className="font-semibold text-ink">De dónde llegan tus clientes</h2>
                 <ul className="mt-2 space-y-1 text-sm">
                   {report.origenes.map((item) => (
@@ -291,7 +294,7 @@ function Resumen() {
               </section>
             ) : null}
             {report.mas_vendidos ? (
-              <section className="rounded-xl border border-line bg-surface p-4" aria-label="Más vendidos">
+              <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-label="Más vendidos">
                 <h2 className="font-semibold text-ink">Más vendidos</h2>
                 {report.mas_vendidos.length ? (
                   <ul className="mt-2 space-y-1 text-sm" data-testid="best-sellers">
@@ -308,7 +311,7 @@ function Resumen() {
               </section>
             ) : null}
             {report.whatsapp_mes ? (
-              <section className="rounded-xl border border-line bg-surface p-4" aria-label="WhatsApp este mes" data-testid="whatsapp-spend">
+              <section className="rounded-xl border border-line bg-surface p-4 sm:p-5" aria-label="WhatsApp este mes" data-testid="whatsapp-spend">
                 <h2 className="font-semibold text-ink">WhatsApp este mes</h2>
                 <p className="mt-1 font-heading text-2xl font-semibold text-ink">
                   {report.whatsapp_mes.costo_estimado_usd !== null ? `US$ ${report.whatsapp_mes.costo_estimado_usd}` : "—"}
@@ -335,6 +338,7 @@ function Resumen() {
                 </p>
               </section>
             ) : null}
+          </div>
           </div>
 
           {canConfigure ? (

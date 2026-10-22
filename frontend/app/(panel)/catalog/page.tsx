@@ -232,9 +232,14 @@ export default function CatalogPage() {
           <p className="text-xs text-ink-faint" aria-live="polite">
             {items.length} de {total} productos
           </p>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface" data-testid="catalog-list">
+          {/* Two columns of rows on a wide screen: a product is read name, price, actions, and a
+              single strip of them wastes the width the list could use. */}
+          <ul className="grid gap-3 xl:grid-cols-2" data-testid="catalog-list">
             {items.map((product) => (
-              <li key={product.id} className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap">
+              <li
+                key={product.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 sm:flex-nowrap"
+              >
                 {product.foto_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

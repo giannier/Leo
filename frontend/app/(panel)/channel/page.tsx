@@ -70,7 +70,7 @@ export default function ChannelPage() {
   const open = requests?.find((r) => r.status === "requested" || r.status === "in_progress");
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Mi número de WhatsApp</h1>
         <p className="mt-1 text-sm text-ink-soft">
@@ -93,28 +93,34 @@ export default function ChannelPage() {
 
       {requests === null && !error ? <Skeleton className="h-40 w-full" /> : null}
 
-      {number ? (
-        <>
-          <ConnectedNumber number={number} />
-          {checklist ? (
-            <ActivationCard checklist={checklist} canConfigure={canConfigure} number={number} />
+      {/* The number and turning the agent on on the left; the other ways customers arrive on the right. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
+          {number ? (
+            <>
+              <ConnectedNumber number={number} />
+              {checklist ? (
+                <ActivationCard checklist={checklist} canConfigure={canConfigure} number={number} />
+              ) : null}
+            </>
           ) : null}
-        </>
-      ) : null}
 
-      {!number && open ? <Progress request={open} /> : null}
+          {!number && open ? <Progress request={open} /> : null}
 
-      {!number && !open && requests !== null ? (
-        <ConnectForm
-          canConfigure={canConfigure}
-          onConnected={load}
-        />
-      ) : null}
+          {!number && !open && requests !== null ? (
+            <ConnectForm
+              canConfigure={canConfigure}
+              onConnected={load}
+            />
+          ) : null}
 
-      {requests && requests.length > 0 ? <History requests={requests} /> : null}
-
-      {canConfigure ? <WebChatCard /> : null}
-      {canConfigure ? <SocialLinks phone={number?.phone_e164 ?? null} /> : null}
+          {requests && requests.length > 0 ? <History requests={requests} /> : null}
+        </div>
+        <div className="space-y-6">
+          {canConfigure ? <WebChatCard /> : null}
+          {canConfigure ? <SocialLinks phone={number?.phone_e164 ?? null} /> : null}
+        </div>
+      </div>
     </div>
   );
 }

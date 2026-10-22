@@ -338,8 +338,10 @@ export default function SandboxPage() {
         </Alert>
       ) : null}
 
-      <div className={cx("grid gap-4", debugOn && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
-        <div className="flex min-h-[60vh] flex-col overflow-hidden rounded-xl border border-line bg-surface">
+      {/* A chat is read down a column: it stays a comfortable width in the middle of a wide screen,
+          and with the debug panel open the two sit side by side. Its height follows the screen. */}
+      <div className={cx("grid gap-4", debugOn ? "lg:grid-cols-[minmax(0,1fr)_26rem]" : "mx-auto w-full max-w-4xl")}>
+        <div className="flex h-[calc(100dvh-16rem)] min-h-[28rem] flex-col overflow-hidden rounded-xl border border-line bg-surface">
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {starting ? (
               <div className="space-y-3">

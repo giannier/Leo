@@ -232,7 +232,7 @@ export default function ReviewPageView() {
             }
           >
             {page.items.length ? (
-              <ul className="space-y-3">
+              <ul className="grid items-start gap-4 xl:grid-cols-2">
                 {page.items.map((item) => (
                   <Conversation key={item.conversation_id} item={item} onRated={() => void load()} />
                 ))}

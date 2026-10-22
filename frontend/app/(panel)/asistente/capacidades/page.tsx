@@ -74,7 +74,7 @@ export default function CapabilitiesPage() {
       {saved === null ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <>
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           <Card>
             <div className="space-y-4">
               <CapabilityPicker value={draft} onChange={setDraft} suggested={suggested} notice={notice} disabled={!canEdit} />
@@ -94,7 +94,7 @@ export default function CapabilitiesPage() {
               </div>
             </Card>
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );

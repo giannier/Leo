@@ -396,7 +396,7 @@ export default function AgendaSetupPage() {
       {!setup ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <>
+        <div className="grid items-start gap-6 xl:grid-cols-2">
           <Card>
             <div className="space-y-3">
               <h2 className="font-heading text-lg font-semibold text-ink">Qué se agenda</h2>
@@ -467,7 +467,7 @@ export default function AgendaSetupPage() {
               <Blocks setup={setup} onChanged={() => void load()} />
             </div>
           </Card>
-        </>
+        </div>
       )}
     </div>
   );

@@ -32,7 +32,7 @@ function Campaigns() {
   const tab: Tab = TABS.some(([key]) => key === raw) ? (raw as Tab) : "campanas";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Campañas</h1>
         <p className="text-sm text-ink-soft">

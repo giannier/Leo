@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 
+import { InfoIcon } from "@/components/icons";
 import { Alert } from "@/components/ui";
 import type { TenantSummary } from "@/lib/api/client";
 
@@ -59,9 +60,13 @@ export function TrialBanner({ tenant }: { tenant: TenantSummary }) {
     // Billing is off while the product is tested with real businesses: no
     // countdown, no limits to warn about.
     return (
-      <Alert tone="info" title="Modo pruebas">
-        Sin límites ni cobros: la prueba no vence y el agente responde sin tope de mensajes.
-      </Alert>
+      <p className="flex items-center gap-2 rounded-lg border border-info/20 bg-info-soft px-3.5 py-2 text-sm text-ink-soft">
+        <InfoIcon className="size-4 shrink-0 text-info" />
+        <span>
+          <span className="font-semibold text-ink">Modo pruebas.</span> Sin límites ni cobros: la prueba no vence y
+          el agente responde sin tope de mensajes.
+        </span>
+      </p>
     );
   }
 

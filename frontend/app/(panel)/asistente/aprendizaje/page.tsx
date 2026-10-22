@@ -226,65 +226,70 @@ export default function LearningPage() {
         description="El asistente propone lo que podría aprender de tus conversaciones. Nada entra en vigor sin que lo apruebes, y todo se puede deshacer."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {learning ? <Settings learning={learning} onChanged={setLearning} /> : <Skeleton className="h-48 w-full" />}
-      <ChatImport enabled={Boolean(learning?.activo)} onFinished={decided} />
-
-      <section className="space-y-3" aria-label="Sugerencias">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-heading text-lg font-semibold text-ink">Sugerencias</h2>
-          <nav aria-label="Filtro" className="flex flex-wrap gap-2">
-            {FILTERS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                aria-pressed={filter === option.key}
-                onClick={() => setFilter(option.key)}
-                className={cx(
-                  "min-h-10 cursor-pointer rounded-full border px-3.5 text-sm transition-colors",
-                  filter === option.key
-                    ? "border-brand bg-brand font-semibold text-brand-fg"
-                    : "border-line-strong bg-surface text-ink-soft hover:bg-surface-muted",
-                )}
-              >
-                {option.label}
-                {option.key === "pendiente" && learning?.total_pendientes ? ` (${learning.total_pendientes})` : ""}
-              </button>
-            ))}
-          </nav>
+      {/* Left, how it learns and what it is given; right, what it proposes and what changed. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
+          {learning ? <Settings learning={learning} onChanged={setLearning} /> : <Skeleton className="h-48 w-full" />}
+          <ChatImport enabled={Boolean(learning?.activo)} onFinished={decided} />
+          <ExamplesList refreshKey={examplesVersion} />
         </div>
-        {list === null && !error ? <Skeleton className="h-32 w-full" /> : null}
-        {list && list.items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
-            <p className="font-semibold text-ink">
-              {filter === "pendiente" ? "No hay nada por revisar" : "No hay sugerencias aquí"}
-            </p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
-              {learning?.activo
-                ? "A medida que el asistente atienda, aquí aparecerán las preguntas que no supo responder y lo que una persona hizo mejor."
-                : "Enciende el aprendizaje arriba para que empiece a proponerte mejoras."}
-            </p>
-          </div>
-        ) : null}
-        {pendingExamples.length > 1 ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 text-sm">
-            <span className="text-ink-soft">Hay {pendingExamples.length} ejemplos reales por revisar.</span>
-            <Button type="button" variant="secondary" loading={batching} onClick={() => void approveExamples()}>
-              Aprobar los {pendingExamples.length} ejemplos
-            </Button>
-          </div>
-        ) : null}
-        {list && list.items.length > 0 ? (
-          <ul className="space-y-3">
-            {list.items.map((row) => (
-              <SuggestionCard key={row.id} row={row} onDecided={decided} />
-            ))}
-          </ul>
-        ) : null}
-      </section>
+        <div className="space-y-6">
+          <section className="space-y-3" aria-label="Sugerencias">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-heading text-lg font-semibold text-ink">Sugerencias</h2>
+              <nav aria-label="Filtro" className="flex flex-wrap gap-2">
+                {FILTERS.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    aria-pressed={filter === option.key}
+                    onClick={() => setFilter(option.key)}
+                    className={cx(
+                      "min-h-10 cursor-pointer rounded-full border px-3.5 text-sm transition-colors",
+                      filter === option.key
+                        ? "border-brand bg-brand font-semibold text-brand-fg"
+                        : "border-line-strong bg-surface text-ink-soft hover:bg-surface-muted",
+                    )}
+                  >
+                    {option.label}
+                    {option.key === "pendiente" && learning?.total_pendientes ? ` (${learning.total_pendientes})` : ""}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            {list === null && !error ? <Skeleton className="h-32 w-full" /> : null}
+            {list && list.items.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line-strong bg-surface px-6 py-10 text-center">
+                <p className="font-semibold text-ink">
+                  {filter === "pendiente" ? "No hay nada por revisar" : "No hay sugerencias aquí"}
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-ink-soft">
+                  {learning?.activo
+                    ? "A medida que el asistente atienda, aquí aparecerán las preguntas que no supo responder y lo que una persona hizo mejor."
+                    : "Enciende el aprendizaje arriba para que empiece a proponerte mejoras."}
+                </p>
+              </div>
+            ) : null}
+            {pendingExamples.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 text-sm">
+                <span className="text-ink-soft">Hay {pendingExamples.length} ejemplos reales por revisar.</span>
+                <Button type="button" variant="secondary" loading={batching} onClick={() => void approveExamples()}>
+                  Aprobar los {pendingExamples.length} ejemplos
+                </Button>
+              </div>
+            ) : null}
+            {list && list.items.length > 0 ? (
+              <ul className="space-y-3">
+                {list.items.map((row) => (
+                  <SuggestionCard key={row.id} row={row} onDecided={decided} />
+                ))}
+              </ul>
+            ) : null}
+          </section>
 
-      <ExamplesList refreshKey={examplesVersion} />
-
-      <History />
+          <History />
+        </div>
+      </div>
     </div>
   );
 }

@@ -300,7 +300,7 @@ export default function CrmPage() {
         <TodayList page={today} onOpen={setOpen} />
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-2">
-          <div className="flex min-w-max gap-3" data-testid="crm-board">
+          <div className="flex min-w-max gap-4 xl:min-w-0" data-testid="crm-board">
             {board.columns.map((column) => (
               <section
                 key={column.stage.id}
@@ -319,7 +319,7 @@ export default function CrmPage() {
                   dragged.current = null;
                   if (lead) void move(lead, column.stage.id);
                 }}
-                className="flex w-72 shrink-0 flex-col rounded-xl border border-line bg-surface-muted"
+                className="flex w-72 shrink-0 flex-col rounded-xl border border-line bg-surface-muted xl:w-auto xl:min-w-64 xl:flex-1"
               >
                 <h2 className="flex items-center justify-between px-3 py-2 text-sm font-semibold text-ink">
                   {column.stage.label}

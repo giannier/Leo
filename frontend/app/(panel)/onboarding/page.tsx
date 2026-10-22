@@ -116,7 +116,8 @@ function Wizard() {
   const shared = { onSaved: refresh, goTo };
 
   return (
-    <div className="space-y-5">
+    // A step-by-step form is read down one column: fields as wide as the screen are hard to follow.
+    <div className="max-w-4xl space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Configura tu agente</h1>
         <p className="mt-1 text-sm text-ink-soft">

@@ -124,179 +124,186 @@ export default function PlansPage() {
       ) : null}
       {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
 
-      <Card title="Estado">
-        <div className="space-y-3 text-sm" data-testid="billing-status">
-          {subscription ? (
-            <>
-              <p>
-                <span className="font-semibold text-ink">
-                  {subscription.plan_nombre} {subscription.ciclo === "annual" ? "anual" : "mensual"}
-                </span>{" "}
-                · {STATUS_TEXT[subscription.estado] ?? subscription.estado} · {usd(subscription.precio)}
-              </p>
-              <p className="text-ink-soft">
-                Período del {day(subscription.desde)} al {day(subscription.hasta)}.
-                {subscription.gracia_hasta ? ` Tu agente sigue respondiendo hasta el ${day(subscription.gracia_hasta)}.` : ""}
-                {subscription.cambio_programado ? ` Cambia a ${subscription.cambio_programado} al terminar el período.` : ""}
-                {subscription.cancela_al_final ? " Se cancela al terminar el período." : ""}
-              </p>
-              {isOwner && live ? (
-                subscription.cancela_al_final ? (
-                  <Button type="button" variant="secondary" loading={busy === "resume"} onClick={() => void act("resume", async () => { await api.billing.resume(); return "Tu plan sigue."; })}>
-                    No cancelar
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    loading={busy === "cancel"}
-                    onClick={() => {
-                      if (window.confirm("Tu plan seguirá hasta el final del período pagado y luego tu agente se pausará. ¿Cancelar?")) {
-                        void act("cancel", async () => { await api.billing.cancel(); return "Tu plan se cancelará al terminar el período."; });
-                      }
-                    }}
-                  >
-                    Cancelar mi plan
-                  </Button>
-                )
-              ) : null}
-            </>
-          ) : (
-            <p>
-              {overview.estado_negocio === "trial"
-                ? `Estás en la prueba gratis${overview.prueba_hasta ? ` hasta el ${day(overview.prueba_hasta)}` : ""}. Si contratas antes, los días que te quedan se suman a tu primer mes.`
-                : "No tienes un plan vigente."}
-            </p>
-          )}
-          <div>
-            <p className="text-xs text-ink-soft" data-testid="billing-usage">
-              Mensajes del asistente: {overview.consumo.usados.toLocaleString("es-PE")} de{" "}
-              {overview.consumo.limite.toLocaleString("es-PE")}
-            </p>
-            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-line">
-              <div className={cx("h-full rounded-full", percent >= 80 ? "bg-warning" : "bg-accent")} style={{ width: `${percent}%` }} />
+      {/* Where the plan stands on the left; the plans to choose from take the wide column. */}
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="space-y-6">
+          <Card title="Estado">
+            <div className="space-y-3 text-sm" data-testid="billing-status">
+              {subscription ? (
+                <>
+                  <p>
+                    <span className="font-semibold text-ink">
+                      {subscription.plan_nombre} {subscription.ciclo === "annual" ? "anual" : "mensual"}
+                    </span>{" "}
+                    · {STATUS_TEXT[subscription.estado] ?? subscription.estado} · {usd(subscription.precio)}
+                  </p>
+                  <p className="text-ink-soft">
+                    Período del {day(subscription.desde)} al {day(subscription.hasta)}.
+                    {subscription.gracia_hasta ? ` Tu agente sigue respondiendo hasta el ${day(subscription.gracia_hasta)}.` : ""}
+                    {subscription.cambio_programado ? ` Cambia a ${subscription.cambio_programado} al terminar el período.` : ""}
+                    {subscription.cancela_al_final ? " Se cancela al terminar el período." : ""}
+                  </p>
+                  {isOwner && live ? (
+                    subscription.cancela_al_final ? (
+                      <Button type="button" variant="secondary" loading={busy === "resume"} onClick={() => void act("resume", async () => { await api.billing.resume(); return "Tu plan sigue."; })}>
+                        No cancelar
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        loading={busy === "cancel"}
+                        onClick={() => {
+                          if (window.confirm("Tu plan seguirá hasta el final del período pagado y luego tu agente se pausará. ¿Cancelar?")) {
+                            void act("cancel", async () => { await api.billing.cancel(); return "Tu plan se cancelará al terminar el período."; });
+                          }
+                        }}
+                      >
+                        Cancelar mi plan
+                      </Button>
+                    )
+                  ) : null}
+                </>
+              ) : (
+                <p>
+                  {overview.estado_negocio === "trial"
+                    ? `Estás en la prueba gratis${overview.prueba_hasta ? ` hasta el ${day(overview.prueba_hasta)}` : ""}. Si contratas antes, los días que te quedan se suman a tu primer mes.`
+                    : "No tienes un plan vigente."}
+                </p>
+              )}
+              <div>
+                <p className="text-xs text-ink-soft" data-testid="billing-usage">
+                  Mensajes del asistente: {overview.consumo.usados.toLocaleString("es-PE")} de{" "}
+                  {overview.consumo.limite.toLocaleString("es-PE")}
+                </p>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-line">
+                  <div className={cx("h-full rounded-full", percent >= 80 ? "bg-warning" : "bg-accent")} style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {overview.pendientes.length ? (
+            <section className="space-y-3" aria-label="Por pagar">
+              <h2 className="font-semibold text-ink">Por pagar</h2>
+              {overview.pendientes.map((charge) => (
+                <PendingCharge key={charge.id} charge={charge} rate={catalog.soles_por_dolar} canCancel={isOwner} busy={busy === charge.id} onCancel={() => act(charge.id, async () => { await api.billing.cancelCharge(charge.id); return "Anulamos ese cobro."; })} />
+              ))}
+            </section>
+          ) : null}
+        </div>
+
+        <section className="space-y-3" aria-label="Planes">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold text-ink">Planes</h2>
+            <div className="flex gap-1" role="group" aria-label="Período">
+              {(["monthly", "annual"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={cycle === value}
+                  onClick={() => setCycle(value)}
+                  className={cx("min-h-9 rounded-full border px-3 text-xs font-medium", cycle === value ? "border-brand bg-brand text-brand-fg" : "border-line bg-surface text-ink-soft")}
+                >
+                  {value === "monthly" ? "Mensual" : "Anual (−20 %)"}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </Card>
-
-      {overview.pendientes.length ? (
-        <section className="space-y-3" aria-label="Por pagar">
-          <h2 className="font-semibold text-ink">Por pagar</h2>
-          {overview.pendientes.map((charge) => (
-            <PendingCharge key={charge.id} charge={charge} rate={catalog.soles_por_dolar} canCancel={isOwner} busy={busy === charge.id} onCancel={() => act(charge.id, async () => { await api.billing.cancelCharge(charge.id); return "Anulamos ese cobro."; })} />
-          ))}
-        </section>
-      ) : null}
-
-      <section className="space-y-3" aria-label="Planes">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-ink">Planes</h2>
-          <div className="flex gap-1" role="group" aria-label="Período">
-            {(["monthly", "annual"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={cycle === value}
-                onClick={() => setCycle(value)}
-                className={cx("min-h-9 rounded-full border px-3 text-xs font-medium", cycle === value ? "border-brand bg-brand text-brand-fg" : "border-line bg-surface text-ink-soft")}
-              >
-                {value === "monthly" ? "Mensual" : "Anual (−20 %)"}
-              </button>
-            ))}
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-3">
+            {catalog.planes.map((plan) => {
+              const price = cycle === "monthly" ? plan.precio_mensual : plan.precio_anual;
+              const current = subscription?.plan === plan.id && subscription.ciclo === cycle && live;
+              return (
+                <div key={plan.id} className={cx("space-y-3 rounded-xl border bg-surface p-5", current ? "border-brand" : "border-line")} data-testid={`plan-${plan.id}`}>
+                  <h3 className="font-heading text-lg font-semibold text-ink">{plan.nombre}</h3>
+                  <p className="text-2xl font-semibold text-ink">
+                    {usd(price)}
+                    <span className="text-sm font-normal text-ink-soft"> / {cycle === "monthly" ? "mes" : "año"}</span>
+                  </p>
+                  {catalog.soles_por_dolar ? <p className="text-xs text-ink-faint">Referencia{soles(price, catalog.soles_por_dolar)}</p> : null}
+                  <ul className="space-y-1 text-sm text-ink-soft">
+                    <li>{plan.mensajes.toLocaleString("es-PE")} mensajes del asistente al mes</li>
+                    <li>{plan.asientos} personas en el equipo</li>
+                    <li>{(plan.caracteres_conocimiento / 1_000_000).toLocaleString("es-PE")} M caracteres de conocimiento</li>
+                  </ul>
+                  {current ? (
+                    <p className="text-sm font-semibold text-brand">Tu plan</p>
+                  ) : isOwner ? (
+                    <Button type="button" loading={busy === `plan-${plan.id}`} onClick={() => void choose(plan)}>
+                      {live ? "Cambiar a este plan" : "Elegir"}
+                    </Button>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {catalog.planes.map((plan) => {
-            const price = cycle === "monthly" ? plan.precio_mensual : plan.precio_anual;
-            const current = subscription?.plan === plan.id && subscription.ciclo === cycle && live;
-            return (
-              <div key={plan.id} className={cx("space-y-3 rounded-xl border bg-surface p-5", current ? "border-brand" : "border-line")} data-testid={`plan-${plan.id}`}>
-                <h3 className="font-heading text-lg font-semibold text-ink">{plan.nombre}</h3>
-                <p className="text-2xl font-semibold text-ink">
-                  {usd(price)}
-                  <span className="text-sm font-normal text-ink-soft"> / {cycle === "monthly" ? "mes" : "año"}</span>
+          {isOwner && !live ? (
+            <div className="max-w-xs">
+              <Field label="Cupón (opcional)" value={coupon} onChange={(e) => setCoupon(e.target.value)} />
+            </div>
+          ) : null}
+          <p className="text-xs text-ink-faint">
+            Precios finales en dólares, impuestos incluidos. Subir de plan aplica lo que no usaste del actual; bajar se aplica al terminar el período.
+          </p>
+        </section>
+      </div>
+
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        {live && catalog.paquetes.length ? (
+          <section className="space-y-3" aria-label="Paquetes">
+            <h2 className="font-semibold text-ink">¿Te faltan mensajes este período?</h2>
+            {catalog.paquetes.map((pack) => (
+              <div key={pack.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
+                <p className="text-sm text-ink">
+                  {pack.nombre}: {usd(pack.precio)}
+                  {soles(pack.precio, catalog.soles_por_dolar)}
                 </p>
-                {catalog.soles_por_dolar ? <p className="text-xs text-ink-faint">Referencia{soles(price, catalog.soles_por_dolar)}</p> : null}
-                <ul className="space-y-1 text-sm text-ink-soft">
-                  <li>{plan.mensajes.toLocaleString("es-PE")} mensajes del asistente al mes</li>
-                  <li>{plan.asientos} personas en el equipo</li>
-                  <li>{(plan.caracteres_conocimiento / 1_000_000).toLocaleString("es-PE")} M caracteres de conocimiento</li>
-                </ul>
-                {current ? (
-                  <p className="text-sm font-semibold text-brand">Tu plan</p>
-                ) : isOwner ? (
-                  <Button type="button" loading={busy === `plan-${plan.id}`} onClick={() => void choose(plan)}>
-                    {live ? "Cambiar a este plan" : "Elegir"}
+                {isOwner ? (
+                  <Button type="button" variant="secondary" loading={busy === pack.id} onClick={() => void act(pack.id, async () => { const charge = await api.billing.addon(pack.id); return `Paga ${usd(charge.monto)} con la referencia ${charge.referencia}.`; })}>
+                    Comprar
                   </Button>
                 ) : null}
               </div>
-            );
-          })}
-        </div>
-        {isOwner && !live ? (
-          <div className="max-w-xs">
-            <Field label="Cupón (opcional)" value={coupon} onChange={(e) => setCoupon(e.target.value)} />
-          </div>
-        ) : null}
-        <p className="text-xs text-ink-faint">
-          Precios finales en dólares, impuestos incluidos. Subir de plan aplica lo que no usaste del actual; bajar se aplica al terminar el período.
-        </p>
-      </section>
-
-      {live && catalog.paquetes.length ? (
-        <section className="space-y-3" aria-label="Paquetes">
-          <h2 className="font-semibold text-ink">¿Te faltan mensajes este período?</h2>
-          {catalog.paquetes.map((pack) => (
-            <div key={pack.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
-              <p className="text-sm text-ink">
-                {pack.nombre}: {usd(pack.precio)}
-                {soles(pack.precio, catalog.soles_por_dolar)}
-              </p>
-              {isOwner ? (
-                <Button type="button" variant="secondary" loading={busy === pack.id} onClick={() => void act(pack.id, async () => { const charge = await api.billing.addon(pack.id); return `Paga ${usd(charge.monto)} con la referencia ${charge.referencia}.`; })}>
-                  Comprar
-                </Button>
-              ) : null}
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {overview.pagos.length ? (
-        <section className="space-y-3" aria-label="Pagos">
-          <h2 className="font-semibold text-ink">Pagos</h2>
-          <ul className="divide-y divide-line rounded-xl border border-line bg-surface" data-testid="billing-payments">
-            {overview.pagos.map((payment) => (
-              <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-                <span>
-                  {day(payment.en)} · {payment.concepto} · {usd(payment.monto)}
-                  {payment.estado === "refunded" ? " · reembolsado" : ""}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={async () => {
-                    try {
-                      const blob = await api.billing.receipt(payment.id);
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement("a");
-                      link.href = url;
-                      link.download = `${payment.comprobante}.pdf`;
-                      link.click();
-                      URL.revokeObjectURL(url);
-                    } catch (caught) {
-                      setNotice({ tone: "danger", text: humanMessage(caught) });
-                    }
-                  }}
-                >
-                  Comprobante {payment.comprobante}
-                </Button>
-              </li>
             ))}
-          </ul>
-        </section>
-      ) : null}
+          </section>
+        ) : null}
+
+        {overview.pagos.length ? (
+          <section className="space-y-3" aria-label="Pagos">
+            <h2 className="font-semibold text-ink">Pagos</h2>
+            <ul className="divide-y divide-line rounded-xl border border-line bg-surface" data-testid="billing-payments">
+              {overview.pagos.map((payment) => (
+                <li key={payment.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                  <span>
+                    {day(payment.en)} · {payment.concepto} · {usd(payment.monto)}
+                    {payment.estado === "refunded" ? " · reembolsado" : ""}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        const blob = await api.billing.receipt(payment.id);
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `${payment.comprobante}.pdf`;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                      } catch (caught) {
+                        setNotice({ tone: "danger", text: humanMessage(caught) });
+                      }
+                    }}
+                  >
+                    Comprobante {payment.comprobante}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
     </div>
   );
 }
