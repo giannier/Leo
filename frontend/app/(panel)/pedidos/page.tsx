@@ -16,6 +16,7 @@
  *   is why the toggle exists and why it is off by default.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui";
@@ -38,6 +39,15 @@ const SEARCH_DEBOUNCE_MS = 300;
 export default function PedidosPage() {
   const [period, setPeriod] = useState<Period>("hoy");
   const [summary, setSummary] = useState<OrderSummary | null>(null);
+  // Requests to return or exchange that wait for a person; the badge of the link.
+  const [waitingReturns, setWaitingReturns] = useState(0);
+
+  useEffect(() => {
+    api.aftersale
+      .returns({ estado: ["solicitada"] })
+      .then((list) => setWaitingReturns(list.pendientes))
+      .catch(() => setWaitingReturns(0));
+  }, []);
 
   const [filters, setFilters] = useState<OrderFilters>(NO_FILTERS);
   const [query, setQuery] = useState(filters);
@@ -114,7 +124,20 @@ export default function PedidosPage() {
             Lo que tus clientes han pedido y los pagos que esperan tu confirmación.
           </p>
         </div>
-        <PeriodSwitch value={period} onChange={setPeriod} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/pedidos/devoluciones"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-line-strong px-3.5 text-sm font-semibold text-ink hover:bg-surface-muted"
+          >
+            Devoluciones
+            {waitingReturns ? (
+              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
+                {waitingReturns} por revisar
+              </span>
+            ) : null}
+          </Link>
+          <PeriodSwitch value={period} onChange={setPeriod} />
+        </div>
       </header>
 
       <OrderSummaryCards summary={summary} />
