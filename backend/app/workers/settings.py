@@ -53,6 +53,8 @@ from app.workers.inbox import (
     email_unattended_handovers,
 )
 from app.workers.knowledge_indexer import index_knowledge_source
+from app.workers.learning import SWEEP_JOB as LEARNING_JOB
+from app.workers.learning import learning_sweep
 from app.workers.media import REFRESH_JOB, refresh_media_provider_ids
 from app.workers.metrics import PURGE_JOB, ROLLUP_JOB, metrics_purge, metrics_rollup
 from app.workers.reminders import REMINDER_JOB, run_reminders
@@ -152,6 +154,8 @@ class WorkerSettings:
         cron(metrics_rollup, name=f"cron:{ROLLUP_JOB}", hour=6, minute=15),
         cron(metrics_purge, name=f"cron:{PURGE_JOB}", hour=7, minute=5),
         cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
+        # What the assistant could learn: once a day, early in the morning of Lima.
+        cron(learning_sweep, name=f"cron:{LEARNING_JOB}", hour=10, minute=35),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
         # gives the bot back within five minutes of its `hasta`.
         # Feature 007: idle takeovers back to the agent, unattended handovers emailed.

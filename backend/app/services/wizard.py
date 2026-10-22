@@ -21,6 +21,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.learning.history import ConfigHistoryService
 from app.models.business import AgentConfig, BusinessProfile
 from app.process.service import DEFAULT_CACHE
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
@@ -28,6 +29,19 @@ from app.repositories.situation import SituationRepository
 from app.services.capabilities import apply as apply_capabilities
 from app.services.situations import SituationService
 from app.services.website import mirror_profile_website_into_contact
+
+# What of the profile leaves a line in the history, and how it is said there.
+HISTORY_LABELS = {
+    "agent_name": "nombre",
+    "tone": "tono",
+    "objective": "objetivo",
+    "tratamiento": "tratamiento",
+    "emojis": "emojis",
+    "saludo": "saludo",
+    "farewell_on_pause": "despedida",
+    "escalation_rules": "cuándo pasa a una persona",
+}
+HISTORY_FIELDS = tuple(HISTORY_LABELS)
 
 
 @dataclass(frozen=True)
@@ -77,7 +91,11 @@ class WizardService:
         return SaveOutcome(record=record, overwrote_newer=stale)
 
     def save_agent_config(
-        self, *, expected_updated_at: datetime | None = None, **values: Any
+        self,
+        *,
+        expected_updated_at: datetime | None = None,
+        actor: uuid.UUID | None = None,
+        **values: Any,
     ) -> SaveOutcome[AgentConfig]:
         # `is_active` is deliberately not settable here: the contract routes
         # activation through `/agent/activate`, which has preconditions the
@@ -97,7 +115,21 @@ class WizardService:
             SituationService(self._session, self._tenant_id).set_migrated_text(
                 values.pop("restrictions")
             )
+        tracked = [name for name in HISTORY_FIELDS if name in values]
+        current = self._agents.current()
+        before = {name: getattr(current, name) for name in tracked} if current else None
         record = self._agents.upsert(**values)
+        if before is not None and tracked:
+            after = {name: getattr(record, name) for name in tracked}
+            if after != before:
+                ConfigHistoryService(self._session, self._tenant_id, actor).record(
+                    "perfil",
+                    "editar",
+                    "Cambió el perfil del asistente: "
+                    + ", ".join(HISTORY_LABELS[n] for n in tracked if after[n] != before[n]),
+                    antes=before,
+                    despues=after,
+                )
         if capacities is not None:
             apply_capabilities(self._session, self._tenant_id, capacities)
         self._session.commit()

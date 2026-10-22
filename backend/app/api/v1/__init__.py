@@ -19,6 +19,7 @@ from app.api.v1 import (
     health,
     inbox,
     knowledge,
+    learning,
     metrics,
     orders,
     platform_admin,
@@ -53,6 +54,7 @@ router.include_router(crm.router)
 router.include_router(scheduling.router)
 router.include_router(files.router)
 router.include_router(knowledge.router)
+router.include_router(learning.router)
 router.include_router(metrics.router)
 router.include_router(orders.router)
 router.include_router(aftersale.router)

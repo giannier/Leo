@@ -103,19 +103,38 @@ def sample(
     out: list[Reviewable] = []
     for conversation in rows:
         contact = session.get(Contact, conversation.contact_id) if conversation.contact_id else None
-        newest = session.execute(
-            select(Message)
-            .where(
-                Message.tenant_id == tenant_id,
-                Message.conversation_id == conversation.id,
-                Message.msg_type.in_(("text", "interactive", "template")),
-            )
-            .order_by(Message.created_at.desc())
-            .limit(EXCERPT)
-        ).scalars()
-        excerpt = list(newest)[::-1]
+        excerpt = _excerpt(session, tenant_id, conversation.id, EXCERPT)
         out.append(Reviewable(conversation, contact, reviews.get(conversation.id), excerpt))
     return out
+
+
+def _excerpt(
+    session: Session, tenant_id: uuid.UUID, conversation_id: uuid.UUID, limit: int
+) -> list[Message]:
+    newest = session.execute(
+        select(Message)
+        .where(
+            Message.tenant_id == tenant_id,
+            Message.conversation_id == conversation_id,
+            Message.msg_type.in_(("text", "interactive", "template")),
+        )
+        .order_by(Message.created_at.desc())
+        .limit(limit)
+    ).scalars()
+    return list(newest)[::-1]
+
+
+def excerpt_of(
+    session: Session, tenant_id: uuid.UUID, conversation_id: uuid.UUID, *, limit: int = EXCERPT
+) -> Reviewable | None:
+    """The last messages of a conversation of this business, to read; None if it is not its own."""
+    conversation = session.get(Conversation, conversation_id)
+    if conversation is None or conversation.tenant_id != tenant_id:
+        return None
+    contact = session.get(Contact, conversation.contact_id) if conversation.contact_id else None
+    return Reviewable(
+        conversation, contact, None, _excerpt(session, tenant_id, conversation_id, limit)
+    )
 
 
 def rate(

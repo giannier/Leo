@@ -285,7 +285,9 @@ async def put_agent_config(
             fields={"destino_leads": "Elige a alguien de tu equipo."},
         )
     service = WizardService(session, principal.tenant_id)
-    outcome = service.save_agent_config(expected_updated_at=payload.expected_updated_at, **values)
+    outcome = service.save_agent_config(
+        expected_updated_at=payload.expected_updated_at, actor=principal.user_id, **values
+    )
     return _agent_response(
         outcome.record,
         restrictions=service.migrated_rules(),
