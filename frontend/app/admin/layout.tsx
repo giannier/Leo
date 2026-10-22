@@ -43,6 +43,7 @@ const NAV = [
   // Last, because it is the one nobody wants to have to open.
   { href: "/admin/dead-letters", label: "Sin procesar", icon: AlertIcon },
   { href: "/admin/catalogo", label: "Catálogo", icon: BookIcon },
+  { href: "/admin/aprendizaje", label: "Aprendizaje", icon: BookIcon },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

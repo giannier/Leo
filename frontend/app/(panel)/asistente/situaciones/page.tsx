@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AssistantHeader } from "@/components/assistant/section-nav";
 import { Alert, Button, Card, Checkbox, Field, Select, Skeleton, TextArea, cx } from "@/components/ui";
-import { api, type MediaAsset, type RubroView, type Situation, type SituationBody } from "@/lib/api/client";
+import { api, type CardDraft, type MediaAsset, type RubroView, type Situation, type SituationBody } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 
 const STAGES = [
@@ -228,6 +228,45 @@ function FromSuggestion({
   );
 }
 
+function Writer({ onCard }: { onCard: (card: CardDraft) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function prepare() {
+    setBusy(true);
+    setError(null);
+    try {
+      onCard(await api.assistant.draftCard(text.trim()));
+      setText("");
+    } catch (caught) {
+      setError(humanMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Escríbela con tus palabras" description="Cuéntale la regla como se la dirías a un vendedor y Leo la convierte en tarjeta y te avisa si choca con otra.">
+      <div className="space-y-3" data-testid="situation-writer">
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <TextArea
+          label="La regla"
+          rows={2}
+          maxLength={600}
+          placeholder="Si piden factura, que me pasen su RUC y su razón social"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <Button type="button" variant="secondary" loading={busy} disabled={text.trim().length < 8} onClick={() => void prepare()}>
+          Preparar la tarjeta
+        </Button>
+        <p className="text-xs text-ink-faint">Usa un análisis de tu tope semanal de aprendizaje (se enciende en Aprendizaje).</p>
+      </div>
+    </Card>
+  );
+}
+
 export default function SituationsPage() {
   const [items, setItems] = useState<Situation[] | null>(null);
   const [media, setMedia] = useState<MediaAsset[]>([]);
@@ -236,6 +275,7 @@ export default function SituationsPage() {
   const [editing, setEditing] = useState<Situation | "new" | null>(null);
   const [suggested, setSuggested] = useState<string | null>(null);
   const [seed, setSeed] = useState<Partial<SituationBody> | null>(null);
+  const [warnings, setWarnings] = useState<CardDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -292,6 +332,37 @@ export default function SituationsPage() {
         />
       ) : null}
 
+      {!editing ? (
+        <Writer
+          onCard={(card) => {
+            setSeed({
+              titulo: card.titulo,
+              cuando_aplica: card.cuando_aplica,
+              que_hace: card.que_hace,
+              derivar: card.derivar,
+              siempre: card.siempre,
+            });
+            setWarnings(card);
+            setEditing("new");
+          }}
+        />
+      ) : null}
+
+      {editing && warnings && (warnings.choques.length > 0 || warnings.avisos.length > 0) ? (
+        <Alert tone="warning" title="Revisa antes de guardar">
+          <ul className="list-disc pl-5">
+            {warnings.choques.map((clash, index) => (
+              <li key={`c${index}`}>
+                Choca con {clash.tipo === "situación" ? "tu situación" : clash.tipo}: «{clash.con}». {clash.motivo}
+              </li>
+            ))}
+            {warnings.avisos.map((notice, index) => (
+              <li key={`a${index}`}>{notice}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
+
       {editing ? (
         <Card title={editing === "new" ? "Nueva situación" : "Editar situación"}>
           <SituationForm
@@ -301,10 +372,12 @@ export default function SituationsPage() {
             onCancel={() => {
               setEditing(null);
               setSeed(null);
+              setWarnings(null);
             }}
             onSaved={() => {
               setEditing(null);
               setSeed(null);
+              setWarnings(null);
               void load();
             }}
           />
