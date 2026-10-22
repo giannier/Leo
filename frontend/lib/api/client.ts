@@ -663,6 +663,9 @@ export type ChatImportRow = Ok<Ops["/api/v1/assistant/imports/{import_id}"]["get
 export type ChatImportList = Ok<Ops["/api/v1/assistant/imports"]["get"]>;
 export type ExampleList = Ok<Ops["/api/v1/assistant/examples"]["get"]>;
 export type ExampleRow = ExampleList["items"][number];
+export type CardDraft = Ok<Ops["/api/v1/assistant/situations/redactar"]["post"]>;
+export type LearnedCandidates = Ok<Ops["/api/v1/platform-admin/learning/candidates"]["get"]>;
+export type LearnedCandidate = LearnedCandidates["items"][number];
 export type HistoryList = Ok<Ops["/api/v1/assistant/history"]["get"]>;
 export type HistoryRow = HistoryList["items"][number];
 export type ResourceBody = {
@@ -1195,6 +1198,8 @@ export const api = {
         method: "POST",
         body: { ids },
       }),
+    draftCard: (texto: string) =>
+      request<CardDraft>("/assistant/situations/redactar", { method: "POST", body: { texto } }),
     history: () => request<HistoryList>("/assistant/history"),
     undoChange: (id: string) => request<HistoryRow>(`/assistant/history/${id}/undo`, { method: "POST" }),
     rateReview: (conversationId: string, body: ReviewBody) =>
@@ -1298,6 +1303,14 @@ export const api = {
         `/platform-admin/catalog/${kind}/${key}/versions/${version}/publicar`,
         { method: "POST" },
       ),
+    /** Situations at least two businesses of a rubro wrote alike (feature 017, phase 4). */
+    learnedCandidates: (rubro: string) =>
+      request<LearnedCandidates>("/platform-admin/learning/candidates", { query: { rubro } }),
+    adoptLearned: (body: { rubro: string; titulo: string; cuando_aplica: string; que_hace: string }) =>
+      request<{ version: number; creada: boolean }>("/platform-admin/learning/adopt", {
+        method: "POST",
+        body,
+      }),
   },
 
   conversations: {

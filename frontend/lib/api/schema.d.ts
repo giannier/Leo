@@ -2445,6 +2445,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/situations/redactar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a rule written in free words into a card, warning of what it clashes with
+         * @description Nothing is saved: the card goes back to the form for the owner to read and save.
+         */
+        post: operations["redact_situation_api_v1_assistant_situations_redactar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/metrics": {
         parameters: {
             query?: never;
@@ -3282,6 +3302,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-admin/learning/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Situations at least two businesses of a rubro wrote alike */
+        get: operations["list_candidates_api_v1_platform_admin_learning_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform-admin/learning/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer a situation as a suggested one of the rubro (in its open draft) */
+        post: operations["adopt_api_v1_platform_admin_learning_adopt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/team": {
         parameters: {
             query?: never;
@@ -4007,6 +4061,24 @@ export interface components {
             /** Precio */
             precio: string;
         };
+        /** AdoptIn */
+        AdoptIn: {
+            /** Rubro */
+            rubro: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+        };
+        /** AdoptOut */
+        AdoptOut: {
+            /** Version */
+            version: number;
+            /** Creada */
+            creada: boolean;
+        };
         /** AgentConfigRequest */
         AgentConfigRequest: {
             /** Expected Updated At */
@@ -4576,6 +4648,47 @@ export interface components {
             report?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** CandidateList */
+        CandidateList: {
+            /** Rubro */
+            rubro: string;
+            /** Items */
+            items: components["schemas"]["CandidateOut"][];
+        };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Negocios */
+            negocios: number;
+            /** Variantes */
+            variantes: string[];
+            /** Con Datos */
+            con_datos: boolean;
+        };
+        /** CardDraft */
+        CardDraft: {
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Derivar */
+            derivar: boolean;
+            /** Siempre */
+            siempre: boolean;
+            /** Choques */
+            choques: components["schemas"]["DraftClash"][];
+            /** Avisos */
+            avisos: string[];
+            /** Quedan */
+            quedan: number;
         };
         /** Catalog */
         Catalog: {
@@ -5240,6 +5353,20 @@ export interface components {
             creado: string;
             /** Enviado */
             enviado: string | null;
+        };
+        /** DraftClash */
+        DraftClash: {
+            /** Con */
+            con: string;
+            /** Tipo */
+            tipo: string;
+            /** Motivo */
+            motivo: string;
+        };
+        /** DraftIn */
+        DraftIn: {
+            /** Texto */
+            texto: string;
         };
         /** DraftOut */
         DraftOut: {
@@ -16344,6 +16471,57 @@ export interface operations {
             };
         };
     };
+    redact_situation_api_v1_assistant_situations_redactar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardDraft"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `learning_off`, `budget` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     metrics_api_v1_tenant_metrics_get: {
         parameters: {
             query?: {
@@ -18728,6 +18906,97 @@ export interface operations {
                 };
             };
             /** @description `version_frozen` or `evals_not_passed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_candidates_api_v1_platform_admin_learning_candidates_get: {
+        parameters: {
+            query: {
+                rubro: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateList"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` for anybody but the operator */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    adopt_api_v1_platform_admin_learning_adopt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdoptOut"];
+                };
+            };
+            /** @description `not_authenticated` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found`: unknown rubro */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `already_there`: the draft has it */
             409: {
                 headers: {
                     [name: string]: unknown;
