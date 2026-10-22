@@ -1,6 +1,6 @@
 # Spec + Plan + Tasks — Pedidos y Delivery
 
-**Feature ID:** 016 · **Módulo:** 16-orders · **Estado:** Draft para ratificación (condicionado: priorizar si los tenants piloto son mayormente restaurantes/retail)
+**Feature ID:** 016 · **Módulo:** 16-orders · **Estado:** Construido el 2026-10-22 sobre el módulo de pedidos de 004 y 019 (ver «Implementación» al final); decisiones D-1 a D-8 por ratificar
 **Depende de:** 004 (pedido informal, stock, comprobantes), 011 (plantillas de estado), 012 (leads)
 
 ## Resumen
@@ -186,3 +186,52 @@ Commits: `feat(orders): ... [TASK-16XX]`
 - [ ] **TASK-1607: Endurecimiento + reconciliación de métricas.** Milestone humano: servicio de un día completo con un restaurante piloto; medir pedidos mal tomados (meta: 0 con confirmación) y tiempo de comanda.
 
 Dependencias: 1601 → 1602 → 1603/1604/1605 → 1606 → 1607.
+
+
+---
+
+## Implementación (2026-10-22, migración 0066)
+
+Este documento se escribió antes de que existieran el pedido de 004, las zonas de `entregas`, la numeración por negocio,
+el historial del cliente ni «repetir pedido». Eso ya estaba hecho; lo que faltaba, y se construyó, es la parte **operativa**:
+
+| Spec | Hecho |
+|---|---|
+| HU-03 comanda | `/pedidos/comanda`: columnas por etapa, el que más espera primero, tiempo en la etapa con color, un toque para avanzar, sonido opcional, se actualiza cada 15 s, pensada para tableta |
+| HU-04 avisos de estado | `pedido_listo` (solo recojo) y `pedido_en_camino` (solo delivery), editables por el dueño; interruptores en `order_settings`; no salen con la ventana de 24 h cerrada (el operador lo ve) |
+| C-003 ubicación de WhatsApp | el pin se guarda en el pedido (`ubicacion_entrega`), el modelo lo lee como dirección y el operador lo abre en el mapa |
+| HU-02 reembolso | `devolucion_pendiente` ya existía; ahora el operador lo marca resuelto (`POST /{id}/refund-resolved`, con bitácora) |
+| RF-008 métricas | tiempo medio confirmado → entregado en el resumen (`tiempo_medio_entrega_min`) |
+| HU-05 historial y repetir | ya hecho en 019 fase G (`consultar_pedidos`) |
+| RF-004 zonas de envío | ya hecho (`entregas.zonas` del negocio, con envío gratis desde un monto) |
+
+### Decisiones (por ratificar por Giannier)
+- **D-1. Las etapas son una columna, no estados nuevos.** `orders.etapa` (`preparando`, `listo`, `en_camino`) solo vale mientras el
+  pedido está `en_curso`. El spec proponía estados nuevos (`preparing`, `ready`, `out_for_delivery`, `delivered`); se descartó porque
+  los hechos del agente, la devolución pendiente, las ventas y el embudo ya dependen de `confirmado / en_curso / completado`, y
+  cambiarlos arriesgaba lo que ya funciona. `en_curso` + etapa dice lo mismo. *Entregado* es `completado`.
+  (La «etapa» del pedido no es la «etapa» de la conversación —INICIO, IDENTIFICAR…—: son cosas distintas.)
+- **D-2. El número `#37` sigue siendo el consecutivo del negocio, no diario.** Ya aparece en avisos, comprobantes y devoluciones;
+  cambiarlo a diario obligaría a que `#5` signifique cosas distintas según el día. Si la cocina lo prefiere, se agrega un número
+  de turno aparte.
+- **D-3. Los avisos salen por defecto, dentro de la ventana de 24 h.** Fuera de la ventana no se envían (no hay plantillas utility
+  aún: es el hueco de «seguimientos con plantilla»), y la respuesta de la API lo dice para que el operador avise por otro medio.
+  Un recojo avisa «listo»; un delivery avisa «en camino»: el otro paso no manda nada para no mandar dos mensajes por una entrega.
+  **Cada aviso es un mensaje de servicio y desde el 2026-10-01 esos se cobran por mensaje entregado** (aprox. US$ 0,030 en Perú, con
+  1.000 gratis al mes por número según partners; ver `leo-sdd/meta-reglas-2026-10.md` §1). Lo cobra Meta al negocio. Quedan
+  **encendidos por defecto** (el cliente espera saber que su pedido salió); es dinero del negocio, así que Giannier decide si el
+  valor por defecto debe ser apagado. El dueño los apaga en la comanda. El gasto cuenta en «gasto estimado en WhatsApp» de Resultados.
+- **D-4. El pin es dato personal.** Lo ven los miembros del negocio y no se escribe en logs ni se envía al modelo (el modelo lee
+  «[Ubicación compartida por WhatsApp]» y, si es un lugar guardado, su nombre o dirección). Un pin de las últimas 12 h es del
+  pedido que se arma; uno más viejo no. *La forma del mensaje (`location.latitude/longitude/name/address`) es la de Meta, que
+  YCloud reenvía; no se ha probado con un webhook real.*
+- **D-5. C-001 (agregar algo después de confirmar) no cambia:** un pedido confirmado es negocio cerrado (C-06 de 004); pedir algo
+  más crea un pedido nuevo. Editar un pedido en preparación sería una decisión del negocio, no del agente.
+- **D-6. Pedidos programados (C-005) no se construyeron.** Dependen de los horarios de atención y de despertar el pedido a la hora;
+  es una decisión de producto (¿el negocio acepta pedidos para otro día?) antes que de código.
+- **D-7. Eventos de dominio (RF-005) esperan a 015** (integraciones y webhooks): no hay a quién entregarlos todavía.
+- **D-8. Sin reparto ni asignación de repartidor.** La comanda dice qué sale y a dónde; quién lo lleva no se registra (fuera de
+  alcance del spec: tracking GPS y apps de delivery).
+
+**Sin probar con un negocio real:** un servicio completo de un día en la comanda (el hito humano de TASK-1607) y el pin con un
+webhook real de WhatsApp.

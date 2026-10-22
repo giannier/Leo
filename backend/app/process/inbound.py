@@ -17,6 +17,7 @@ from dataclasses import asdict
 from typing import Any
 
 from app.providers.whatsapp.base import (
+    InboundLocation,
     InboundMedia,
     InboundMessage,
     InteractiveReply,
@@ -38,6 +39,10 @@ def payload_of(message: InboundMessage) -> dict[str, Any] | None:
     if message.media is not None:
         payload["media"] = {
             key: value for key, value in asdict(message.media).items() if value is not None
+        }
+    if message.location is not None:
+        payload["location"] = {
+            key: value for key, value in asdict(message.location).items() if value is not None
         }
     return payload or None
 
@@ -91,6 +96,40 @@ def media_of(payload: Mapping[str, Any] | None) -> InboundMedia | None:
         caption=_text(raw.get("caption")),
     )
     return media if (media.media_id or media.link) else None
+
+
+def location_of(payload: Mapping[str, Any] | None) -> InboundLocation | None:
+    """The pin stored with a message, if its coordinates are still numbers on the globe."""
+    raw = (payload or {}).get("location")
+    if not isinstance(raw, Mapping):
+        return None
+    try:
+        lat, lng = float(raw["lat"]), float(raw["lng"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        return None
+    return InboundLocation(
+        lat=lat, lng=lng, nombre=_text(raw.get("nombre")), direccion=_text(raw.get("direccion"))
+    )
+
+
+def location_line(location: InboundLocation | None) -> str:
+    """What the customer's pin reads as in the conversation, for the inbox and the model.
+
+    Never the coordinates: the model has no use for them and they are personal data (C-20). A
+    saved place carries its name or address, which is what a person would have typed.
+    """
+    detail = " · ".join(
+        part
+        for part in (
+            location.nombre if location else None,
+            location.direccion if location else None,
+        )
+        if part
+    )
+    base = "[Ubicación compartida por WhatsApp]"
+    return f"{base} {detail}" if detail else base
 
 
 def stored_image_of(payload: Mapping[str, Any] | None) -> tuple[str, str] | None:

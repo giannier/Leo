@@ -226,6 +226,11 @@ def _customer_schema(scope: ToolScope) -> dict[str, Any]:
     for field_name in customer_fields(scope):
         if field_name == "tipo_entrega":
             properties[field_name] = {"type": "string", "enum": list(DELIVERY_TYPES)}
+        elif field_name == "direccion":
+            properties[field_name] = {
+                "type": "string",
+                "description": "Si solo envió su ubicación: «Ubicación compartida por WhatsApp».",
+            }
         else:
             properties[field_name] = {"type": "string"}
     return _object(properties)

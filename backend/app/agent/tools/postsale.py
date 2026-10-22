@@ -22,7 +22,7 @@ from app.repositories.orders import OrderItemRepository, OrderRepository
 HOW_IT_STANDS = {
     "por_confirmar": "su pago o su pedido está en revisión por el equipo",
     "confirmado": "confirmado por el equipo",
-    "en_curso": "en preparación o en camino",
+    "en_curso": "en preparación",
     "completado": "completado",
     "descartado": "cancelado",
 }
@@ -38,6 +38,19 @@ def _contact_id(context: ToolContext) -> uuid.UUID | None:
     return conversation.contact_id
 
 
+def _how_it_stands(order: Order) -> str:
+    """Where the order is, as exactly as the business recorded it (feature 016)."""
+    if order.estado == "en_curso" and order.etapa == "listo":
+        return (
+            "listo para recoger en el local"
+            if order.tipo_entrega == "recojo"
+            else "listo, a punto de salir"
+        )
+    if order.estado == "en_curso" and order.etapa == "en_camino":
+        return "en camino"
+    return HOW_IT_STANDS[order.estado]
+
+
 def _line(order: Order, items: list[Any]) -> str:
     lines = [
         f"- {item.cantidad} × {item.nombre}"
@@ -45,7 +58,7 @@ def _line(order: Order, items: list[Any]) -> str:
         for item in items
     ]
     head = (
-        f"Pedido #{order.numero} ({order.created_at:%d/%m/%Y}): {HOW_IT_STANDS[order.estado]}. "
+        f"Pedido #{order.numero} ({order.created_at:%d/%m/%Y}): {_how_it_stands(order)}. "
         f"Total {order.moneda} {order.total:.2f}."
     )
     if order.tipo_entrega:

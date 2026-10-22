@@ -331,14 +331,16 @@ def _case(
 def _past_order(
     estado: str = "en_curso",
     *,
+    etapa: str | None = None,
     days_ago: int = 0,
     document: tuple[str, str, str] | None = None,
     policy: dict[str, object] | None = None,
 ) -> Callable[[Session, Tenant, Contact, Conversation], None]:
     """The customer bought two polos in an earlier conversation.
 
-    `document`: (type, series, number) of a document the business attached to it. `policy`: what
-    the business wrote about returns.
+    `etapa`: where the business is in its work while the order is `en_curso`. `document`: (type,
+    series, number) of a document the business attached to it. `policy`: what the business wrote
+    about returns.
     """
 
     def prelude(session: Session, tenant: Tenant, contact: Contact, _now: Conversation) -> None:
@@ -357,6 +359,8 @@ def _past_order(
             subtotal=Decimal("70.00"),
             total=Decimal("70.00"),
             estado=estado,
+            etapa=etapa,
+            etapa_at=datetime.now(UTC) if etapa else None,
             is_sandbox=True,
             tipo_entrega="delivery",
             zona_envio="Miraflores",
@@ -471,6 +475,29 @@ FLOW_CASES: tuple[FlowCase, ...] = (
         ["PEDIDO", "DATOS"],
         ["gestionar_pedido"],
         mentions_any=["Miraflores", "San Isidro", "Callao"],
+    ),
+    _case(
+        "productos",
+        "comparte su ubicación como dirección",
+        [
+            "Quiero un polo básico",
+            "Sí, uno",
+            "Quiero delivery a Miraflores. Me llamo Ana Torres, mi celular es 987654321",
+            "[Ubicación compartida por WhatsApp]",
+        ],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["registrar_datos_cliente"],
+        never=["cuál es tu dirección", "tu dirección exacta", "pásame tu dirección"],
+    ),
+    _case(
+        "productos",
+        "pregunta por su pedido que va en camino",
+        ["Hola, ¿ya salió mi pedido?"],
+        ["INICIO", "IDENTIFICAR"],
+        ["consultar_pedidos"],
+        mentions_any=["en camino", "camino"],
+        never=["llegará en", "llega en 10", "llegará mañana", "te llega hoy"],
+        prelude=_past_order(etapa="en_camino"),
     ),
     _case(
         "productos",
