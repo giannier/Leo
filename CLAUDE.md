@@ -119,6 +119,18 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
   corre dentro del contenedor (`docker compose`, `make up`) o en WSL2. Si una task pide "tests en verde",
   se miden ahí.
 
+## Diseño del panel (pantallas anchas)
+Giannier trabaja en monitores de 1 900 px: una columna de 1 000 px deja la información amontonada en el centro. Reglas:
+- El contenido del panel llega hasta 1 760 px (`app/(panel)/layout.tsx`); el menú lateral es fijo (`sticky`, `h-dvh`) y está en tres
+  grupos. **Una página no se limita con `mx-auto max-w-*`** (eso la centra y deja vacíos a los lados): usa el ancho.
+- Tarjetas independientes → dos columnas desde `xl` (`grid items-start gap-6 xl:grid-cols-2`); un bloque que se abre (acordeón) va en
+  dos pilas, no en una cuadrícula de filas, para que no deje un hueco al lado. Tablero (comanda, CRM) → columnas que se reparten el
+  ancho. Gráfica + rankings → `xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]`. Lista de cifras → `grid-cols-2 md:grid-cols-3 xl:grid-cols-5`.
+- Solo se limita el ancho (`max-w-4xl`) a lo que se lee **hacia abajo**: un asistente de pasos (configuración inicial), el chat del modo
+  prueba, el formulario de una regla. Dos paneles que se desplazan solos (bandeja) usan `h-[calc(100dvh-…)]`.
+- Se revisa con capturas a 1 900, 1 280 y 390 px de ancho (Playwright en el contenedor `mcr.microsoft.com/playwright`, con la app local y
+  datos de ejemplo), no a ojo: un diseño que solo se vio en una pantalla casi siempre se rompe en otra.
+
 ## Despliegue en el VPS
 Quien opere el servidor (Giannier o un Claude en el VPS) sigue `deploy/RUNBOOK.md`, sección 10 incluida:
 qué hace cada quien, qué comandos **nunca** correr (`down -v` y `prune --volumes` borran la base y con ella
