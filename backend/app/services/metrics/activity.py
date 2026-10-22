@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.models.crm import Lead
 from app.models.scheduling import Appointment
+from app.repositories.aftersale import ReturnRepository
 from app.services.metrics.rollup import bounds, zone_of
 
 
@@ -83,5 +84,14 @@ def what_it_did(session: Session, tenant_id: uuid.UUID, start: date, end: date) 
             "calientes": by_score.get("caliente", 0),
             "tibios": by_score.get("tibio", 0),
             "frios": by_score.get("frio", 0),
+        }
+
+    returns = ReturnRepository(session, tenant_id).counts_between(since, until)
+    if returns:
+        out["devoluciones"] = {
+            "solicitadas": sum(returns.values()),
+            "aprobadas": returns.get("aprobada", 0) + returns.get("resuelta", 0),
+            "rechazadas": returns.get("rechazada", 0),
+            "pendientes": returns.get("solicitada", 0),
         }
     return out

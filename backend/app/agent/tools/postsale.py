@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from app.agent.tools.aftersale import aftersale_lines
 from app.agent.tools.registry import ToolContext, ToolResult
 from app.models.conversation import Conversation
 from app.models.orders import Order
@@ -71,8 +72,11 @@ async def consultar_pedidos(context: ToolContext, arguments: dict[str, Any]) -> 
     grouped = OrderItemRepository(context.session, context.tenant_id).for_orders(
         [order.id for order in orders]
     )
+    after = aftersale_lines(context, list(orders))
     text = "Pedidos del cliente, del más reciente al más antiguo:\n" + "\n".join(
-        _line(order, grouped.get(order.id, [])) for order in orders
+        _line(order, grouped.get(order.id, []))
+        + (f"\n  {after[order.id]}" if order.id in after else "")
+        for order in orders
     )
     text += (
         "\nDi solo lo que está aquí: no prometas fechas ni tiempos de entrega que no estén. "

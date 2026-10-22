@@ -26,6 +26,7 @@ from __future__ import annotations
 from functools import cache
 from typing import Any
 
+from app.agent.tools.aftersale import enviar_documento, solicitar_devolucion
 from app.agent.tools.catalog import (
     KNOWLEDGE_TOOL,
     SEARCH_TOOL,
@@ -312,6 +313,30 @@ def _appointment_schema(scope: ToolScope) -> dict[str, Any]:
     )
 
 
+def _return_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "pedido": {"type": "integer"},
+            "tipo": {"type": "string", "enum": ["devolucion", "cambio", "garantia", "reclamo"]},
+            "motivo": {
+                "type": "string",
+                "enum": ["defectuoso", "equivocado", "incompleto", "no_conforme", "tardio", "otro"],
+            },
+            "detalle": {"type": "string", "description": "Qué pasó y qué producto."},
+        },
+        ["tipo", "motivo", "detalle"],
+    )
+
+
+def _document_schema(scope: ToolScope) -> dict[str, Any]:
+    return _object(
+        {
+            "pedido": {"type": "integer"},
+            "tipo": {"type": "string", "enum": ["boleta", "factura", "guia", "garantia"]},
+        }
+    )
+
+
 def _after_the_sale(scope: ToolScope) -> bool:
     return scope.options.postventa
 
@@ -448,6 +473,25 @@ def _definitions() -> list[ToolDefinition]:
             parameters=_no_arguments,
             handler=consultar_pedidos,
             available=_after_the_sale,
+        ),
+        ToolDefinition(
+            name="solicitar_devolucion",
+            description=(
+                "Registra que quiere devolver, cambiar o reclamar algo de un pedido suyo. "
+                "Solo registra: decide una persona."
+            ),
+            parameters=_return_schema,
+            handler=solicitar_devolucion,
+            available=_after_the_sale,
+            effect=True,
+        ),
+        ToolDefinition(
+            name="enviar_documento",
+            description="Envía al cliente la boleta, factura, guía o garantía de su pedido.",
+            parameters=_document_schema,
+            handler=enviar_documento,
+            available=_after_the_sale,
+            effect=True,
         ),
         ToolDefinition(
             name="calificar_cliente",

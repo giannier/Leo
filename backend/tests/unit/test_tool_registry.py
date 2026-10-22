@@ -161,7 +161,7 @@ class TestCatalog:
     ) -> None:
         extra = set(SCHEDULING_TOOL_NAMES) | set(LEAD_TOOL_NAMES) | set(POSTSALE_TOOL_NAMES)
         assert set(default_catalog().names()) == set(TOOL_NAMES) | extra
-        assert len(default_catalog().names()) == 15
+        assert len(default_catalog().names()) == 17
 
     def test_a_tool_cannot_be_defined_twice(self) -> None:
         definition = default_catalog().get("ver_producto")

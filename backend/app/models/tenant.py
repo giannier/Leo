@@ -72,6 +72,9 @@ LLM_DOWN = "llm_caido"
 UNATTENDED = "derivacion_sin_atender"
 # Feature 019, phase E: the assistant judged a lead hot.
 HOT_LEAD = "lead_caliente"
+# Feature 019, phase G: a customer asked for a return, or for a document not attached yet.
+RETURN_REQUESTED = "devolucion_solicitada"
+DOCUMENT_REQUESTED = "documento_solicitado"
 
 EVENT_KINDS = (
     NEW_RECEIPT,
@@ -81,6 +84,8 @@ EVENT_KINDS = (
     LLM_DOWN,
     UNATTENDED,
     HOT_LEAD,
+    RETURN_REQUESTED,
+    DOCUMENT_REQUESTED,
 )
 
 NOTIFICATION_KINDS = (*ONE_SHOT_KINDS, *EVENT_KINDS)
