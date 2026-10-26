@@ -491,7 +491,8 @@ def test_the_platform_rules_name_the_assistant_and_the_business() -> None:
     assert text.startswith("Eres Capacitín, asistente virtual de Escuela Capacita.")
     assert "9. Si usaste mostrar_opciones" in text
     # The model has the whole conversation and is told to use it (Giannier, 2026-10-26).
-    assert "10. Tienes toda la conversación" in text
+    assert "11. Tienes toda la conversación" in text
+    assert text.count("\n10. ") == 1
 
 
 def test_without_a_card_link_cobro_loses_that_line_and_no_sentence_is_cut() -> None:
@@ -581,7 +582,7 @@ def test_the_detail_sets_the_style_text(detalle: str, phrase: str) -> None:
 def test_an_unknown_tone_pace_or_detail_falls_back_to_the_defaults() -> None:
     text = _prompt(Stage.IDENTIFICAR, behavior=Behavior(tone="x", ritmo="y", detalle="z"))
 
-    assert "Trata de tú. Cálido y natural" in text
+    assert "Tono cálido y natural." in text
     assert "Una pregunta por mensaje." in text
     assert "máximo 700 caracteres" in text
 
@@ -868,3 +869,36 @@ def test_an_unknown_time_zone_does_not_break_the_state_block() -> None:
     text = _prompt(Stage.COBRO, Facts(promos_cierre=[promo]), timezone="Marte/Olimpo")
 
     assert "· ofrecida, vence" in text
+
+
+@pytest.mark.parametrize("tone", ["profesional", "cercano", "juvenil"])
+@pytest.mark.parametrize(
+    ("tratamiento", "emojis"), [("tu", "si"), ("usted", "no"), ("tu", "pocos")]
+)
+def test_the_style_says_treatment_and_emojis_once_and_as_the_business_set_them(
+    tone: str, tratamiento: str, emojis: str
+) -> None:
+    """The tone texts used to carry their own «trata de tú» and emoji rule, against the settings."""
+    text = _prompt(
+        Stage.IDENTIFICAR, behavior=Behavior(tone=tone, tratamiento=tratamiento, emojis=emojis)
+    )
+    style = text.split("ESTILO", 1)[1].split("\n\n", 1)[0]
+
+    assert style.count("Trata ") == 1
+    assert style.lower().count("emoji") == (0 if emojis == "no" else 1) + (
+        1 if emojis == "no" else 0
+    )
+
+
+def test_a_long_description_is_cut_at_a_sentence_not_mid_word() -> None:
+    description = (
+        "Bebidas Yana Yacu es una marca peruana de agua de mesa. Ofrecemos distintas líneas de "
+        "productos, con presentaciones para hogares, empresas y distribuidores. Atendemos a "
+        "clientes particulares y empresas en todo Lima, con reparto propio y pedidos recurrentes "
+        "para negocios que necesitan abastecerse cada semana sin preocuparse por nada más."
+    )
+    text = _prompt(Stage.IDENTIFICAR, business_description=description)
+    line = next(line for line in text.splitlines() if line.startswith("Negocio:"))
+
+    assert line.endswith(".") or line.endswith("…")
+    assert "empres\n" not in text and not line.endswith(" empres")

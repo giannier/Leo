@@ -16,12 +16,18 @@ cd "$(dirname "$0")/.."
 ENV_FILE=deploy/.env.prod
 COMPOSE=(docker compose -f deploy/docker-compose.prod.yml --env-file "$ENV_FILE")
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# One key at a time: the env file is not valid bash (an unquoted `EMAIL_FROM=Leo <...>` breaks
+# `source`), and only these four are needed. Nothing is echoed.
+env_value() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2-; }
+BACKUP_PASSPHRASE="$(env_value BACKUP_PASSPHRASE)"
+POSTGRES_USER="$(env_value POSTGRES_USER)"
+POSTGRES_DB="$(env_value POSTGRES_DB)"
+export BACKUP_PASSPHRASE
 
 : "${BACKUP_PASSPHRASE:?BACKUP_PASSPHRASE is empty in $ENV_FILE}"
+: "${POSTGRES_USER:?POSTGRES_USER is empty in $ENV_FILE}"
+: "${POSTGRES_DB:?POSTGRES_DB is empty in $ENV_FILE}"
+BACKUP_DIR="${BACKUP_DIR:-$(env_value BACKUP_DIR)}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/leo}"
 BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"

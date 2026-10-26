@@ -19,8 +19,9 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.agent.tools.catalog import (
+    LISTED_DESCRIPTIONS_CHARS,
     MAX_CATALOG_RESULTS,
-    MAX_LISTED_DESCRIPTION,
+    MIN_LISTED_DESCRIPTION,
     buscar_productos,
     consultar_conocimiento,
     ver_producto,
@@ -287,7 +288,9 @@ class TestSearching:
         assert len(result.data["productos"]) == MAX_CATALOG_RESULTS
         described = [p["descripcion"] for p in result.data["productos"] if p["descripcion"]]
         assert described
-        assert all(len(text) == MAX_LISTED_DESCRIPTION for text in described)
+        # The descriptions of a full listing share the space, each cut cleanly with «…».
+        share = max(MIN_LISTED_DESCRIPTION, LISTED_DESCRIPTIONS_CHARS // MAX_CATALOG_RESULTS)
+        assert all(len(text) <= share and text.endswith("…") for text in described)
 
     async def test_stock_is_stated_only_when_tracked(
         self, db: Session, tenant_a: TenantFixture

@@ -127,14 +127,17 @@ Antes de una actualización con migraciones, corre un backup (sección 6).
 
 ## 6. Backups
 
-Diario, cifrado, 14 días de retención, con cron del usuario `leo`:
+Diario, cifrado, 14 días de retención, con el cron del usuario que opera el servidor. `BACKUP_DIR` tiene que
+existir y ese usuario tiene que poder escribir en él (en el VPS actual: `/home/gerente_ti/backups/leo`; la
+ruta por defecto `/var/backups/leo` necesita root y no existía, así que el backup nunca corrió):
 
 ```bash
 crontab -e
-15 4 * * * cd /opt/leo && deploy/backup.sh >> /var/log/leo-backup.log 2>&1
+15 4 * * * cd /home/gerente_ti/apps/Leo && BACKUP_DIR=/home/gerente_ti/backups/leo deploy/backup.sh >> /home/gerente_ti/backups/leo/backup.log 2>&1
 ```
 
-Escribe en `/var/backups/leo` un archivo por día: `leo-db-*.dump.enc`. Es la base completa, y **las
+El script lee solo las cuatro claves que necesita de `deploy/.env.prod` (no hace `source`: el archivo no es
+bash válido) y no las muestra. Escribe en `BACKUP_DIR` un archivo por día: `leo-db-*.dump.enc`. Es la base completa, y **las
 fotos, documentos y comprobantes van dentro**, porque viven en Postgres: no hay una segunda copia que
 acordarse de hacer. **Cópialo fuera del VPS** al menos una vez por semana (por ejemplo, `rsync` a otra
 máquina): un backup en el mismo disco no sobrevive a perder el disco.

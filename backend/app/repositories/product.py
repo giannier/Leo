@@ -147,6 +147,11 @@ class ProductRepository(BaseRepository[Product]):
         )
         return labels_of([list(row or []) for row in self._session.execute(statement).scalars()])
 
+    def last_change(self) -> datetime | None:
+        """When any product of this tenant was last created, edited or removed."""
+        statement = select(func.max(Product.updated_at)).where(self._tenant_predicate)
+        return self._session.execute(statement).scalar_one_or_none()
+
     def list_active(self, *, limit: int | None = None) -> Sequence[Product]:
         """Live, sellable products - what the agent is allowed to quote."""
         return self.list(

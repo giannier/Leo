@@ -29,6 +29,7 @@ from app.models.business import BUNDLE_MAX_SIZE, BUNDLE_MIN_SIZE, Product
 from app.models.media import MediaAsset
 from app.process.service import DEFAULT_CACHE
 from app.providers.storage.base import StorageError, StorageProvider
+from app.repositories.audit import AuditLogRepository
 from app.services.catalog import CatalogService, PreviewNotFound
 from app.services.csv_import import (
     MAX_BYTES,
@@ -311,6 +312,7 @@ async def create_product(
     payload: ProductRequest, principal: ConfigurationManagerDep, session: SessionDep
 ) -> ProductResponse:
     product = CatalogService(session, principal.tenant_id).create(**payload.model_dump())
+    _catalog_changed(session, principal, "product.created", product)
     return _as_response(product)
 
 
@@ -350,9 +352,17 @@ async def update_product(
                 error="validation_error",
                 message="Un servicio que se agenda necesita su duración.",
             )
+    current = catalog.get(product_id)
+    before = {key: _shown(getattr(current, key, None)) for key in values} if current else {}
     product = catalog.update(product_id, **values)
     if product is None:
         raise _not_found()
+    changes = {
+        key: {"antes": before.get(key), "despues": _shown(getattr(product, key, None))}
+        for key in values
+        if before.get(key) != _shown(getattr(product, key, None))
+    }
+    _catalog_changed(session, principal, "product.updated", product, changes)
     return _as_response(product)
 
 
@@ -367,8 +377,11 @@ async def delete_product(
 ) -> None:
     """Soft delete. Past conversations reference products by id, and a hard
     delete would rewrite what the agent said last week."""
-    if not CatalogService(session, principal.tenant_id).soft_delete(product_id):
+    catalog = CatalogService(session, principal.tenant_id)
+    product = catalog.get(product_id)
+    if product is None or not catalog.soft_delete(product_id):
         raise _not_found()
+    _catalog_changed(session, principal, "product.deleted", product)
 
 
 @router.post(
@@ -439,6 +452,11 @@ async def import_confirm(
             error="preview_not_found",
             message="That preview has expired or was already confirmed. Upload the file again.",
         ) from exc
+    DEFAULT_CACHE.invalidate(principal.tenant_id)
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id, action="product.imported", detail={"creados": created}
+    )
+    session.commit()
     return ImportConfirmResponse(created=created)
 
 
@@ -464,7 +482,45 @@ async def duplicate_product(
     copy = CatalogService(session, principal.tenant_id).duplicate(product_id)
     if copy is None:
         raise _not_found()
+    _catalog_changed(session, principal, "product.created", copy)
     return _as_response(copy)
+
+
+_AUDITED_TEXT = 300
+
+
+def _shown(value: Any) -> Any:
+    """A product value as the audit log keeps it: short, and plain JSON."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, str):
+        return value[:_AUDITED_TEXT]
+    if isinstance(value, list | tuple):
+        return [str(item)[:_AUDITED_TEXT] for item in value]
+    return value
+
+
+def _catalog_changed(
+    session: SessionDep,
+    principal: Any,
+    action: str,
+    product: Product,
+    changes: dict[str, Any] | None = None,
+) -> None:
+    """After a product changes: what the agent asks for quotes is rebuilt, and the change is kept.
+
+    The process configuration (what a quote asks) is cached per process, and a product edit did not
+    clear it; nor could anybody tell afterwards what an owner changed, when the agent seemed not to
+    know about it.
+    """
+    DEFAULT_CACHE.invalidate(principal.tenant_id)
+    detail: dict[str, Any] = {"producto_id": str(product.id), "producto": product.name}
+    if changes:
+        detail["cambios"] = changes
+    AuditLogRepository(session, principal.tenant_id).record(
+        actor_id=principal.user_id, action=action, detail=detail
+    )
+    session.commit()
 
 
 def _product(session: SessionDep, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:

@@ -167,6 +167,16 @@ class MessageRepository(BaseRepository[Message]):
         )
         return self._session.execute(statement).scalar_one_or_none()
 
+    def last_reply_at(self, conversation_id: uuid.UUID) -> datetime | None:
+        """When the assistant (or a person of the business) last wrote in this thread."""
+        statement = select(func.max(Message.created_at)).where(
+            self._tenant_predicate,
+            Message.conversation_id == conversation_id,
+            Message.direction == "outbound",
+            Message.msg_type != EVENT,
+        )
+        return self._session.execute(statement).scalar_one_or_none()
+
     def outbound_after(
         self, conversation_id: uuid.UUID, after_id: uuid.UUID | None = None
     ) -> Sequence[Message]:
