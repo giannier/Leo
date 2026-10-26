@@ -44,6 +44,7 @@ from app.process.templates import TEMPLATES, get_template
 from app.process.templates.base import EffectiveOptions, Stage, Template
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
+from app.repositories.product import ProductRepository
 from app.repositories.sales_config import BusinessInfoRepository, PromotionRepository
 from app.schemas.business_info import (
     SECTION_SCHEMAS,
@@ -259,6 +260,12 @@ class ProcessConfigService:
             agendar="agendar" in capacities,
             captar="captar" in capacities,
             postventa="vender" in capacities,
+            cotizar="cotizar" in capacities,
+            datos_cotizacion=(
+                ProductRepository(self._session, tenant_id).quote_fields()
+                if "cotizar" in capacities
+                else ()
+            ),
         )
 
         layers = LayerResolver(self._session, tenant_id).resolve(

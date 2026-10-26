@@ -42,6 +42,7 @@ from app.process.templates.base import (
     GLOBAL_TOOLS,
     LEAD_TOOL_NAMES,
     POSTSALE_TOOL_NAMES,
+    QUOTE_TOOL_NAMES,
     SCHEDULING_TOOL_NAMES,
     EffectiveOptions,
     Stage,
@@ -299,6 +300,8 @@ def tools_of_stage(scope: ToolScope) -> tuple[str, ...]:
         names.extend(tool for tool in LEAD_TOOL_NAMES if tool not in names)
     if scope.options.postventa:
         names.extend(tool for tool in POSTSALE_TOOL_NAMES if tool not in names)
+    if scope.options.cotizar:
+        names.extend(tool for tool in QUOTE_TOOL_NAMES if tool not in names)
     return tuple(names)
 
 

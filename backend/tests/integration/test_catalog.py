@@ -57,7 +57,7 @@ class TestTheSplit:
         ]
 
 
-LATEST_PROCESS_VERSION = 3
+LATEST_PROCESS_VERSION = 4
 
 
 class TestVersionOne:
@@ -69,7 +69,7 @@ class TestVersionOne:
         code = {s.value: TEMPLATES[key].stage(s).instrucciones for s in Stage}
         texts = stage_texts_from(rules, code, list(code))
 
-        # The newest published version (v3 since migration 0048) is today's code text.
+        # The newest published version (v4 since migration 0067) is today's code text.
         assert rules.process_version == LATEST_PROCESS_VERSION
         assert texts == code
 
@@ -96,6 +96,46 @@ class TestVersionOne:
         config = ProcessConfigService(db, cache=ProcessConfigCache())._load(uuid4())
 
         assert config.process_version == LATEST_PROCESS_VERSION
+
+
+class TestVersionFour:
+    """Migration 0067: the quote flow, as the fourth published version of each template."""
+
+    @pytest.mark.parametrize("key", sorted(TEMPLATES))
+    def test_it_keeps_every_rule_key_of_version_three(self, db: Session, key: str) -> None:
+        catalog = CatalogRepository(db)
+        v3, v4 = catalog.version("proceso", key, 3), catalog.version("proceso", key, 4)
+
+        assert v3 is not None and v4 is not None
+        assert v3.estado == v4.estado == "publicada"
+        # A business that switched a rule off keeps it off: the keys are the same.
+        assert [r.rule_key for r in catalog.rules(v4.id)] == [
+            r.rule_key for r in catalog.rules(v3.id)
+        ]
+
+    def test_only_the_servicios_identification_text_changed(self, db: Session) -> None:
+        catalog = CatalogRepository(db)
+        changed: list[tuple[str, str]] = []
+        for key in sorted(TEMPLATES):
+            v3, v4 = catalog.version("proceso", key, 3), catalog.version("proceso", key, 4)
+            assert v3 is not None and v4 is not None
+            before = {r.rule_key: r.texto for r in catalog.rules(v3.id)}
+            changed += [
+                (key, r.rule_key) for r in catalog.rules(v4.id) if before[r.rule_key] != r.texto
+            ]
+
+        assert changed
+        assert {key for key, _ in changed} == {"servicios"}
+        assert all(rule_key.startswith("IDENTIFICAR.") for _, rule_key in changed)
+
+    def test_version_three_is_left_as_it_was(self, db: Session) -> None:
+        catalog = CatalogRepository(db)
+        v3 = catalog.version("proceso", "servicios", 3)
+
+        assert v3 is not None
+        texts = "\n".join(r.texto for r in catalog.rules(v3.id))
+        assert "pídele su nombre y correo" in texts or "nombre y correo" in texts
+        assert "COTIZACIÓN" not in texts
 
 
 class TestPublishedIsFrozen:

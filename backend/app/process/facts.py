@@ -17,6 +17,7 @@ table-driven test.
 
 from __future__ import annotations
 
+import unicodedata
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -63,6 +64,7 @@ STORED_KEYS = frozenset(
         "promos_ofrecidas",
         "cita_agendada",
         "lead_calificado",
+        "cotizacion",
     }
 )
 
@@ -113,6 +115,36 @@ class LeadCalificado(_Model):
     motivo: str | None = None
     respuestas: dict[str, str] = Field(default_factory=dict)
     en: datetime | None = None
+
+
+class Cotizacion(_Model):
+    """The quote being put together: what the customer gave and what is still missing.
+
+    Without this the only memory of a quote is the transcript, and the model re-reads it every
+    turn to guess what to ask: it asked again for what was already said, and decided by mood when
+    to hand over. `pide` is the list the product asks for, as it was when the data were last noted.
+    """
+
+    producto: str | None = None
+    producto_id: str | None = None
+    datos: dict[str, str] = Field(default_factory=dict)
+    pide: list[str] = Field(default_factory=list)
+    # The datum the assistant was last told to ask: «sin dato» is only valid for that one.
+    preguntado: str | None = None
+
+    @property
+    def falta(self) -> list[str]:
+        """What the product asks for that the customer has not given."""
+        given = {plain(name) for name in self.datos}
+        return [name for name in self.pide if plain(name) not in given]
+
+
+def plain(text: str) -> str:
+    """Lower case, no accents, single spaces: how two spellings of a datum are compared."""
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFD", text.lower()) if unicodedata.category(c) != "Mn"
+    )
+    return " ".join(stripped.split())
 
 
 class Seguimiento(_Model):
@@ -184,6 +216,8 @@ class Facts(_Model):
     cita_agendada: datetime | None = None
     # How warm the customer is, as the assistant judged it (`captar`).
     lead_calificado: LeadCalificado | None = None
+    # The quote in progress (`anotar_cotizacion`), kept until it goes to a person.
+    cotizacion: Cotizacion | None = None
     seguimiento: Seguimiento | None = None
     # Closing promotions offered in this conversation, with their expiry.
     promos_ofrecidas: dict[str, datetime] = Field(default_factory=dict)
@@ -242,6 +276,7 @@ class Facts(_Model):
                 "asesoria_derivada_en",
                 "cita_agendada",
                 "lead_calificado",
+                "cotizacion",
                 "seguimiento",
                 "promos_ofrecidas",
             },

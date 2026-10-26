@@ -41,6 +41,7 @@ from app.agent.tools.leads import calificar_cliente
 from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.payments import enviar_metodos_pago
 from app.agent.tools.postsale import consultar_pedidos
+from app.agent.tools.quote import anotar_cotizacion, quote_key
 from app.agent.tools.registry import (
     ToolCatalog,
     ToolDefinition,
@@ -258,27 +259,28 @@ def _has_paths(scope: ToolScope) -> bool:
 
 
 def _handover_schema(scope: ToolScope) -> dict[str, Any]:
-    return _object(
-        {
-            "motivo": {"type": "string", "enum": list(HANDOVER_REASONS)},
-            "resumen": _text("Qué necesita el cliente, en pocas líneas.", maxLength=_MAX_SUMMARY),
-            "ofrecido": {"type": "string", "description": "Qué se le ofreció, si algo."},
-            "animo": {"type": "string", "enum": ["tranquilo", "apurado", "molesto", "dudoso"]},
-            "datos": {
-                "type": "array",
-                "maxItems": 8,
-                "description": "Solo cotizacion: lo que el cliente ya dijo (dato y valor).",
-                "items": _object(
-                    {
-                        "dato": {"type": "string", "maxLength": 40},
-                        "valor": {"type": "string", "maxLength": 120},
-                    },
-                    ["dato", "valor"],
-                ),
-            },
-        },
-        ["motivo", "resumen"],
-    )
+    properties: dict[str, Any] = {
+        "motivo": {"type": "string", "enum": list(HANDOVER_REASONS)},
+        "resumen": _text("Qué necesita el cliente, en pocas líneas.", maxLength=_MAX_SUMMARY),
+        "ofrecido": {"type": "string", "description": "Qué se le ofreció."},
+        "animo": {"type": "string", "enum": ["tranquilo", "apurado", "molesto", "dudoso"]},
+    }
+    # With the quote form the data are noted there and the handover merges them: the list would
+    # only repeat what the form already carries (~70 tokens on every turn).
+    if not (scope.options.cotizar and scope.options.datos_cotizacion):
+        properties["datos"] = {
+            "type": "array",
+            "maxItems": 8,
+            "description": "Solo cotizacion: lo que el cliente ya dijo (dato y valor).",
+            "items": _object(
+                {
+                    "dato": {"type": "string", "maxLength": 40},
+                    "valor": {"type": "string", "maxLength": 120},
+                },
+                ["dato", "valor"],
+            ),
+        }
+    return _object(properties, ["motivo", "resumen"])
 
 
 def _can_schedule(scope: ToolScope) -> bool:
@@ -352,6 +354,39 @@ def _no_arguments(scope: ToolScope) -> dict[str, Any]:
 
 def _can_qualify(scope: ToolScope) -> bool:
     return scope.options.captar
+
+
+def _can_quote(scope: ToolScope) -> bool:
+    return scope.options.cotizar
+
+
+def _quote_schema(scope: ToolScope) -> dict[str, Any]:
+    """One field per datum the business asks for (a form the model fills), or a free list.
+
+    A field with the datum's own name is filled more reliably than a generic «dato / valor»
+    list (the model archived «20 semanales» as the product); it also invites filling every field,
+    which the handler checks (`quote.py`): only what was said, and a date has to look like one.
+    """
+    names = scope.options.datos_cotizacion
+    if not names:
+        return _object(
+            {
+                "datos": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "description": "Lo que el cliente dio ahora.",
+                    "items": _object(
+                        {"dato": {"type": "string"}, "valor": {"type": "string"}}, ["dato", "valor"]
+                    ),
+                },
+            },
+            ["datos"],
+        )
+    # The key already says the datum: a description per field is tokens spent on a repetition.
+    fields: dict[str, Any] = {quote_key(name): {"type": "string"} for name in names}
+    fields["producto"] = {"type": "string"}  # «todas», says the quote block
+    return _object(fields)
 
 
 def _qualify_schema(scope: ToolScope) -> dict[str, Any]:
@@ -504,6 +539,14 @@ def _definitions() -> list[ToolDefinition]:
             parameters=_qualify_schema,
             handler=calificar_cliente,
             available=_can_qualify,
+            effect=True,
+        ),
+        ToolDefinition(
+            name="anotar_cotizacion",
+            description="Anota lo que da el cliente para cotizar; completo, pasa a una persona.",
+            parameters=_quote_schema,
+            handler=anotar_cotizacion,
+            available=_can_quote,
             effect=True,
         ),
         ToolDefinition(

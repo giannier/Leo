@@ -57,7 +57,7 @@ from app.agent.prompts.builder import (
 from app.agent.situations import SelectedSituation
 from app.models.business import MAX_SALUDO
 from app.process.engine import anuncio_vigente
-from app.process.facts import Facts, PromoCierre
+from app.process.facts import Cotizacion, Facts, PromoCierre
 from app.process.service import EffectiveProcessConfig
 from app.process.templates.base import PLACEHOLDER_PATTERN, Stage
 from app.process.turn import TurnContext
@@ -74,6 +74,7 @@ SECTION_CAPS: Mapping[str, int] = {
     "venta": 540,
     "agenda": 200,
     "captacion": 220,
+    "cotizacion": 320,
     "postventa": 170,
     "estilo": 300,
     "estado": 500,
@@ -131,9 +132,9 @@ Eres {nombre_asistente}, asistente virtual de {nombre_negocio}.
 SALES_PLAYBOOK = """\
 VENTA: así conversas para vender
 1. Sondea antes de ofrecer. Pregunta de a UNA, abierta y sobre lo último que dijo el cliente: qué quiere lograr, cómo lo resuelve hoy, para cuándo. Con 2 respuestas ya recomiendas.
-2. Recomienda con seguridad: UNA opción, por qué le sirve a SU caso y, como mucho, una alternativa. Varía cómo lo dices; no recites el catálogo ni preguntes "¿quieres / prefieres que te cuente, te explique, te deje...?": hazlo.
-3. Habla en firme y con hechos. Afirma ("Te conviene X porque...") sin "quizás", "tal vez" ni "normalmente". Solo dices lo que sale de tus herramientas o del negocio; si no lo sabes, dilo y di quién lo confirma. Nunca inventes casos, clientes, plazos, cifras, escasez ni urgencia.
-4. Cierra cada mensaje con un siguiente paso concreto: elegir entre dos opciones, un dato que falta o confirmar. Nunca con "¿algo más?".
+2. Si aún no eligió, recomienda con seguridad UNA opción y por qué le sirve a SU caso. Si ya dijo qué quiere, no lo recomiendes otra vez: avanza. Varía cómo lo dices; no recites el catálogo ni preguntes "¿quieres / prefieres que te cuente, te explique, te deje...?": hazlo.
+3. Habla en firme y con hechos, sin "quizás", "tal vez" ni "normalmente". Solo dices lo que sale de tus herramientas o del negocio; si no lo sabes, dilo y di quién lo confirma. Nunca inventes casos, clientes, plazos, cifras, popularidad, escasez, urgencia ni razones de venta.
+4. Cierra cada mensaje con un siguiente paso concreto: elegir entre dos opciones, un dato que falta o confirmar; si ya tienes todo, avanza. Nunca con "¿algo más?".
 5. Ante una objeción (precio, "lo pienso", comparar, desconfianza): reconócela en una frase, pregunta qué pesa más para él, responde a ESO con el valor real del negocio y vuelve al siguiente paso. Si dice "lo pienso", respeta su tiempo, resume el valor en una línea y ofrécele resolver una duda o enviarle la propuesta. No discutas, no rebajes, no menciones descuentos ni digas que no hay promoción (solo ofrece la que el ESTADO traiga) y no derives por una objeción de precio.
 6. Señal de compra (pregunta precio, plazo o cómo pagar; dice "me interesa"): resume en una línea lo que recibirá y propón cerrar ya ("Te lo dejo listo: ¿pagas por Yape o transferencia?"). Si ya eligió, no reabras la decisión ni ofrezcas lo que no esté en tus herramientas: avanza.
 7. Cercanía: usa su nombre si lo dio, retoma sus palabras, mensajes cortos. Si hay interés real, pide su nombre y cómo contactarlo, diciendo para qué."""
@@ -182,6 +183,26 @@ menciones). Interés ALTO: necesidad concreta y plazo corto, o pide precio, cita
 interés con plazo o presupuesto sin definir. BAJO: solo curiosidad. No pidas tarjeta ni documentos."""
 
 
+QUOTE_RULES = """\
+COTIZACIÓN: lo «a cotizar» no tiene precio: tú juntas los datos y una persona lo cotiza.
+1. Anota con anotar_cotizacion, en ESE turno y antes de contestar, cada dato que dé (varios a la vez), solo si responde al dato. Si quiere varios productos o todos, anótalo como «producto».
+2. Pregunta solo lo que falte (ESTADO), de a uno. Nunca lo que ya dio ni una pregunta repetida: si no la contestó, cámbiala.
+3. Si dice con claridad que no sabe o no quiere dar ESE dato, anótalo como «sin dato» (solo entonces). Si te corrige («ya te dije…»), disculpa breve, anótalo y sigue.
+4. Confirma lo nuevo en pocas palabras. No repitas que tienes el producto ni que se cotiza ni vuelvas a buscar si ya sabes cuál es. Si no eligió producto (ni dijo «todos»), nombra las opciones y pregunta cuál; no recomiendes ni des razones de venta.
+5. Si el producto no pide datos, al entender qué quiere usa derivar_a_humano(motivo="cotizacion", datos=...). Con todos los datos pasa sola a una persona: no escribas más."""
+
+
+# A business that also qualifies leads: asking for a quote is clear interest, and with the quote
+# tool at hand the model noted it and handed over without qualifying (the sales flows caught it).
+QUOTE_QUALIFIES = "\n6. Cotizar es interés ALTO: llama también a calificar_cliente en ese turno."
+
+
+def _quote_block(config: EffectiveProcessConfig, stage: Stage) -> str:
+    if not (config.options.cotizar and stage in _SELLING_STAGES):
+        return ""
+    return QUOTE_RULES + (QUOTE_QUALIFIES if config.options.captar else "")
+
+
 AFTERSALE_RULES = """\
 POSTVENTA: si pregunta por un pedido ya hecho, usa consultar_pedidos. Si quiere devolver, cambiar o
 reclamar algo, usa solicitar_devolucion: solo registra la solicitud; NUNCA prometas reembolso, cambio,
@@ -206,7 +227,7 @@ def _schedule_block(config: EffectiveProcessConfig) -> str:
 
 _PACE_TEXT: Mapping[str, str] = {
     "directo": "Ve al grano. Si el cliente ya dio lo que necesitas, avanza sin preguntar de nuevo.",
-    "equilibrado": "Una pregunta por mensaje. Confirma lo importante antes de avanzar.",
+    "equilibrado": ("Una pregunta por mensaje. Reconoce el dato nuevo en pocas palabras y avanza."),
     "paso_a_paso": (
         "Explica cada paso antes de pedir algo. Pregunta una cosa a la vez y verifica que entendió."
     ),
@@ -668,6 +689,24 @@ def _order_line(facts: Facts, limits: _StateLimits) -> str:
     return text
 
 
+def _quote_line(quote: Cotizacion, limits: _StateLimits) -> str:
+    """What the customer already gave for the quote and what is left to ask: the model's memory."""
+    product = _one_line(quote.producto, 60) if quote.producto else "producto sin elegir"
+    given = "; ".join(
+        f"{_one_line(name, 30)} = {_one_line(value, limits.text)}"
+        for name, value in quote.datos.items()
+    )
+    if not quote.pide:
+        left = "este producto no pide datos"
+    else:
+        missing = quote.falta
+        left = ", ".join(_one_line(name, 40) for name in missing) if missing else "nada"
+    return (
+        f"- Cotización en curso ({product}). Ya dio: {given or 'nada'}. Falta: {left}. "
+        "No vuelvas a pedir lo que ya dio."
+    )
+
+
 def _promo_state_line(promo: PromoCierre, now: datetime, zone: ZoneInfo) -> str:
     head = (
         f'- Promoción de cierre disponible (solo si duda): "{_one_line(promo.nombre, 60)}" '
@@ -728,6 +767,8 @@ def _state_lines(
         )
 
     lines.append(_order_line(facts, limits))
+    if facts.cotizacion is not None:
+        lines.append(_quote_line(facts.cotizacion, limits))
 
     if facts.datos_faltantes:
         lines.append(f"- Datos del cliente: faltan {', '.join(facts.datos_faltantes)}")
@@ -834,6 +875,9 @@ def build_stage_prompt(
     sales = _sales_block(config, stage)
     if sales:
         parts["venta"] = sales
+    quote = _quote_block(config, stage)
+    if quote:
+        parts["cotizacion"] = quote
     schedule = _schedule_block(config)
     if schedule:
         parts["agenda"] = schedule

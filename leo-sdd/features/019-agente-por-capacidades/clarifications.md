@@ -210,3 +210,40 @@ regla y con su revisión; costo apagado hasta activarlo y con tope semanal. Se r
 **Fuera, por decisión:** reentrenar el modelo, aprendizaje sin aprobación, transcribir mensajes en vivo, volver a pasar conversaciones
 antiguas por la configuración nueva (así lo dice el brief).
 
+
+## C-11: cotizar bien (una conversación real que los evals daban por buena)
+**Origen (Giannier, 2026-10-26):** seis capturas del simulador de «Nayu» (Bebidas yanayacu, agua en bidones) y un 👎: repetía «Sí,
+contamos con…» en cada mensaje, volvía a preguntar lo que el cliente ya había dicho («ya te dije que 20 semanales»), cerraba una vez
+con tres datos y otra con dos, entregaba a una persona con un «ya le pasé lo que necesitas» sin decir qué, y justificaba con una frase
+de venta que nada respaldaba. Los evals estaban en verde.
+**Causas (comprobadas con el modelo real, no supuestas):**
+1. *Tres jefes distintos.* El manual de venta («recomienda UNA opción y por qué»), el texto de la etapa de *servicios* («pide nombre y
+   correo y deriva») y la pista dentro de `buscar_productos` («antes de derivar pide lo que falte») se contradecían; el modelo
+   obedecía a uno distinto cada vez.
+2. *Sin memoria de la cotización.* Lo único que había era el historial: el modelo lo releía y adivinaba qué faltaba, y a veces
+   anotaba «20 semanales» como la fecha o «para negocio» como el producto.
+3. *Nadie decidía cuándo cerrar.* Derivaba «por ánimo»; el mensaje de entrega era genérico y no devolvía al cliente lo anotado.
+4. *Los evals miraban otra cosa.* Revisaban la etapa final y qué herramientas se usaron, no leían la conversación como la lee un
+   cliente (repeticiones, preguntas repetidas, afirmaciones sin respaldo). Un flujo podía terminar en la etapa correcta con una
+   conversación mala.
+**Qué se hizo:**
+- `anotar_cotizacion` (capacidad `cotizar`): un formulario con un campo por cada dato que el negocio pide (`products.datos_a_pedir`);
+  lo anotado queda en el hecho `cotizacion` y el bloque ESTADO le muestra al modelo qué ya dio y qué falta. La herramienta responde
+  qué dato preguntar ahora; con todo completo **pasa sola a una persona** y le devuelve al cliente lo anotado («Anoté: …»).
+- Una fecha y una cantidad tienen que parecerlo (no se anota «para negocio» como fecha); «sin dato» solo vale para el dato que se
+  acaba de preguntar y si el cliente mismo dijo que no sabe o no quiere darlo; `derivar_a_humano` no deja cerrar una cotización
+  incompleta (salvo que el cliente se niegue).
+- Si el modelo escribe «ya anoté» sin llamar a la herramienta, se le avisa una vez (`UNBACKED_CLAIMS` en `agent/core.py`).
+- Un solo conjunto de instrucciones: bloque COTIZACIÓN en el prompt (~260 tokens), texto de *servicios* corregido como **versión 4**
+  de las tres plantillas (migración 0067; las versiones publicadas no se tocan y las reglas conservan sus claves), y la pista de
+  `buscar_productos` cambia cuando la herramienta existe. Un negocio con `cotizar` y `captar` también califica el lead al cotizar.
+- **Un eval honesto** (`evals/real_conversations.py`): 9 conversaciones copiadas de las capturas (escritas por el dueño) y 9 distintas
+  que se escribieron *después* del arreglo para no ajustarlo a ellas. Mide repeticiones, preguntas repetidas, datos ya dados, cierres
+  inconsistentes, afirmaciones sin respaldo y una frase de venta inventada; con `JUDGE=1` un segundo modelo la lee como cliente.
+  Se pide 85 % (medido en 20 corridas: casi siempre 16 a 18 de 18; una dio 13); corre dentro de `make evals`.
+**Costo del modelo (informativo):** un negocio con `cotizar` paga ~260 tokens más en el prompt de cada turno donde vende y entre 100 y
+170 tokens por la herramienta; los demás negocios no pagan nada. La plantilla y el manual de venta cambiaron unas palabras para todos.
+**Límites que quedan:** no es 100 %: el modelo aún puede poner un dato en el campo equivocado (la validación solo ataca fecha y
+cantidad); un negocio sin `datos_a_pedir` solo tiene la memoria del estado, no un formulario; y el último mensaje del cliente puede
+aparecer dos veces en el historial que ve el modelo (no corregido). **No se pudo leer la configuración ni el catálogo reales de
+Nayu en producción** (acceso denegado, no se rodeó): el arreglo supone que sus productos a cotizar piden cosas como cantidad y fecha.
