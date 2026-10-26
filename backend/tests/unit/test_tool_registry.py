@@ -575,7 +575,7 @@ class TestThePromptBudgetWithTheRealTools:
                 postventa=True,
                 # A business that quotes too, asking for three data of its own.
                 cotizar=True,
-                datos_cotizacion=("cantidad", "fecha", "distrito o dirección"),
+                datos_cotizacion=("cantidad", "fecha", "distrito o dirección", "uso", "frecuencia"),
             ),
             preguntas_calificacion=(
                 "¿Qué proceso quieres resolver?",

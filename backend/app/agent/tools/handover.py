@@ -28,9 +28,10 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.agent.tools.registry import ToolContext, ToolResult
-from app.process.facts import Cotizacion, plain
+from app.process.facts import Cotizacion
 from app.process.system_messages import render_system_message
 from app.process.templates.base import DEFAULT_SYSTEM_MESSAGES
+from app.process.text import plain
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.conversation import MessageRepository
 from app.scheduling.availability import is_open, next_opening
@@ -177,6 +178,16 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
     if motivo == "cotizacion":
         # What the model passes, over what was noted turn by turn: nothing noted is lost.
         noted = current_quote(context)
+        asks = context.options.datos_cotizacion if context.options is not None else ()
+        if noted is None and asks and not customer_refused(context):
+            # Nothing noted yet and the business asks for data: handing over now sends a person a
+            # conversation with nothing in it (the assistant did it on «quiero empezar a vender»).
+            return ToolResult.no_disponible(
+                decir=(
+                    f"Aún no tienes ningún dato de la cotización ({', '.join(asks[:5])}). Conversa "
+                    "con el cliente y anótalos con anotar_cotizacion; no derives todavía."
+                )
+            )
         if noted is not None and noted.falta and not customer_refused(context):
             return ToolResult.no_disponible(
                 decir=(

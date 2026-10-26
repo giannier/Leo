@@ -52,6 +52,7 @@ from app.agent.tools.registry import (
 from app.agent.tools.sales import elegir_camino, enviar_recurso, mostrar_opciones
 from app.agent.tools.scheduling import agendar_cita, consultar_horarios, gestionar_cita
 from app.process.facts import Facts
+from app.process.quote_data import gloss
 from app.process.templates.base import EffectiveOptions, Stage, Template
 
 OPTION_TYPES = ("caminos", "categorias", "productos", "promociones")
@@ -261,8 +262,8 @@ def _has_paths(scope: ToolScope) -> bool:
 def _handover_schema(scope: ToolScope) -> dict[str, Any]:
     properties: dict[str, Any] = {
         "motivo": {"type": "string", "enum": list(HANDOVER_REASONS)},
-        "resumen": _text("Qué necesita el cliente, en pocas líneas.", maxLength=_MAX_SUMMARY),
-        "ofrecido": {"type": "string", "description": "Qué se le ofreció."},
+        "resumen": _text("Qué necesita el cliente.", maxLength=_MAX_SUMMARY),
+        "ofrecido": {"type": "string"},
         "animo": {"type": "string", "enum": ["tranquilo", "apurado", "molesto", "dudoso"]},
     }
     # With the quote form the data are noted there and the handover merges them: the list would
@@ -314,7 +315,7 @@ def _appointment_schema(scope: ToolScope) -> dict[str, Any]:
             "accion": {"type": "string", "enum": ["ver", "reprogramar", "cancelar", "confirmar"]},
             "cita_id": _text("Puede omitirse si tiene una sola."),
             "slot": _text("Al reprogramar: el nuevo slot."),
-            "motivo": {"type": "string", "maxLength": 200},
+            "motivo": {"type": "string"},
         },
         ["accion"],
     )
@@ -383,8 +384,14 @@ def _quote_schema(scope: ToolScope) -> dict[str, Any]:
             },
             ["datos"],
         )
-    # The key already says the datum: a description per field is tokens spent on a repetition.
-    fields: dict[str, Any] = {quote_key(name): {"type": "string"} for name in names}
+    # The key says the datum; the usual ones add a few words on what goes there (uso: para qué lo
+    # usa).
+    fields: dict[str, Any] = {
+        quote_key(name): (
+            {"type": "string", "description": gloss(name)} if gloss(name) else {"type": "string"}
+        )
+        for name in names
+    }
     fields["producto"] = {"type": "string"}  # «todas», says the quote block
     return _object(fields)
 
@@ -517,8 +524,7 @@ def _definitions() -> list[ToolDefinition]:
         ToolDefinition(
             name="solicitar_devolucion",
             description=(
-                "Registra que quiere devolver, cambiar o reclamar algo de un pedido suyo. "
-                "Solo registra: decide una persona."
+                "Registra una devolución, cambio o reclamo de un pedido suyo; decide una persona."
             ),
             parameters=_return_schema,
             handler=solicitar_devolucion,
@@ -543,7 +549,7 @@ def _definitions() -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="anotar_cotizacion",
-            description="Anota lo que da el cliente para cotizar; completo, pasa a una persona.",
+            description="Anota los datos de la cotización que da el cliente.",
             parameters=_quote_schema,
             handler=anotar_cotizacion,
             available=_can_quote,
@@ -552,8 +558,8 @@ def _definitions() -> list[ToolDefinition]:
         ToolDefinition(
             name="derivar_a_humano",
             description=(
-                "Pasa la conversación a una persona del negocio. Termina tu turno: lo que "
-                "escribas después se descarta."
+                "Pasa la conversación a una persona. Termina tu turno: lo que escribas después "
+                "se descarta."
             ),
             parameters=_handover_schema,
             handler=derivar_a_humano,

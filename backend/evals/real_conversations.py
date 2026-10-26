@@ -86,12 +86,84 @@ def water(asks: Sequence[str]) -> Business:
     )
 
 
+# Bebidas yanayacu as it is in production (read 2026-10-26 with the owner's permission): five products
+# «a cotizar», each with the owner's own questions, and the capabilities atender, vender, cotizar and
+# captar. Nothing else about the business is copied: no customers, no prices, no credentials.
+NAYU_ASKS: dict[str, tuple[str, ...]] = {
+    "Agua Alcalina": (
+        "¿Cuántas botellas de Agua Alcalina de 625 ml necesitas?",
+        "¿Para qué fecha necesitas tu pedido?",
+        "¿A qué distrito o dirección deseas recibirlo?",
+        "¿Es para consumo personal, un evento, tu gimnasio o tu negocio?",
+        "¿Necesitas una compra puntual o pedidos recurrentes?",
+    ),
+    "Agua de Mesa de 625 ml": (
+        "¿Cuántas botellas de 500 ml necesitas?",
+        "¿Para qué fecha necesitas el pedido?",
+        "¿A qué distrito o dirección se realizará la entrega?",
+        "¿Es para consumo personal, un evento o tu negocio?",
+    ),
+    "Agua de Mesa de 7 L": (
+        "¿Cuántas unidades de agua de 7 litros necesitas?",
+        "¿Para qué fecha necesitas tu pedido?",
+        "¿A qué distrito o dirección deseas recibirlo?",
+        "¿Es para tu hogar, oficina o negocio?",
+    ),
+    "Bidon de Agua de 20L": (
+        "¿Cuántas unidades de agua de 20 litros necesitas?",
+        "¿Para qué fecha necesitas el pedido?",
+        "¿A qué distrito o dirección deseas recibirlo?",
+        "¿Es para tu hogar, oficina o negocio?",
+        "¿Necesitas una entrega puntual o pedidos recurrentes?",
+    ),
+    "Caja de Agua de 20L": (
+        "¿Cuántas unidades de agua de 20 litros necesitas?",
+        "¿Para qué fecha necesitas el pedido?",
+        "¿A qué distrito o dirección deseas recibirlo?",
+        "¿Es para tu hogar, oficina o negocio?",
+        "¿Necesitas una entrega puntual o pedidos recurrentes?",
+    ),
+}
+
+
+def _nayu_setup(session: Session, tenant) -> None:  # type: ignore[no-untyped-def]
+    config = session.query(AgentConfig).filter(AgentConfig.tenant_id == tenant.id).one()
+    config.capacidades = ["atender", "vender", "cotizar", "captar"]
+    config.agent_name = "Nayu"
+    for product in ProductRepository(session, tenant.id).list():
+        product.datos_a_pedir = list(NAYU_ASKS[product.name])
+
+
+def nayu() -> Business:
+    return Business(
+        name="Bebidas yanayacu",
+        industry="b2b",
+        template="servicios",
+        description="Distribuidora de agua de mesa en bidones y botellas, por mayor y menor.",
+        products=tuple((name, "0.00", "", "cotizacion", None, False, False) for name in NAYU_ASKS),
+        payment="Transferencia a nombre de Bebidas yanayacu.",
+        setup=_nayu_setup,  # type: ignore[arg-type]
+    )
+
+
 # What the assistant may ask for, in the words it uses. A reply «asks for» a datum when a sentence
 # of it that is a question, or says it is missing, matches.
 ASKS: dict[str, re.Pattern[str]] = {
     "cantidad": re.compile(r"cu[aá]nt[oa]s?\b|cantidad|unidades|cu[aá]ntos bidones", re.I),
-    "fecha": re.compile(r"fecha|cu[aá]ndo|para qu[eé] d[ií]a|desde cu[aá]ndo", re.I),
+    "fecha": re.compile(
+        r"qu[eé] fecha|fecha (exacta|de entrega|que|necesit|quier)|cu[aá]ndo|para qu[eé] d[ií]a|"
+        r"me falta (solo )?(la )?fecha",
+        re.I,
+    ),
     "distrito": re.compile(r"distrito|direcci[oó]n|d[oó]nde|zona de entrega", re.I),
+    "uso": re.compile(
+        r"hogar,? (oficina|o )|oficina,? o|consumo (personal|propio)|"
+        r"para qu[eé] (lo|la|es|ser[aá]|usar)|tipo de (negocio|local)",
+        re.I,
+    ),
+    "frecuencia": re.compile(
+        r"puntual|recurrent|con qu[eé] frecuencia|cada cu[aá]nto|peri[oó]dic|de forma regular", re.I
+    ),
     "producto": re.compile(
         r"qu[eé] presentaci[oó]n|cu[aá]l presentaci[oó]n|qu[eé] tama[ñn]o|cu[aá]l de", re.I
     ),
@@ -107,9 +179,22 @@ _ASKED_AVAILABILITY = re.compile(r"cuentan|tienen|distribuyen|manejan|disponible
 # Reasons nobody gave it: the catalogue has no rotation, no «formato más fuerte», no «te conviene».
 _INVENTED = re.compile(
     r"alta rotaci[oó]n|m[aá]s rota|rota m[aá]s|pensada para volumen|formato (m[aá]s )?fuerte|"
-    r"te conviene|le conviene|ideal para (revender|negocio)|opci[oó]n destacada",
+    r"te conviene(?! (definir|elegir|decidir|empezar|revisar|ver|pensar|aclarar))|le conviene|"
+    r"ideal para (revender|negocio)|opci[oó]n destacada|m[aá]s (pedid[oa]|usad[oa]|vendid[oa])",
     re.I,
 )
+
+
+# A reply that hands the datum back like a receipt: «Anotado: *8 cajas*. ¿Para qué fecha...?», «Gracias,
+# *Chorrillos*.». One is a confirmation; three in a conversation is a form (the owner's complaint:
+# a person asks «¿y dónde queda tu hogar?», not «Anotado: *hogar*»). gpt-5.4 did it too: it was the
+# instructions, not the model.
+_RECEIPT = re.compile(
+    r"^\W*(anotado|perfecto|gracias|listo|entendido|ok)\b[^\n*]{0,25}\*[^*\n]{1,60}\*|"
+    r"\bya qued[oó] (anotad[oa]:? )?\*[^*\n]{1,60}\*",
+    re.I,
+)
+RECEIPTS_ALLOWED = 2
 
 
 def _label(call: dict[str, object]) -> str:
@@ -161,6 +246,9 @@ class Scenario:
     recap: tuple[str, ...] = ()
     # When it must have gone to a person: after this many customer lines (None: no demand).
     handed_at: int | None = None
+    # `water` is the simple catalogue (three presentations, one list of short data); `nayu` is the
+    # real one (five products, questions of the owner's own).
+    catalog: str = "water"
 
 
 ALEXANDER = (
@@ -397,7 +485,133 @@ HELD_OUT: tuple[Scenario, ...] = (
     ),
 )
 
-ALL_SCENARIOS = SCENARIOS + HELD_OUT
+
+def _nayu(name: str, lines: tuple[Line, ...], recap: tuple[str, ...], handed_at: int) -> Scenario:
+    return Scenario(name, (), lines, recap=recap, handed_at=handed_at, catalog="nayu")
+
+
+# On the catalogue as it is in production. The first is the owner's own conversation of 23 October
+# (the assistant handed over with only the quantity, called the product by a name it does not have
+# and recommended with reasons nobody gave); the rest are other customers, written after the fix.
+NAYU: tuple[Scenario, ...] = (
+    _nayu(
+        "nayu 1: la conversación del dueño",
+        (
+            say("Buenos dias"),
+            say(
+                "estaba llamando para consultar si distribuyen agua por mayor, quiero empezar a vender",
+                asks_availability=True,
+            ),
+            say("quiero el bidón de 20 L, unos 12 para empezar", "producto", "cantidad"),
+            say("para chiclayo, la victoria", "distrito"),
+            say("en tienda, quiero vender", "uso"),
+            say("que precio tiene ?"),
+            say("mejor 15 unidades", "cantidad"),
+            say("para el lunes", "fecha"),
+            say("serían pedidos recurrentes, todas las semanas", "frecuencia"),
+        ),
+        ("15", "lunes", "Victoria"),
+        9,
+    ),
+    _nayu(
+        "nayu 2: todo en un mensaje",
+        (
+            say(
+                "Hola, necesito 20 bidones de 20 litros desde el lunes para mi tienda en La Victoria, "
+                "Chiclayo, y compraríamos todas las semanas, pedidos recurrentes",
+                "producto",
+                "cantidad",
+                "fecha",
+                "uso",
+                "distrito",
+                "frecuencia",
+            ),
+        ),
+        ("20", "lunes", "Victoria"),
+        1,
+    ),
+    _nayu(
+        "nayu 3: botellas de 625, no se pregunta la frecuencia",
+        (
+            say("Hola, quiero agua de mesa de 625 ml para mi gimnasio", "producto", "uso"),
+            say("200 botellas", "cantidad"),
+            say("para el viernes", "fecha"),
+            say("en Surco", "distrito"),
+        ),
+        ("200", "viernes", "Surco"),
+        4,
+    ),
+    _nayu(
+        "nayu 4: no sabe la fecha",
+        (
+            say("Necesito bidones de 20 L para mi oficina", "producto", "uso"),
+            say("unos 10", "cantidad"),
+            say("en San Isidro", "distrito"),
+            say("compra puntual, una sola vez", "frecuencia"),
+            say("todavía no sé la fecha, lo veo luego"),
+        ),
+        ("10", "San Isidro"),
+        5,
+    ),
+    _nayu(
+        "nayu 5: pregunta el precio y cambia la cantidad",
+        (
+            say("Hola, ¿precio del bidón de 20 L?", "producto", asks_availability=True),
+            say("¿y cuánto cuesta por mayor?"),
+            say("unos 30 al mes", "cantidad"),
+            say("mejor 40", "cantidad"),
+            say("para el 3 de noviembre", "fecha"),
+            say("Miraflores, Av. Larco 123", "distrito"),
+            say("para mi restaurante", "uso"),
+            say("puntual", "frecuencia"),
+        ),
+        ("40", "noviembre", "Miraflores"),
+        8,
+    ),
+    _nayu(
+        "nayu 6: agua alcalina",
+        (
+            say("Hola, ¿venden agua alcalina?", "producto", asks_availability=True),
+            say("50 botellas", "cantidad"),
+            say("para el martes", "fecha"),
+            say("Av. Benavides 500, Miraflores", "distrito"),
+            say("para mi gimnasio", "uso"),
+            say("pedidos recurrentes", "frecuencia"),
+        ),
+        ("50", "martes", "Miraflores"),
+        6,
+    ),
+    _nayu(
+        "nayu 7: molesto porque le repiten una pregunta",
+        (
+            say("Quiero cotizar la caja de agua de 20 L", "producto"),
+            say("8 cajas", "cantidad"),
+            say("ya te dije 8 cajas, ¿por qué preguntas lo mismo?", "cantidad"),
+            say("para mi hogar", "uso"),
+            say("el lunes", "fecha"),
+            say("Chorrillos", "distrito"),
+            say("una sola vez", "frecuencia"),
+        ),
+        ("8", "lunes", "Chorrillos"),
+        7,
+    ),
+    _nayu(
+        "nayu 8: respuestas de una palabra",
+        (
+            say("hola"),
+            say("bidón 20L", "producto"),
+            say("10", "cantidad"),
+            say("lunes", "fecha"),
+            say("Surco", "distrito"),
+            say("tienda", "uso"),
+            say("semanal", "frecuencia"),
+        ),
+        ("10", "lunes", "Surco"),
+        7,
+    ),
+)
+
+ALL_SCENARIOS = SCENARIOS + HELD_OUT + NAYU
 
 
 # ----------------------------------------------------------------------- results
@@ -409,6 +623,9 @@ class Outcome:
     transcript: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
     judge: dict[str, object] | None = None
+    # What the model was asked and wrote, measured, so a run says what it cost.
+    tokens_in: int = 0
+    tokens_out: int = 0
 
     @property
     def ok(self) -> bool:
@@ -439,7 +656,7 @@ def _check_turn(
 
 
 async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider) -> Outcome:
-    tenant = seed(session, water(scenario.asks))
+    tenant = seed(session, nayu() if scenario.catalog == "nayu" else water(scenario.asks))
     contact = Contact(tenant_id=tenant.id, external_user_id=f"sandbox:{uuid.uuid4()}")
     session.add(contact)
     session.flush()
@@ -450,6 +667,7 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
     session.flush()
 
     outcome = Outcome(scenario)
+    receipts = 0
     given: set[str] = set()
     availability_said = False
     handed_at: int | None = None
@@ -476,6 +694,9 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
         result = await pipeline.run(conversation.id, InboundTurn(text=line.text))
         reply = "\n".join(message.content for message in result.messages)
         calls = result.reply.tools_called if result.reply else []
+        if result.reply:
+            outcome.tokens_in += result.reply.input_tokens
+            outcome.tokens_out += result.reply.output_tokens
         outcome.transcript.append(f"- Cliente: {line.text}")
         outcome.transcript.append(
             f"  - {result.stage_before.value} → {result.stage_after.value} · "
@@ -485,6 +706,7 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
         handed = result.stage_after is Stage.DERIVADO
         if reply:
             _check_turn(outcome, index, line, given, reply, availability_said=availability_said)
+            receipts += bool(_RECEIPT.search(reply))
         given |= set(line.gives)
         if _AGAIN_AVAILABLE.search(reply) or re.search(r"se cotiza", reply, re.I):
             availability_said = True
@@ -493,6 +715,10 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
             handed_at = index
             break
 
+    if receipts > RECEIPTS_ALLOWED:
+        outcome.failures.append(
+            f"suena a formulario: {receipts} respuestas devuelven el dato como un recibo"
+        )
     if scenario.handed_at is not None:
         if handed_at is None:
             outcome.failures.append("no pasó a una persona aunque ya tenía todos los datos")
@@ -520,7 +746,9 @@ Eres una persona exigente que revisa conversaciones de un asistente de WhatsApp 
 que cotiza por mayor (el precio lo da una persona; el asistente solo junta datos y pasa la cotización).
 Lee la conversación completa como la leería el cliente. Responde SOLO un JSON:
 {"razonable": true|false, "fallas": ["..."], "mejor_respuesta_del_primer_error": "..."}
-Es NO razonable si ocurre cualquiera de estas: pregunta algo que el cliente ya dijo; repite la misma pregunta;
+Es NO razonable si ocurre cualquiera de estas: devuelve cada dato como un recibo ("Anotado: *8 cajas*") en vez de
+conversar; recibe una respuesta vaga o que no encaja ("mi hogar" cuando pidió la dirección) y sigue con otra
+pregunta sin preguntar lo necesario para entenderla; pregunta algo que el cliente ya dijo; repite la misma pregunta;
 ignora una corrección del cliente; dice otra vez que tiene el producto cuando nadie lo preguntó; da razones de
 venta que no vienen del negocio; responde sin avanzar hacia pasar la cotización; o suena robótico y repetitivo.
 Una breve confirmación de un dato nuevo ("Perfecto, 15 bidones") es normal y razonable.
@@ -557,7 +785,9 @@ class Report:
     def render(self) -> str:
         lines = [
             f"# Conversaciones reales: {sum(o.ok for o in self.outcomes)}/{len(self.outcomes)} "
-            f"sin fallas ({self.ratio:.0%}, se pide {PASS_RATIO:.0%})"
+            f"sin fallas ({self.ratio:.0%}, se pide {PASS_RATIO:.0%})",
+            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
+            f"{sum(o.tokens_out for o in self.outcomes)} de salida",
         ]
         for outcome in self.outcomes:
             lines.append(f"\n### {'✅' if outcome.ok else '❌'} {outcome.scenario.name}")

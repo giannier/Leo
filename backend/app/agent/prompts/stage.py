@@ -74,7 +74,7 @@ SECTION_CAPS: Mapping[str, int] = {
     "venta": 540,
     "agenda": 200,
     "captacion": 220,
-    "cotizacion": 320,
+    "cotizacion": 390,
     "postventa": 170,
     "estilo": 300,
     "estado": 500,
@@ -185,10 +185,10 @@ interés con plazo o presupuesto sin definir. BAJO: solo curiosidad. No pidas ta
 
 QUOTE_RULES = """\
 COTIZACIÓN: lo «a cotizar» no tiene precio: tú juntas los datos y una persona lo cotiza.
-1. Anota con anotar_cotizacion, en ESE turno y antes de contestar, cada dato que dé (varios a la vez), solo si responde al dato. Si quiere varios productos o todos, anótalo como «producto».
-2. Pregunta solo lo que falte (ESTADO), de a uno. Nunca lo que ya dio ni una pregunta repetida: si no la contestó, cámbiala.
-3. Si dice con claridad que no sabe o no quiere dar ESE dato, anótalo como «sin dato» (solo entonces). Si te corrige («ya te dije…»), disculpa breve, anótalo y sigue.
-4. Confirma lo nuevo en pocas palabras. No repitas que tienes el producto ni que se cotiza ni vuelvas a buscar si ya sabes cuál es. Si no eligió producto (ni dijo «todos»), nombra las opciones y pregunta cuál; no recomiendes ni des razones de venta.
+1. Anota con anotar_cotizacion, en ESE turno y antes de contestar, cada dato que dé en su campo, aunque use otras palabras o conteste otra pregunta («mi hogar» a una dirección es el uso). Si quiere varios productos o todos, anótalo como «producto».
+2. Conversa como una persona atenta: contesta primero lo que dijo o preguntó; si su respuesta es vaga o no encaja («mi hogar» a una dirección), pregunta lo necesario para entenderla («¿en qué distrito queda?»). Luego pide lo que falte (ESTADO), de a una o dos juntas; nunca lo ya dicho.
+3. Si dice con claridad que no sabe o no quiere dar un dato, anótalo «sin dato». Si te corrige («ya te dije…»), disculpa breve y anótalo.
+4. Reacciona como una persona (varía cómo empiezas), sin recitarle de vuelta lo que dijo ni decir «ya quedó» o «anotado»; no repitas que tienes el producto o que se cotiza ni vuelvas a buscar si ya sabes cuál es. Si no eligió producto (ni dijo «todos»), nombra las opciones y pregunta cuál; sin recomendar ni dar razones de venta.
 5. Si el producto no pide datos, al entender qué quiere usa derivar_a_humano(motivo="cotizacion", datos=...). Con todos los datos pasa sola a una persona: no escribas más."""
 
 
@@ -227,7 +227,7 @@ def _schedule_block(config: EffectiveProcessConfig) -> str:
 
 _PACE_TEXT: Mapping[str, str] = {
     "directo": "Ve al grano. Si el cliente ya dio lo que necesitas, avanza sin preguntar de nuevo.",
-    "equilibrado": ("Una pregunta por mensaje. Reconoce el dato nuevo en pocas palabras y avanza."),
+    "equilibrado": "Una pregunta por mensaje. Habla como persona, sin repetirle lo que dijo.",
     "paso_a_paso": (
         "Explica cada paso antes de pedir algo. Pregunta una cosa a la vez y verifica que entendió."
     ),

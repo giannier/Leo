@@ -37,6 +37,7 @@ from app.agent.formatter import to_whatsapp_markup
 from app.agent.privacy import mask_arguments, redact_registered
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
+from app.agent.tools.handover import current_quote
 from app.agent.tools.quote import unnoted_answer
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.conversation import Message
@@ -209,11 +210,43 @@ UNBACKED_NOTE = (
 )
 
 
-UNNOTED_NOTE = (
-    "Aviso del sistema: el cliente respondió «{dato}» y no llamaste a anotar_cotizacion. Llámala "
-    "ahora con ese dato (si dice que no sabe o no quiere darlo, «sin dato»). Si en realidad no lo "
-    "respondió, contesta sin anotar nada."
+# A reason to buy that nothing backs («el formato más usado para reventa»): platform rule 3 says
+# never to invent one and the model did, in a quote, in every run. One nudge per turn, as the
+# others.
+UNBACKED_PITCH = re.compile(
+    r"\bm[aá]s (usad|pedid|vendid|popular)|\bformato (m[aá]s )?fuerte|alta rotaci[oó]n|"
+    r"ideal para (revender|reventa)",
+    re.IGNORECASE,
 )
+PITCH_NOTE = (
+    "Aviso del sistema: tu mensaje da una razón de venta («el más usado…») que no viene del "
+    "negocio ni de tus herramientas. Escríbelo otra vez sin esa razón; si el negocio la dice en "
+    "su información, cítala tal cual."
+)
+
+# A quote that is still missing data and a reply that asks nothing: the customer has to carry the
+# conversation («Perfecto, para el lunes ya queda claro.», or only «Hola, soy Nayu» to a question).
+NEXT_STEP_NOTE = (
+    "Aviso del sistema: tu mensaje no termina con la pregunta que sigue y la cotización aún no "
+    "está completa. Escríbelo otra vez: responde lo que dijo el cliente y termina pidiendo lo "
+    "que falta, con tus palabras."
+)
+
+UNNOTED_NOTE = (
+    "Aviso del sistema: el cliente puede haber respondido «{dato}» y no llamaste a "
+    "anotar_cotizacion. Si lo dijo (aunque haya contestado otra pregunta, como «mi hogar» a una "
+    "dirección), llámala ahora con ese dato (si no sabe o no quiere darlo, «sin dato»). Si no, "
+    "contesta sin anotar nada."
+)
+
+
+def _quote_is_open(context: ToolContext) -> bool:
+    """Whether a quote is being put together and still misses something the business asks for."""
+    quote = current_quote(context)
+    if quote is not None:
+        return bool(quote.falta)
+    asks = context.options.datos_cotizacion if context.options is not None else ()
+    return bool(asks)
 
 
 def _missed_note(
@@ -231,6 +264,16 @@ def _missed_note(
         datum = unnoted_answer(context, customer_message)
         if datum is not None:
             return UNNOTED_NOTE.format(dato=datum)
+    if UNBACKED_PITCH.search(content):
+        return PITCH_NOTE
+    if (
+        "anotar_cotizacion" in available
+        and content.strip()
+        and "?" not in content
+        and context.ending.reply is None
+        and _quote_is_open(context)
+    ):
+        return NEXT_STEP_NOTE
     return None
 
 

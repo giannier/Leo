@@ -240,10 +240,56 @@ de venta que nada respaldaba. Los evals estaban en verde.
 - **Un eval honesto** (`evals/real_conversations.py`): 9 conversaciones copiadas de las capturas (escritas por el dueño) y 9 distintas
   que se escribieron *después* del arreglo para no ajustarlo a ellas. Mide repeticiones, preguntas repetidas, datos ya dados, cierres
   inconsistentes, afirmaciones sin respaldo y una frase de venta inventada; con `JUDGE=1` un segundo modelo la lee como cliente.
-  Se pide 85 % (medido en 20 corridas: casi siempre 16 a 18 de 18; una dio 13); corre dentro de `make evals`.
+  Se pide 85 % (medido en más de 20 corridas: casi siempre 16 a 18 de 18; una dio 13); corre dentro de `make evals`.
 **Costo del modelo (informativo):** un negocio con `cotizar` paga ~260 tokens más en el prompt de cada turno donde vende y entre 100 y
 170 tokens por la herramienta; los demás negocios no pagan nada. La plantilla y el manual de venta cambiaron unas palabras para todos.
-**Límites que quedan:** no es 100 %: el modelo aún puede poner un dato en el campo equivocado (la validación solo ataca fecha y
-cantidad); un negocio sin `datos_a_pedir` solo tiene la memoria del estado, no un formulario; y el último mensaje del cliente puede
-aparecer dos veces en el historial que ve el modelo (no corregido). **No se pudo leer la configuración ni el catálogo reales de
-Nayu en producción** (acceso denegado, no se rodeó): el arreglo supone que sus productos a cotizar piden cosas como cantidad y fecha.
+**Los datos reales de Nayu (leídos en producción el 2026-10-26 con permiso de Giannier):** los productos a cotizar no tienen datos
+cortos sino **preguntas completas, distintas por producto** («¿Cuántas botellas de Agua Alcalina de 625 ml necesitas?», «¿Para qué
+fecha necesitas el pedido?», «¿Es para tu hogar, oficina o negocio?»…), de 4 a 5 por producto, y el negocio tiene las capacidades
+atender, vender, cotizar y captar. En el panel se llaman «preguntas» (una por línea) y los rubros sugieren frases libres. La primera
+versión (ya desplegada) suponía nombres cortos; con estos datos la validación de fecha y cantidad nunca se activaba. Se rehízo así:
+- Cada entrada se traduce a un **nombre corto** (`process/quote_data.py`: cantidad, fecha, distrito o dirección, uso, frecuencia,
+  personas, presupuesto; si no es ninguno, la frase misma limpia) y se conserva la **pregunta del dueño**, que la herramienta
+  devuelve para preguntar con sus palabras cuando es la misma en todos los productos. La herramienta, el hecho `cotizacion` y el aviso
+  final hablan en nombres cortos.
+- El producto se elige por lo que dice el cliente o el modelo (palabras que distinguen un producto de otro); cada producto pide solo
+  lo suyo (los envases de 625 ml no preguntan la frecuencia).
+- Un dato libre (uso, frecuencia…) solo se anota si sale de lo que escribió el cliente: el modelo inventaba «frecuencia: recurrente»
+  para cerrar antes. El dato recién preguntado se acepta con las palabras del modelo.
+- Si lo preguntado antes sigue sin respuesta, la herramienta pide **otro** dato y vuelve a él después (la misma pregunta cuatro veces
+  seguidas mientras el cliente contestaba otras cosas); «todavía no sé la fecha» cuenta como respuesta y se anota como «sin dato».
+- El eval incluye ahora **8 conversaciones sobre el catálogo exacto de Nayu** (la del dueño del 23 de octubre y 7 más): 22 de 24 en
+  tres pasadas. La del cliente que contesta «para mi hogar» justo cuando se le pregunta el distrito sigue fallando a veces.
+**Límites que quedan (primera versión, 2026-10-26 por la mañana):** no es 100 %; el modelo podía poner un dato en el campo
+equivocado; y el último mensaje del cliente puede aparecer dos veces en el historial que ve el modelo (no corregido).
+
+### C-11, actualización (2026-10-26, tarde): con los datos reales de Nayu
+Giannier dio permiso total para leer la configuración (solo lectura; sin credenciales ni datos de clientes). Lo que se encontró cambió el
+diseño:
+1. **`datos_a_pedir` son preguntas, no nombres.** El panel las llama «preguntas» (una por línea) y los productos de Nayu tienen cinco,
+   distintas por producto («¿Cuántas botellas de Agua Alcalina de 625 ml necesitas?», «¿Es para tu hogar, oficina o negocio?»). La
+   primera versión suponía nombres cortos («cantidad», «fecha»): con los datos reales las validaciones nunca se activaban y los campos
+   de la herramienta salían con nombres de 40 letras. Ahora cada entrada recibe un **nombre corto** (`process/quote_data.py`: cantidad,
+   fecha, distrito o dirección, uso, frecuencia, personas, presupuesto; o la propia frase limpia) y se conserva la **redacción del dueño**,
+   que se muestra junto a lo que falta cuando es la misma en todos los productos.
+2. **Un modelo más grande no arregla la rigidez.** Prueba con gpt-5.4 contra gpt-5.4-mini (mismo código, 3 conversaciones de Nayu, 3
+   pasadas cada uno, unos US$ 1,23 en total con precios de terceros): ambos contestaban como formulario («Anotado: *8 cajas*. ¿Para qué
+   fecha…?»; 11 de 17 respuestas del mini y 8 de 17 del 5.4 con forma de recibo). La causa eran mis instrucciones («pregunta SOLO por X en
+   una frase», rotar la pregunta). **No se cambia el modelo** (sigue gpt-5.4-mini, decisión de costo de Giannier).
+3. **Rediseño para que use criterio.** La herramienta ya no dicta la siguiente pregunta: dice qué se sabe y qué falta (con la redacción
+   del dueño) y pide contestar primero lo que el cliente dijo o preguntó, aclarar una respuesta vaga («mi hogar» a una dirección →
+   «¿en qué distrito queda?»), juntar dos preguntas que van juntas y no recitarle lo que acaba de decir. Reglas duras en código, pocas:
+   no inventar datos (cada dato debe salir de lo que el cliente escribió, salvo el que se acaba de preguntar), un uso dicho para la
+   dirección se anota como uso, «sin dato» solo si el cliente lo rechaza (uno por llamada; si es lo único que falta, se cierra solo),
+   no se deriva una cotización sin ningún dato, una respuesta del modelo sin pregunta mientras falta algo recibe un aviso, y lo mismo
+   si da una «razón de venta» que nadie respalda (`el más usado…`) o si no anotó lo que el cliente acaba de decir.
+4. **Medición** (catálogo exacto de Nayu, 8 conversaciones): respuestas con forma de recibo de 65 % a 0–4 %; 8/8 y 7/8 en las dos
+   últimas pasadas; regresión completa: 24/26 conversaciones (92 %, se pide 85 %), calidad de venta 88 %, flujos de venta 39/40
+   (`certificaciones` falla de forma intermitente, con casos distintos, también con el código anterior).
+5. **Costo (informativo):** el bloque COTIZACIÓN pasó de ~260 a ~360 tokens por turno de venta; la herramienta, ~120. Unas centésimas de
+   centavo por turno con gpt-5.4-mini. Los avisos del núcleo añaden una llamada al modelo solo en los turnos donde el modelo se saltó
+   algo.
+6. **Pendiente, decisión de Giannier:** llave de OpenAI por negocio. El código ya soporta una llave propia por negocio
+   (`tenant_llm_settings`, solo chat) pero no hay pantalla para cargarla, y la tabla de precios `model_costs` está vacía en producción
+   (ninguna respuesta tiene costo en dólares). Ver la conversación del 2026-10-26: opciones 1 (una llave y medir en Leo), 2 (un proyecto de
+   OpenAI por negocio) y 3 (llave del cliente).

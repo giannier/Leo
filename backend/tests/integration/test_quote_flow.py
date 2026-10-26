@@ -151,7 +151,7 @@ class TestNotingTheQuote:
 
         assert result.status == "hecho" and result.texto is not None
         assert "Falta: fecha, distrito o dirección" in result.texto
-        assert "SOLO por «fecha»" in result.texto
+        assert "no como un formulario" in result.texto
         assert context.facts_patch["cotizacion"] == {
             "producto": "Bidón 20 L",
             "producto_id": str(next(iter(_ids(db, tenant)))),
@@ -218,7 +218,7 @@ class TestNotingTheQuote:
 
         result = await anotar_cotizacion(context, {"cantidad": "20", "fecha": "para negocio"})
 
-        assert result.texto is not None and "no responde a fecha" in result.texto
+        assert result.texto is not None and "No se anotó fecha" in result.texto
         assert context.facts_patch["cotizacion"]["datos"] == {"cantidad": "20"}
         assert context.facts_patch["cotizacion"]["preguntado"] == "fecha"
 
@@ -230,7 +230,7 @@ class TestNotingTheQuote:
         result = await anotar_cotizacion(context, {"fecha": "semanales"})
 
         assert result.status == "hecho" and result.texto is not None
-        assert "no responde a fecha" in result.texto
+        assert "No se anotó fecha" in result.texto
         assert context.facts_patch["cotizacion"]["datos"] == {}
 
     async def test_a_use_noted_as_the_product_is_not_kept(self, db: Session) -> None:
@@ -240,7 +240,7 @@ class TestNotingTheQuote:
 
         result = await anotar_cotizacion(context, {"cantidad": "20", "producto": "para negocio"})
 
-        assert result.texto is not None and "no responde a producto" in result.texto
+        assert result.texto is not None and "No se anotó producto" in result.texto
         assert context.facts_patch["cotizacion"]["datos"] == {"cantidad": "20"}
 
     async def test_an_empty_call_is_an_error(self, db: Session) -> None:
@@ -398,6 +398,30 @@ class TestTheQuoteGoesToAPersonByItself:
         assert "Aún falta fecha, distrito o dirección" in result.decir
         assert context.ending.reply is None and "derivado" not in context.facts_patch
 
+    async def test_nothing_can_be_handed_over_before_anything_is_noted(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, WATER)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "quiero empezar a vender, ¿distribuyen por mayor?")
+        context = _context(db, tenant, conversation)
+
+        result = await derivar_a_humano(context, {"motivo": "cotizacion", "resumen": "quiere agua"})
+
+        assert result.status == "no_disponible" and result.decir is not None
+        assert "Aún no tienes ningún dato de la cotización" in result.decir
+        assert context.ending.reply is None and "derivado" not in context.facts_patch
+
+    async def test_a_customer_who_wants_no_questions_can_still_be_handed_over(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, WATER)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "no quiero dar datos, que me llamen")
+        context = _context(db, tenant, conversation)
+
+        await derivar_a_humano(context, {"motivo": "cotizacion", "resumen": "que lo llamen"})
+
+        assert context.facts_patch["derivado"]["motivo"] == "cotizacion"
+
     async def test_it_can_when_the_customer_will_not_give_the_rest(self, db: Session) -> None:
         tenant = _quoting_tenant(db, WATER)
         conversation = _conversation(db, tenant)
@@ -519,10 +543,54 @@ class TestInTheTurn:
 
         assert len(second.chat_calls) == 3
         nudge = second.chat_calls[1].messages[-1]
-        assert nudge.role == "user" and "respondió «fecha»" in nudge.content
+        assert nudge.role == "user" and "respondido «fecha»" in nudge.content
         datos = _stored(db, tenant, conversation)["cotizacion"]["datos"]
         assert datos == {"cantidad": "5", "fecha": "el lunes"}
         assert _outbound(db, conversation)[-1] == "Anotado. ¿En qué distrito sería?"
+
+    async def test_an_invented_reason_to_buy_gets_one_nudge_and_is_not_sent(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+        conversation = _conversation(db, tenant)
+        llm = MockLLMProvider()
+        llm.queue(ChatResult(content="Te conviene el bidón: es el formato más usado para reventa."))
+        llm.queue(ChatResult(content="Tenemos bidón de 20 L y botellas. ¿Cuál quieres cotizar?"))
+
+        await _pipeline(db, tenant, conversation, llm).run(
+            conversation.id, InboundTurn(text="quiero empezar a vender agua")
+        )
+
+        assert len(llm.chat_calls) == 2
+        assert "razón de venta" in llm.chat_calls[1].messages[-1].content
+        assert _outbound(db, conversation) == [
+            "Tenemos bidón de 20 L y botellas. ¿Cuál quieres cotizar?"
+        ]
+
+    async def test_a_message_the_model_answered_without_noting_gets_one_nudge(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        first = MockLLMProvider()
+        first.queue(ChatResult(content="", tool_calls=(_call("anotar_cotizacion", cantidad="8"),)))
+        first.queue(ChatResult(content="¿Para qué fecha y a qué distrito?"))
+        await _pipeline(db, tenant, conversation, first).run(
+            conversation.id, InboundTurn(text="quiero 8 bidones")
+        )
+        second = MockLLMProvider()
+        second.queue(ChatResult(content="Entendido. ¿En qué distrito queda tu hogar?"))
+        second.queue(ChatResult(content="", tool_calls=(_call("anotar_cotizacion", uso="hogar"),)))
+        second.queue(ChatResult(content="Entendido. ¿En qué distrito queda tu hogar?"))
+
+        await _pipeline(db, tenant, conversation, second).run(
+            conversation.id, InboundTurn(text="para mi hogar")
+        )
+
+        assert len(second.chat_calls) == 3
+        assert "mi hogar" in second.chat_calls[1].messages[-1].content
+        datos = _stored(db, tenant, conversation)["cotizacion"]["datos"]
+        assert datos["uso"] == "hogar"
 
     async def test_a_business_that_does_not_quote_is_never_nudged(self, db: Session) -> None:
         tenant = _quoting_tenant(db, WATER, capacidades=("atender", "vender"))
@@ -584,3 +652,264 @@ def test_a_business_without_the_capability_never_has_the_tool(
     )
 
     assert "anotar_cotizacion" not in tools_of_stage(scope)
+
+
+BIDON = (
+    "Bidon de Agua de 20L",
+    [
+        "¿Cuántas unidades de agua de 20 litros necesitas?",
+        "¿Para qué fecha necesitas el pedido?",
+        "¿A qué distrito o dirección deseas recibirlo?",
+        "¿Es para tu hogar, oficina o negocio?",
+        "¿Necesitas una entrega puntual o pedidos recurrentes?",
+    ],
+)
+MESA = (
+    "Agua de Mesa de 625 ml",
+    [
+        "¿Cuántas botellas de 500 ml necesitas?",
+        "¿Para qué fecha necesitas el pedido?",
+        "¿A qué distrito o dirección se realizará la entrega?",
+        "¿Es para consumo personal, un evento o tu negocio?",
+    ],
+)
+USUAL = ["cantidad", "fecha", "distrito o dirección", "uso", "frecuencia"]
+
+
+class TestWithTheOwnersQuestions:
+    """Bebidas yanayacu writes questions, not names: they are noted under short ones."""
+
+    def test_the_questions_become_the_names_the_assistant_notes_under(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+
+        assert ProductRepository(db, tenant.id).quote_fields() == tuple(USUAL)
+
+    async def test_the_product_the_customer_names_decides_what_is_asked(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+        conversation = _conversation(db, tenant)
+        context = _context(db, tenant, conversation)
+
+        await anotar_cotizacion(context, {"producto": "agua de mesa de 625 ml", "cantidad": "200"})
+
+        assert context.facts_patch["cotizacion"]["pide"] == USUAL[:4]
+        assert context.facts_patch["cotizacion"]["producto"] == "Agua de Mesa de 625 ml"
+
+    async def test_the_product_with_one_more_question_asks_it(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+        conversation = _conversation(db, tenant)
+        context = _context(db, tenant, conversation)
+
+        await anotar_cotizacion(context, {"producto": "bidón de 20 litros", "cantidad": "20"})
+
+        assert context.facts_patch["cotizacion"]["pide"] == USUAL
+
+    async def test_what_is_missing_comes_with_the_owner_s_words(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+        conversation = _conversation(db, tenant)
+        context = _context(db, tenant, conversation)
+
+        result = await anotar_cotizacion(
+            context, {"producto": "bidón de 20 litros", "cantidad": "20"}
+        )
+
+        assert result.texto is not None
+        assert "fecha (¿Para qué fecha necesitas el pedido?)" in result.texto
+        # The model is told how to talk, not which question to ask next.
+        assert "SOLO" not in result.texto
+
+    async def test_a_question_worded_differently_per_product_is_not_quoted(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON, MESA)
+        conversation = _conversation(db, tenant)
+        context = _context(db, tenant, conversation)
+
+        # No product chosen: «cuántas unidades de 20 litros» would be asked of a 500 ml customer.
+        result = await anotar_cotizacion(context, {"fecha": "el lunes"})
+
+        assert result.texto is not None and "Falta: cantidad," in result.texto
+        assert "litros" not in result.texto and "500 ml" not in result.texto
+
+    async def test_an_answer_to_another_question_is_kept_and_what_is_missing_still_listed(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        before = Cotizacion(
+            producto="Bidon de Agua de 20L",
+            datos={"cantidad": "12"},
+            pide=USUAL,
+            preguntado="fecha",
+        )
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        result = await anotar_cotizacion(context, {"distrito_o_direccion": "La Victoria"})
+
+        assert context.facts_patch["cotizacion"]["datos"] == {
+            "cantidad": "12",
+            "distrito o dirección": "La Victoria",
+        }
+        assert result.texto is not None
+        assert "Falta: fecha (¿Para qué fecha necesitas el pedido?), uso" in result.texto
+
+    async def test_with_everything_it_goes_to_a_person_with_the_short_names_in_the_recap(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        context = _context(db, tenant, conversation)
+
+        await anotar_cotizacion(
+            context,
+            {
+                "cantidad": "15",
+                "fecha": "el lunes",
+                "distrito_o_direccion": "La Victoria, Chiclayo",
+                "uso": "tienda",
+                "frecuencia": "todas las semanas",
+            },
+        )
+
+        assert context.facts_patch["derivado"]["motivo"] == "cotizacion"
+        assert context.ending.reply is not None
+        assert "cantidad: 15" in context.ending.reply and "uso: tienda" in context.ending.reply
+
+    async def test_a_datum_the_customer_never_said_is_not_noted(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "quiero el bidón de 20 L, unos 15, para mi tienda")
+        context = _context(db, tenant, conversation)
+
+        result = await anotar_cotizacion(
+            context, {"cantidad": "15", "uso": "tienda", "frecuencia": "recurrente"}
+        )
+
+        assert result.texto is not None and "No se anotó frecuencia" in result.texto
+        datos = context.facts_patch["cotizacion"]["datos"]
+        assert datos == {"cantidad": "15", "uso": "tienda"}
+        assert "Falta: fecha" in result.texto
+
+    async def test_the_answer_to_what_was_just_asked_is_taken_in_the_models_words(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "unos 10 bidones para mi oficina")
+        db.add(
+            Message(
+                tenant_id=tenant.id,
+                conversation_id=conversation.id,
+                direction="outbound",
+                author="agent",
+                content="Gracias. ¿Lo necesitas como entrega puntual o pedidos recurrentes?",
+                msg_type="text",
+            )
+        )
+        db.flush()
+        _says(db, tenant, conversation, "compra puntual, una sola vez")
+        context = _context(db, tenant, conversation)
+
+        await anotar_cotizacion(context, {"frecuencia": "única"})
+
+        assert context.facts_patch["cotizacion"]["datos"] == {"frecuencia": "única"}
+
+    async def test_what_was_not_asked_is_still_checked_against_what_the_customer_said(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "unos 10 bidones para mi oficina")
+        db.add(
+            Message(
+                tenant_id=tenant.id,
+                conversation_id=conversation.id,
+                direction="outbound",
+                author="agent",
+                content="Perfecto. ¿Para qué fecha lo necesitas?",
+                msg_type="text",
+            )
+        )
+        db.flush()
+        _says(db, tenant, conversation, "el lunes")
+        context = _context(db, tenant, conversation)
+
+        result = await anotar_cotizacion(context, {"fecha": "lunes", "frecuencia": "única"})
+
+        assert context.facts_patch["cotizacion"]["datos"] == {"fecha": "lunes"}
+        assert result.texto is not None and "No se anotó frecuencia" in result.texto
+
+    async def test_a_use_said_for_the_address_is_noted_as_the_use(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, BIDON)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "para mi hogar")
+        before = Cotizacion(
+            producto="Bidon de Agua de 20L",
+            datos={"cantidad": "8"},
+            pide=USUAL,
+            preguntado="distrito o dirección",
+        )
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        result = await anotar_cotizacion(context, {"distrito_o_direccion": "mi hogar"})
+
+        datos = context.facts_patch["cotizacion"]["datos"]
+        assert datos["uso"] == "mi hogar" and "distrito o dirección" not in datos
+        assert (
+            result.texto is not None and "distrito o dirección" in result.texto.split("Falta:")[1]
+        )
+
+    async def test_the_customer_not_knowing_the_only_thing_missing_closes_the_quote(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, MESA)
+        conversation = _conversation(db, tenant)
+        before = Cotizacion(
+            producto="Agua de Mesa de 625 ml",
+            datos={"cantidad": "5", "distrito o dirección": "Surco", "uso": "gimnasio"},
+            pide=USUAL[:4],
+            preguntado="fecha",
+        )
+        _says(db, tenant, conversation, "5 botellas para mi gimnasio, entrega en Surco")
+        _says(db, tenant, conversation, "todavía no sé la fecha, lo veo luego")
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        # The model answered «queda pendiente» and noted nothing new.
+        await anotar_cotizacion(context, {"uso": "gimnasio"})
+
+        assert context.facts_patch["derivado"]["datos"]["fecha"] == "sin dato"
+        assert context.ending.reply is not None and "fecha: por definir" in context.ending.reply
+
+    async def test_not_knowing_one_thing_does_not_close_a_quote_that_misses_two(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, MESA)
+        conversation = _conversation(db, tenant)
+        before = Cotizacion(
+            producto="Agua de Mesa de 625 ml",
+            datos={"cantidad": "5", "uso": "gimnasio"},
+            pide=USUAL[:4],
+            preguntado="fecha",
+        )
+        _says(db, tenant, conversation, "todavía no sé la fecha")
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        await anotar_cotizacion(context, {"cantidad": "5"})
+
+        assert "derivado" not in context.facts_patch and context.ending.reply is None
+
+    async def test_saying_the_date_is_not_known_closes_it_when_asked(self, db: Session) -> None:
+        tenant = _quoting_tenant(db, MESA)
+        conversation = _conversation(db, tenant)
+        before = Cotizacion(
+            producto="Agua de Mesa de 625 ml",
+            datos={"cantidad": "5", "distrito o dirección": "Surco", "uso": "gimnasio"},
+            pide=USUAL[:4],
+            preguntado="fecha",
+        )
+        _says(db, tenant, conversation, "todavía no sé la fecha, lo veo luego")
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        await anotar_cotizacion(context, {"fecha": "sin dato"})
+
+        assert context.facts_patch["derivado"]["datos"]["fecha"] == "sin dato"
+        assert context.ending.reply is not None and "fecha: por definir" in context.ending.reply
