@@ -26,7 +26,7 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -68,15 +68,81 @@ logger = logging.getLogger(__name__)
 # rounds it used, so the cost of this number can be read from real traffic.
 MAX_TOOL_ROUNDS = 3
 
-# Conversation *messages* - not exchanges - replayed into the prompt. At ten
-# the agent lost track inside a single order: a customer who said "para recoger
-# en Bagua" was asked for a delivery address four turns later, because the
-# sentence had already fallen out of the window. Thirty covers the ordering
-# conversations this is actually used for, at roughly 1.8k tokens of history,
-# and still leaves the tool results room to be the part that decides the
-# answer. A rolling summary (TASK-304) is what removes the ceiling; this only
-# raises it.
-HISTORY_TURNS = 20
+# The whole conversation is replayed to the model (Giannier, 2026-10-26: «memoria completa»). It
+# used to be the last twenty messages: a customer who said «para recoger en Bagua» was asked for a
+# delivery address once the sentence fell out of the window, and in a long quote what was said at
+# the start was asked again. Only a thread longer than this is cut, and then what the customer said
+# before the cut goes in as a literal digest (no model call, nothing invented), so nothing they
+# told us is lost. Four characters a token, as the prompt budget counts.
+HISTORY_TOKEN_BUDGET = 12_000
+DIGEST_TOKEN_BUDGET = 1_500
+DIGEST_LINE_CHARS = 200
+# A media message is stored with a placeholder; the model reads what happened, not the placeholder.
+MEDIA_LINES = {
+    "[imagen]": "[El cliente envió una imagen]",
+    "[documento]": "[El cliente envió un documento]",
+    "[audio]": "[El cliente envió un audio]",
+    "[video]": "[El cliente envió un video]",
+    "[sticker]": "[El cliente envió un sticker]",
+}
+# The replies of the agent: low, so the same conversation is answered the same way from one run to
+# the next (it was 0.2, the provider's default, and a small model varied from run to run).
+AGENT_TEMPERATURE = 0.0
+
+
+def _tokens(text: str) -> int:
+    return len(text) // 4 + 4
+
+
+def _readable(message: Message, registered: dict[str, str]) -> str:
+    """A stored message as the model reads it: media said in words, registered documents hidden."""
+    content = message.content.strip()
+    if message.author == "customer" and content in MEDIA_LINES:
+        return MEDIA_LINES[content]
+    return redact_registered(content, registered) if registered else content
+
+
+def _without_trailing_copy(rows: list[Message], current_text: str) -> list[Message]:
+    """`rows` without the last customer messages when together they are `current_text`."""
+    tail = len(rows)
+    while tail and rows[tail - 1].author == "customer":
+        tail -= 1
+    trailing = rows[tail:]
+    said = " ".join(" ".join(m.content.split()) for m in trailing)
+    return rows[:tail] if trailing and said == " ".join(current_text.split()) else rows
+
+
+def _fit(turns: list[ChatMessage]) -> list[ChatMessage]:
+    """The conversation within the budget: whole if it fits; else the newest part and a digest of
+    what the customer said before it."""
+    if sum(_tokens(turn.content) for turn in turns) <= HISTORY_TOKEN_BUDGET:
+        return turns
+    total = 0
+    start = len(turns)
+    for index in range(len(turns) - 1, -1, -1):
+        cost = _tokens(turns[index].content)
+        if total + cost > HISTORY_TOKEN_BUDGET - DIGEST_TOKEN_BUDGET:
+            break
+        total += cost
+        start = index
+    said: list[str] = []
+    used = 0
+    for turn in reversed(turns[:start]):
+        if turn.role != "user":
+            continue
+        line = " ".join(turn.content.split())[:DIGEST_LINE_CHARS]
+        if used + _tokens(line) > DIGEST_TOKEN_BUDGET:
+            break
+        said.append(f"- {line}")
+        used += _tokens(line)
+    if not said:
+        return turns[start:]
+    digest = (
+        "Antes en esta conversación (mensajes más antiguos, resumidos), el cliente dijo:\n"
+        + "\n".join(reversed(said))
+    )
+    return [ChatMessage("system", digest), *turns[start:]]
+
 
 FALLBACK_REPLY = (
     "Disculpa, no pude procesar tu mensaje en este momento. "
@@ -380,6 +446,7 @@ class AgentCore:
         customer_message: str,
         system_prompt: str | None = None,
         context: ToolContext | None = None,
+        current_message_ids: Collection[uuid.UUID] = (),
     ) -> AgentReply:
         """Produce one reply, running tools as the model asks for them.
 
@@ -393,7 +460,10 @@ class AgentCore:
             ChatMessage(
                 "system", system_prompt if system_prompt is not None else self.system_prompt()
             ),
-            *self.history(conversation_id),
+            # The messages of this turn are already stored; they go once, as the last message.
+            *self.history(
+                conversation_id, exclude=current_message_ids, current_text=customer_message
+            ),
             ChatMessage("user", customer_message),
         ]
 
@@ -422,6 +492,7 @@ class AgentCore:
                 result = await self._llm.chat(
                     messages,
                     tools=self._registry.specs() if offer_tools else (),
+                    temperature=AGENT_TEMPERATURE,
                 )
             except LLMError:
                 logger.exception("agent turn failed", extra={"tenant_id": str(self._tenant_id)})
@@ -693,8 +764,19 @@ class AgentCore:
         cache.entries[key] = (output, sources, cache.writes)
         return output, sources, False
 
-    def history(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
-        """Recent turns of this conversation, oldest first.
+    def history(
+        self,
+        conversation_id: uuid.UUID,
+        *,
+        exclude: Collection[uuid.UUID] = (),
+        current_text: str | None = None,
+    ) -> list[ChatMessage]:
+        """The whole conversation, oldest first, without the messages of the turn being answered.
+
+        The pipeline stores the customer's messages before it calls the model, and `respond` sends
+        them as the last message: replayed here too they went twice («quiero 5 bidones» / «quiero
+        5 bidones»). `exclude` names them. A caller that stored the message but did not name it
+        (the evals) gets the trailing copy dropped when it is the same text.
 
         A DNI or RUC the customer already registered is replaced by a label
         (decision 18): the model does not need the number again, and it is
@@ -703,15 +785,20 @@ class AgentCore:
         rows = MessageRepository(self._session, self._tenant_id).list_for_conversation(
             conversation_id
         )
-        recent = list(rows)[-HISTORY_TURNS:]
+        skip = set(exclude)
+        kept = [message for message in rows if message.id not in skip]
+        if not skip and current_text:
+            kept = _without_trailing_copy(kept, current_text)
         registered = self._registered_documents(conversation_id)
-        return [
+        turns = [
             ChatMessage(
                 "user" if message.author == "customer" else "assistant",
-                redact_registered(message.content, registered) if registered else message.content,
+                _readable(message, registered),
             )
-            for message in recent
+            for message in kept
+            if message.content.strip()
         ]
+        return _fit(turns)
 
     def _registered_documents(self, conversation_id: uuid.UUID) -> dict[str, str]:
         """The DNI and RUC stored for this conversation's customer, if any."""

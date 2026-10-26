@@ -707,6 +707,7 @@ class ConversationResponder:
                 for message in burst
                 if message.msg_type == "image"
             ),
+            message_ids=tuple(message.id for message in burst),
         )
 
     def _react_to_the_meter(self, tenant: Tenant, metered: MeteringResult) -> None:

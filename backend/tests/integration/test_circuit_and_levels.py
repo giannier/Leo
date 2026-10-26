@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.agent.circuit import CircuitBreaker
-from app.agent.core import HISTORY_TURNS, AgentCore
+from app.agent.core import AgentCore
 from app.agent.model_policy import chat_provider_for, tenant_level
 from app.agent.pipeline import InboundTurn
 from app.core.config import get_settings
@@ -125,7 +125,7 @@ class TestTheLevel:
 
 
 class TestTheMemory:
-    def test_the_model_sees_the_last_twenty_messages(self, db: Session) -> None:
+    def test_the_model_sees_the_whole_conversation(self, db: Session) -> None:
         tenant = _tenant(db, template="productos")
         conversation = _conversation(db, tenant)
         for index in range(30):
@@ -142,5 +142,5 @@ class TestTheMemory:
 
         history = AgentCore(db, tenant.id, llm=MockLLMProvider()).history(conversation.id)
 
-        assert HISTORY_TURNS == 20
-        assert [m.content for m in history] == [f"mensaje {i}" for i in range(10, 30)]
+        # It used to be the last twenty: what was said at the start of a long order was lost.
+        assert [m.content for m in history] == [f"mensaje {i}" for i in range(30)]

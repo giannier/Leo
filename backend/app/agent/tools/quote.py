@@ -106,11 +106,8 @@ def _required(chosen: Product | None, quoted: Sequence[Product]) -> list[str]:
     return [datum.label for datum, _ in _data(chosen, quoted)]
 
 
-_STOP = frozenset({"agua", "mesa", "para", "unid"})
-
-
 def _tokens(text: str) -> set[str]:
-    """The stems of a product name that tell it from another: 4 letters of a word, or a number."""
+    """The stems of a product name: 4 letters of a word, or a number («20»)."""
     spaced = re.sub(r"(\d)([a-z])", r"\1 \2", re.sub(r"([a-z])(\d)", r"\1 \2", plain(text)))
     return {
         w[:_NAME_WORD] if w.isalpha() else w
@@ -119,12 +116,20 @@ def _tokens(text: str) -> set[str]:
     }
 
 
-def _match_product(value: str, quoted: Sequence[Product]) -> Product | None:
-    """The one product `value` names, if it names exactly one: «bidón» is, «agua de 20 L» is not."""
+def match_product(value: str, products: Sequence[Product]) -> Product | None:
+    """The one product `value` names, if it names exactly one of `products`.
+
+    Only the words that tell the products apart count: «bidón de 20 L» names the Bidón when the
+    other one is the Caja de 20 L (both have «agua» and «20»), «agua de 20 L» names neither.
+    """
+    if not products:
+        return None
+    names = [_tokens(p.name) for p in products]
+    shared = set.intersection(*names) if len(names) > 1 else set()
     said = _tokens(value)
-    scores = [(len((said & _tokens(p.name)) - _STOP), p) for p in quoted]
-    best = max((score for score, _ in scores), default=0)
-    winners = [p for score, p in scores if score == best]
+    scores = [len(said & (tokens - shared)) for tokens in names]
+    best = max(scores)
+    winners = [p for p, score in zip(products, scores, strict=True) if score == best]
     return winners[0] if best > 0 and len(winners) == 1 else None
 
 
@@ -142,7 +147,7 @@ def _chosen(
         if isinstance(item, dict) and plain(str(item.get("dato") or "")) == PRODUCT and not named:
             named = str(item.get("valor") or "").strip()
     if named:
-        match = _match_product(named, quoted)
+        match = match_product(named, quoted)
         if match is not None:
             return match
     if before is not None and before.producto_id:
@@ -152,7 +157,7 @@ def _chosen(
     if len(quoted) == 1:
         return quoted[0]
     # The model did not say which, but the customer did («bidones de 20 litros»).
-    return _match_product(heard, quoted) if heard else None
+    return match_product(heard, quoted) if heard else None
 
 
 def _canonical(name: str, required: Sequence[str]) -> str:
