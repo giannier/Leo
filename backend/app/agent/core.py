@@ -37,6 +37,7 @@ from app.agent.formatter import to_whatsapp_markup
 from app.agent.privacy import mask_arguments, redact_registered
 from app.agent.prompts.builder import build_name_correction, build_system_prompt
 from app.agent.tools.catalog import build_default_registry
+from app.agent.tools.quote import unnoted_answer
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.conversation import Message
 from app.providers.llm.base import (
@@ -194,6 +195,53 @@ class _TurnCache:
     writes: int = 0
 
 
+# What the model may say it did only if it called the tool (platform rule 4). A quote «anotada» in
+# words and never in the tool is a quote that never goes to a person: the model said «ya quedó
+# anotado» without calling `anotar_cotizacion`, and the conversation stayed open with everything
+# given. One nudge per turn, with the tools still offered.
+UNBACKED_CLAIMS: dict[str, re.Pattern[str]] = {
+    "anotar_cotizacion": re.compile(r"\banot[eé]\b|\banotad[oa]s?\b", re.IGNORECASE),
+}
+UNBACKED_NOTE = (
+    "Aviso del sistema: tu mensaje dice que anotaste datos, pero no llamaste a {tool}. Llámala "
+    "ahora con lo que el cliente dio en su último mensaje. Si no dio ningún dato, responde sin "
+    "decir que anotaste nada."
+)
+
+
+UNNOTED_NOTE = (
+    "Aviso del sistema: el cliente respondió «{dato}» y no llamaste a anotar_cotizacion. Llámala "
+    "ahora con ese dato (si dice que no sabe o no quiere darlo, «sin dato»). Si en realidad no lo "
+    "respondió, contesta sin anotar nada."
+)
+
+
+def _missed_note(
+    content: str,
+    called: Sequence[str],
+    available: Sequence[str],
+    context: ToolContext,
+    customer_message: str,
+) -> str | None:
+    """What to tell the model when it skipped a tool it should have used this turn, if anything."""
+    tool = _unbacked_claim(content, called, available)
+    if tool is not None:
+        return UNBACKED_NOTE.format(tool=tool)
+    if "anotar_cotizacion" in available and "anotar_cotizacion" not in called:
+        datum = unnoted_answer(context, customer_message)
+        if datum is not None:
+            return UNNOTED_NOTE.format(dato=datum)
+    return None
+
+
+def _unbacked_claim(content: str, called: Sequence[str], available: Sequence[str]) -> str | None:
+    """The tool whose work `content` claims but that was not called this turn, if any."""
+    for tool, pattern in UNBACKED_CLAIMS.items():
+        if tool in available and tool not in called and pattern.search(content):
+            return tool
+    return None
+
+
 @dataclass(frozen=True)
 class _GuardOutcome:
     """What the catalogue post-guard decided about one reply.
@@ -320,6 +368,7 @@ class AgentCore:
         output_tokens = 0
         result: ChatResult | None = None
         rounds_used = 0
+        nudged = False
 
         for round_index in range(self._max_rounds + 1):
             # The last round offers no tools, which is what forces an answer.
@@ -349,7 +398,23 @@ class AgentCore:
             output_tokens += result.output_tokens
 
             if not result.wants_tool:
-                break
+                missed = (
+                    None
+                    if nudged or not offer_tools
+                    else _missed_note(
+                        result.content,
+                        [str(call["tool"]) for call in tools_called],
+                        self._registry.names(),
+                        context,
+                        customer_message,
+                    )
+                )
+                if missed is None:
+                    break
+                nudged = True
+                messages.append(ChatMessage("assistant", result.content))
+                messages.append(ChatMessage("user", missed))
+                continue
 
             # The full turn, tool calls included. Replaying only the text
             # leaves the `tool` results below answering nothing, which OpenAI

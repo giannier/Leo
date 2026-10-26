@@ -127,6 +127,28 @@ class ProductRepository(BaseRepository[Product]):
         )
         return list(self._session.execute(statement).scalars().all())
 
+    def quote_fields(self) -> tuple[str, ...]:
+        """What the business asks for before a quote, across its live quoted products, once each.
+
+        A column read, not whole rows: it runs when the process configuration loads.
+        """
+        statement = (
+            select(Product.datos_a_pedir)
+            .where(self._tenant_predicate)
+            .where(
+                Product.deleted_at.is_(None),
+                Product.is_active.is_(True),
+                Product.modo_venta == "cotizacion",
+            )
+            .order_by(Product.destacado.desc(), Product.name)
+        )
+        lists = [list(row or []) for row in self._session.execute(statement).scalars().all()]
+        seen: dict[str, str] = {}
+        for names in lists:
+            for name in names:
+                seen.setdefault(" ".join(name.lower().split()), name)
+        return tuple(seen.values())
+
     def list_active(self, *, limit: int | None = None) -> Sequence[Product]:
         """Live, sellable products - what the agent is allowed to quote."""
         return self.list(

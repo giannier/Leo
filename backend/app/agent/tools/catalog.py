@@ -217,7 +217,7 @@ def _product_data(
     }
 
 
-def _product_line(item: dict[str, Any], symbol: str = "S/") -> str:
+def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool = False) -> str:
     """One product as text the model can quote, with its files and promotions.
 
     The id is there so the model can pass it to `ver_producto` and, later, to
@@ -235,8 +235,14 @@ def _product_line(item: dict[str, Any], symbol: str = "S/") -> str:
     if item["bundle_size"]:
         parts.append(f"[paquete de {item['bundle_size']} selecciones]")
     if item["modo_venta"] == "cotizacion":
-        parts.append("[se cotiza con una persona, no tiene precio fijo]")
-        if item["datos_a_pedir"]:
+        parts.append("[a cotizar: sin precio fijo]")
+        if item["datos_a_pedir"] and quote_tool:
+            parts.append(
+                "[datos para cotizar, anótalos con anotar_cotizacion: "
+                + "; ".join(item["datos_a_pedir"])
+                + "]"
+            )
+        elif item["datos_a_pedir"]:
             parts.append(
                 "[antes de derivar pide, uno por mensaje, lo que falte de: "
                 + "; ".join(item["datos_a_pedir"])
@@ -331,7 +337,8 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
 
     items = _enrich(context, rows)
     symbol = currency_symbol(context.session, context.tenant_id)
-    listing = "\n".join(_product_line(item, symbol) for item in items)
+    quote_tool = bool(context.options and context.options.cotizar)
+    listing = "\n".join(_product_line(item, symbol, quote_tool=quote_tool) for item in items)
     if missed:
         asked = query or categoria or "paquetes"
         texto = (
@@ -366,7 +373,10 @@ async def ver_producto(context: ToolContext, arguments: dict[str, Any]) -> ToolR
     item = _enrich(context, [product], full=True)[0]
     symbol = currency_symbol(context.session, context.tenant_id)
     context.facts_patch["vio_productos"] = True
-    return ToolResult.hecho(data=item, texto="Producto:\n" + _product_line(item, symbol))
+    quote_tool = bool(context.options and context.options.cotizar)
+    return ToolResult.hecho(
+        data=item, texto="Producto:\n" + _product_line(item, symbol, quote_tool=quote_tool)
+    )
 
 
 def build_default_registry() -> ToolRegistry:

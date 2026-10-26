@@ -207,6 +207,7 @@ class TestTheModel:
             "promos_ofrecidas",
             "cita_agendada",
             "lead_calificado",
+            "cotizacion",
         } == STORED_KEYS
 
     def test_an_empty_facts_object_serialises_to_the_minimum(self) -> None:

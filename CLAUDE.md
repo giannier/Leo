@@ -84,7 +84,7 @@ Términos oficiales de Leo y su nombre en el repo (feature 017, `leo-sdd/feature
 - **Agenda**: calendario propio (`scheduling/`): servicios agendables (`products.agendable`), recursos, bloqueos y citas; la
   base impide dos citas vivas que se pisen en un recurso. Herramientas `consultar_horarios`, `agendar_cita`, `gestionar_cita`.
   Recordatorios apagados por defecto: necesitan una plantilla aprobada fuera de la ventana de 24 h.
-- **Cotización**: una cotización pedida vive en el lead (`leads.quote_*`: solicitada, enviada) con lo que el agente juntó.
+- **Cotización**: una cotización pedida vive en el lead (`leads.quote_*`: solicitada, enviada) con lo que el agente juntó. Mientras se arma, vive en el hecho `cotizacion` de la conversación (`anotar_cotizacion`) y pasa sola a una persona al completarse (019 C-11).
 - **Calificación**: el asistente anota el interés (`calificar_cliente`) y el lead queda `caliente`, `tibio` o `frio`.
 - **Modo piloto**: `agent_configs.piloto_pct`, el porcentaje de clientes (por persona) que atiende el asistente; el resto, el equipo.
 - **Chat web**: canal `web` sin número de WhatsApp (página pública y widget); `REAL_CHANNELS` agrupa los canales reales.

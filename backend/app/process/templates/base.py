@@ -77,6 +77,10 @@ SCHEDULING_TOOL_NAMES: tuple[str, ...] = ("consultar_horarios", "agendar_cita", 
 # The tool of a business whose agent also qualifies leads (capability `captar`, feature 019, phase E).
 LEAD_TOOL_NAMES: tuple[str, ...] = ("calificar_cliente",)
 
+# The tool of a business whose agent quotes (capability `cotizar`): it keeps what the customer gave
+# for the quote and hands it to a person when nothing is missing.
+QUOTE_TOOL_NAMES: tuple[str, ...] = ("anotar_cotizacion",)
+
 # The tools of a business that sells, for after the sale (feature 019, phase G): what happened to an
 # order already made, a return or a claim about it, and the documents of the order.
 POSTSALE_TOOL_NAMES: tuple[str, ...] = (
@@ -405,6 +409,11 @@ class EffectiveOptions:
     captar: bool = False
     # A business that sells answers for its orders too (feature 019, phase G).
     postventa: bool = False
+    # ...and the one to quote: the assistant gathers the data and a person gives the price.
+    cotizar: bool = False
+    # What the business asks for before a quote (its quoted products' `datos_a_pedir`): the names the
+    # assistant may note, so the customer's words never decide what counts as «la fecha».
+    datos_cotizacion: tuple[str, ...] = ()
 
     @property
     def calificacion_activa(self) -> bool:

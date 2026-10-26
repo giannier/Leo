@@ -170,7 +170,7 @@ class TestSearching:
 
         result = await buscar_productos(_context(db, tenant_a), {"consulta": "web"})
 
-        assert "[se cotiza con una persona, no tiene precio fijo]" in _text(result)
+        assert "[a cotizar: sin precio fijo]" in _text(result)
         assert result.data["productos"][0]["modo_venta"] == "cotizacion"
 
     async def test_only_packages(self, db: Session, tenant_a: TenantFixture) -> None:
