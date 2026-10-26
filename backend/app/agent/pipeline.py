@@ -110,6 +110,9 @@ class InboundTurn:
     image: bool = False
     # The image messages of the burst, to fetch if a receipt is expected.
     images: tuple[InboundImage, ...] = ()
+    # The stored messages this turn answers: the model gets them once, as the last message, and not
+    # again in the history.
+    message_ids: tuple[uuid.UUID, ...] = ()
 
     @property
     def readable(self) -> bool:
@@ -318,6 +321,7 @@ class TurnPipeline:
             customer_message=inbound.for_the_model(),
             system_prompt=prompt.text,
             context=context,
+            current_message_ids=inbound.message_ids,
         )
         tool_messages = list(
             self._messages.outbound_after(conversation_id, anchor.id if anchor else None)

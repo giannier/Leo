@@ -290,6 +290,7 @@ class SandboxService:
                     if stored is not None
                     else ()
                 ),
+                message_ids=(customer_message.id,),
             ),
         )
 

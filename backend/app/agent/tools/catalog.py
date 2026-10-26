@@ -25,6 +25,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from app.agent.tools.handover import latest_customer_text
+from app.agent.tools.quote import match_product
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.agent.tools.shared import (
     applies_to,
@@ -347,6 +349,11 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
         )
     else:
         texto = f"Productos disponibles:\n{listing}"
+        # «bidón 20L» when the search also brought the Caja de 20 L: the customer already said which
+        # one, and asking «¿cuál de los dos?» is asking again what they said.
+        named = match_product(latest_customer_text(context), rows) if len(rows) > 1 else None
+        if named is not None:
+            texto += f"\nEl cliente ya nombró «{named.name}»: es ese, no le preguntes cuál."
     if not missed:
         # The customer was shown what they asked for (a fallback listing is
         # the model offering alternatives, not the customer having seen it).

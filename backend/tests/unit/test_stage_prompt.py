@@ -490,6 +490,8 @@ def test_the_platform_rules_name_the_assistant_and_the_business() -> None:
 
     assert text.startswith("Eres Capacitín, asistente virtual de Escuela Capacita.")
     assert "9. Si usaste mostrar_opciones" in text
+    # The model has the whole conversation and is told to use it (Giannier, 2026-10-26).
+    assert "10. Tienes toda la conversación" in text
 
 
 def test_without_a_card_link_cobro_loses_that_line_and_no_sentence_is_cut() -> None:

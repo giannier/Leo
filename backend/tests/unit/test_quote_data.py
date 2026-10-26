@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.agent.tools.quote import _match_product
+from app.agent.tools.quote import match_product
 from app.process.quote_data import data_of, gloss, labels_of, topic_of
 
 ALCALINA = [
@@ -131,7 +131,7 @@ class TestWhichProductTheCustomerMeans:
         ],
     )
     def test_a_name_that_tells_one_from_the_others_chooses_it(self, said: str, name: str) -> None:
-        match = _match_product(said, self.ROWS)  # type: ignore[arg-type]
+        match = match_product(said, self.ROWS)  # type: ignore[arg-type]
 
         assert match is not None and match.name == name
 
@@ -139,4 +139,4 @@ class TestWhichProductTheCustomerMeans:
         "said", ["agua", "agua de 20 L", "todas las presentaciones", "para negocio"]
     )
     def test_a_name_that_fits_several_or_none_chooses_nothing(self, said: str) -> None:
-        assert _match_product(said, self.ROWS) is None  # type: ignore[arg-type]
+        assert match_product(said, self.ROWS) is None  # type: ignore[arg-type]

@@ -293,3 +293,24 @@ diseño:
    (`tenant_llm_settings`, solo chat) pero no hay pantalla para cargarla, y la tabla de precios `model_costs` está vacía en producción
    (ninguna respuesta tiene costo en dólares). Ver la conversación del 2026-10-26: opciones 1 (una llave y medir en Leo), 2 (un proyecto de
    OpenAI por negocio) y 3 (llave del cliente).
+
+### C-11, memoria completa (2026-10-26, noche)
+**Pedido de Giannier:** «el agente tenga memoria completa de toda la conversación, para que sepa bien de lo que habla el cliente», y
+corregir el mensaje duplicado y la variación, **sin correr evals** con el modelo real (por el gasto). Se verificó con pruebas
+automáticas (sin costo de API); la regla del CLAUDE.md de adjuntar evals a un cambio de prompt queda pendiente para cuando Giannier
+lo autorice.
+- **El mensaje del turno iba dos veces.** El canal guarda el mensaje del cliente antes de llamar al modelo; el historial lo incluía y
+  además se mandaba como mensaje a responder. Ahora el turno lleva los ids de sus mensajes (`InboundTurn.message_ids`) y el historial los
+  excluye; un llamador que no los da recibe el último descartado si es el mismo texto. Lo que el cliente escribió mientras el asistente
+  estaba en pausa sigue en el historial.
+- **Toda la conversación.** Antes eran los últimos 20 mensajes. Ahora va completa hasta ~12 000 tokens (cientos de mensajes de
+  WhatsApp); solo un hilo más largo se corta, y entonces lo que el cliente dijo antes del corte va como resumen literal (sin llamar al
+  modelo, sin inventar). Imágenes, audios y documentos se leen como «[El cliente envió una imagen]».
+- **Regla 10 de plataforma:** «Tienes toda la conversación: úsala para entender qué necesita; no preguntes lo que ya dijo, aunque fuera
+  hace mucho». Para caber en el presupuesto (6 000 tokens) se compactaron las reglas 1, 5, 6, 7 y 9 sin cambiar su sentido.
+- **Variación:** las respuestas del agente van con temperatura 0 (antes 0,2): la misma conversación se contesta igual de una vez a
+  otra. No elimina toda la variación del modelo.
+- **«¿Bidón o caja?» cuando dijo «bidón»:** `buscar_productos` le dice al modelo qué producto nombró el cliente cuando nombró uno solo
+  (cuentan solo las palabras que distinguen los productos).
+- **Costo (informativo):** una conversación típica (10–60 mensajes) manda 1 000–3 000 tokens de historial por turno; el tope, ~13 500.
+  Con gpt-5.4-mini (US$ 0,75 por millón de entrada, precio de terceros) el peor caso es ~US$ 0,01 por turno.

@@ -92,10 +92,10 @@ _REFUSAL = re.compile(
 LAST_MESSAGES = 8
 
 
-def customer_refused(context: ToolContext) -> bool:
-    """Whether what the customer wrote since the assistant last spoke says they will not give it."""
+def latest_customer_text(context: ToolContext) -> str:
+    """What the customer wrote since the assistant last spoke, in order."""
     if context.conversation_id is None:
-        return False
+        return ""
     rows = MessageRepository(context.session, context.tenant_id).list_for_conversation(
         context.conversation_id
     )
@@ -104,7 +104,12 @@ def customer_refused(context: ToolContext) -> bool:
         if message.author != "customer":
             break
         words.append(message.content)
-    return bool(_REFUSAL.search(plain(" ".join(words))))
+    return " ".join(reversed(words))
+
+
+def customer_refused(context: ToolContext) -> bool:
+    """Whether what the customer wrote since the assistant last spoke says they will not give it."""
+    return bool(_REFUSAL.search(plain(latest_customer_text(context))))
 
 
 def current_quote(context: ToolContext) -> Cotizacion | None:
