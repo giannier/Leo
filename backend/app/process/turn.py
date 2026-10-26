@@ -14,6 +14,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 IMAGE_RECEIVED_LINE = "[El cliente envió una imagen]"
+# The owner edited a product while this conversation went on, and the model only remembers what it
+# said before, not what the tools answered: told, it searches again instead of repeating it.
+CATALOGUE_CHANGED_LINE = (
+    "El catálogo cambió desde tu último mensaje: lo que dijiste antes de productos, precios o "
+    "condiciones puede estar desactualizado. Vuelve a consultar con buscar_productos antes de "
+    "repetirlo."
+)
 _MAX_LINE = 300
 
 
@@ -33,6 +40,8 @@ class TurnContext:
     comprobante: str | None = None
     # An image arrived and was not analysed (C-16).
     imagen_recibida: bool = False
+    # A product changed after the assistant last spoke here: what it said of it may be out of date.
+    catalogo_cambiado: bool = False
 
     def lines(self) -> list[str]:
         """The lines to show, in the order the customer did things."""
@@ -43,6 +52,8 @@ class TurnContext:
             lines.append(_one_line(self.comprobante))
         elif self.imagen_recibida:
             lines.append(IMAGE_RECEIVED_LINE)
+        if self.catalogo_cambiado:
+            lines.append(CATALOGUE_CHANGED_LINE)
         return lines
 
     def is_empty(self) -> bool:

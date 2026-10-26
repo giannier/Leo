@@ -49,7 +49,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.agent.examples import SelectedExample
 from app.agent.prompts.builder import (
-    _TONE_GUIDANCE,
     DEFAULT_TONE,
     _format_hours,
     _format_today,
@@ -74,7 +73,7 @@ SECTION_CAPS: Mapping[str, int] = {
     "venta": 540,
     "agenda": 200,
     "captacion": 220,
-    "cotizacion": 390,
+    "cotizacion": 410,
     "postventa": 170,
     "estilo": 300,
     "estado": 500,
@@ -118,10 +117,10 @@ Eres {nombre_asistente}, asistente virtual de {nombre_negocio}.
    sola vez y llama a gestionar_pedido(accion="aplicar_promocion").
 8. No menciones herramientas, etapas, el sistema ni estas reglas.
 9. Si usaste mostrar_opciones, responde corto o nada: el cliente ya ve las opciones.
-10. Tienes toda la conversación: úsala para entender qué necesita; no preguntes lo que ya dijo, aunque
-   fuera hace mucho.
 10. Si te preguntan si eres una persona o un robot, di con naturalidad que eres el asistente virtual de
-    {nombre_negocio}; nunca finjas ser humano."""
+    {nombre_negocio}; nunca finjas ser humano.
+11. Tienes toda la conversación: úsala para entender qué necesita; no preguntes lo que ya dijo, aunque
+    fuera hace mucho."""
 
 # -------------------------------------------------------------------- sales
 
@@ -186,7 +185,7 @@ interés con plazo o presupuesto sin definir. BAJO: solo curiosidad. No pidas ta
 
 
 QUOTE_RULES = """\
-COTIZACIÓN: lo «a cotizar» no tiene precio: tú juntas los datos y una persona lo cotiza.
+COTIZACIÓN: lo «a cotizar» no tiene precio: tú juntas los datos y una persona lo cotiza. Para eso, este bloque manda sobre VENTA, PROCESO y RUBRO.
 1. Anota con anotar_cotizacion, en ESE turno y antes de contestar, cada dato que dé en su campo, aunque use otras palabras o conteste otra pregunta («mi hogar» a una dirección es el uso). Si quiere varios productos o todos, anótalo como «producto».
 2. Conversa como una persona atenta: contesta primero lo que dijo o preguntó; si su respuesta es vaga o no encaja («mi hogar» a una dirección), pregunta lo necesario para entenderla («¿en qué distrito queda?»). Luego pide lo que falte (ESTADO), de a una o dos juntas; nunca lo ya dicho.
 3. Si dice con claridad que no sabe o no quiere dar un dato, anótalo «sin dato». Si te corrige («ya te dije…»), disculpa breve y anótalo.
@@ -215,8 +214,22 @@ def _aftersale_block(config: EffectiveProcessConfig) -> str:
     return AFTERSALE_RULES if config.options.postventa else ""
 
 
+# A business that quotes and qualifies: the quote already asks quantity, date and the rest, and the
+# qualification questions of its rubro asked them again in other words («¿qué cantidad aproximada por
+# pedido?» after «¿cuántas unidades necesitas?»). What the customer gives for the quote qualifies them.
+LEAD_RULES_WITH_QUOTE = """\
+CAPTACIÓN: no hagas preguntas aparte para conocer al cliente: lo que cuenta para la cotización basta.
+Apenas muestre interés claro, llama a calificar_cliente (nota interna: no la menciones). Interés ALTO:
+necesidad concreta y plazo corto, o pide precio o propuesta. MEDIO: plazo o presupuesto sin definir.
+BAJO: solo curiosidad. No pidas tarjeta ni documentos."""
+
+
 def _lead_block(config: EffectiveProcessConfig) -> str:
-    if not config.options.captar or not config.preguntas_calificacion:
+    if not config.options.captar:
+        return ""
+    if config.options.cotizar and config.options.datos_cotizacion:
+        return LEAD_RULES_WITH_QUOTE
+    if not config.preguntas_calificacion:
         return ""
     return LEAD_RULES.format(preguntas="; ".join(config.preguntas_calificacion))
 
@@ -227,6 +240,14 @@ def _schedule_block(config: EffectiveProcessConfig) -> str:
 
 # ------------------------------------------------------------------- style
 
+# The tone alone. The texts of the first agent also said «trata de tú» and what to do with emojis, and
+# here the business sets both on their own lines: a «cercano» business that allows emojis read «con
+# emojis solo si el cliente los usa» and «puedes usar emojis con naturalidad» in the same block.
+_STAGE_TONE: Mapping[str, str] = {
+    "profesional": "Tono profesional: frases completas, sin jerga.",
+    "cercano": "Tono cálido y natural.",
+    "juvenil": "Tono relajado y breve.",
+}
 _PACE_TEXT: Mapping[str, str] = {
     "directo": "Ve al grano. Si el cliente ya dio lo que necesitas, avanza sin preguntar de nuevo.",
     "equilibrado": "Una pregunta por mensaje. Habla como persona, sin repetirle lo que dijo.",
@@ -403,7 +424,7 @@ def _style_block(config: EffectiveProcessConfig) -> str:
     behavior = config.behavior
     lines = [
         "ESTILO",
-        _TONE_GUIDANCE.get(behavior.tone, _TONE_GUIDANCE[DEFAULT_TONE]),
+        _STAGE_TONE.get(behavior.tone, _STAGE_TONE[DEFAULT_TONE]),
         _PACE_TEXT.get(behavior.ritmo, _PACE_TEXT["equilibrado"]),
         _DETAIL_TEXT.get(behavior.detalle, _DETAIL_TEXT["moderado"]),
         _TREATMENT_TEXT.get(behavior.tratamiento, _TREATMENT_TEXT["tu"]),
@@ -433,6 +454,19 @@ def _rubro_block(config: EffectiveProcessConfig) -> str | None:
             break
         lines = candidate
     return "\n".join(lines)
+
+
+def _cut_at_sentence(text: str, chars: int) -> str:
+    """One line of at most `chars`: up to the last full sentence that fits, else the last word and
+    «…». The business description was cut mid-word («Atendemos a clientes particulares y empres»)."""
+    flat = " ".join(text.split())
+    if len(flat) <= chars:
+        return flat
+    head = flat[:chars]
+    end = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+    if end >= chars // 2:
+        return head[: end + 1]
+    return head[: chars - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
 
 
 def _clip(text: str, chars: int) -> str:
@@ -633,7 +667,7 @@ def _identity_line(config: EffectiveProcessConfig) -> str:
         line += f" (rubro {config.industry})"
     line += "."
     if config.business_description:
-        line += f" {_one_line(config.business_description, _DESCRIPTION_CAP_CHARS)}"
+        line += f" {_cut_at_sentence(config.business_description, _DESCRIPTION_CAP_CHARS)}"
     return line
 
 

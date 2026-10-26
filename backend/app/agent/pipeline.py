@@ -217,6 +217,8 @@ class TurnPipeline:
 
         # 4-5. inbound
         patch, turn = self._read_inbound(inbound, facts, config, now)
+        if self._catalogue_changed_since_last_reply(conversation_id):
+            turn = dataclasses.replace(turn, catalogo_cambiado=True)
         proof_made = False
         if inbound.images and self._expects_proof(stage_previa, facts):
             # A receipt that arrives while the bot is quiet (paused, handed over,
@@ -452,6 +454,14 @@ class TurnPipeline:
             imagen_recibida=inbound.image,
         )
         return patch, turn
+
+    def _catalogue_changed_since_last_reply(self, conversation_id: uuid.UUID) -> bool:
+        """Whether a product changed after the assistant last wrote in this conversation."""
+        replied = self._messages.last_reply_at(conversation_id)
+        if replied is None:
+            return False
+        changed = ProductRepository(self._session, self._tenant_id).last_change()
+        return changed is not None and changed > replied
 
     def _named_bundle(self, text: str) -> str | None:
         """The live package the customer's words name, if exactly one."""

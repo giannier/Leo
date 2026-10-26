@@ -57,8 +57,14 @@ CATALOG_TOOL = "consultar_catalogo"
 SEARCH_TOOL = "buscar_productos"
 VIEW_TOOL = "ver_producto"
 KNOWLEDGE_TOOL = "consultar_conocimiento"
-# A description in a listing; the full text is for `ver_producto`.
-MAX_LISTED_DESCRIPTION = 200
+# A description in a listing; the full text is for `ver_producto`. It was a flat 200 characters, cut
+# mid-word: an owner's 450-character description lost its second half, which is where they had
+# written how the product is sold («dime cuántas unidades necesitas y dónde deseas recibirlas»), and
+# an edit there never reached the agent. Now the descriptions of a listing share this many
+# characters, each between the two bounds, cut at a sentence or a word.
+LISTED_DESCRIPTIONS_CHARS = 2_400
+MIN_LISTED_DESCRIPTION = 200
+MAX_LISTED_DESCRIPTION = 700
 # When to use a linked file, as the model reads it next to the product.
 MAX_RESOURCE_HINT = 90
 
@@ -171,6 +177,18 @@ async def consultar_conocimiento(context: ToolContext, arguments: dict[str, Any]
     )
 
 
+def cut_description(text: str, chars: int) -> str:
+    """At most `chars`, ending at a sentence or a word, with «…» when something was left out."""
+    flat = " ".join(text.split())
+    if len(flat) <= chars:
+        return flat
+    head = flat[:chars]
+    end = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+    if end >= chars // 2:
+        return head[: end + 1] + " …"
+    return head[: chars - 1].rsplit(" ", 1)[0].rstrip(",;:") + "…"
+
+
 def _product_data(
     product: Product,
     *,
@@ -179,10 +197,11 @@ def _product_data(
     promotions: Sequence[Promotion] = (),
     sent: Sequence[str] = (),
     symbol: str = "S/",
+    listed_chars: int = MAX_LISTED_DESCRIPTION,
 ) -> dict[str, Any]:
     description = product.description or None
     if description is not None and not full:
-        description = description[:MAX_LISTED_DESCRIPTION]
+        description = cut_description(description, listed_chars)
     return {
         "producto_id": str(product.id),
         "nombre": product.name,
@@ -255,7 +274,9 @@ def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool 
     if item["categoria"]:
         parts.append(f"(categoría: {item['categoria']})")
     if item["descripcion"]:
-        parts.append(f"- {item['descripcion']}")
+        # Labelled: owners write greetings and selling lines into descriptions («¡Hola! Soy Nayu…»),
+        # and the model must read them as what the product is, not as something to say.
+        parts.append(f"Descripción (dato del producto, no la recites): {item['descripcion']}")
     if item["stock"] is not None:
         # Stated only when tracked. "stock: None" means the business does
         # not count it, which is different from having none.
@@ -290,6 +311,8 @@ def _enrich(
         PromotionRepository(context.session, context.tenant_id).in_force(now=datetime.now(UTC))
     )
     sent = _sent_resources(context)
+    share = LISTED_DESCRIPTIONS_CHARS // max(len(rows), 1)
+    listed = min(MAX_LISTED_DESCRIPTION, max(MIN_LISTED_DESCRIPTION, share))
     return [
         _product_data(
             row,
@@ -298,6 +321,7 @@ def _enrich(
             promotions=[p for p in promotions if applies_to(p, row)],
             sent=sent,
             symbol=symbol,
+            listed_chars=listed,
         )
         for row in rows
     ]

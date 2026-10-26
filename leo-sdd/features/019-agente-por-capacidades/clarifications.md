@@ -314,3 +314,28 @@ lo autorice.
   (cuentan solo las palabras que distinguen los productos).
 - **Costo (informativo):** una conversación típica (10–60 mensajes) manda 1 000–3 000 tokens de historial por turno; el tope, ~13 500.
   Con gpt-5.4-mini (US$ 0,75 por millón de entrada, precio de terceros) el peor caso es ~US$ 0,01 por turno.
+
+## C-12: auditoría de producción y de coherencia del agente (2026-10-26)
+**Pedido de Giannier:** auditoría exhaustiva, «cuando realicé un cambio a mi producto vi que no se actualizó en las respuestas
+del agente», y el agente al 100 % en coherencia, criterio y humanidad. Lectura en producción solo de configuración y metadatos.
+**Por qué un cambio de producto no llegaba al agente (tres causas, corregidas):**
+1. La búsqueda mostraba solo los primeros **200 caracteres** de cada descripción, cortados a media palabra. Las de Nayu tienen
+   359–486: la segunda mitad (donde el dueño escribió cómo se vende: «dime cuántas unidades necesitas y dónde deseas recibirlas»)
+   nunca llegó al modelo. Ahora las descripciones de un listado se reparten 2 400 caracteres (cada una entre 200 y 700), cortadas en
+   frase o palabra, y van rotuladas como dato del producto.
+2. La configuración del proceso se guarda en caché **por proceso** (producción corre tres: dos web y el worker) y editar un producto
+   no la limpiaba. Ahora crear, editar, borrar, duplicar o importar productos la limpia, y el caché dura 10 s (antes 60).
+3. En una conversación en curso el modelo repetía lo que dijo antes (no ve los resultados viejos de las herramientas, solo sus
+   mensajes). Ahora, si un producto cambió después del último mensaje del asistente, el turno lo dice y pide volver a buscar.
+   Además los cambios de productos quedan en `audit_logs` (campo, antes y después): antes no había forma de saber qué cambió.
+**Contradicciones del prompt (corregidas):** VENTA y PROCESO decían «recomienda UNA opción y por qué» y COTIZACIÓN «no recomiendes»;
+el RUBRO b2b dice «si no hay precio, deriva» (por eso a veces derivaba sin datos): ahora COTIZACIÓN dice que manda sobre VENTA,
+PROCESO y RUBRO para lo «a cotizar». CAPTACIÓN pedía cantidad y frecuencia, que ya pide la cotización: con cotización no hace
+preguntas aparte. ESTILO decía el tratamiento dos veces y dos reglas de emojis distintas (el texto del tono traía las suyas): el tono
+ya no las trae. La descripción del negocio se cortaba a media palabra. La regla de memoria quedó como 11 (había dos «10.»).
+**Operación:** contenedores sanos, 0 errores en logs, 151 trabajos sin fallas, disco al 26 %. **No había backup automático de Leo**
+(el cron no existía, el script hacía `source` de un archivo que no es bash y la carpeta por defecto no existía): el script quedó
+corregido y probado; falta instalar la línea del cron (RUNBOOK sección 6), cambio en el servidor que confirma Giannier.
+**Para el dueño (configuración, no código):** en Nayu, «Mayorista: ofrécele precio al por mayor» choca con que todo es a cotizar
+(mejor: «el precio por mayor lo cotiza una persona»); y las descripciones traen saludos («¡Hola! Soy Nayu…») que conviene quitar.
+**Sin evals con el modelo real** en este cambio (por el costo, a pedido de Giannier); verificado con la suite automática.

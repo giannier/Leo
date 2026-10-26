@@ -57,7 +57,11 @@ from app.schemas.business_info import (
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL_SECONDS = 60.0
+# The cache is per process, and production runs three (two web workers and the job worker): a
+# change made from the panel clears the cache of the process that took it, and the others see it
+# when their entry runs out. Ten seconds, so an owner who edits and tries it at once sees the
+# change (it was 60).
+CACHE_TTL_SECONDS = 10.0
 DEFAULT_TEMPLATE_KEY = "productos"
 DEFAULT_AGENT_NAME = "Leo"
 DEFAULT_TONE = "cercano"
