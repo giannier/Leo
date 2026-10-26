@@ -25,12 +25,18 @@ alone says little). Needs the real embedding model.
 ## Real conversations (Feature 019, C-11)
 
 `evals/test_real_conversations.py`: the sales flows above check the final stage and the tools used, which let a bad
-conversation pass (a real one, from the simulator, repeated «Sí, contamos con…» in every message and asked again for what the
-customer had said). This eval reads the conversation the way the customer does. 9 scenarios copied from those captures
-(`SCENARIOS`, written by the owner) and 9 written afterwards, not tuned against (`HELD_OUT`). Turn by turn, against what each
-customer message actually gave, it checks that the assistant: does not ask again for something already given, does not say the
-product is available twice, does not make up sales reasons no tool or catalogue holds, goes to a person in the same turn the last
-datum arrives (with what was said written back) and not before, and takes a correction («ya te dije…») instead of repeating the
-question. `JUDGE=1` adds a second model that reads each conversation as a customer would (`JUDGE=gate` makes its verdict count).
-85 % of the scenarios must pass (measured: 16 to 18 of 18 on almost every run). `REAL_SET=owner|new` picks a set, `REAL_ONLY=<name>` one scenario, `REAL_CONVERSATIONS_REPORT=<file>` writes the transcripts. Model
-answers vary: run it more than once before trusting a change, and when you find a bad conversation, add it here before fixing it.
+conversation pass (a real one, from the simulator, repeated «Sí, contamos con…» in every message, asked again for what the
+customer had said and answered like a form). This eval reads the conversation the way the customer does. Three sets:
+`SCENARIOS` (9, copied from the owner's captures), `HELD_OUT` (9, written afterwards and not tuned against) and `NAYU` (8, on
+Bebidas yanayacu's real catalogue: five products with the owner's own questions, as they are in production; the first scenario is the
+owner's own chat of 23 October). Turn by turn, against what each customer message gave, it checks that the assistant: does not ask
+again for something already given, does not say the product is available twice, does not invent sales reasons («el más usado»),
+goes to a person in the same turn the last datum arrives (with what was said written back) and not before, takes a correction
+(«ya te dije…») instead of repeating the question, and **does not answer like a form** (more than two replies that hand the datum
+back like a receipt, «Anotado: *8 cajas*», fail the conversation). It also reports the agent's tokens, so a run says what it cost.
+`JUDGE=1` adds a second model that reads each conversation as a customer would (`JUDGE=gate` makes its verdict count). 85 % of the
+scenarios must pass (measured: 16 to 18 of 18, 24 of 26 on the three sets together). `REAL_SET=owner|new|nayu` picks a set,
+`REAL_ONLY="nayu 1;nayu 7"` the scenarios whose name starts with any of those, `REAL_CONVERSATIONS_REPORT=<file>` writes the
+transcripts and `OPENAI_CHAT_MODEL=<model>` runs it on another model (it does not touch production). Model answers vary: run it more
+than once before trusting a change, read the transcripts and not only the percentage (a stronger model, gpt-5.4, answered as stiffly
+as the mini when the instructions were a form), and when you find a bad conversation, add it here before fixing it.

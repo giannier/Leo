@@ -13,7 +13,14 @@ from typing import Any
 
 import pytest
 
-from app.agent.core import UNBACKED_CLAIMS, UNNOTED_NOTE, _missed_note, _unbacked_claim
+from app.agent.core import (
+    NEXT_STEP_NOTE,
+    PITCH_NOTE,
+    UNBACKED_CLAIMS,
+    UNNOTED_NOTE,
+    _missed_note,
+    _unbacked_claim,
+)
 from app.agent.prompts.stage import (
     QUOTE_QUALIFIES,
     QUOTE_RULES,
@@ -30,14 +37,17 @@ from app.agent.tools.quote import (
     _QUANTITY,
     NO_DATA,
     _given,
+    _grounded,
+    _is_a_use,
     _names_a_product,
     quote_key,
     unnoted_answer,
 )
 from app.agent.tools.registry import ToolContext, ToolScope, tools_of_stage
-from app.process.facts import Cotizacion, Facts, plain
+from app.process.facts import Cotizacion, Facts
 from app.process.templates import QUOTE_TOOL_NAMES, TEMPLATES
 from app.process.templates.base import EffectiveOptions, Stage
+from app.process.text import plain
 from tests.unit.test_stage_prompt import NOW, make_config
 
 SERVICES = TEMPLATES["servicios"]
@@ -100,23 +110,33 @@ class TestWhatTheModelMayNote:
         assert (data, unclear) == ({}, ["cantidad"])
 
     def test_a_datum_of_the_business_without_a_rule_is_taken_as_said(self) -> None:
-        data, _, unclear = self._note([{"dato": "distrito o dirección", "valor": "en mi casa"}])
+        data, _, unclear = self._note([{"dato": "distrito o dirección", "valor": "Av. Larco 120"}])
 
-        assert data == {"distrito o dirección": "en mi casa"} and unclear == []
+        assert data == {"distrito o dirección": "Av. Larco 120"} and unclear == []
 
-    def test_sin_dato_is_refused_when_nothing_was_asked(self) -> None:
+    def test_sin_dato_is_refused_for_something_the_product_does_not_ask(self) -> None:
         data, refused, _ = self._note(
-            [{"dato": "fecha", "valor": NO_DATA}], asked=None, refused=True
+            [{"dato": "color", "valor": NO_DATA}], asked=None, refused=True
         )
 
-        assert (data, refused) == ({}, ["fecha"])
+        assert (data, refused) == ({}, ["color"])
 
-    def test_sin_dato_is_refused_for_a_datum_that_was_not_the_one_asked(self) -> None:
+    def test_sin_dato_closes_any_missing_datum_the_customer_refused(self) -> None:
+        # Not only the one asked last: a person is told «no sé la fecha» whatever was asked.
         data, refused, _ = self._note(
             [{"dato": "fecha", "valor": NO_DATA}], asked="cantidad", refused=True
         )
 
-        assert (data, refused) == ({}, ["fecha"])
+        assert (data, refused) == ({"fecha": NO_DATA}, [])
+
+    def test_only_one_sin_dato_per_call_so_a_quote_is_not_closed_early(self) -> None:
+        data, refused, _ = self._note(
+            [{"dato": "fecha", "valor": NO_DATA}, {"dato": "cantidad", "valor": NO_DATA}],
+            asked="fecha",
+            refused=True,
+        )
+
+        assert data == {"fecha": NO_DATA} and refused == ["cantidad"]
 
     def test_sin_dato_is_refused_when_the_customer_did_not_refuse(self) -> None:
         data, refused, _ = self._note(
@@ -147,6 +167,112 @@ class TestWhatTheModelMayNote:
 
         ((name, value),) = data.items()
         assert len(name) == 40 and len(value) == 120
+
+
+class TestADatumIsWhatTheCustomerSaid:
+    HEARD = "quiero el bidon de 20 l, unos 12 para empezar. en tienda, quiero vender. para el lunes"
+
+    @pytest.mark.parametrize(
+        "value", ["tienda", "en tienda, para vender", "Tienda y reventa", "lunes", "12 unidades"]
+    )
+    def test_what_echoes_the_customer_is_grounded(self, value: str) -> None:
+        assert _grounded(value, self.HEARD)
+
+    @pytest.mark.parametrize("value", ["recurrente", "mensual", "oficina", "San Isidro", "99"])
+    def test_what_the_customer_never_said_is_not(self, value: str) -> None:
+        assert not _grounded(value, self.HEARD)
+
+    def test_a_value_with_nothing_to_check_passes(self) -> None:
+        assert _grounded("no", self.HEARD)
+
+    def test_a_free_datum_nobody_said_is_left_out_and_reported(self) -> None:
+        data, _, unclear = _given(
+            [{"dato": "frecuencia", "valor": "recurrente"}, {"dato": "uso", "valor": "tienda"}],
+            ["uso", "frecuencia"],
+            None,
+            refused_by_customer=False,
+            heard=self.HEARD,
+        )
+
+        assert data == {"uso": "tienda"} and unclear == ["frecuencia"]
+
+    def test_the_datum_just_asked_is_taken_in_the_models_words(self) -> None:
+        # «compra puntual, una sola vez» answered «¿puntual o recurrente?»; the model wrote «única».
+        data, _, unclear = _given(
+            [{"dato": "frecuencia", "valor": "única"}],
+            ["frecuencia"],
+            "frecuencia",
+            refused_by_customer=False,
+            heard="compra puntual, una sola vez",
+        )
+
+        assert data == {"frecuencia": "única"} and unclear == []
+
+    def test_the_date_and_the_quantity_keep_their_own_checks(self) -> None:
+        data, _, unclear = _given(
+            [{"dato": "fecha", "valor": "2026-10-27"}, {"dato": "cantidad", "valor": "doce"}],
+            ["fecha", "cantidad"],
+            None,
+            refused_by_customer=False,
+            heard=self.HEARD,
+        )
+
+        assert data == {"fecha": "2026-10-27", "cantidad": "doce"} and unclear == []
+
+    def test_sin_dato_is_not_grounded_in_words(self) -> None:
+        data, _, _ = _given(
+            [{"dato": "frecuencia", "valor": "sin dato"}],
+            ["frecuencia"],
+            "frecuencia",
+            refused_by_customer=True,
+            heard=self.HEARD,
+        )
+
+        assert data == {"frecuencia": "sin dato"}
+
+
+class TestWhatIsSaidAboutTheUseIsNotAnAddress:
+    @pytest.mark.parametrize(
+        "said", ["mi hogar", "para mi hogar", "hogar", "el negocio", "mi tienda", "casa", "oficina"]
+    )
+    def test_these_say_what_it_is_for(self, said: str) -> None:
+        assert _is_a_use(said)
+
+    @pytest.mark.parametrize(
+        "said", ["Chorrillos", "Av. Larco 123", "mi casa en Surco", "", "para el lunes"]
+    )
+    def test_these_do_not(self, said: str) -> None:
+        assert not _is_a_use(said)
+
+    def test_a_use_given_for_the_address_is_filed_as_the_use(self) -> None:
+        data, _, unclear = _given(
+            [{"dato": "distrito o dirección", "valor": "mi hogar"}],
+            ["cantidad", "distrito o dirección", "uso"],
+            "distrito o dirección",
+            refused_by_customer=False,
+        )
+
+        assert data == {"uso": "mi hogar"} and unclear == []
+
+    def test_without_a_use_to_ask_it_is_not_an_address_either(self) -> None:
+        data, _, unclear = _given(
+            [{"dato": "distrito o dirección", "valor": "mi hogar"}],
+            ["cantidad", "distrito o dirección"],
+            None,
+            refused_by_customer=False,
+        )
+
+        assert data == {} and unclear == ["distrito o dirección"]
+
+    def test_a_real_address_stays_where_it_was_said(self) -> None:
+        data, _, _ = _given(
+            [{"dato": "distrito o dirección", "valor": "Chorrillos"}],
+            ["distrito o dirección", "uso"],
+            None,
+            refused_by_customer=False,
+        )
+
+        assert data == {"distrito o dirección": "Chorrillos"}
 
 
 class TestTheProductIsAProduct:
@@ -216,6 +342,13 @@ class TestTheFormFields:
             "producto",
         }
         assert "required" not in spec.parameters or not spec.parameters["required"]
+
+    def test_the_labels_that_are_not_obvious_say_what_goes_there(self) -> None:
+        options = replace(SERVICES.resolve(), cotizar=True, datos_cotizacion=("uso", "fecha"))
+
+        properties = _specs(options)["anotar_cotizacion"].parameters["properties"]
+
+        assert properties["uso"]["description"] and "description" not in properties["fecha"]
 
     def test_without_data_names_it_is_a_list(self) -> None:
         options = replace(SERVICES.resolve(), cotizar=True, datos_cotizacion=())
@@ -423,14 +556,27 @@ class TestAnAnswerThatWasNotNoted:
     def test_an_answer_to_the_date_just_asked_is_recognised(self, said: str) -> None:
         assert unnoted_answer(_context(self.ASKING_DATE), said) == "fecha"
 
-    @pytest.mark.parametrize("said", ["para negocio", "gracias", "¿cuánto cuesta?"])
-    def test_something_else_is_not_taken_for_the_answer(self, said: str) -> None:
+    @pytest.mark.parametrize("said", ["gracias", "ok", "¿cuánto cuesta?", "dale, listo"])
+    def test_an_acknowledgement_or_a_question_is_not_taken_for_an_answer(self, said: str) -> None:
         assert unnoted_answer(_context(self.ASKING_DATE), said) is None
 
-    def test_a_datum_that_cannot_be_recognised_without_a_model_is_left_alone(self) -> None:
+    def test_anything_else_may_be_an_answer_the_model_did_not_note(self) -> None:
+        # «para mi hogar» to a question about the address: understood, answered, never noted.
+        asking = Cotizacion(pide=["distrito", "uso"], preguntado="distrito")
+
+        assert unnoted_answer(_context(asking), "para mi hogar") == "distrito, uso"
+
+    def test_a_datum_that_is_not_recognised_without_a_model_still_reports_what_is_missing(
+        self,
+    ) -> None:
         asking = Cotizacion(pide=["distrito"], preguntado="distrito")
 
-        assert unnoted_answer(_context(asking), "en Miraflores") is None
+        assert unnoted_answer(_context(asking), "en Miraflores") == "distrito"
+
+    def test_nothing_is_reported_when_nothing_is_missing(self) -> None:
+        done = Cotizacion(datos={"fecha": "lunes"}, pide=["fecha"], preguntado=None)
+
+        assert unnoted_answer(_context(done), "el lunes") is None
 
     def test_without_a_quote_in_progress_there_is_nothing_to_note(self) -> None:
         assert unnoted_answer(_context(None), "desde el lunes") is None
@@ -449,7 +595,7 @@ class TestAnAnswerThatWasNotNoted:
 
     def test_a_call_to_the_tool_means_nothing_was_missed(self) -> None:
         note = _missed_note(
-            "Anotado.",
+            "Anotado. ¿Y en qué distrito?",
             ["anotar_cotizacion"],
             ("anotar_cotizacion",),
             _context(self.ASKING_DATE),
@@ -464,3 +610,72 @@ class TestAnAnswerThatWasNotNoted:
         )
 
         assert note is None
+
+
+class TestAReasonNobodyGave:
+    OFFERED = ("buscar_productos",)
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "Los formatos más usados para reventa son el bidón y la caja.",
+            "El bidón de 20 L es el más pedido por las tiendas.",
+            "Es el más vendido de la línea.",
+            "Tiene alta rotación en bodegas.",
+        ],
+    )
+    def test_an_invented_reason_to_buy_is_caught(self, content: str) -> None:
+        note = _missed_note(content, [], self.OFFERED, _context(None), "hola")
+
+        assert note == PITCH_NOTE
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "Tenemos bidón de 20 L, caja de 20 L y botellas. ¿Cuál quieres cotizar?",
+            "Necesito algo más: ¿para qué fecha lo necesitas?",
+            "El precio lo confirma una persona del negocio.",
+        ],
+    )
+    def test_ordinary_replies_are_left_alone(self, content: str) -> None:
+        assert _missed_note(content, [], self.OFFERED, _context(None), "hola") is None
+
+
+class TestAReplyThatAsksNothing:
+    OFFERED = ("anotar_cotizacion",)
+    OPEN = Cotizacion(datos={"cantidad": "5"}, pide=["cantidad", "fecha"], preguntado="fecha")
+
+    def test_a_quote_that_misses_data_and_a_reply_without_a_question_is_caught(self) -> None:
+        note = _missed_note(
+            "Perfecto, para el lunes ya queda claro.", [], self.OFFERED, _context(self.OPEN), "ok"
+        )
+
+        assert note == NEXT_STEP_NOTE
+
+    def test_a_reply_that_asks_is_left_alone(self) -> None:
+        note = _missed_note(
+            "Perfecto. ¿A qué distrito te lo llevamos?", [], self.OFFERED, _context(self.OPEN), "ok"
+        )
+
+        assert note is None
+
+    def test_a_complete_quote_needs_no_question(self) -> None:
+        done = Cotizacion(datos={"cantidad": "5"}, pide=["cantidad"])
+
+        assert _missed_note("Listo.", [], self.OFFERED, _context(done), "x") is None
+
+    def test_a_business_with_data_to_ask_and_nothing_noted_yet_is_nudged_too(self) -> None:
+        context = _context(None)
+        context = replace(context, options=_options())
+
+        note = _missed_note("Hola, soy Nayu 😊", [], self.OFFERED, context, "precio del bidón?")
+
+        assert note == NEXT_STEP_NOTE
+
+    def test_a_business_that_asks_no_data_is_never_nudged_for_it(self) -> None:
+        assert _missed_note("Hola 😊", [], self.OFFERED, _context(None), "hola") is None
+
+    def test_a_business_without_the_tool_is_never_nudged_for_it(self) -> None:
+        context = replace(_context(None), options=_options())
+
+        assert _missed_note("Hola 😊", [], ("buscar_productos",), context, "hola") is None

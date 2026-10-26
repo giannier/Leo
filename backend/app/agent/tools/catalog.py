@@ -38,6 +38,7 @@ from app.learning.questions import record_unanswered
 from app.models.business import Product
 from app.models.media import MediaAsset
 from app.models.sales_config import Promotion
+from app.process.quote_data import data_of
 from app.repositories.media import MediaAssetRepository
 from app.repositories.product import ProductRepository
 from app.repositories.sales_config import PromotionRepository
@@ -237,10 +238,9 @@ def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool 
     if item["modo_venta"] == "cotizacion":
         parts.append("[a cotizar: sin precio fijo]")
         if item["datos_a_pedir"] and quote_tool:
+            labels = [datum.label for datum in data_of(item["datos_a_pedir"])]
             parts.append(
-                "[datos para cotizar, anótalos con anotar_cotizacion: "
-                + "; ".join(item["datos_a_pedir"])
-                + "]"
+                "[datos para cotizar, anótalos con anotar_cotizacion: " + "; ".join(labels) + "]"
             )
         elif item["datos_a_pedir"]:
             parts.append(

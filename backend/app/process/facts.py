@@ -17,7 +17,6 @@ table-driven test.
 
 from __future__ import annotations
 
-import unicodedata
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -35,6 +34,7 @@ from app.models.sales_config import Promotion
 from app.orders.pricing import Line as PricingLine
 from app.orders.pricing import Rule, applies_to_order
 from app.process.templates.base import EffectiveOptions
+from app.process.text import plain
 from app.repositories.conversation_snapshot import (
     ConversationSnapshot,
     ConversationSnapshotRepository,
@@ -137,14 +137,6 @@ class Cotizacion(_Model):
         """What the product asks for that the customer has not given."""
         given = {plain(name) for name in self.datos}
         return [name for name in self.pide if plain(name) not in given]
-
-
-def plain(text: str) -> str:
-    """Lower case, no accents, single spaces: how two spellings of a datum are compared."""
-    stripped = "".join(
-        c for c in unicodedata.normalize("NFD", text.lower()) if unicodedata.category(c) != "Mn"
-    )
-    return " ".join(stripped.split())
 
 
 class Seguimiento(_Model):

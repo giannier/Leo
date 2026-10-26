@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, exists, func, literal, or_, select
 
 from app.models.business import Product, ProductCategory
+from app.process.quote_data import labels_of
 from app.repositories.base import BaseRepository
 
 
@@ -130,7 +131,9 @@ class ProductRepository(BaseRepository[Product]):
     def quote_fields(self) -> tuple[str, ...]:
         """What the business asks for before a quote, across its live quoted products, once each.
 
-        A column read, not whole rows: it runs when the process configuration loads.
+        As labels («cantidad», «fecha»...): the owner writes questions, one list per product, and
+        the assistant notes the answers under short names (`process/quote_data.py`). A column
+        read, not whole rows: it runs when the process configuration loads.
         """
         statement = (
             select(Product.datos_a_pedir)
@@ -142,12 +145,7 @@ class ProductRepository(BaseRepository[Product]):
             )
             .order_by(Product.destacado.desc(), Product.name)
         )
-        lists = [list(row or []) for row in self._session.execute(statement).scalars().all()]
-        seen: dict[str, str] = {}
-        for names in lists:
-            for name in names:
-                seen.setdefault(" ".join(name.lower().split()), name)
-        return tuple(seen.values())
+        return labels_of([list(row or []) for row in self._session.execute(statement).scalars()])
 
     def list_active(self, *, limit: int | None = None) -> Sequence[Product]:
         """Live, sellable products - what the agent is allowed to quote."""
