@@ -39,12 +39,12 @@ SEARCH_AND_ORDER = (*SEARCH, "gestionar_pedido")
 
 # plantillas.md section 2, the columns that are identical in every template.
 COMMON_TOOLS = {
-    Stage.CALIFICAR: ("mostrar_opciones", "elegir_camino"),
+    Stage.CALIFICAR: ("mostrar_opciones", "elegir_camino", "buscar_productos", "ver_producto"),
     Stage.ANUNCIO: (*SEARCH_AND_ORDER, "elegir_camino"),
     Stage.IDENTIFICAR: (*SEARCH_AND_ORDER, "elegir_camino"),
     Stage.PEDIDO: ("gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"),
-    Stage.DATOS: ("gestionar_pedido",),
-    Stage.COBRO: ("enviar_metodos_pago", "gestionar_pedido"),
+    Stage.DATOS: ("gestionar_pedido", "buscar_productos"),
+    Stage.COBRO: ("enviar_metodos_pago", "gestionar_pedido", "buscar_productos"),
     Stage.VERIFICACION: ("gestionar_pedido",),
     Stage.CERRADO: ("buscar_productos", "ver_producto", "gestionar_pedido"),
     Stage.ASESORIA: (*SEARCH, "elegir_camino"),

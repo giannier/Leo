@@ -112,6 +112,20 @@ def customer_refused(context: ToolContext) -> bool:
     return bool(_REFUSAL.search(plain(latest_customer_text(context))))
 
 
+# «pásame con alguien del equipo», «quiero hablar con una persona»: a person, asked for in so many
+# words. Platform rule 5 hands over then, with whatever the quote holds.
+_ASKS_FOR_A_PERSON = re.compile(
+    r"\b(pasa(me)?|comunica(me)?|contacta(me)?|deriva(me)?|hablar|habla|atienda|atiendan|"
+    r"llame|llamen|escriba|escriban)\b.{0,40}\b(persona|humano|humana|asesor|asesora|alguien|"
+    r"encargad[oa]|vendedor|vendedora|ejecutiv[oa]|equipo|dueno|duena)\b"
+)
+
+
+def customer_asks_for_a_person(context: ToolContext) -> bool:
+    """Whether what the customer wrote since the assistant last spoke asks for a person."""
+    return bool(_ASKS_FOR_A_PERSON.search(plain(latest_customer_text(context))))
+
+
 def current_quote(context: ToolContext) -> Cotizacion | None:
     """The quote in progress: what a tool set earlier this turn, else what the facts hold."""
     patched = context.facts_patch.get("cotizacion")
@@ -184,7 +198,10 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
         # What the model passes, over what was noted turn by turn: nothing noted is lost.
         noted = current_quote(context)
         asks = context.options.datos_cotizacion if context.options is not None else ()
-        if noted is None and asks and not customer_refused(context):
+        # Asked for a person: it goes now, with what is noted (the tool refused it and the assistant
+        # kept asking for the date of a customer who wanted to negotiate the price with someone).
+        waits = not customer_refused(context) and not customer_asks_for_a_person(context)
+        if noted is None and asks and waits:
             # Nothing noted yet and the business asks for data: handing over now sends a person a
             # conversation with nothing in it (the assistant did it on «quiero empezar a vender»).
             return ToolResult.no_disponible(
@@ -193,7 +210,7 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
                     "con el cliente y anótalos con anotar_cotizacion; no derives todavía."
                 )
             )
-        if noted is not None and noted.falta and not customer_refused(context):
+        if noted is not None and noted.falta and waits:
             return ToolResult.no_disponible(
                 decir=(
                     f"Aún falta {', '.join(noted.falta)} y el cliente no dijo que no quiera darlo: "

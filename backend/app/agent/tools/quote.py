@@ -67,8 +67,9 @@ _QUANTITY = re.compile(
 # Words that say how often: «única» stands for «una sola vez», «recurrente» for «todas las semanas»,
 # but neither for a customer who never spoke of it.
 _FREQUENCY_SAID = re.compile(
-    r"puntual|una vez|sola vez|unic|recurrent|semana|semanal|mensual|al mes|por mes|cada |"
-    r"todos los|todas las|seguido|quincen|diari|siempre|frecuen|de vez en cuando|regular"
+    r"puntual|una vez|sola vez|esa vez|esta vez|unic|ocasion|eventual|recurrent|semana|semanal|"
+    r"mensual|al mes|por mes|cada |todos los|todas las|seguido|quincen|diari|siempre|frecuen|"
+    r"de vez en cuando|regular"
 )
 _PLAUSIBLE = {"fecha": _DATE, "cantidad": _QUANTITY, "personas": _QUANTITY}
 # «producto» is what the customer wants quoted, or all of it: «para negocio» (a use) and «10 de cada

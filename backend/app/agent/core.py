@@ -41,6 +41,7 @@ from app.agent.tools.handover import current_quote
 from app.agent.tools.quote import unnoted_answer
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.conversation import Message
+from app.process.quote_data import topics_asked
 from app.process.text import plain
 from app.providers.llm.base import (
     ChatMessage,
@@ -154,9 +155,11 @@ FALLBACK_REPLY = (
 # so, and named one again. Saying nothing useful is the right answer here:
 # the alternative is sending a product name the business cannot honour, and
 # the customer finds that out standing at the counter.
+# Nothing hands the conversation over after it, so it must not promise a person (it did: «Déjame
+# comunicarte con una persona…», and nobody came).
 CATALOG_GUARD_REPLY = (
     "Disculpa, no quiero darte el nombre equivocado de un producto. "
-    "Déjame comunicarte con una persona del negocio para confirmártelo bien."
+    "¿Me dices otra vez cuál buscas, para confirmártelo bien?"
 )
 
 # The most product names the guard will hold to judge a reply against. A
@@ -325,6 +328,38 @@ ASKS_PERMISSION = re.compile(
 )
 # Not «¿te lo agrego?»: after a recommendation that is the closing question, and adding what the
 # customer did not confirm puts it in the order uninvited. Wanting it is `WANTS_IT`.
+# «¿Te los agrego?» and the customer says yes («sí, los dos», «dale»): the yes is wanting it, though
+# it says no product (gpt-4.1-mini then asked «¿quieres que lo haga ahora?»).
+OFFERED_TO_ADD = re.compile(r"\b(agrego|agregue|anado|anada|sumo|sume)\b")
+ACCEPTS = re.compile(
+    r"^\W*(si|sii|claro|dale|ok|okey|ya|listo|de acuerdo|perfecto|va|vale|bueno|por supuesto|"
+    r"correcto|confirmo|eso|ese|esa|esos|esas|ambos|ambas|(los|las) (dos|tres))\b"
+)
+# What it says it will do, or did, without a tool behind it: a WhatsApp assistant only speaks when
+# the customer writes, so «enseguida te los muestro» is a promise nobody keeps, and «te envío los
+# datos para el pago» with no `enviar_metodos_pago` sends nothing.
+PROMISES = re.compile(
+    r"\b(te|le) (envio|enviare|mando|mandare|paso|pasare|comparto) (ahora |ya )?(los |el |la )?"
+    r"(datos|metodos|numero|cuenta|qr)\b|"
+    r"\bvoy a (buscar|revisar|consultar|verificar|averiguar|enviarte|mandarte|mostrarte)\b|"
+    r"\b(en un momento|enseguida|en breve|ahorita) te (los |las |lo |la )?"
+    r"(envio|mando|muestro|paso|confirmo|aviso)\b"
+)
+SENDING_TOOLS = frozenset(
+    {"enviar_metodos_pago", "enviar_recurso", "enviar_documento", "mostrar_opciones"}
+)
+PROMISE_NOTE = (
+    "Aviso del sistema: tu mensaje promete enviar, buscar o mostrar algo que no hiciste, y no "
+    "podrás hacerlo después. Hazlo ahora con tus herramientas; si no tienes cómo, no lo prometas: "
+    "dile qué falta para seguir."
+)
+# The quote asked as a form: «¿cuántas, para cuándo, en qué distrito y para qué uso?» in the first
+# reply (gpt-4.1-mini, 2026-10-27), though the quote rules say one or two at a time.
+MOST_ASKED_AT_ONCE = 2
+TOO_MANY_NOTE = (
+    "Aviso del sistema: preguntas varias cosas a la vez y suena a formulario. Escríbelo otra vez "
+    "pidiendo solo una o dos que vayan juntas; lo demás, después."
+)
 ADD_NOTE = (
     "Aviso del sistema: el cliente dijo que lo quiere y no lo agregaste. Si es de precio fijo, "
     "agrégalo ahora con gestionar_pedido (con lo que ya dijo: cantidad, temas); si es a cotizar, "
@@ -349,17 +384,33 @@ def _quote_is_open(context: ToolContext) -> bool:
     return bool(asks)
 
 
+def accepted_an_offer_to_add(previous_reply: str, customer_message: str) -> bool:
+    """Whether the customer said yes to the assistant's «¿te lo agrego?»."""
+    return (
+        "?" in previous_reply
+        and bool(OFFERED_TO_ADD.search(plain(previous_reply)))
+        and bool(ACCEPTS.search(plain(customer_message)))
+    )
+
+
 def _missed_note(
     content: str,
     called: Sequence[str],
     available: Sequence[str],
     context: ToolContext,
     customer_message: str,
+    *,
+    accepted: bool = False,
 ) -> str | None:
-    """What to tell the model when it skipped a tool it should have used this turn, if anything."""
+    """What to tell the model when it skipped a tool it should have used this turn, if anything.
+
+    `accepted`: the customer said yes to the assistant's offer to add something.
+    """
     tool = _unbacked_claim(content, called, available)
     if tool is not None:
         return UNBACKED_NOTE.format(tool=tool)
+    if not SENDING_TOOLS & set(called) and PROMISES.search(plain(content)):
+        return PROMISE_NOTE
     if "anotar_cotizacion" in available and "anotar_cotizacion" not in called:
         datum = unnoted_answer(context, customer_message)
         if datum is not None:
@@ -370,7 +421,9 @@ def _missed_note(
     # order already made, and adding it again would put it in twice.
     order = context.facts.pedido
     nothing_ordered = order is None or not order.items
-    if "gestionar_pedido" in available and not acted and nothing_ordered and WANTS_IT.search(said):
+    # A yes to «¿te lo agrego?» holds with an order too: the offer named what to add.
+    wants_it = (nothing_ordered and bool(WANTS_IT.search(said))) or accepted
+    if "gestionar_pedido" in available and not acted and wants_it:
         return ADD_NOTE
     # Methods already sent for this order: the process tells the customer to look at that message.
     if (
@@ -384,6 +437,12 @@ def _missed_note(
         return PERMISSION_NOTE
     if UNBACKED_PITCH.search(content):
         return PITCH_NOTE
+    if (
+        "anotar_cotizacion" in available
+        and _quote_is_open(context)
+        and len(topics_asked(content)) > MOST_ASKED_AT_ONCE
+    ):
+        return TOO_MANY_NOTE
     if (
         "anotar_cotizacion" in available
         and content.strip()
@@ -521,6 +580,11 @@ class AgentCore:
 
         if context is None:
             context = ToolContext(session=self._session, tenant_id=self._tenant_id, llm=self._llm)
+        previous_reply = next(
+            (m.content for m in reversed(messages[1:-1]) if m.role == "assistant" and m.content),
+            "",
+        )
+        accepted = accepted_an_offer_to_add(previous_reply, customer_message)
         # Models repeat themselves: `consultar_catalogo` came back seven times
         # for the same term in one conversation. Within a turn the answer
         # cannot have changed, so it is looked up once. The cache dies with
@@ -573,6 +637,7 @@ class AgentCore:
                         self._registry.names(),
                         context,
                         customer_message,
+                        accepted=accepted,
                     )
                 )
                 if missed is None:

@@ -12,7 +12,14 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from evals.real_conversations import ALL_SCENARIOS, HELD_OUT, NAYU, SCENARIOS, run_all
+from evals.real_conversations import (
+    ALL_SCENARIOS,
+    HELD_OUT,
+    NAYU,
+    NAYU_FRESH,
+    SCENARIOS,
+    run_all,
+)
 from sqlalchemy.orm import Session
 
 pytestmark = pytest.mark.evals
@@ -26,7 +33,7 @@ class TestRealConversations:
     async def test_the_assistant_holds_a_reasonable_conversation(self, db: Session, llm) -> None:  # type: ignore[no-untyped-def]
         mode = os.getenv("JUDGE", "")
         only = os.getenv("REAL_ONLY")
-        pool = {"owner": SCENARIOS, "new": HELD_OUT, "nayu": NAYU}.get(
+        pool = {"owner": SCENARIOS, "new": HELD_OUT, "nayu": NAYU, "fresh": NAYU_FRESH}.get(
             os.getenv("REAL_SET", ""), ALL_SCENARIOS
         )
         # `REAL_ONLY="nayu 1;nayu 7"`: the scenarios whose name starts with any of them.

@@ -398,6 +398,28 @@ class TestTheQuoteGoesToAPersonByItself:
         assert "Aún falta fecha, distrito o dirección" in result.decir
         assert context.ending.reply is None and "derivado" not in context.facts_patch
 
+    async def test_a_customer_who_asks_for_a_person_is_handed_over_with_what_is_noted(
+        self, db: Session
+    ) -> None:
+        """«pásame con alguien del equipo»: the tool refused it for the missing date and the
+        assistant kept asking for it (gpt-4.1-mini, 2026-10-27)."""
+        tenant = _quoting_tenant(db, WATER)
+        conversation = _conversation(db, tenant)
+        before = Cotizacion(
+            producto="Bidón 20 L",
+            datos={"cantidad": "15"},
+            pide=["cantidad", "fecha", "distrito o dirección"],
+            preguntado="fecha",
+        )
+        _says(db, tenant, conversation, "mejor pásame con alguien del equipo, quiero negociar")
+        context = _context(db, tenant, conversation, cotizacion=before)
+
+        await derivar_a_humano(context, {"motivo": "cotizacion", "resumen": "15 bidones"})
+
+        assert context.facts_patch["derivado"]["motivo"] == "cotizacion"
+        assert context.facts_patch["derivado"]["datos"] == {"cantidad": "15"}
+        assert context.ending.reply is not None
+
     async def test_nothing_can_be_handed_over_before_anything_is_noted(self, db: Session) -> None:
         tenant = _quoting_tenant(db, WATER)
         conversation = _conversation(db, tenant)
