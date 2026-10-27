@@ -14,10 +14,12 @@ this leaves the application (Constitution: third-party access lives in
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 import httpx
@@ -41,6 +43,50 @@ from app.providers.llm.base import (
 # margin for a slow day rather than a tight budget.
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
+logger = logging.getLogger(__name__)
+
+# Every business shares one OpenAI organization and its tokens per minute. A burst gets 429 with a
+# wait of a second or two; without a retry the customer read «no pude procesar tu mensaje», and
+# three of those in a minute opened that business's circuit for two minutes. A provider hiccup
+# (5xx) is retried the same way. A wait longer than MAX_RETRY_WAIT is not waited for: the canned
+# reply beats a reply a minute late. An exhausted quota is never retried: it will not pass.
+RETRIES = 2
+MAX_RETRY_WAIT = 8.0
+RETRIED_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+
+def _retry_wait(response: httpx.Response, attempt: int) -> float | None:
+    """Seconds to wait before trying again, or None when trying again cannot help."""
+    if response.status_code == 429 and _out_of_quota(response):
+        return None
+    hinted = _hinted_wait(response.headers)
+    wait = hinted if hinted is not None else float(2**attempt)
+    return wait if 0 <= wait <= MAX_RETRY_WAIT else None
+
+
+def _hinted_wait(headers: httpx.Headers) -> float | None:
+    for name, scale in (("retry-after-ms", 1000.0), ("retry-after", 1.0)):
+        raw = headers.get(name)
+        if raw is None:
+            continue
+        try:
+            return float(raw) / scale
+        except ValueError:
+            continue  # an HTTP date: not worth parsing for a wait this short
+    return None
+
+
+def _out_of_quota(response: httpx.Response) -> bool:
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    error = body.get("error") if isinstance(body, dict) else None
+    return isinstance(error, dict) and "insufficient_quota" in (
+        str(error.get("code")),
+        str(error.get("type")),
+    )
+
 
 class OpenAICompatibleProvider:
     """Chat and embeddings against any OpenAI-compatible endpoint."""
@@ -59,6 +105,7 @@ class OpenAICompatibleProvider:
         vision_model: str | None = None,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -84,6 +131,8 @@ class OpenAICompatibleProvider:
         # which model suits which intelligence level is TASK-445's decision.
         self._vision_model = vision_model or chat_model
         self._timeout = timeout
+        # How a retry waits; the tests pass one that does not.
+        self._sleep = sleep
         # The seam that makes everything below testable without a network.
         # `None` is httpx's own default, so production behaviour is untouched;
         # the suite passes a `MockTransport` and gets to assert on the exact
@@ -136,13 +185,24 @@ class OpenAICompatibleProvider:
     ) -> dict[str, Any]:
         url = f"{self._base_url}{path}"
         limit = limit or self._timeout
-        try:
-            async with httpx.AsyncClient(timeout=limit, transport=self._transport) as client:
-                response = await client.post(url, headers=self._headers(), json=payload)
-        except httpx.TimeoutException as exc:
-            raise LLMError(f"{self._base_url} timed out after {limit.read}s") from exc
-        except httpx.HTTPError as exc:
-            raise LLMError(f"could not reach {self._base_url}: {exc}") from exc
+        for attempt in range(RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=limit, transport=self._transport) as client:
+                    response = await client.post(url, headers=self._headers(), json=payload)
+            except httpx.TimeoutException as exc:
+                raise LLMError(f"{self._base_url} timed out after {limit.read}s") from exc
+            except httpx.HTTPError as exc:
+                raise LLMError(f"could not reach {self._base_url}: {exc}") from exc
+            if response.status_code not in RETRIED_STATUSES or attempt == RETRIES:
+                break
+            wait = _retry_wait(response, attempt)
+            if wait is None:
+                break
+            logger.warning(
+                "model provider asked to wait; retrying",
+                extra={"status": response.status_code, "wait_s": wait, "attempt": attempt + 1},
+            )
+            await self._sleep(wait)
 
         self._raise_for_status(response)
 

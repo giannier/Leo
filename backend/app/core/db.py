@@ -29,7 +29,13 @@ def get_engine() -> Engine:
     class of errors where a connection was closed by the database (restart,
     idle timeout) while sitting unused in the pool.
     """
-    return create_engine(get_settings().database_url, pool_pre_ping=True)
+    settings = get_settings()
+    return create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
 
 
 @lru_cache

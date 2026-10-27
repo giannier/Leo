@@ -122,6 +122,12 @@ services:
   worker:
     <<: *backend
     command: ["arq", "app.workers.settings.WorkerSettings"]
+    environment:
+      <<: *backend-env
+      # Up to twenty conversations answered at once (max_jobs), each holding a connection while
+      # the model thinks: 20 + 10 here, 15 for each web process, under Postgres's 100.
+      DB_POOL_SIZE: "20"
+      DB_MAX_OVERFLOW: "10"
     depends_on:
       migrate:
         condition: service_completed_successfully

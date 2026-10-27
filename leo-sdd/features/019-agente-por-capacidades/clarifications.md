@@ -435,3 +435,21 @@ Las dos fallas de Nayu de gpt-5.4-mini (y una de gpt-4.1-mini) eran nuestras: «
 por no ser las palabras del cliente; corregido (3b1baad). gpt-5.4-mini dijo «ya quedó registrada» sin agregar: ahora recibe aviso.
 Gasto de evals del día: ~US$2,41. **Pendiente (decisión de Giannier, costo del LLM):** qué modelo atiende la conversación;
 producción sigue con gpt-5.4-mini. Propuesta aparte para bajar el costo: caché de prompt (ESTADO al final, medir `cached_tokens`).
+
+## C-14: capacidad para 20 negocios y origen de los clientes (2026-10-27)
+**Pregunta de Giannier:** con la misma API de OpenAI para las 20 empresas, ¿habrá errores o cruce de información?; ¿se distingue el
+cliente que llega por publicidad pagada del orgánico?
+**Cruce de información: no.** Cada llamada al modelo lleva solo el prompt de ese negocio y el historial de esa conversación; OpenAI no
+guarda estado entre llamadas y la caché de prompt solo reutiliza un prefijo idéntico (no se comparte entre organizaciones). La suite
+de aislamiento (639 pruebas) pasó ese día.
+**Capacidad (corregido):** (1) un 429 o un 5xx de OpenAI no se reintentaba: el cliente recibía el mensaje de respaldo y tres fallas en
+un minuto abrían el circuito del negocio por 2 minutos. Ahora se reintenta dos veces (espera de OpenAI, máximo 8 s); sin saldo no se
+reintenta. (2) Un solo worker con 4 tareas a la vez, compartidas con la indexación de documentos: con 20 negocios los mensajes harían
+cola. Ahora 20 a la vez, las pesadas de 2 en 2, y el pool de conexiones del worker es 20 + 10 (RUNBOOK §7).
+**Origen:** el anuncio Click-to-WhatsApp de Meta llega en el webhook (`referral`) y queda como `entrada_anuncio` (etapa ANUNCIO; en el
+CRM «Anuncio: <titular>»); lo orgánico sale del enlace `?o=` o del texto «te escribo desde Instagram»; sin dato, «Directo». El reporte
+de resultados anteponía «Anuncio:» a todo origen (un cliente orgánico de Instagram contaba como pagado): corregido. Aún no visto con un
+anuncio real; un anuncio que lleva a la web y de ahí a WhatsApp necesita el enlace con `?o=`.
+**Plantillas y rubros:** 3 plantillas de proceso (cómo avanza la venta) y 13 rubros (lo que se sabe de cada industria), entre ellos
+«otros», el genérico por defecto. Recomendación: no una plantilla por rubro (cada una pide sus evals con el modelo real); enriquecer los
+rubros (hoy ~4 reglas cada uno) y crear una plantilla solo donde la venta fluye distinto. Pendiente: los rubros de las 20 empresas.

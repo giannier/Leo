@@ -131,6 +131,11 @@ class Settings(BaseSettings):
     # model was approved for personal data should run with it on.
     vision_enabled: bool = True
 
+    # The connection pool of each process. The worker holds one connection per conversation it is
+    # answering while the model thinks, so it gets a bigger pool (deploy/docker-compose.prod.yml).
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+
     # OpenAI - paid.
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"

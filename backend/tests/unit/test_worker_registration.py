@@ -73,3 +73,31 @@ class TestWorkerBounds:
     def test_concurrency_and_timeout_are_explicit(self) -> None:
         assert WorkerSettings.max_jobs > 0
         assert WorkerSettings.job_timeout >= 60
+
+
+class TestRoomForConversations:
+    """With twenty businesses, four slots shared with document indexing made messages queue."""
+
+    def test_twenty_conversations_can_be_answered_at_once(self) -> None:
+        assert WorkerSettings.max_jobs >= 20
+
+    async def test_the_heavy_jobs_run_two_at_a_time(self) -> None:
+        import asyncio
+
+        from app.workers.settings import HEAVY_AT_ONCE, _few_at_a_time
+
+        running = 0
+        most = 0
+
+        async def heavy(ctx: dict[str, object]) -> None:
+            nonlocal running, most
+            running += 1
+            most = max(most, running)
+            await asyncio.sleep(0.01)
+            running -= 1
+
+        job = _few_at_a_time(heavy)
+        await asyncio.gather(*(job({}) for _ in range(5)))
+
+        assert most == HEAVY_AT_ONCE == 2
+        assert job.__name__ == "heavy"  # the queue finds it by its name

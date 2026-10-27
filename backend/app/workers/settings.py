@@ -15,10 +15,13 @@ PDF reader - are built once in `startup` and handed to every job through
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import logging
-from typing import Any
+from typing import Any, cast
 
 from arq import cron
+from arq.typing import WorkerCoroutine
 
 from app.core.config import get_settings
 from app.core.db import get_session_factory
@@ -111,17 +114,41 @@ async def shutdown(ctx: dict[str, Any]) -> None:
     ctx.pop("whatsapp", None)
 
 
+# Jobs that hold a lot in memory or call the model in bulk: two at a time, so the conversations
+# always find a free slot among `max_jobs`.
+HEAVY_AT_ONCE = 2
+_heavy = asyncio.Semaphore(HEAVY_AT_ONCE)
+
+
+def _few_at_a_time(job: WorkerCoroutine) -> WorkerCoroutine:
+    """`job`, waiting its turn among the heavy ones. Same name, so the queue still finds it."""
+
+    @functools.wraps(job)
+    async def run(ctx: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
+        async with _heavy:
+            return await job(ctx, *args, **kwargs)
+
+    return cast(WorkerCoroutine, run)
+
+
+_heavy_index_knowledge_source = _few_at_a_time(index_knowledge_source)
+_heavy_index_catalog_knowledge = _few_at_a_time(index_catalog_knowledge)
+_heavy_embed_situations = _few_at_a_time(embed_situations)
+_heavy_run_catalog_evals = _few_at_a_time(run_catalog_evals)
+_heavy_process_chat_import = _few_at_a_time(process_chat_import)
+
+
 class WorkerSettings:
     """The class the `arq` CLI loads."""
 
     functions = [
-        index_knowledge_source,
+        _heavy_index_knowledge_source,
         process_webhook_event,
         answer_conversation,
-        index_catalog_knowledge,
-        embed_situations,
-        run_catalog_evals,
-        process_chat_import,
+        _heavy_index_catalog_knowledge,
+        _heavy_embed_situations,
+        _heavy_run_catalog_evals,
+        _heavy_process_chat_import,
     ]
 
     # Times are UTC and deliberately off the hour: everything on a VPS
@@ -146,7 +173,7 @@ class WorkerSettings:
         # provider still holds for 48 hours has time to be uploaded again
         # before it lapses, even if one run fails.
         cron(refresh_media_provider_ids, name=f"cron:{REFRESH_JOB}", hour=8, minute=25),
-        cron(index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
+        cron(_heavy_index_catalog_knowledge, name="cron:index_catalog_knowledge", minute=40),
         # Feature 019, phase D: the appointment reminders, every five minutes off the boundary.
         cron(
             run_reminders,
@@ -158,7 +185,7 @@ class WorkerSettings:
         # Feature 010: yesterday's metrics after midnight in Lima (06:15 UTC), then the purge.
         cron(metrics_rollup, name=f"cron:{ROLLUP_JOB}", hour=6, minute=15),
         cron(metrics_purge, name=f"cron:{PURGE_JOB}", hour=7, minute=5),
-        cron(embed_situations, name="cron:embed_situations", minute={10, 40}),
+        cron(_heavy_embed_situations, name="cron:embed_situations", minute={10, 40}),
         # What the assistant could learn: once a day, early in the morning of Lima.
         cron(learning_sweep, name=f"cron:{LEARNING_JOB}", hour=10, minute=35),
         # Every five minutes (`contracts/api.md` section 9): a pause that ran out
@@ -225,11 +252,12 @@ class WorkerSettings:
     on_shutdown = shutdown
     redis_settings = redis_settings()
 
-    # One document at a time per worker process. Indexing is dominated by
-    # waiting on the embedding API, but a 10 MB PDF is also held in memory
-    # while it is parsed, and a single-VPS deployment (Constitution:
-    # "simplicidad operativa") has no headroom for many of those at once.
-    max_jobs = 4
+    # Twenty jobs at once: one per conversation being answered, for twenty businesses at their
+    # busiest hour (a turn mostly waits on the model, it does not use the CPU). It was 4, shared
+    # with document indexing, and messages queued. The heavy jobs (a 10 MB PDF held in memory
+    # while parsed, a chat export, the catalogue evals) stay at HEAVY_AT_ONCE (`_few_at_a_time`).
+    # Each job holds a database connection: the worker's pool is sized for it (DB_POOL_SIZE).
+    max_jobs = 20
 
     # A long document is several embedding round trips. The default 300s is
     # generous enough; making it explicit means a change is deliberate.
