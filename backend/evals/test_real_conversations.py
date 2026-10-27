@@ -18,6 +18,7 @@ from evals.real_conversations import (
     NAYU,
     NAYU_FRESH,
     NAYU_FRESH2,
+    NAYU_FRESH3,
     SCENARIOS,
     run_all,
 )
@@ -40,6 +41,7 @@ class TestRealConversations:
             "nayu": NAYU,
             "fresh": NAYU_FRESH,
             "fresh2": NAYU_FRESH2,
+            "fresh3": NAYU_FRESH3,
         }.get(os.getenv("REAL_SET", ""), ALL_SCENARIOS)
         # `REAL_ONLY="nayu 1;nayu 7"`: the scenarios whose name starts with any of them.
         prefixes = [p for p in (only or "").split(";") if p]

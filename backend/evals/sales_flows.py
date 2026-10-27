@@ -1111,6 +1111,140 @@ FRESH2_FLOW_CASES: tuple[FlowCase, ...] = (
 )
 
 
+# A third batch, written after the second had been used to fix things (2026-10-27): it measures
+# those fixes without having shaped them. `SALES_FLOWS_SET=fresh3`.
+FRESH3_FLOW_CASES: tuple[FlowCase, ...] = (
+    # ---------------------------------------------------------------- productos
+    _case(
+        "productos",
+        "lote 3: pregunta por gorras, precio y colores",
+        ["hola! tienen gorras? cuánto y de qué colores?"],
+        ["INICIO", "IDENTIFICAR"],
+        mentions_any=["25"],
+        never=["negra", "blanca", "azul", "roja"],
+    ),
+    _case(
+        "productos",
+        "lote 3: una mochila de regalo con delivery",
+        [
+            "quiero regalar una mochila ejecutiva a mi papá",
+            "envíala a Miraflores, Calle Schell 345, a nombre de Rosa Quispe, 944555666",
+        ],
+        ["DATOS", "COBRO"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "productos",
+        "lote 3: cuánto sale todo con envío, sin pedirlo",
+        ["cuánto me sale 2 gorras con envío a Callao?"],
+        ["INICIO", "IDENTIFICAR", "PEDIDO", "DATOS"],
+        mentions_any=["12"],
+    ),
+    _case(
+        "productos",
+        "lote 3: se arrepiente y quita todo",
+        ["quiero un polo básico", "sí", "ay no, mejor no quiero nada, quítalo"],
+        ["IDENTIFICAR", "INICIO"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "productos",
+        "lote 3: horario que el negocio no dio",
+        ["a qué hora atienden?"],
+        ["INICIO", "IDENTIFICAR", "DERIVADO"],
+        never=["de 9", "9:00", "9 am", "10:00", "8:00"],
+    ),
+    _case(
+        "productos",
+        "lote 3: quiere hablar con el dueño",
+        ["necesito hablar con el dueño de la tienda"],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+    ),
+    # ---------------------------------------------------------- certificaciones
+    _case(
+        "certificaciones",
+        "lote 3: dos individuales en un mensaje",
+        [
+            "Buenas tardes",
+            "soy Raúl, quiero certificar Excel avanzado y Power BI, las dos individuales",
+        ],
+        ["DATOS"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 3: cuánto demora el certificado",
+        ["Hola, soy Elena, solo quiero certificar", "¿en cuántos días me entregan el certificado?"],
+        ["CALIFICAR", "IDENTIFICAR", "DERIVADO"],
+        never=["en 24 horas", "en 48 horas", "en 3 días", "en 5 días", "días hábiles"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 3: paquete de 2, un tema por mensaje",
+        [
+            "Hola, soy Iván, quiero certificar mi experiencia",
+            "quiero el paquete de 2",
+            "SIAF",
+            "y Gestión pública",
+        ],
+        ["DATOS"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 3: quiere pagar con tarjeta",
+        [
+            "Hola, soy Luz, solo quiero certificar",
+            "quiero la individual de SIAF",
+            "¿puedo pagar con tarjeta?",
+        ],
+        ["IDENTIFICAR", "PEDIDO", "DATOS"],
+        ["gestionar_pedido"],
+        never=["sí, puedes pagar con tarjeta", "aceptamos tarjeta", "sí aceptamos"],
+    ),
+    # ---------------------------------------------------------------- servicios
+    _case(
+        "servicios",
+        "lote 3: hosting por dos años",
+        ["necesito hosting por dos años, cuánto sería?"],
+        ["INICIO", "IDENTIFICAR", "PEDIDO", "DATOS"],
+        mentions_any=["350"],
+    ),
+    _case(
+        "servicios",
+        "lote 3: rediseño de una web que ya tiene",
+        [
+            "Hola, ya tengo una web pero quiero rediseñarla",
+            "es de mi ferretería, quiero que se vea moderna y tenga catálogo",
+            "soy Pablo Rojas, de Ferretería Rojas, pablo@ferreteriarojas.pe",
+        ],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+    ),
+    _case(
+        "servicios",
+        "lote 3: datos en dos mensajes y pregunta cómo pagar",
+        [
+            "quiero el hosting anual",
+            "ok",
+            "Andrea Soto, Soto Consultores EIRL, andrea@sotoconsultores.pe, 912000111",
+            "RUC 20511122233",
+            "listo, ¿cómo pago?",
+        ],
+        ["COBRO"],
+        ["gestionar_pedido", "enviar_metodos_pago"],
+    ),
+    _case(
+        "servicios",
+        "lote 3: pregunta si emiten factura",
+        ["¿emiten factura?"],
+        ["INICIO", "IDENTIFICAR", "CALIFICAR", "DERIVADO"],
+        never=["sí, emitimos factura", "sí emitimos", "claro, emitimos"],
+    ),
+)
+
+
 # ------------------------------------------------------------------ the runner
 
 

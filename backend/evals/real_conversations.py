@@ -871,6 +871,137 @@ NAYU_FRESH2: tuple[Scenario, ...] = (
     ),
 )
 
+# A third batch, written after the second had been used to fix things (2026-10-27). `REAL_SET=fresh3`.
+NAYU_FRESH3: tuple[Scenario, ...] = (
+    _nayu(
+        "nayu lote 3-1: colegio para el año escolar",
+        (
+            say(
+                "Buenos días, soy de la administración del colegio San Martín, necesitamos "
+                "bidones de 20 litros",
+                "producto",
+                "uso",
+            ),
+            say("unos 40 al mes", "cantidad", "frecuencia"),
+            say("desde marzo", "fecha"),
+            say("en Ate Vitarte, Av. Central 1500", "distrito"),
+        ),
+        ("40", "marzo", "Ate"),
+        4,
+    ),
+    _nayu(
+        "nayu lote 3-2: pregunta si son retornables y sigue",
+        (
+            say("¿los bidones son retornables?", "producto"),
+            say("ya, quiero 6 para mi casa", "cantidad", "uso"),
+            say("en Lince", "distrito"),
+            say("el sábado", "fecha"),
+            say("cada 15 días", "frecuencia"),
+        ),
+        ("6", "sábado", "Lince"),
+        5,
+    ),
+    _nayu(
+        "nayu lote 3-3: «lo antes posible»",
+        (
+            say(
+                "necesito 100 botellas de 625 ml para un evento en Miraflores",
+                "producto",
+                "cantidad",
+                "uso",
+                "distrito",
+            ),
+            say("lo antes posible", "fecha"),
+        ),
+        ("100", "Miraflores"),
+        2,
+    ),
+    _nayu(
+        "nayu lote 3-4: duda entre el bidón y la caja",
+        (
+            say("hola, qué diferencia hay entre el bidón y la caja de 20 litros?"),
+            say("ya, entonces la caja", "producto"),
+            say("8 cajas para mi oficina", "cantidad", "uso"),
+            say("en Jesús María, el lunes", "distrito", "fecha"),
+            say("una vez nomás", "frecuencia"),
+        ),
+        ("8", "lunes", "Jesús María"),
+        5,
+    ),
+    _nayu(
+        "nayu lote 3-5: todo menos el uso",
+        (
+            say(
+                "Necesito 25 bidones de 20 L cada semana desde el lunes, entrega en Surquillo",
+                "producto",
+                "cantidad",
+                "frecuencia",
+                "fecha",
+                "distrito",
+            ),
+            say("es para mi lavandería", "uso"),
+        ),
+        ("25", "lunes", "Surquillo"),
+        2,
+    ),
+    _nayu(
+        "nayu lote 3-6: exige el precio o se va",
+        (
+            say("cuánto el agua alcalina? si no me das precio me voy a otro lado", "producto"),
+            say("ok, 60 botellas para mi gimnasio", "cantidad", "uso"),
+            say("en San Miguel", "distrito"),
+            say("el jueves", "fecha"),
+            say("todas las semanas", "frecuencia"),
+        ),
+        ("60", "jueves", "San Miguel"),
+        5,
+    ),
+    _nayu(
+        "nayu lote 3-7: prefiere que lo llamen",
+        (
+            say("quiero agua de 7 litros, 20 unidades", "producto", "cantidad"),
+            say("prefiero que me llame alguien, mi número es 987654321"),
+        ),
+        (),
+        2,
+    ),
+    _nayu(
+        "nayu lote 3-8: corrige la cantidad",
+        (
+            say("hola buenas noches, disculpe la hora"),
+            say("quería cotizar agua alcalina para mi tienda naturista", "producto", "uso"),
+            say("unas 48 botellas", "cantidad"),
+            say("no perdón, 72", "cantidad"),
+            say("en Pueblo Libre, para el martes", "distrito", "fecha"),
+            say("cada quincena", "frecuencia"),
+        ),
+        ("72", "martes", "Pueblo Libre"),
+        6,
+    ),
+    _nayu(
+        "nayu lote 3-9: solo quería saber qué venden",
+        (say("hola"), say("gracias, solo quería saber qué venden", asks_availability=True)),
+        (),
+        None,
+    ),
+    _nayu(
+        "nayu lote 3-10: constructora que pregunta por factura",
+        (
+            say(
+                "Somos una constructora, necesitamos 200 bidones de 20 L al mes para nuestras obras",
+                "producto",
+                "cantidad",
+                "frecuencia",
+                "uso",
+            ),
+            say("¿emiten factura?"),
+            say("la entrega en Chorrillos, desde el 1 de diciembre", "distrito", "fecha"),
+        ),
+        ("200", "diciembre", "Chorrillos"),
+        3,
+    ),
+)
+
 ALL_SCENARIOS = SCENARIOS + HELD_OUT + NAYU
 
 

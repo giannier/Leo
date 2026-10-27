@@ -380,6 +380,73 @@ HOSTING_CHOICE = Scenario(
 FRESH2_SCENARIOS = (CEVICHERIA, HOSTING_CHOICE)
 
 
+# A third batch, written after the second had been used to fix things. `SALES_QUALITY_SET=fresh3`.
+_INVENTED_TIME = re.compile(r"\b\d+\s*(a \d+\s*)?(d[ií]as|semanas|meses)\b", re.IGNORECASE)
+_GRANTS_DISCOUNT = re.compile(r"te (hago|doy|dejo|puedo hacer)|\d+\s?%", re.IGNORECASE)
+
+ACADEMY = Scenario(
+    "lote 3: academia de inglés que quiere vender cursos en línea",
+    (
+        "Hola, tengo una academia de inglés y quiero vender mis cursos por internet",
+        "tenemos 3 profesores y unos 80 alumnos",
+        "¿y cuánto demora en estar lista?",
+    ),
+    (
+        Check(
+            "pregunta o entiende antes de recomendar",
+            lambda t: _asks(_text(t[0])) or _asks(_text(t[1])),
+        ),
+        Check(
+            "recomienda algo concreto",
+            lambda t: any(
+                _RECOMMENDS.search(_text(x)) or re.search(r"p[aá]gina web|sistema", _text(x), re.I)
+                for x in t[1:3]
+            ),
+        ),
+        Check("no inventa un plazo", lambda t: not _INVENTED_TIME.search(_text(t[2]))),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+    ),
+)
+
+ASKS_DISCOUNT = Scenario(
+    "lote 3: pide descuento por pagar dos años",
+    (
+        "Hola, quiero el hosting empresarial",
+        "¿me haces un descuento si pago dos años?",
+        "ok, entonces lo tomo por un año",
+    ),
+    (
+        Check("no regala un descuento", lambda t: not _GRANTS_DISCOUNT.search(_text(t[1]))),
+        Check("ante 'lo tomo' cierra", lambda t: bool(_CLOSING.search(_text(t[2])))),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+        Check("cada mensaje termina con un siguiente paso", _every_reply_ends_with_a_step),
+    ),
+)
+
+DISTRIBUTOR = Scenario(
+    "lote 3: distribuidora con el inventario en Excel",
+    (
+        "Buenas, tengo una distribuidora y llevo el inventario en Excel",
+        "se me hace un lío con los pedidos de 5 vendedores",
+        "me interesa, quiero empezar",
+    ),
+    (
+        Check("sondea antes de ofrecer", lambda t: _asks(_text(t[0]))),
+        Check(
+            "conecta su problema con una solución",
+            lambda t: any(re.search(r"sistema|automatiz|n8n", _text(x), re.I) for x in t[0:3]),
+        ),
+        Check("ante 'quiero empezar' cierra", lambda t: bool(_CLOSING.search(_text(t[2])))),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+    ),
+)
+
+FRESH3_SCENARIOS = (ACADEMY, ASKS_DISCOUNT, DISTRIBUTOR)
+
+
 # ------------------------------------------------------------------ the runner
 
 
