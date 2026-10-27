@@ -64,6 +64,12 @@ _QUANTITY = re.compile(
     r"\d|\b(un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince|veinte|"
     r"treinta|cuarenta|cincuenta|cien|ciento|mil|docena|decena|varios|varias|muchos|algunos)\b"
 )
+# Words that say how often: «única» stands for «una sola vez», «recurrente» for «todas las semanas»,
+# but neither for a customer who never spoke of it.
+_FREQUENCY_SAID = re.compile(
+    r"puntual|una vez|sola vez|unic|recurrent|semana|semanal|mensual|al mes|por mes|cada |"
+    r"todos los|todas las|seguido|quincen|diari|siempre|frecuen|de vez en cuando|regular"
+)
 _PLAUSIBLE = {"fecha": _DATE, "cantidad": _QUANTITY, "personas": _QUANTITY}
 # «producto» is what the customer wants quoted, or all of it: «para negocio» (a use) and «10 de cada
 # una» (a quantity) were noted as the product and reached the person that way.
@@ -327,10 +333,20 @@ def _given(
                 continue
             # The datum just asked is answered in the customer's words, whatever the model calls it
             # («una sola vez» → «única»); it is the ones nobody asked that get invented.
-            just_asked = plain(name) in asked_labels
+            # Only when one datum was asked: asked two («¿para qué uso? ¿puntual o recurrente?») and
+            # answered one («para mi restaurante»), the model invented the other («recurrente»).
+            just_asked = len(asked_labels) == 1 and plain(name) in asked_labels
             free = plain(name) != PRODUCT and plain(name) not in _PLAUSIBLE and not just_asked
             if heard is not None and free and not _grounded(value, heard):
                 unclear.append(name)
+                continue
+            if (
+                heard is not None
+                and plain(name) == "frecuencia"
+                and plain(value) != NO_DATA
+                and not _FREQUENCY_SAID.search(heard)
+            ):
+                unclear.append(name)  # «recurrente» for a customer who said nothing about how often
                 continue
         data[name] = value
     return data, refused, unclear

@@ -208,6 +208,41 @@ class TestADatumIsWhatTheCustomerSaid:
 
         assert data == {"frecuencia": "única"} and unclear == []
 
+    def test_two_asked_and_one_answered_does_not_let_the_other_be_invented(self) -> None:
+        # «¿Para qué uso? ¿Puntual o recurrente?» – «para mi restaurante»: gpt-4.1-mini noted
+        # «frecuencia: recurrente» too and the quote went to a person with a datum nobody gave.
+        data, _, unclear = _given(
+            [
+                {"dato": "uso", "valor": "restaurante"},
+                {"dato": "frecuencia", "valor": "recurrente"},
+            ],
+            ["uso", "frecuencia"],
+            ["uso", "frecuencia"],
+            refused_by_customer=False,
+            heard="para mi restaurante",
+        )
+
+        assert data == {"uso": "restaurante"} and unclear == ["frecuencia"]
+
+    @pytest.mark.parametrize(
+        ("heard", "kept"),
+        [
+            ("compra puntual, una sola vez", True),
+            ("serian pedidos todas las semanas", True),
+            ("para mi gimnasio", False),
+        ],
+    )
+    def test_how_often_needs_the_customer_to_have_said_it(self, heard: str, kept: bool) -> None:
+        data, _, _ = _given(
+            [{"dato": "frecuencia", "valor": "recurrente" if "semanas" in heard else "única"}],
+            ["frecuencia"],
+            "frecuencia",
+            refused_by_customer=False,
+            heard=heard,
+        )
+
+        assert ("frecuencia" in data) is kept
+
     def test_the_date_and_the_quantity_keep_their_own_checks(self) -> None:
         data, _, unclear = _given(
             [{"dato": "fecha", "valor": "2026-10-27"}, {"dato": "cantidad", "valor": "doce"}],
