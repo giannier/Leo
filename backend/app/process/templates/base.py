@@ -106,12 +106,16 @@ INICIO_TOOLS_GREET_ONLY: tuple[str, ...] = ()
 
 _TOOLS_BY_STAGE: Mapping[Stage, tuple[str, ...]] = MappingProxyType(
     {
-        Stage.CALIFICAR: ("mostrar_opciones", "elegir_camino"),
+        # With the search: CALIFICAR answers a price question before the path is chosen (its rule
+        # says so, and without the tool it dodged «¿qué diferencia hay entre los paquetes?»).
+        Stage.CALIFICAR: ("mostrar_opciones", "elegir_camino", "buscar_productos", "ver_producto"),
         Stage.ANUNCIO: (*_SEARCH_AND_ORDER, "elegir_camino"),
         Stage.IDENTIFICAR: (*_SEARCH_AND_ORDER, "elegir_camino"),
         Stage.PEDIDO: ("gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"),
-        Stage.DATOS: ("gestionar_pedido",),
-        Stage.COBRO: ("enviar_metodos_pago", "gestionar_pedido"),
+        # With the search: a customer who changes product while giving their data («mejor cámbiala
+        # por una gorra») needs the new product's id; without it the model could only remove.
+        Stage.DATOS: ("gestionar_pedido", "buscar_productos"),
+        Stage.COBRO: ("enviar_metodos_pago", "gestionar_pedido", "buscar_productos"),
         # Waiting on the business: the order can only be shown, or a change the
         # customer asks for noted for the operator (Milestone B, decision 8).
         # Rejected: the customer may fix it.

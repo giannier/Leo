@@ -75,6 +75,22 @@ def topic_of(entry: str) -> str | None:
     return next((label for label, pattern in _TOPICS if pattern.search(said)), None)
 
 
+_ASKING = re.compile(r"\b(dime|indicame|pasame|necesito|me falta|comparteme)\b")
+
+
+def topics_asked(text: str) -> set[str]:
+    """The usual topics a reply asks for, in its questions or where it says it needs them.
+
+    «¿Cuántos bidones necesitas, para cuándo y en qué distrito?» asks three: a form, not a person.
+    """
+    asked: set[str] = set()
+    for sentence in re.split(r"(?<=[.?!])\s+|\n+", text):
+        said = plain(sentence)
+        if "?" in sentence or _ASKING.search(said):
+            asked.update(label for label, pattern in _TOPICS if pattern.search(said))
+    return asked
+
+
 def data_of(entries: Sequence[str]) -> list[QuoteDatum]:
     """The entries of one product as data, each under its own label.
 

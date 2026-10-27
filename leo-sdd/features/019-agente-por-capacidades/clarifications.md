@@ -373,5 +373,27 @@ puedes elegir el que prefieras», un segundo mensaje que decía lo mismo.
 7. `parallel_tool_calls=false` en OpenAI: una herramienta por paso, en orden (lo recomienda la guía; evita dos envíos a la vez).
 8. Descripciones de `gestionar_pedido` («úsala en cuanto quiera algo de precio fijo, sin pedirle datos antes») y
    `enviar_metodos_pago` («no los escribas tú»).
-**Pendiente:** una pasada de validación con gpt-4.1-mini (flujos, calidad y Nayu, ~US$0,40) con el visto bueno de Giannier, y el
-despliegue con su «despliega». Gasto de evals de la sesión hasta aquí: ~US$0,86.
+**Validación con casos nuevos (2026-10-27, autorizada por Giannier: «genera nuevos ejemplos, altera las conversaciones reales de
+Nayu»).** Casos escritos ese día y nunca usados para ajustar: 19 flujos (`SALES_FLOWS_SET=fresh`), 3 de calidad
+(`SALES_QUALITY_SET=fresh`) y 12 conversaciones de Nayu alteradas (`REAL_SET=fresh`: jerga, dos productos, corrección, lugar vago,
+pide una persona, solo mira). Todos los evals revisan además que no salgan dos mensajes iguales ni dos menús en un turno.
+Resultado con gpt-4.1-mini: flujos 13/19 (productos 5/7, certificaciones 3/6, servicios 5/6), calidad 88 %, Nayu 9/12; **ningún
+mensaje duplicado**. ~690 mil tokens de entrada y ~11 mil de salida: ~US$0,29 a precio de lista. Lo que se vio y se corrigió:
+1. **Agregaba al pedido lo que nadie pidió** («¿cuánto cuesta la mochila?» y «pierdo tiempo pasando pedidos a Excel» terminaron en
+   el pedido), efecto de «no pidas permiso» + «agrégalo»: ahora solo se agrega lo que el cliente dijo que quiere, y un «sí» a
+   «¿te lo agrego?» cuenta como quererlo (aviso del sistema).
+2. **«Pásame con alguien del equipo» no derivaba**: la herramienta rechazaba la derivación por faltar datos de la cotización, y la
+   regla de VENTA «no derives por el precio» chocaba con la regla 5. Ahora pedir una persona deriva con lo anotado.
+3. **Pregunta sin respuesta en el negocio → derivaba de inmediato** (reglas 5 y 6 se contradecían): ahora dice que lo confirma una
+   persona y sigue; si no hay pedido ni cotización, ofrece pasarlo.
+4. **Promesas sin hacer**: «te envío los datos para el pago» sin enviarlos, «voy a buscar… te las muestro enseguida», y el texto de
+   respaldo del control de nombres prometía «te comunico con una persona» sin derivar. Ahora hay aviso del sistema y el respaldo
+   ya no promete.
+5. **Etapas sin la herramienta que su regla pide**: CALIFICAR debía responder un precio sin poder buscar; DATOS y COBRO no podían
+   cambiar de producto. Ahora tienen `buscar_productos` (tabla de `plantillas.md` actualizada).
+6. **«solo esa vez» no se reconocía como frecuencia** y la cotización de dos productos no se cerraba.
+7. **Cotización como formulario**: en el primer mensaje pedía 3 o 4 datos juntos; ahora un aviso pide una o dos a la vez.
+Queda visto y sin cambiar: a veces anota un dato un turno después de recibirlo; el resumen final («Anoté: …; cantidad: …») se lee
+seco; el juez (el mismo modelo) marcó 8 de 12 de Nayu como poco naturales, pero sus fallas no siempre coinciden con la transcripción.
+**Pendiente:** otra pasada con los mismos casos nuevos (para ver las correcciones) y un segundo lote nuevo, con el visto bueno de
+Giannier, y el despliegue con su «despliega». Gasto de evals del día: ~US$1,15.

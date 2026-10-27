@@ -460,7 +460,7 @@ def _definitions() -> list[ToolDefinition]:
             name="gestionar_pedido",
             description=(
                 "Crea o modifica el pedido del cliente; los totales los calcula el sistema. Úsala "
-                "en cuanto quiera algo de precio fijo, sin pedirle datos antes."
+                "cuando dice que lo quiere (no si solo pregunta), sin pedirle datos antes."
             ),
             parameters=_order_schema,
             handler=gestionar_pedido,

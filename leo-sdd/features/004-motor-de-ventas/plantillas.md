@@ -74,12 +74,12 @@ Siempre disponibles (globales): `consultar_conocimiento`, `enviar_recurso`, `der
 | Etapa | productos | certificaciones | servicios |
 |---|---|---|---|
 | INICIO | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido | — (solo saluda) | buscar_productos, ver_producto, mostrar_opciones |
-| CALIFICAR | mostrar_opciones, elegir_camino | ídem | ídem |
+| CALIFICAR | mostrar_opciones, elegir_camino, buscar_productos, ver_producto | ídem | ídem |
 | ANUNCIO | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido, elegir_camino | ídem | ídem |
 | IDENTIFICAR | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido, elegir_camino | ídem | ídem |
 | PEDIDO | gestionar_pedido, buscar_productos, ver_producto, mostrar_opciones | ídem | ídem |
-| DATOS | gestionar_pedido | ídem | ídem |
-| COBRO | enviar_metodos_pago (solo pago previo), gestionar_pedido | ídem | ídem |
+| DATOS | gestionar_pedido, buscar_productos | ídem | ídem |
+| COBRO | enviar_metodos_pago (solo pago previo), gestionar_pedido, buscar_productos | ídem | ídem |
 | VERIFICACION | por verificar: gestionar_pedido (solo `ver` y `solicitar_cambio`) · rechazado: enviar_metodos_pago, gestionar_pedido, buscar_productos | ídem | ídem |
 | CERRADO | buscar_productos, ver_producto, gestionar_pedido | ídem | ídem |
 | ASESORIA | buscar_productos, ver_producto, mostrar_opciones, elegir_camino | ídem | ídem |
@@ -87,6 +87,8 @@ Siempre disponibles (globales): `consultar_conocimiento`, `enviar_recurso`, `der
 
 Reglas del registry:
 - `elegir_camino` y `mostrar_opciones(tipo=caminos)` se omiten si la calificación no tiene caminos.
+- `buscar_productos` en CALIFICAR, DATOS y COBRO (2026-10-27, 019 C-13): en CALIFICAR para responder un precio antes de
+  elegir el camino; en DATOS y COBRO para cambiar de producto (agregar necesita el `producto_id` de la búsqueda).
 - `gestionar_pedido` permite todas sus acciones donde está habilitada, salvo `confirmar`, que solo vale en COBRO con modalidad contra entrega. Si agregar algo deja el pedido incompleto, la etapa vuelve sola a PEDIDO: eso lo decide el cálculo, no la herramienta.
 
 ---

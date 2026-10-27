@@ -19,10 +19,13 @@ from app.agent.core import (
     PAY_NOTE,
     PERMISSION_NOTE,
     PITCH_NOTE,
+    PROMISE_NOTE,
+    TOO_MANY_NOTE,
     UNBACKED_CLAIMS,
     UNNOTED_NOTE,
     _missed_note,
     _unbacked_claim,
+    accepted_an_offer_to_add,
 )
 from app.agent.prompts.stage import (
     QUOTE_QUALIFIES,
@@ -207,6 +210,19 @@ class TestADatumIsWhatTheCustomerSaid:
             "frecuencia",
             refused_by_customer=False,
             heard="compra puntual, una sola vez",
+        )
+
+        assert data == {"frecuencia": "única"} and unclear == []
+
+    @pytest.mark.parametrize("heard", ["solo esa vez", "por esta vez nomás", "es ocasional"])
+    def test_a_one_off_said_another_way_is_a_frequency(self, heard: str) -> None:
+        # «solo esa vez» answered «¿puntual o recurrente?» and was not noted: the quote never closed
+        data, _, unclear = _given(
+            [{"dato": "frecuencia", "valor": "única"}],
+            ["frecuencia"],
+            "frecuencia",
+            refused_by_customer=False,
+            heard=heard,
         )
 
         assert data == {"frecuencia": "única"} and unclear == []
@@ -786,6 +802,72 @@ class TestWhatGpt41MiniSkipped:
     )
     def test_asking_permission_gets_the_permission_note(self, content: str) -> None:
         assert _missed_note(content, [], self.SELLING, _context(None), "hola") == PERMISSION_NOTE
+
+    @pytest.mark.parametrize("said", ["sí, los dos", "dale", "ok, ese", "Sí por favor"])
+    def test_yes_to_an_offer_to_add_is_wanting_it(self, said: str) -> None:
+        offer = "Tenemos el hosting anual y el mantenimiento. ¿Te los agrego al pedido?"
+
+        assert accepted_an_offer_to_add(offer, said)
+        note = _missed_note(
+            "¿Quieres que lo haga ahora?", [], self.SELLING, _context(None), said, accepted=True
+        )
+        assert note == ADD_NOTE
+
+    def test_yes_to_another_question_is_not_wanting_it(self) -> None:
+        assert not accepted_an_offer_to_add("¿Es para tu hogar o tu negocio?", "sí, negocio")
+        assert not accepted_an_offer_to_add("¿Te lo agrego?", "no, todavía no")
+
+    def test_yes_to_an_offer_adds_even_with_an_order(self) -> None:
+        """The offer named what to add: «¿te agrego también la gorra?» – «sí»."""
+        ordered = replace(
+            _context(None), facts=Facts(pedido=Pedido(items=[PedidoItem(nombre="Polo básico")]))
+        )
+
+        assert _missed_note("Perfecto.", [], self.SELLING, ordered, "sí", accepted=True) == ADD_NOTE
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "Te envío los datos para el pago por Yape y así puedas avanzar.",
+            "Voy a buscar las opciones de automatización y te las muestro enseguida.",
+            "En un momento te confirmo el precio.",
+        ],
+    )
+    def test_promising_what_it_did_not_do_gets_the_promise_note(self, content: str) -> None:
+        assert _missed_note(content, [], self.SELLING, _context(None), "ok") == PROMISE_NOTE
+
+    def test_saying_what_a_tool_just_sent_is_not_a_promise(self) -> None:
+        content = "Te envío los datos para el pago. Cuando pagues, mándame la foto del comprobante."
+        called = ["enviar_metodos_pago"]
+
+        assert _missed_note(content, called, self.SELLING, _context(None), "¿cómo pago?") is None
+
+    def test_a_person_writing_soon_is_not_a_promise_of_its_own(self) -> None:
+        content = (
+            "Listo, ya le pasé a nuestro equipo lo que necesitas. Una persona te escribe en breve."
+        )
+
+        assert (
+            _missed_note(content, ["derivar_a_humano"], self.SELLING, _context(None), "x") is None
+        )
+
+    def test_asking_three_quote_data_at_once_gets_the_too_many_note(self) -> None:
+        quoting = ("buscar_productos", "anotar_cotizacion")
+        content = (
+            "Tenemos bidones de 20 L. ¿Cuántos bidones necesitas, para cuándo y en qué distrito "
+            "sería la entrega?"
+        )
+
+        quote = Cotizacion(datos={}, pide=["cantidad", "fecha", "distrito"])
+
+        assert _missed_note(content, [], quoting, _context(quote), "bidones") == TOO_MANY_NOTE
+
+    def test_two_that_go_together_are_fine(self) -> None:
+        quoting = ("buscar_productos", "anotar_cotizacion")
+        content = "Perfecto, 8 bidones. ¿Para qué fecha y en qué distrito sería la entrega?"
+        quote = Cotizacion(datos={"cantidad": "8"}, pide=["cantidad", "fecha", "distrito"])
+
+        assert _missed_note(content, ["anotar_cotizacion"], quoting, _context(quote), "8") is None
 
     def test_offering_to_add_it_is_the_closing_question_not_asking_permission(self) -> None:
         """After a recommendation «¿te lo agrego?» waits for the customer to say yes."""

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -50,6 +51,29 @@ _CONFIRMED = re.compile(
     r"|\bconfirmamos\s+(tu|su)\s+pago\b",
     re.IGNORECASE,
 )
+
+
+# Two messages of one turn that say the same thing: the smaller one's words are at least this
+# share of the other's. Written apart from the pipeline's own filter (`agent/pipeline.py`), so
+# the eval does not grade the filter with itself.
+_SAME_SHARE = 0.8
+_WORD = re.compile(r"[a-z0-9]{4,}")
+
+
+def _words(text: str) -> set[str]:
+    folded = unicodedata.normalize("NFD", text.lower())
+    return set(_WORD.findall("".join(c for c in folded if unicodedata.category(c) != "Mn")))
+
+
+def repeated_messages(messages: Sequence[str]) -> str | None:
+    """The first pair of messages of one turn that repeat each other, worded for the report."""
+    texts = [(m, _words(m)) for m in messages if m and m.strip()]
+    for i, (first, first_words) in enumerate(texts):
+        for second, second_words in texts[i + 1 :]:
+            small, big = sorted((first_words, second_words), key=len)
+            if len(small) >= 3 and len(small & big) / len(small) >= _SAME_SHARE:
+                return f"«{first[:60]}» y «{second[:60]}»"
+    return None
 
 
 # ------------------------------------------------------------------ businesses
@@ -783,6 +807,197 @@ FLOW_CASES: tuple[FlowCase, ...] = (
 )
 
 
+# Written on 2026-10-27 for the gpt-4.1-mini validation and not used to tune anything: other
+# words, other customers (everything in one message, a change of mind, wanting it and asking how
+# to pay at once, a theme the catalogue does not list, a detail the business never gave).
+# `SALES_FLOWS_SET=fresh`.
+FRESH_FLOW_CASES: tuple[FlowCase, ...] = (
+    # ---------------------------------------------------------------- productos
+    _case(
+        "productos",
+        "nuevo: precio y envío a Callao, luego pide dos",
+        ["buenas! a cuánto el polo básico? y cuánto cobran de envío a Callao?", "ya, dame 2 polos"],
+        ["PEDIDO", "DATOS"],
+        ["gestionar_pedido"],
+        mentions_any=["12"],
+    ),
+    _case(
+        "productos",
+        "nuevo: compra con todos sus datos en un mensaje",
+        [
+            "Hola",
+            "quiero comprar una gorra urbana. Envíala a San Isidro, Calle Las Flores 456. "
+            "Soy Pedro Ruiz, cel 999888777",
+        ],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "productos",
+        "nuevo: cambia la mochila por una gorra",
+        [
+            "Hola, quiero la mochila ejecutiva",
+            "agrégala",
+            "mmm mejor no, cámbiala por una gorra urbana",
+        ],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["gestionar_pedido"],
+        mentions_any=["25"],
+    ),
+    _case(
+        "productos",
+        "nuevo: desde cuánto el envío es gratis",
+        ["Hola, ¿desde cuánto el envío es gratis?"],
+        ["INICIO", "IDENTIFICAR"],
+        mentions_any=["150"],
+    ),
+    _case(
+        "productos",
+        "nuevo: lo quiere y pregunta cómo pagar en el mismo mensaje",
+        ["Hola", "me llevo un polo básico, ¿cómo te pago?"],
+        ["PEDIDO", "DATOS"],
+        ["gestionar_pedido"],
+        never=["912345678", "912 345 678"],
+    ),
+    _case(
+        "productos",
+        "nuevo: le parece cara y no recibe descuento",
+        [
+            "Hola, ¿cuánto cuesta la mochila ejecutiva?",
+            "uff, está cara, en otro lado la vi más barata",
+        ],
+        ["IDENTIFICAR", "PEDIDO", "INICIO"],
+        never=["te hago un descuento", "% de descuento", "rebaja"],
+    ),
+    _case(
+        "productos",
+        "nuevo: desconfía y pide una persona",
+        ["¿esto es un bot? quiero que me atienda alguien de verdad"],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+        never=["soy una persona", "soy humano", "soy un humano"],
+    ),
+    # ---------------------------------------------------------- certificaciones
+    _case(
+        "certificaciones",
+        "nuevo: paquete de 2 con los temas ya dichos",
+        [
+            "Hola, buenas noches",
+            "quiero certificar mi experiencia, me interesa el paquete de 2 con Excel avanzado y "
+            "Power BI",
+            "sí, esos dos",
+        ],
+        ["DATOS"],
+        ["gestionar_pedido"],
+        mentions_any=["200"],
+    ),
+    _case(
+        "certificaciones",
+        "nuevo: compara los paquetes",
+        ["Hola, solo quiero certificar", "¿qué diferencia hay entre el paquete de 2 y el de 5?"],
+        ["IDENTIFICAR", "PEDIDO"],
+        ["buscar_productos"],
+        mentions_any=["500"],
+    ),
+    _case(
+        "certificaciones",
+        "nuevo: un tema que el catálogo no lista",
+        [
+            "Hola, solo quiero certificar mi experiencia",
+            "necesito certificar Contrataciones del Estado",
+        ],
+        ["IDENTIFICAR", "PEDIDO", "DATOS"],
+        never=["no lo tenemos", "no contamos con", "no tenemos esa", "no tenemos ese"],
+    ),
+    _case(
+        "certificaciones",
+        "nuevo: la quiere y da sus datos en dos mensajes",
+        [
+            "Hola, solo quiero certificar",
+            "me interesa la certificación individual de Gestión pública, la quiero",
+            "Luis Pérez, DNI 45678912",
+            "mi correo es luis.perez@mail.com",
+        ],
+        ["COBRO"],
+        ["gestionar_pedido", "registrar_datos_cliente"],
+    ),
+    _case(
+        "certificaciones",
+        "nuevo: la quiere y pregunta a qué número yapear",
+        ["Hola, solo quiero certificar", "quiero la de Excel avanzado, ¿a qué número te yapeo?"],
+        ["PEDIDO", "DATOS"],
+        ["gestionar_pedido"],
+        never=["987654321", "987 654 321"],
+    ),
+    _case(
+        "certificaciones",
+        "nuevo: lo piensa ante el paquete de 5",
+        [
+            "Hola, soy Rosa, solo quiero certificar",
+            "¿cuánto cuesta el paquete de 5?",
+            "mmm déjame pensarlo, es bastante",
+        ],
+        ["IDENTIFICAR", "PEDIDO"],
+        never=["descuento del", "% de descuento"],
+    ),
+    # ---------------------------------------------------------------- servicios
+    _case(
+        "servicios",
+        "nuevo: hosting y mantenimiento juntos",
+        ["Hola, necesito el hosting anual y también el mantenimiento mensual", "sí, los dos"],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["gestionar_pedido"],
+        mentions_any=["350"],
+    ),
+    _case(
+        "servicios",
+        "nuevo: una tienda online se cotiza",
+        [
+            "buenas, cuánto me cobran por una tienda online?",
+            "es para vender ropa, unos 50 productos",
+            "soy Jorge Salas, de Moda Salas EIRL, jorge@modasalas.pe",
+        ],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+    ),
+    _case(
+        "servicios",
+        "nuevo: pregunta algo que el negocio no dijo",
+        ["Hola, ¿el hosting anual incluye dominio y correos?"],
+        ["INICIO", "IDENTIFICAR", "CALIFICAR", "DERIVADO"],
+        never=["sí, incluye dominio", "incluye el dominio", "sí incluye"],
+    ),
+    _case(
+        "servicios",
+        "nuevo: contrata y pide la cuenta",
+        [
+            "quiero el mantenimiento web mensual",
+            "ok, agrégalo",
+            "Soy Miguel Torres de Torres Logística EIRL, RUC 20456789123, miguel@torreslog.pe, "
+            "cel 934567812",
+            "pásame la cuenta para transferirte",
+        ],
+        ["COBRO"],
+        ["enviar_metodos_pago"],
+    ),
+    _case(
+        "servicios",
+        "nuevo: apurado, decide en dos mensajes",
+        ["Hola, necesito hosting para hoy mismo, ¿cuál tienen y cuánto?", "ese, lo quiero"],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["gestionar_pedido"],
+        mentions_any=["350"],
+    ),
+    _case(
+        "servicios",
+        "nuevo: pide algo que no venden",
+        ["Hola, ¿hacen apps para celular?"],
+        ["INICIO", "IDENTIFICAR", "CALIFICAR", "DERIVADO", "ASESORIA"],
+        never=["sí, hacemos apps", "desarrollamos apps", "sí, desarrollamos"],
+    ),
+)
+
+
 # ------------------------------------------------------------------ the runner
 
 
@@ -912,6 +1127,12 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
 
         if len(result.messages) > MAX_OUTBOUND:
             outcome.failures.append(f"{len(result.messages)} mensajes en un turno")
+        twice = repeated_messages(said)
+        if twice:
+            outcome.failures.append(f"mensaje duplicado en un turno: {twice}")
+        menus = sum(m.msg_type == "interactive" for m in result.messages)
+        if menus > 1:
+            outcome.failures.append(f"{menus} menús de opciones en un turno")
         for line in said:
             if _CONFIRMED.search(line):
                 outcome.failures.append(f"dijo confirmado sin operador: {line[:80]}")

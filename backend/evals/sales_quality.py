@@ -254,6 +254,81 @@ UNSURE = Scenario(
 SCENARIOS = (CAFETERIA, PRICE_OBJECTION, DECIDED, UNSURE)
 
 
+# Written on 2026-10-27 for the gpt-4.1-mini validation and not tuned against.
+# `SALES_QUALITY_SET=fresh`.
+VETERINARY = Scenario(
+    "nuevo: veterinaria que quiere citas por internet",
+    (
+        "Buenas, tengo una veterinaria en Trujillo",
+        "quiero que mis clientes puedan sacar cita por internet y ver los precios",
+        "ok me convence, ¿qué necesito para empezar?",
+    ),
+    (
+        Check(
+            "pregunta por su necesidad antes de recomendar",
+            lambda t: _asks(_text(t[0])) or _asks(_text(t[1])),
+        ),
+        Check(
+            "recomienda algo concreto al conocer su caso",
+            lambda t: any(
+                _RECOMMENDS.search(_text(x)) or re.search(r"p[aá]gina web", _text(x), re.I)
+                for x in t[1:3]
+            ),
+        ),
+        Check(
+            "ante la señal de compra avanza al cierre", lambda t: bool(_CLOSING.search(_text(t[2])))
+        ),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+        Check("cada mensaje termina con un siguiente paso", _every_reply_ends_with_a_step),
+    ),
+)
+
+COMPETITOR = Scenario(
+    "nuevo: le cobran menos en otro lado",
+    (
+        "Hola, ¿cuánto cuesta una página web?",
+        "es para mi estudio contable",
+        "en otro lado me cobran menos",
+        "ya, mándame cómo pago",
+    ),
+    (
+        Check(
+            "ante 'me cobran menos' pregunta o aporta valor, no regala descuento",
+            lambda t: _asks(_text(t[2])) and not _DISCOUNT.search(_text(t[2])),
+        ),
+        Check(
+            "explica cómo pagar cuando lo pide",
+            lambda t: bool(re.search(r"transferencia|bcp|cuenta|pag|datos", _text(t[3]), re.I)),
+        ),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+        Check("cada mensaje termina con un siguiente paso", _every_reply_ends_with_a_step),
+    ),
+)
+
+AUTOMATION = Scenario(
+    "nuevo: pierde tiempo pasando pedidos a Excel",
+    (
+        "Hola, pierdo mucho tiempo respondiendo pedidos por WhatsApp y pasándolos a Excel",
+        "somos 2 personas, unos 40 pedidos al día",
+        "me interesa, lo quiero",
+    ),
+    (
+        Check("sondea antes de ofrecer", lambda t: _asks(_text(t[0]))),
+        Check(
+            "conecta su problema con la automatización",
+            lambda t: any(re.search(r"automatiz|n8n", _text(x), re.I) for x in t[0:2]),
+        ),
+        Check("ante 'lo quiero' cierra", lambda t: bool(_CLOSING.search(_text(t[2])))),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+    ),
+)
+
+FRESH_SCENARIOS = (VETERINARY, COMPETITOR, AUTOMATION)
+
+
 # ------------------------------------------------------------------ the runner
 
 

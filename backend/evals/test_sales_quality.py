@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from evals.sales_quality import SCENARIOS, run_quality
+from evals.sales_quality import FRESH_SCENARIOS, SCENARIOS, run_quality
 from sqlalchemy.orm import Session
 
 pytestmark = pytest.mark.evals
@@ -23,6 +23,8 @@ REPORT = Path(os.getenv("SALES_QUALITY_REPORT") or Path(tempfile.gettempdir()) /
 class TestSalesQuality:
     async def test_the_agent_sounds_like_a_seller(self, db: Session, llm) -> None:  # type: ignore[no-untyped-def]
         templates = (os.getenv("SALES_QUALITY_TEMPLATES") or "productos,servicios").split(",")
-        report = await run_quality(db, SCENARIOS, templates, llm=llm)
+        # `SALES_QUALITY_SET=fresh`: the scenarios written for a validation and never tuned against.
+        scenarios = FRESH_SCENARIOS if os.getenv("SALES_QUALITY_SET") == "fresh" else SCENARIOS
+        report = await run_quality(db, scenarios, templates, llm=llm)
         REPORT.write_text(report.render(), encoding="utf-8")  # noqa: ASYNC240 - once, at the end
         assert report.ok, "\n" + report.render()

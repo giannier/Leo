@@ -35,7 +35,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from evals.sales_flows import Business, seed
+from evals.sales_flows import Business, repeated_messages, seed
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline
@@ -486,7 +486,9 @@ HELD_OUT: tuple[Scenario, ...] = (
 )
 
 
-def _nayu(name: str, lines: tuple[Line, ...], recap: tuple[str, ...], handed_at: int) -> Scenario:
+def _nayu(
+    name: str, lines: tuple[Line, ...], recap: tuple[str, ...], handed_at: int | None
+) -> Scenario:
     return Scenario(name, (), lines, recap=recap, handed_at=handed_at, catalog="nayu")
 
 
@@ -611,6 +613,175 @@ NAYU: tuple[Scenario, ...] = (
     ),
 )
 
+# Written on 2026-10-27 for the gpt-4.1-mini validation, from Nayu's real conversations altered (other
+# products, slang and typos, a correction, two products at once, a vague place, a person asked for
+# halfway, a customer who only looks) and not used to tune anything. `REAL_SET=fresh`.
+NAYU_FRESH: tuple[Scenario, ...] = (
+    _nayu(
+        "nayu nueva 1: bodeguera con jerga",
+        (
+            say("buenas tardes amigo"),
+            say(
+                "kiero saber si venden la caja de agua de 20 litros pa mi bodega",
+                "producto",
+                "uso",
+                asks_availability=True,
+            ),
+            say("unas 6 cajitas", "cantidad"),
+            say("x semana nomas", "frecuencia"),
+            say("el jueves q viene", "fecha"),
+            say("en comas, por el mercado", "distrito"),
+        ),
+        ("6", "jueves", "comas"),
+        6,
+    ),
+    _nayu(
+        "nayu nueva 2: «lo dejan en la oficina» como dirección",
+        (
+            say("Hola, necesito bidones de 20 litros para la oficina", "producto", "uso"),
+            say("8 bidones", "cantidad"),
+            say("lo dejan en la oficina nomás"),
+            say("queda en San Borja, Av. Aviación 2500", "distrito"),
+            say("el lunes", "fecha"),
+            say("cada quincena", "frecuencia"),
+        ),
+        ("8", "lunes", "San Borja"),
+        6,
+    ),
+    _nayu(
+        "nayu nueva 3: dos productos para un evento",
+        (
+            say(
+                "Necesito 100 botellas de agua alcalina y 20 bidones de 20 L para un evento el "
+                "sábado en Barranco",
+                "producto",
+                "cantidad",
+                "fecha",
+                "distrito",
+                "uso",
+            ),
+            say("solo esa vez", "frecuencia"),
+        ),
+        ("100", "20", "sábado", "Barranco"),
+        2,
+    ),
+    _nayu(
+        "nayu nueva 4: insiste con el precio",
+        (
+            say("precio del agua de 7 litros?", "producto", asks_availability=True),
+            say("pero dime el precio pues"),
+            say("ok, 30 unidades", "cantidad"),
+            say("para mi casa", "uso"),
+            say("el miércoles", "fecha"),
+            say("Los Olivos", "distrito"),
+        ),
+        ("30", "miércoles", "Olivos"),
+        6,
+    ),
+    _nayu(
+        "nayu nueva 5: corrige el distrito",
+        (
+            say(
+                "Hola! quiero agua de mesa en botellita de 625 para un matrimonio",
+                "producto",
+                "uso",
+            ),
+            say("300 botellas", "cantidad"),
+            say("en Lince", "distrito"),
+            say("perdón, me equivoqué, es en Jesús María", "distrito"),
+            say("el 15 de noviembre", "fecha"),
+        ),
+        ("300", "noviembre", "Jesús María"),
+        5,
+    ),
+    _nayu(
+        "nayu nueva 6: todo en un audio transcrito",
+        (
+            say(
+                "hola mira te cuento, tengo un gimnasio en surquillo y quiero ofrecer agua alcalina "
+                "a mis clientes, serían unas 80 botellas cada semana, para empezar este viernes",
+                "producto",
+                "uso",
+                "distrito",
+                "cantidad",
+                "frecuencia",
+                "fecha",
+            ),
+        ),
+        ("80", "viernes", "surquillo"),
+        1,
+    ),
+    _nayu(
+        "nayu nueva 7: pregunta primero si llegan a su distrito",
+        (
+            say("¿hacen delivery a Ate?", "distrito"),
+            say("necesito bidones de 20 litros para mi casa", "producto", "uso"),
+            say("4 bidones", "cantidad"),
+            say("cada semana", "frecuencia"),
+            say("desde el lunes", "fecha"),
+        ),
+        ("4", "Ate"),
+        5,
+    ),
+    _nayu(
+        "nayu nueva 8: pregunta si es un bot",
+        (
+            say("¿eres un bot?"),
+            say("ya. quiero cotizar cajas de agua de 20 L", "producto"),
+            say("10 cajas, para mi minimarket", "cantidad", "uso"),
+            say("en Callao", "distrito"),
+            say("el lunes, y luego cada 15 días", "fecha", "frecuencia"),
+        ),
+        ("10", "lunes", "Callao"),
+        5,
+    ),
+    _nayu(
+        "nayu nueva 9: pide una persona a mitad",
+        (
+            say("Hola, quiero bidones de 20 L", "producto"),
+            say("15", "cantidad"),
+            say("mejor pásame con alguien del equipo, quiero negociar el precio"),
+        ),
+        (),
+        3,
+    ),
+    _nayu(
+        "nayu nueva 10: solo pregunta y se va",
+        (
+            say("hola, qué venden?", asks_availability=True),
+            say("ah ok, y hacen envíos a provincia?"),
+            say("ya, lo pienso y te escribo"),
+        ),
+        (),
+        None,
+    ),
+    _nayu(
+        "nayu nueva 11: frecuencia primero, números en letras",
+        (
+            say("buenas, necesito agua todas las semanas para mi restaurante", "frecuencia", "uso"),
+            say("bidones de veinte litros", "producto"),
+            say("doce", "cantidad"),
+            say("en Pueblo Libre", "distrito"),
+            say("a partir del lunes 3", "fecha"),
+        ),
+        ("lunes", "Pueblo Libre"),
+        5,
+    ),
+    _nayu(
+        "nayu nueva 12: cambia de producto a mitad",
+        (
+            say("Hola, quiero el bidón de 20 L", "producto"),
+            say("20 unidades", "cantidad"),
+            say("ah no, mejor la caja de 20 L, es más fácil de cargar", "producto"),
+            say("para mi oficina en Magdalena", "uso", "distrito"),
+            say("el martes", "fecha"),
+            say("una sola vez", "frecuencia"),
+        ),
+        ("20", "martes", "Magdalena"),
+        6,
+    ),
+)
+
 ALL_SCENARIOS = SCENARIOS + HELD_OUT + NAYU
 
 
@@ -704,6 +875,9 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
         )
         outcome.transcript.extend(f"  - Nayu: {message.content}" for message in result.messages)
         handed = result.stage_after is Stage.DERIVADO
+        twice = repeated_messages([message.content for message in result.messages])
+        if twice:
+            outcome.failures.append(f"turno {index}: mensaje duplicado: {twice}")
         if reply:
             _check_turn(outcome, index, line, given, reply, availability_said=availability_said)
             receipts += bool(_RECEIPT.search(reply))

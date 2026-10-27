@@ -190,7 +190,7 @@ class TestCatalog:
 
 _EXPECTED_OWN_TOOLS: dict[Stage, set[str]] = {
     Stage.INICIO: {"buscar_productos", "ver_producto", "mostrar_opciones", "gestionar_pedido"},
-    Stage.CALIFICAR: {"mostrar_opciones", "elegir_camino"},
+    Stage.CALIFICAR: {"mostrar_opciones", "elegir_camino", "buscar_productos", "ver_producto"},
     Stage.ANUNCIO: {
         "buscar_productos",
         "ver_producto",
@@ -206,8 +206,8 @@ _EXPECTED_OWN_TOOLS: dict[Stage, set[str]] = {
         "elegir_camino",
     },
     Stage.PEDIDO: {"gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"},
-    Stage.DATOS: {"gestionar_pedido"},
-    Stage.COBRO: {"enviar_metodos_pago", "gestionar_pedido"},
+    Stage.DATOS: {"gestionar_pedido", "buscar_productos"},
+    Stage.COBRO: {"enviar_metodos_pago", "gestionar_pedido", "buscar_productos"},
     Stage.VERIFICACION: {"gestionar_pedido"},
     Stage.CERRADO: {"buscar_productos", "ver_producto", "gestionar_pedido"},
     Stage.ASESORIA: {"buscar_productos", "ver_producto", "mostrar_opciones", "elegir_camino"},
@@ -531,7 +531,8 @@ class TestTheOldCatalogueToolStillWorks:
         assert "consultar_catalogo" not in [spec.name for spec in registry.specs()]
 
     def test_it_does_not_come_back_where_the_search_is_disabled(self) -> None:
-        registry = registry_for_stage(SHOP, Stage.DATOS, Facts(), SHOP_OPTIONS)
+        # Under review the order is only shown: no search (DATOS has it since 2026-10-27).
+        registry = registry_for_stage(SHOP, Stage.VERIFICACION, Facts(), SHOP_OPTIONS)
 
         assert registry.get("consultar_catalogo") is None
 
