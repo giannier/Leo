@@ -672,7 +672,7 @@ class TestInTheTurn:
             conversation.id, InboundTurn(text="el lunes")
         )
 
-        prompt = second.chat_calls[0].messages[0].content
+        prompt = second.chat_calls[0].system
         assert "Cotización en curso (Bidón 20 L)" in prompt
         assert "Ya dio: cantidad = 20 semanales" in prompt
         assert "Falta: fecha, distrito o dirección" in prompt

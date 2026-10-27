@@ -19,7 +19,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
-from evals.sales_flows import Business, known_amounts, seed
+from evals.sales_flows import Business, cost_line, known_amounts, seed
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline
@@ -462,6 +462,8 @@ class QualityOutcome:
     # What the model was asked and wrote, so a run says what it cost.
     tokens_in: int = 0
     tokens_out: int = 0
+    tokens_cached: int = 0
+    model: str = ""
 
 
 async def run_scenario(
@@ -503,6 +505,8 @@ async def run_scenario(
         if result.reply:
             outcome.tokens_in += result.reply.input_tokens
             outcome.tokens_out += result.reply.output_tokens
+            outcome.tokens_cached += result.reply.cached_input_tokens
+            outcome.model = result.reply.model or outcome.model
         said = [m.content for m in result.messages if m.content]
         outcome.replies.append(said)
         outcome.transcript.append(f"- Cliente: {text}")
@@ -542,8 +546,13 @@ class QualityReport:
     def render(self) -> str:
         lines = [
             f"# Calidad de venta · {self.score:.0%} ({self.total} comprobaciones)",
-            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
-            f"{sum(o.tokens_out for o in self.outcomes)} de salida\n",
+            cost_line(
+                next((o.model for o in self.outcomes if o.model), ""),
+                sum(o.tokens_in for o in self.outcomes),
+                sum(o.tokens_cached for o in self.outcomes),
+                sum(o.tokens_out for o in self.outcomes),
+            )
+            + "\n",
         ]
         for outcome in self.outcomes:
             lines.append(f"## {outcome.template} · {outcome.scenario.name}")

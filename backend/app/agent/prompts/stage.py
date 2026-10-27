@@ -368,6 +368,13 @@ class StagePrompt:
     text: str
     # Estimated tokens by section; "herramientas" is sent apart as `tools`.
     sections: Mapping[str, int]
+    # `text` in two: what stays the same turn after turn (`head`, before the conversation) and what
+    # changes every turn (`tail`: the situations and examples of this message, the state, the closing
+    # rules), which goes after the conversation. The provider caches the longest prefix it has seen,
+    # so the head and the conversation so far are billed at a fraction; with the state in the middle
+    # (its clock changes every minute) nothing after it ever was.
+    head: str = ""
+    tail: str = ""
 
     @property
     def tokens(self) -> int:
@@ -1001,6 +1008,12 @@ def build_stage_prompt(
     parts["estado"] = _state_block(config, facts, stage, turn or TurnContext(), now)
     parts["cierre"] = CLOSING_RULES
     text = "\n\n".join(parts.values())
+    head = "\n\n".join(part for name, part in parts.items() if name not in _EVERY_TURN)
+    tail = "\n\n".join(part for name, part in parts.items() if name in _EVERY_TURN)
     sections = {name: estimate_tokens(part) for name, part in parts.items()}
     sections["herramientas"] = _tools_tokens(tool_specs)
-    return StagePrompt(text=text, sections=sections)
+    return StagePrompt(text=text, sections=sections, head=head, tail=tail)
+
+
+# The sections that change from one message to the next: they follow the conversation (`StagePrompt`).
+_EVERY_TURN = frozenset({"situaciones", "ejemplos", "estado", "cierre"})

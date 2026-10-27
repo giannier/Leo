@@ -35,7 +35,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from evals.sales_flows import Business, repeated_messages, seed
+from evals.sales_flows import Business, cost_line, repeated_messages, seed
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline
@@ -1017,6 +1017,8 @@ class Outcome:
     # What the model was asked and wrote, measured, so a run says what it cost.
     tokens_in: int = 0
     tokens_out: int = 0
+    tokens_cached: int = 0
+    model: str = ""
 
     @property
     def ok(self) -> bool:
@@ -1088,6 +1090,8 @@ async def run_scenario(session: Session, scenario: Scenario, *, llm: LLMProvider
         if result.reply:
             outcome.tokens_in += result.reply.input_tokens
             outcome.tokens_out += result.reply.output_tokens
+            outcome.tokens_cached += result.reply.cached_input_tokens
+            outcome.model = result.reply.model or outcome.model
         outcome.transcript.append(f"- Cliente: {line.text}")
         outcome.transcript.append(
             f"  - {result.stage_before.value} → {result.stage_after.value} · "
@@ -1180,8 +1184,12 @@ class Report:
         lines = [
             f"# Conversaciones reales: {sum(o.ok for o in self.outcomes)}/{len(self.outcomes)} "
             f"sin fallas ({self.ratio:.0%}, se pide {PASS_RATIO:.0%})",
-            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
-            f"{sum(o.tokens_out for o in self.outcomes)} de salida",
+            cost_line(
+                next((o.model for o in self.outcomes if o.model), ""),
+                sum(o.tokens_in for o in self.outcomes),
+                sum(o.tokens_cached for o in self.outcomes),
+                sum(o.tokens_out for o in self.outcomes),
+            ),
         ]
         for outcome in self.outcomes:
             lines.append(f"\n### {'✅' if outcome.ok else '❌'} {outcome.scenario.name}")

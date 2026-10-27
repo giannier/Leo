@@ -70,6 +70,9 @@ class ProviderProfile:
     # that searches a product and adds it to an order, a parallel call adds a guessed product.
     # None sends nothing (endpoints that do not know the parameter).
     parallel_tool_calls: bool | None = None
+    # OpenAI's `prompt_cache_key` (one per conversation): calls that share a prompt land where it is
+    # cached. Endpoints that only copy the protocol may reject the field.
+    send_cache_key: bool = False
 
 
 def _openai_profile(settings: Settings) -> ProviderProfile:
@@ -88,6 +91,7 @@ def _openai_profile(settings: Settings) -> ProviderProfile:
         send_embedding_input_type=False,
         max_tokens_field="max_completion_tokens",
         parallel_tool_calls=False,
+        send_cache_key=True,
     )
 
 
@@ -122,6 +126,7 @@ def build_provider(profile: ProviderProfile) -> LLMProvider:
         send_embedding_input_type=profile.send_embedding_input_type,
         max_tokens_field=profile.max_tokens_field,
         parallel_tool_calls=profile.parallel_tool_calls,
+        send_cache_key=profile.send_cache_key,
     )
 
 
@@ -179,4 +184,5 @@ def provider_for_tenant(
         embedding_dimensions=EMBEDDING_DIMENSIONS,
         send_embedding_input_type=False,
         parallel_tool_calls=False if llm_settings.mode == "byo_openai" else None,
+        send_cache_key=llm_settings.mode == "byo_openai",
     )

@@ -53,6 +53,25 @@ _CONFIRMED = re.compile(
 )
 
 
+# List prices per million tokens (input, cached input, output), from OpenAI's model pages on
+# 2026-10-27, so a report says what a run cost. A model not listed reports no amount.
+PRICES: dict[str, tuple[float, float, float]] = {
+    "gpt-4.1-mini": (0.40, 0.10, 1.60),
+    "gpt-5.4-mini": (0.75, 0.075, 4.50),
+}
+
+
+def cost_line(model: str, tokens_in: int, cached: int, tokens_out: int) -> str:
+    """«tokens del agente: …» with what part was cached and, for a priced model, the dollars."""
+    line = f"tokens del agente: {tokens_in} de entrada ({cached} en caché), {tokens_out} de salida"
+    price = next((p for name, p in PRICES.items() if model.startswith(name)), None)
+    if price is None:
+        return line
+    fresh, cached_price, out = price
+    dollars = ((tokens_in - cached) * fresh + cached * cached_price + tokens_out * out) / 1_000_000
+    return f"{line} · ~US${dollars:.3f} con {model}"
+
+
 # Two messages of one turn that say the same thing: the smaller one's words are at least this
 # share of the other's. Written apart from the pipeline's own filter (`agent/pipeline.py`), so
 # the eval does not grade the filter with itself.
@@ -1257,6 +1276,8 @@ class FlowOutcome:
     # What the model was asked and wrote, so a run says what it cost.
     tokens_in: int = 0
     tokens_out: int = 0
+    tokens_cached: int = 0
+    model: str = ""
 
     @property
     def ok(self) -> bool:
@@ -1361,6 +1382,8 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
         if result.reply:
             outcome.tokens_in += result.reply.input_tokens
             outcome.tokens_out += result.reply.output_tokens
+            outcome.tokens_cached += result.reply.cached_input_tokens
+            outcome.model = result.reply.model or outcome.model
         for call in calls:
             tools.add(str(call.get("tool")))
             if call.get("tool") == "enviar_recurso" and call.get("status") == "hecho":
@@ -1425,8 +1448,12 @@ class FlowReport:
     def render(self) -> str:
         lines = [
             "# Evals de flujos de venta (TASK-447)",
-            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
-            f"{sum(o.tokens_out for o in self.outcomes)} de salida",
+            cost_line(
+                next((o.model for o in self.outcomes if o.model), ""),
+                sum(o.tokens_in for o in self.outcomes),
+                sum(o.tokens_cached for o in self.outcomes),
+                sum(o.tokens_out for o in self.outcomes),
+            ),
             "",
         ]
         for template in BUSINESSES:

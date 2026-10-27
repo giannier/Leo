@@ -72,6 +72,7 @@ class OfflineLLMProvider:
         tools: Sequence[ToolSpec] = (),
         temperature: float = 0.2,
         max_tokens: int = 1024,
+        cache_key: str | None = None,
     ) -> ChatResult:
         """Echo the question back inside an unmistakable banner.
 

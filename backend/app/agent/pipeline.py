@@ -323,7 +323,8 @@ class TurnPipeline:
         reply = await core.respond(
             conversation_id=conversation_id,
             customer_message=inbound.for_the_model(),
-            system_prompt=prompt.text,
+            system_prompt=prompt.head,
+            system_tail=prompt.tail,
             context=context,
             current_message_ids=inbound.message_ids,
         )
