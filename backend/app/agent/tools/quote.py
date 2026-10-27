@@ -337,7 +337,20 @@ def _given(
             # Only when one datum was asked: asked two («¿para qué uso? ¿puntual o recurrente?») and
             # answered one («para mi restaurante»), the model invented the other («recurrente»).
             just_asked = len(asked_labels) == 1 and plain(name) in asked_labels
-            free = plain(name) != PRODUCT and plain(name) not in _PLAUSIBLE and not just_asked
+            # How often is said in many words («40 al mes» → «mensual»): if the customer said
+            # anything about how often, the model's word for it stands. Rejecting «mensual» made
+            # both models ask «¿puntual o recurrente?» three times and the quote never closed.
+            said_how_often = (
+                plain(name) == "frecuencia"
+                and heard is not None
+                and bool(_FREQUENCY_SAID.search(heard))
+            )
+            free = (
+                plain(name) != PRODUCT
+                and plain(name) not in _PLAUSIBLE
+                and not just_asked
+                and not said_how_often
+            )
             if heard is not None and free and not _grounded(value, heard):
                 unclear.append(name)
                 continue

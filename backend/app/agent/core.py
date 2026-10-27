@@ -276,7 +276,20 @@ UNBACKED_CLAIMS: dict[str, re.Pattern[str]] = {
 # «te agrego el mantenimiento a tu pedido» with no `gestionar_pedido`: the order stays empty while
 # the customer is told it is not. Only statements count: «¿te lo agrego?» is an offer.
 ADDED_CLAIM = re.compile(
-    r"\b(agrego|agregu[eé]|a[ñn]ad[ií]|a[ñn]ado|sum[eé])\b[^?!\n]{0,80}\bpedido\b", re.IGNORECASE
+    r"\b(agrego|agregu[eé]|a[ñn]ad[ií]|a[ñn]ado|sum[eé])\b[^?!\n]{0,80}\bpedido\b|"
+    r"\b(qued[oó]|est[aá]) (registrad|agregad|separad|reservad)[oa]",
+    re.IGNORECASE,
+)
+# «quedó registrada» is also the honest word for a return, an appointment or the customer's data.
+RECORDING_TOOLS = frozenset(
+    {
+        "solicitar_devolucion",
+        "agendar_cita",
+        "gestionar_cita",
+        "registrar_datos_cliente",
+        "anotar_cotizacion",
+        "calificar_cliente",
+    }
 )
 ADDED_CLAIM_NOTE = (
     "Aviso del sistema: tu mensaje dice que agregaste algo al pedido, pero gestionar_pedido no lo "
@@ -429,6 +442,7 @@ def _missed_note(
     if (
         "gestionar_pedido" in available
         and "gestionar_pedido" not in done
+        and not RECORDING_TOOLS & set(done)
         and ADDED_CLAIM.search(_statements(content))
     ):
         return ADDED_CLAIM_NOTE
