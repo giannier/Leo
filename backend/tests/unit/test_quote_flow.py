@@ -249,6 +249,7 @@ class TestADatumIsWhatTheCustomerSaid:
         [
             ("compra puntual, una sola vez", True),
             ("serian pedidos todas las semanas", True),
+            ("necesitamos unos 40 al mes", True),
             ("para mi gimnasio", False),
         ],
     )
@@ -884,6 +885,22 @@ class TestWhatGpt41MiniSkipped:
         note = _missed_note(content, [], self.SELLING, _context(None), "lo necesito")
 
         assert note == ADDED_CLAIM_NOTE
+
+    def test_saying_it_is_registered_without_the_tool_is_a_claim(self) -> None:
+        content = "Listo, Luz: ya quedó registrada la *Certificación individual SIAF*."
+
+        note = _missed_note(content, [], self.SELLING, _context(None), "quiero la de SIAF")
+
+        assert note == ADDED_CLAIM_NOTE
+
+    def test_a_return_recorded_is_not_an_order_claim(self) -> None:
+        content = "Listo, tu solicitud de cambio quedó registrada. Una persona la revisa."
+
+        note = _missed_note(
+            content, ["solicitar_devolucion"], self.SELLING, _context(None), "quiero cambiarlo"
+        )
+
+        assert note is None
 
     def test_offering_to_add_is_not_a_claim(self) -> None:
         content = "Cuesta S/ 35. ¿Te agrego el polo al pedido?"
