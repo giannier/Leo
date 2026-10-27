@@ -15,6 +15,7 @@ import pytest
 
 from app.agent.core import (
     ADD_NOTE,
+    ADDED_CLAIM_NOTE,
     NEXT_STEP_NOTE,
     PAY_NOTE,
     PERMISSION_NOTE,
@@ -868,6 +869,47 @@ class TestWhatGpt41MiniSkipped:
         quote = Cotizacion(datos={"cantidad": "8"}, pide=["cantidad", "fecha", "distrito"])
 
         assert _missed_note(content, ["anotar_cotizacion"], quoting, _context(quote), "8") is None
+
+    @pytest.mark.parametrize(
+        "said", ["me llevo un polo básico, ¿cómo te pago?", "quiero contratar el mantenimiento"]
+    )
+    def test_other_ways_of_wanting_it(self, said: str) -> None:
+        note = _missed_note("¿Te lo agrego?", [], self.SELLING, _context(None), said)
+
+        assert note == ADD_NOTE
+
+    def test_saying_it_was_added_without_the_tool_gets_the_claim_note(self) -> None:
+        content = "Perfecto, te agrego el mantenimiento web mensual por S/ 150.00 a tu pedido."
+
+        note = _missed_note(content, [], self.SELLING, _context(None), "lo necesito")
+
+        assert note == ADDED_CLAIM_NOTE
+
+    def test_offering_to_add_is_not_a_claim(self) -> None:
+        content = "Cuesta S/ 35. ¿Te agrego el polo al pedido?"
+
+        assert _missed_note(content, [], self.SELLING, _context(None), "hola") is None
+
+    def test_a_failed_order_call_does_not_excuse_a_promise(self) -> None:
+        content = (
+            "Lucía, ya tengo tus datos. Voy a agregar el mantenimiento a tu pedido. Un momento."
+        )
+
+        note = _missed_note(
+            content, ["gestionar_pedido"], self.SELLING, _context(None), "Soy Lucía", done=[]
+        )
+
+        assert note == PROMISE_NOTE
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "Voy a derivarte con una persona para que te lo confirme. Un momento, por favor.",
+            "Te envío la información sobre el proceso para certificar SIAF.",
+        ],
+    )
+    def test_other_promises(self, content: str) -> None:
+        assert _missed_note(content, [], self.SELLING, _context(None), "hola") == PROMISE_NOTE
 
     def test_offering_to_add_it_is_the_closing_question_not_asking_permission(self) -> None:
         """After a recommendation «¿te lo agrego?» waits for the customer to say yes."""

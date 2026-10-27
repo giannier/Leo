@@ -190,7 +190,13 @@ class TestCatalog:
 
 _EXPECTED_OWN_TOOLS: dict[Stage, set[str]] = {
     Stage.INICIO: {"buscar_productos", "ver_producto", "mostrar_opciones", "gestionar_pedido"},
-    Stage.CALIFICAR: {"mostrar_opciones", "elegir_camino", "buscar_productos", "ver_producto"},
+    Stage.CALIFICAR: {
+        "mostrar_opciones",
+        "elegir_camino",
+        "buscar_productos",
+        "ver_producto",
+        "gestionar_pedido",
+    },
     Stage.ANUNCIO: {
         "buscar_productos",
         "ver_producto",

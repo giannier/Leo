@@ -33,6 +33,7 @@ from typing import Any
 
 from app.agent.tools.registry import ToolContext, ToolResult
 from app.agent.tools.shared import currency_code, currency_symbol
+from app.models.business import Product
 from app.models.channel import Contact
 from app.models.conversation import Conversation
 from app.models.orders import Order
@@ -52,6 +53,7 @@ from app.orders.service import (
     SelectionRefused,
 )
 from app.process.facts import missing_customer_data
+from app.process.text import plain
 from app.repositories.channel import ContactRepository
 from app.repositories.conversation import ConversationRepository
 from app.repositories.product import ProductRepository
@@ -278,6 +280,30 @@ def _product_id(arguments: Mapping[str, Any]) -> uuid.UUID | None:
     return _uuid(arguments.get("producto_id"))
 
 
+# Most products a name is matched against: a catalogue larger than this is searched, not scanned.
+MAX_NAMED_PRODUCTS = 300
+
+
+def _named_product(context: ToolContext, raw: str) -> Product | None:
+    """The one active product `raw` names, when the model passed a name instead of the id.
+
+    gpt-4.1-mini wrote the product's name (or a mangled id) in `producto_id`; the tool refused it
+    and the reply still said «te agrego…» or «un momento». A name that names one product is it.
+    """
+    from app.agent.tools.quote import match_product  # quote imports the handover, not the order
+
+    said = plain(raw)
+    if not re.search(r"[a-z]{3}", said):
+        return None
+    products = ProductRepository(context.session, context.tenant_id).list_active(
+        limit=MAX_NAMED_PRODUCTS
+    )
+    exact = [p for p in products if plain(p.name) == said]
+    if len(exact) == 1:
+        return exact[0]
+    return match_product(raw, products)
+
+
 def _bad_product_id() -> ToolResult:
     return ToolResult.error(
         "producto_id no es válido: usa el producto_id que devolvió buscar_productos."
@@ -285,15 +311,22 @@ def _bad_product_id() -> ToolResult:
 
 
 def _agregar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
+    context = turn.context
     product_id = _product_id(arguments)
+    product = (
+        ProductRepository(context.session, context.tenant_id).get_active(product_id)
+        if product_id is not None
+        else None
+    )
     if product_id is None:
-        return _bad_product_id()
+        # Not an id at all: a name. An id that names nothing is not looked up by its digits.
+        product = _named_product(context, str(arguments.get("producto_id") or ""))
+        if product is None:
+            return _bad_product_id()
     quantity = _quantity(arguments.get("cantidad"), 1)
     if quantity is None or not 1 <= quantity <= MAX_QUANTITY:
         return ToolResult.error("cantidad no es válida: debe ser un número entre 1 y 999.")
 
-    context = turn.context
-    product = ProductRepository(context.session, context.tenant_id).get_active(product_id)
     if product is None:
         return turn.result(
             "no_disponible",

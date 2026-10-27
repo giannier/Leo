@@ -145,6 +145,39 @@ def promotion(db: Session, tenant: Tenant, **values: Any) -> Promotion:
     return row
 
 
+class TestAProductNamedInsteadOfItsId:
+    """gpt-4.1-mini wrote the name in `producto_id`; the tool refused it and the reply said
+    «te agrego…» with an empty order (2026-10-27)."""
+
+    async def test_a_name_that_names_one_product_is_that_product(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        context = make_context(db, tenant, conversation)
+
+        result = await act(context, accion="agregar", producto_id="Word", cantidad=1)
+
+        assert result.status == "hecho"
+        assert result.data["pedido"]["items"][0]["producto_id"] == str(catalogue["word"].id)
+
+    async def test_a_name_that_names_none_is_still_refused(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        context = make_context(db, tenant, conversation)
+
+        result = await act(context, accion="agregar", producto_id="Zapatillas", cantidad=1)
+
+        assert result.status == "error"
+        assert active_order(db, tenant, conversation) is None
+
+
 class TestAddingAndChangingLines:
     async def test_adding_returns_the_whole_order_priced_by_the_system(
         self,

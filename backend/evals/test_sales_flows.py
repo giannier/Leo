@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from evals.sales_flows import FLOW_CASES, FRESH_FLOW_CASES, run_flows
+from evals.sales_flows import FLOW_CASES, FRESH2_FLOW_CASES, FRESH_FLOW_CASES, run_flows
 from sqlalchemy.orm import Session
 
 pytestmark = pytest.mark.evals
@@ -23,7 +23,9 @@ class TestSalesFlows:
     async def test_each_template_sells_as_its_template_says(self, db: Session, llm) -> None:  # type: ignore[no-untyped-def]
         only = os.getenv("SALES_FLOWS_ONLY")
         # `SALES_FLOWS_SET=fresh`: the cases written for a validation and never tuned against.
-        pool = FRESH_FLOW_CASES if os.getenv("SALES_FLOWS_SET") == "fresh" else FLOW_CASES
+        pool = {"fresh": FRESH_FLOW_CASES, "fresh2": FRESH2_FLOW_CASES}.get(
+            os.getenv("SALES_FLOWS_SET", ""), FLOW_CASES
+        )
         cases = [c for c in pool if not only or c.template == only]
         report = await run_flows(db, cases, llm=llm)
         REPORT.write_text(report.render(), encoding="utf-8")  # noqa: ASYNC240 - once, at the end

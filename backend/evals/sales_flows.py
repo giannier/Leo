@@ -998,6 +998,119 @@ FRESH_FLOW_CASES: tuple[FlowCase, ...] = (
 )
 
 
+# A second batch, written after the first had been used to fix things (2026-10-27), so the check
+# stays honest: other wording again, and the cases the fixes are about said another way (a price
+# question that must not add, a person asked for, a detail the business never gave).
+# `SALES_FLOWS_SET=fresh2`.
+FRESH2_FLOW_CASES: tuple[FlowCase, ...] = (
+    # ---------------------------------------------------------------- productos
+    _case(
+        "productos",
+        "lote 2: pregunta si es impermeable y luego la lleva",
+        ["buenas, la mochila ejecutiva es resistente al agua?", "ok, me la llevo"],
+        ["PEDIDO", "DATOS"],
+        ["gestionar_pedido"],
+        never=["sí, es resistente al agua", "es impermeable", "sí es resistente"],
+    ),
+    _case(
+        "productos",
+        "lote 2: solo pregunta el precio de la gorra",
+        ["hola, a cuánto la gorra?"],
+        ["INICIO", "IDENTIFICAR"],
+        mentions_any=["25"],
+    ),
+    _case(
+        "productos",
+        "lote 2: quiere 3 polos",
+        ["Hola, quiero 3 polos básicos", "sí"],
+        ["PEDIDO", "DATOS", "COBRO"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "productos",
+        "lote 2: le quedó chico y pide hablar con alguien",
+        ["el polo que compré me quedó chico, quiero hablar con alguien"],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+        never=["te devolvemos", "te devolveremos"],
+        prelude=_past_order("completado"),
+    ),
+    # ---------------------------------------------------------- certificaciones
+    _case(
+        "certificaciones",
+        "lote 2: pregunta el precio antes de elegir camino",
+        ["Hola", "soy Marta, ¿cuánto cuesta certificar SIAF?"],
+        ["CALIFICAR", "IDENTIFICAR"],
+        ["buscar_productos"],
+        mentions_any=["120"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 2: paquete de 5 con los cinco temas",
+        [
+            "Hola, soy Jorge, solo quiero certificar mi experiencia",
+            "el paquete de 5: SIAF, Gestión pública, Excel avanzado, Power BI y Contrataciones "
+            "del Estado",
+            "sí, esos cinco",
+        ],
+        ["DATOS"],
+        ["gestionar_pedido"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 2: quiere estudiar un programa",
+        ["Hola, soy Ana", "quiero estudiar un programa completo de gestión pública"],
+        ["DERIVADO", "ASESORIA"],
+        ["derivar_a_humano"],
+    ),
+    _case(
+        "certificaciones",
+        "lote 2: pregunta si sirve para un concurso CAS",
+        ["Hola, soy Pedro, solo quiero certificar", "¿me sirve para postular a un concurso CAS?"],
+        ["CALIFICAR", "IDENTIFICAR", "DERIVADO"],
+        never=["sí, te sirve para", "es válida para concursos", "sí te sirve"],
+    ),
+    # ---------------------------------------------------------------- servicios
+    _case(
+        "servicios",
+        "lote 2: qué incluye el hosting, sin decidir",
+        ["hola, qué incluye el hosting anual y cuánto cuesta?"],
+        ["INICIO", "IDENTIFICAR", "CALIFICAR"],
+        mentions_any=["350"],
+    ),
+    _case(
+        "servicios",
+        "lote 2: contrata el mantenimiento y pregunta dónde depositar",
+        [
+            "Buenas, quiero contratar el mantenimiento web mensual",
+            "Soy Lucía Vega, de Vega Abogados SAC, RUC 20601234567, lucia@vegaabogados.pe, "
+            "987111222",
+            "¿a qué cuenta deposito?",
+        ],
+        ["COBRO"],
+        ["gestionar_pedido", "enviar_metodos_pago"],
+    ),
+    _case(
+        "servicios",
+        "lote 2: web para una clínica dental",
+        [
+            "Hola, necesito una página web para mi clínica dental",
+            "que tenga reservas de citas y una galería de fotos",
+            "Rodrigo Paz, de Clínica Paz, rodrigo@clinicapaz.pe",
+        ],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+    ),
+    _case(
+        "servicios",
+        "lote 2: se queja de que no le entiende",
+        ["no me estás entendiendo, quiero hablar con un humano"],
+        ["DERIVADO"],
+        ["derivar_a_humano"],
+    ),
+)
+
+
 # ------------------------------------------------------------------ the runner
 
 

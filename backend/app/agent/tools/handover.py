@@ -126,6 +126,31 @@ def customer_asks_for_a_person(context: ToolContext) -> bool:
     return bool(_ASKS_FOR_A_PERSON.search(plain(latest_customer_text(context))))
 
 
+# A question the business never answered while a quote is being put together: the person gets it
+# with the quote, so the conversation goes on. It handed over «¿distribuyen a Huacho?» at once, with
+# nothing for the person to quote (three runs of three, gpt-4.1-mini, 2026-10-27).
+_ASIDE_REASONS = frozenset({"asesoria", "sin_respuesta", "otro"})
+ASIDE_REFUSAL = (
+    "No derives por esta duda: dile que eso se lo confirma una persona del equipo junto con la "
+    "cotización, y sigue con ella (pregunta lo que falta). Si pide hablar con una persona, deriva."
+)
+
+
+def _an_aside_while_quoting(context: ToolContext, motivo: str) -> bool:
+    options = context.options
+    if motivo not in _ASIDE_REASONS or options is None:
+        return False
+    if not (options.cotizar and options.datos_cotizacion):
+        return False
+    chosen = options.camino(context.facts.camino) if context.facts.camino else None
+    if chosen is not None and chosen.tipo == "asesoria":
+        return False  # the path the business set for a person
+    if customer_asks_for_a_person(context) or customer_refused(context):
+        return False
+    noted = current_quote(context)
+    return noted is None or bool(noted.falta)
+
+
 def current_quote(context: ToolContext) -> Cotizacion | None:
     """The quote in progress: what a tool set earlier this turn, else what the facts hold."""
     patched = context.facts_patch.get("cotizacion")
@@ -192,6 +217,8 @@ async def derivar_a_humano(context: ToolContext, arguments: dict[str, Any]) -> T
     if resumen and any(extra):
         resumen = " ".join([resumen, *[e for e in extra if e]])
 
+    if _an_aside_while_quoting(context, motivo):
+        return ToolResult.no_disponible(decir=ASIDE_REFUSAL)
     quote: dict[str, str] | None = None
     producto: str | None = None
     if motivo == "cotizacion":

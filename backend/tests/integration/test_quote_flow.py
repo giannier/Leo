@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn
-from app.agent.tools.handover import customer_refused, derivar_a_humano
+from app.agent.tools.handover import ASIDE_REFUSAL, customer_refused, derivar_a_humano
 from app.agent.tools.quote import anotar_cotizacion
 from app.agent.tools.registry import ToolContext
 from app.models.business import AgentConfig, Product
@@ -419,6 +419,32 @@ class TestTheQuoteGoesToAPersonByItself:
         assert context.facts_patch["derivado"]["motivo"] == "cotizacion"
         assert context.facts_patch["derivado"]["datos"] == {"cantidad": "15"}
         assert context.ending.reply is not None
+
+    async def test_a_detail_the_business_never_gave_does_not_end_the_quote(
+        self, db: Session
+    ) -> None:
+        """«¿distribuyen a Huacho?»: handed over at once, with nothing for the person to quote."""
+        tenant = _quoting_tenant(db, WATER)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "hola, distribuyen a Huacho? tengo una tienda")
+        context = _context(db, tenant, conversation)
+
+        result = await derivar_a_humano(context, {"motivo": "asesoria", "resumen": "Huacho"})
+
+        assert result.status == "no_disponible" and result.decir == ASIDE_REFUSAL
+        assert context.ending.reply is None and "derivado" not in context.facts_patch
+
+    async def test_the_same_detail_with_a_person_asked_for_is_handed_over(
+        self, db: Session
+    ) -> None:
+        tenant = _quoting_tenant(db, WATER)
+        conversation = _conversation(db, tenant)
+        _says(db, tenant, conversation, "¿llegan a Huacho? quiero hablar con una persona")
+        context = _context(db, tenant, conversation)
+
+        await derivar_a_humano(context, {"motivo": "asesoria", "resumen": "Huacho"})
+
+        assert context.facts_patch["derivado"]["motivo"] == "asesoria"
 
     async def test_nothing_can_be_handed_over_before_anything_is_noted(self, db: Session) -> None:
         tenant = _quoting_tenant(db, WATER)

@@ -66,9 +66,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: INICIO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / CALIFICAR ##########
@@ -139,9 +139,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: CALIFICAR
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / ANUNCIO ##########
@@ -214,9 +214,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: ANUNCIO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / IDENTIFICAR ##########
@@ -293,9 +293,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: IDENTIFICAR
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / PEDIDO ##########
@@ -368,9 +368,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: PEDIDO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / DATOS ##########
@@ -442,9 +442,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: DATOS
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / COBRO ##########
@@ -523,9 +523,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: COBRO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / VERIFICACION ##########
@@ -594,9 +594,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: VERIFICACION
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / CERRADO ##########
@@ -657,9 +657,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: CERRADO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / ASESORIA ##########
@@ -734,9 +734,9 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: ASESORIA
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.
 
 ########## productos / DERIVADO ##########
@@ -794,7 +794,7 @@ ESTADO DE LA CONVERSACIÓN
 ETAPA ACTUAL: DERIVADO
 
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso.

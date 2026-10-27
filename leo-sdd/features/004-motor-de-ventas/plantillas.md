@@ -74,7 +74,7 @@ Siempre disponibles (globales): `consultar_conocimiento`, `enviar_recurso`, `der
 | Etapa | productos | certificaciones | servicios |
 |---|---|---|---|
 | INICIO | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido | — (solo saluda) | buscar_productos, ver_producto, mostrar_opciones |
-| CALIFICAR | mostrar_opciones, elegir_camino, buscar_productos, ver_producto | ídem | ídem |
+| CALIFICAR | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido, elegir_camino | ídem | ídem |
 | ANUNCIO | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido, elegir_camino | ídem | ídem |
 | IDENTIFICAR | buscar_productos, ver_producto, mostrar_opciones, gestionar_pedido, elegir_camino | ídem | ídem |
 | PEDIDO | gestionar_pedido, buscar_productos, ver_producto, mostrar_opciones | ídem | ídem |
@@ -87,8 +87,9 @@ Siempre disponibles (globales): `consultar_conocimiento`, `enviar_recurso`, `der
 
 Reglas del registry:
 - `elegir_camino` y `mostrar_opciones(tipo=caminos)` se omiten si la calificación no tiene caminos.
-- `buscar_productos` en CALIFICAR, DATOS y COBRO (2026-10-27, 019 C-13): en CALIFICAR para responder un precio antes de
-  elegir el camino; en DATOS y COBRO para cambiar de producto (agregar necesita el `producto_id` de la búsqueda).
+- `buscar_productos` en CALIFICAR, DATOS y COBRO, y `gestionar_pedido` en CALIFICAR (2026-10-27, 019 C-13): en CALIFICAR para
+  responder un precio y agregar lo que el cliente ya dijo que quiere antes de elegir el camino (un pedido manda sobre el camino
+  en el cálculo de la etapa); en DATOS y COBRO para cambiar de producto (agregar necesita el producto de la búsqueda).
 - `gestionar_pedido` permite todas sus acciones donde está habilitada, salvo `confirmar`, que solo vale en COBRO con modalidad contra entrega. Si agregar algo deja el pedido incompleto, la etapa vuelve sola a PEDIDO: eso lo decide el cálculo, no la herramienta.
 
 ---

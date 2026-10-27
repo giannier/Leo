@@ -395,5 +395,22 @@ mensaje duplicado**. ~690 mil tokens de entrada y ~11 mil de salida: ~US$0,29 a 
 7. **Cotización como formulario**: en el primer mensaje pedía 3 o 4 datos juntos; ahora un aviso pide una o dos a la vez.
 Queda visto y sin cambiar: a veces anota un dato un turno después de recibirlo; el resumen final («Anoté: …; cantidad: …») se lee
 seco; el juez (el mismo modelo) marcó 8 de 12 de Nayu como poco naturales, pero sus fallas no siempre coinciden con la transcripción.
-**Pendiente:** otra pasada con los mismos casos nuevos (para ver las correcciones) y un segundo lote nuevo, con el visto bueno de
-Giannier, y el despliegue con su «despliega». Gasto de evals del día: ~US$1,15.
+**Segunda pasada (autorizada, ~US$0,47):** lote 1 repetido tras las correcciones: flujos 14/19, Nayu 8/12, calidad 81 % (solo
+productos); lote 2 nuevo (`*_SET=fresh2`: 12 flujos, 7 de Nayu, 2 de calidad): flujos 9/12, Nayu 4/7, calidad 90 %. Ningún
+mensaje duplicado. Las primeras correcciones casi no movieron los números; leer las transcripciones mostró causas más hondas,
+corregidas después (sin medir aún):
+1. El bloque final «ANTES DE RESPONDER» decía «si el cliente pide algo que una herramienta hace (agregar al pedido…), hazlo»: para
+   un modelo literal, preguntar el precio de la mochila es «pedirla». Ahora: «al pedido solo va lo que dijo que quiere».
+2. `gestionar_pedido` rechazaba el nombre del producto en `producto_id` (el modelo copia mal los ids) y la respuesta decía igual
+   «te agrego…» o «voy a agregar, un momento». Ahora un nombre que nombra un solo producto es ese producto; decir que se agregó sin
+   que la herramienta lo hiciera, o prometer («voy a derivarte», «te envío la información», «un momento, por favor»), recibe aviso.
+3. «me llevo un polo» y «quiero contratar…» no contaban como quererlo.
+4. CALIFICAR (certificaciones) no podía agregar: «la quiero» terminaba pidiendo el DNI. Ahora tiene las herramientas de IDENTIFICAR
+   (un pedido manda sobre el camino en el cálculo de la etapa).
+5. Una duda que el negocio no respondió («¿distribuyen a Huacho?», «¿es tratada con ozono?») seguía derivando de inmediato aunque la
+   regla 6 dice seguir. En un negocio que cotiza, con la cotización abierta, la derivación por esa duda ahora se rechaza («se lo
+   confirma una persona con la cotización»), salvo que pida una persona o sea el camino de asesoría.
+Siguen vistos sin corregir: inventó cómo es el proceso de certificar («un examen y documentos»: no está en ningún dato); anota a
+veces un dato un turno tarde («reunión de mi empresa» no quedó como uso); la plantilla de certificaciones pide el nombre y el
+camino antes de todo (diseño del dueño). Gasto de evals del día: ~US$1,62.
+**Pendiente:** una pasada con un tercer lote nuevo, con el visto bueno de Giannier, y el despliegue con su «despliega».

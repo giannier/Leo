@@ -273,6 +273,16 @@ class _TurnCache:
 UNBACKED_CLAIMS: dict[str, re.Pattern[str]] = {
     "anotar_cotizacion": re.compile(r"\banot[eé]\b|\banotad[oa]s?\b", re.IGNORECASE),
 }
+# «te agrego el mantenimiento a tu pedido» with no `gestionar_pedido`: the order stays empty while
+# the customer is told it is not. Only statements count: «¿te lo agrego?» is an offer.
+ADDED_CLAIM = re.compile(
+    r"\b(agrego|agregu[eé]|a[ñn]ad[ií]|a[ñn]ado|sum[eé])\b[^?!\n]{0,80}\bpedido\b", re.IGNORECASE
+)
+ADDED_CLAIM_NOTE = (
+    "Aviso del sistema: tu mensaje dice que agregaste algo al pedido, pero gestionar_pedido no lo "
+    "hizo. Si el cliente lo quiere, llámala ahora (producto_id de buscar_productos); si no, no "
+    "digas que lo agregaste."
+)
 UNBACKED_NOTE = (
     "Aviso del sistema: tu mensaje dice que anotaste datos, pero no llamaste a {tool}. Llámala "
     "ahora con lo que el cliente dio en su último mensaje. Si no dio ningún dato, responde sin "
@@ -315,8 +325,9 @@ UNNOTED_NOTE = (
 # enviar_metodos_pago; and it asked «¿quieres que te cuente más?» instead of telling. One nudge per
 # turn, as the others.
 WANTS_IT = re.compile(
-    r"\b(agreg|anad|ponme|me (lo|la|los|las) llevo|(lo|la|los|las) quiero|quiero (comprar|pedir)|"
-    r"lo compro|la compro|quiero (el|la|los|las|un|una) (?!precio|costo|info|detalle|dato|cotiza))"
+    r"\b(agreg|anad|ponme|me (lo |la |los |las )?llevo|(lo|la|los|las) quiero|"
+    r"quiero (comprar|pedir|contratar|llevar|reservar)|(lo|la) (compro|contrato)|"
+    r"quiero (el|la|los|las|un|una) (?!precio|costo|info|detalle|dato|cotiza))"
 )
 ASKS_HOW_TO_PAY = re.compile(
     r"\b(como|donde|adonde) (te |le )?(pago|deposito|transfiero|yapeo|plineo)\b|"
@@ -339,9 +350,12 @@ ACCEPTS = re.compile(
 # the customer writes, so «enseguida te los muestro» is a promise nobody keeps, and «te envío los
 # datos para el pago» with no `enviar_metodos_pago` sends nothing.
 PROMISES = re.compile(
-    r"\b(te|le) (envio|enviare|mando|mandare|paso|pasare|comparto) (ahora |ya )?(los |el |la )?"
-    r"(datos|metodos|numero|cuenta|qr)\b|"
-    r"\bvoy a (buscar|revisar|consultar|verificar|averiguar|enviarte|mandarte|mostrarte)\b|"
+    r"\b(te|le) (envio|enviare|mando|mandare|paso|pasare|comparto) (ahora |ya )?"
+    r"(los |el |la |toda la )?"
+    r"(datos|metodos|numero|cuenta|qr|informacion|detalles|propuesta|catalogo|archivo|fotos?)\b|"
+    r"\bvoy a (buscar|revisar|consultar|verificar|averiguar|enviarte|mandarte|mostrarte|"
+    r"derivarte|pasarte|comunicarte|agregar|agregarlo|agregarla|anotar|confirmar)\b|"
+    r"\b(un momento,? por favor|dame un momento)\b|"
     r"\b(en un momento|enseguida|en breve|ahorita) te (los |las |lo |la )?"
     r"(envio|mando|muestro|paso|confirmo|aviso)\b"
 )
@@ -401,16 +415,23 @@ def _missed_note(
     customer_message: str,
     *,
     accepted: bool = False,
+    done: Sequence[str] | None = None,
 ) -> str | None:
     """What to tell the model when it skipped a tool it should have used this turn, if anything.
 
-    `accepted`: the customer said yes to the assistant's offer to add something.
+    `accepted`: the customer said yes to the assistant's offer to add something. `done`: the tools
+    that did their job this turn (`hecho` or `omitido`); `called` by default.
     """
+    done = called if done is None else done
     tool = _unbacked_claim(content, called, available)
     if tool is not None:
         return UNBACKED_NOTE.format(tool=tool)
-    if not SENDING_TOOLS & set(called) and PROMISES.search(plain(content)):
-        return PROMISE_NOTE
+    if (
+        "gestionar_pedido" in available
+        and "gestionar_pedido" not in done
+        and ADDED_CLAIM.search(_statements(content))
+    ):
+        return ADDED_CLAIM_NOTE
     if "anotar_cotizacion" in available and "anotar_cotizacion" not in called:
         datum = unnoted_answer(context, customer_message)
         if datum is not None:
@@ -433,6 +454,10 @@ def _missed_note(
         and ASKS_HOW_TO_PAY.search(said)
     ):
         return PAY_NOTE
+    # After the order and the payment: a «sí» they asked for is worth more than a promise fixed.
+    acting = SENDING_TOOLS | {"gestionar_pedido", "anotar_cotizacion", "derivar_a_humano"}
+    if not acting & set(done) and PROMISES.search(plain(content)):
+        return PROMISE_NOTE
     if ASKS_PERMISSION.search(plain(content)):
         return PERMISSION_NOTE
     if UNBACKED_PITCH.search(content):
@@ -452,6 +477,12 @@ def _missed_note(
     ):
         return NEXT_STEP_NOTE
     return None
+
+
+def _statements(content: str) -> str:
+    """The sentences of `content` that are not questions."""
+    sentences = re.split(r"(?<=[.?!])\s+|\n+", content)
+    return " ".join(s for s in sentences if "?" not in s and "¿" not in s)
 
 
 def _unbacked_claim(content: str, called: Sequence[str], available: Sequence[str]) -> str | None:
@@ -638,6 +669,11 @@ class AgentCore:
                         context,
                         customer_message,
                         accepted=accepted,
+                        done=[
+                            str(call["tool"])
+                            for call in tools_called
+                            if call.get("status") in ("hecho", "omitido")
+                        ],
                     )
                 )
                 if missed is None:
