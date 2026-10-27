@@ -138,7 +138,9 @@ def funnel(session: Session, tenant_id: uuid.UUID, start: date, end: date) -> di
         if campaign_id is not None:
             origin = f"Campaña: {names.get(campaign_id, 'sin nombre')}"
         elif lead_origin.get(conversation_id):
-            origin = f"Anuncio: {lead_origin[conversation_id]}"
+            # As the CRM wrote it: «Anuncio: <titular>» for a paid ad, «Instagram» for someone who
+            # came on their own. Prefixing «Anuncio:» here counted organic Instagram as paid.
+            origin = lead_origin[conversation_id]
         else:
             origin = "Directo"
         local = created_at.astimezone(zone)

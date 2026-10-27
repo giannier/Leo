@@ -44,7 +44,12 @@ def _stage(db: Session, tenant: Tenant, semantic: str) -> uuid.UUID:
 
 
 def _journey(
-    db: Session, tenant: Tenant, *, reach: str | None, product: str | None = None
+    db: Session,
+    tenant: Tenant,
+    *,
+    reach: str | None,
+    product: str | None = None,
+    origen: str | None = None,
 ) -> Conversation:
     """A real conversation; with a lead that reached `reach` (None: no lead)."""
     contact = customer(db, tenant)
@@ -63,6 +68,7 @@ def _journey(
         stage_id=_stage(db, tenant, reach),
         status=status,
         product_interest=product,
+        origen=origen,
     )
     db.add(lead)
     db.flush()
@@ -122,6 +128,21 @@ class TestFunnel:
         assert report["anterior"]["conversaciones"] == 0
         assert report["por_origen"]["Directo"] == {"conversaciones": 5, "ganados": 1}
         assert sum(day["conversaciones"] for day in report["por_dia_semana"].values()) == 5
+
+    def test_an_organic_origin_is_not_counted_as_an_ad(self, db: Session) -> None:
+        """The report prefixed «Anuncio:» to every origin: «Anuncio: Instagram» for a customer who
+        came on their own, «Anuncio: Anuncio: Oferta» for one who came from a paid ad."""
+        tenant, _ = business(db)
+        _journey(db, tenant, reach="nuevo", origen="Instagram")
+        _journey(db, tenant, reach="ganado", origen="Anuncio: Oferta de octubre")
+
+        report = funnel(db, tenant.id, TODAY - timedelta(days=6), TODAY)
+
+        assert report["por_origen"]["Instagram"] == {"conversaciones": 1, "ganados": 0}
+        assert report["por_origen"]["Anuncio: Oferta de octubre"] == {
+            "conversaciones": 1,
+            "ganados": 1,
+        }
 
 
 class TestProducts:
