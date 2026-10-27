@@ -41,7 +41,7 @@ import json
 import logging
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -416,8 +416,40 @@ def resolve_placeholders(text: str, values: Mapping[str, str | None]) -> str:
 # ------------------------------------------------------------------ sections
 
 
-def _platform_block(values: Mapping[str, str | None]) -> str:
-    return resolve_placeholders(PLATFORM_RULES, values)
+# The rules are the same in every stage, but not every stage has every tool: in DATOS or COBRO there is
+# no buscar_productos, and rule 1 told the model to use it there (an audit of every stage found it).
+# A clause that names a tool the stage does not offer is said without the tool.
+_TOOL_CLAUSES: tuple[tuple[str, str, str], ...] = (
+    (
+        "buscar_productos",
+        "Si piden otra cosa, búscala antes con buscar_productos; si no está, di con amabilidad que solo\n"
+        "   ayudas con eso.",
+        "Si piden otra cosa, di con amabilidad que solo ayudas con eso.",
+    ),
+    (
+        "gestionar_pedido",
+        'sola vez y llama a gestionar_pedido(accion="aplicar_promocion").',
+        "sola vez.",
+    ),
+    (
+        "mostrar_opciones",
+        "9. Si usaste mostrar_opciones, responde corto o nada: el cliente ya ve las opciones.",
+        "9. Mensajes cortos y claros: uno por idea.",
+    ),
+)
+
+
+def _platform_block(
+    values: Mapping[str, str | None], offered: Collection[str] | None = None
+) -> str:
+    """The platform rules, naming only the tools this stage offers (all, when not told)."""
+    text = resolve_placeholders(PLATFORM_RULES, values)
+    if offered is None:
+        return text
+    for tool, with_it, without in _TOOL_CLAUSES:
+        if tool not in offered:
+            text = text.replace(with_it, without)
+    return text
 
 
 def _style_block(config: EffectiveProcessConfig) -> str:
@@ -907,7 +939,8 @@ def build_stage_prompt(
     6 000-token budget, so their estimate is reported with the sections.
     """
     values = _placeholder_values(config, facts)
-    parts: dict[str, str] = {"plataforma": _platform_block(values)}
+    offered = {spec.name for spec in tool_specs} if tool_specs else None
+    parts: dict[str, str] = {"plataforma": _platform_block(values, offered)}
     sales = _sales_block(config, stage)
     if sales:
         parts["venta"] = sales
