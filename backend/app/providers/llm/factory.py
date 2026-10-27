@@ -66,6 +66,10 @@ class ProviderProfile:
     # OpenAI's newer models reject `max_tokens` and require
     # `max_completion_tokens`; some compatible endpoints still take the old name.
     max_tokens_field: str = "max_tokens"
+    # OpenAI: one tool call at a time. Its GPT-4.1 guide reports wrong parallel calls; for an agent
+    # that searches a product and adds it to an order, a parallel call adds a guessed product.
+    # None sends nothing (endpoints that do not know the parameter).
+    parallel_tool_calls: bool | None = None
 
 
 def _openai_profile(settings: Settings) -> ProviderProfile:
@@ -83,6 +87,7 @@ def _openai_profile(settings: Settings) -> ProviderProfile:
         embedding_dimensions=EMBEDDING_DIMENSIONS,
         send_embedding_input_type=False,
         max_tokens_field="max_completion_tokens",
+        parallel_tool_calls=False,
     )
 
 
@@ -116,6 +121,7 @@ def build_provider(profile: ProviderProfile) -> LLMProvider:
         embedding_dimensions=profile.embedding_dimensions,
         send_embedding_input_type=profile.send_embedding_input_type,
         max_tokens_field=profile.max_tokens_field,
+        parallel_tool_calls=profile.parallel_tool_calls,
     )
 
 
@@ -172,4 +178,5 @@ def provider_for_tenant(
         embedding_model=llm_settings.chat_model,
         embedding_dimensions=EMBEDDING_DIMENSIONS,
         send_embedding_input_type=False,
+        parallel_tool_calls=False if llm_settings.mode == "byo_openai" else None,
     )

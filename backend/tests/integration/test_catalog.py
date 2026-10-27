@@ -57,7 +57,7 @@ class TestTheSplit:
         ]
 
 
-LATEST_PROCESS_VERSION = 4
+LATEST_PROCESS_VERSION = 5
 
 
 class TestVersionOne:
@@ -69,7 +69,7 @@ class TestVersionOne:
         code = {s.value: TEMPLATES[key].stage(s).instrucciones for s in Stage}
         texts = stage_texts_from(rules, code, list(code))
 
-        # The newest published version (v4 since migration 0067) is today's code text.
+        # The newest published version (v5 since migration 0068) is today's code text.
         assert rules.process_version == LATEST_PROCESS_VERSION
         assert texts == code
 
@@ -136,6 +136,46 @@ class TestVersionFour:
         texts = "\n".join(r.texto for r in catalog.rules(v3.id))
         assert "pídele su nombre y correo" in texts or "nombre y correo" in texts
         assert "COTIZACIÓN" not in texts
+
+
+class TestVersionFive:
+    """Migration 0068: certificaciones for a literal model, as the fifth published version."""
+
+    @pytest.mark.parametrize("key", sorted(TEMPLATES))
+    def test_it_keeps_every_rule_key_of_version_four(self, db: Session, key: str) -> None:
+        catalog = CatalogRepository(db)
+        v4, v5 = catalog.version("proceso", key, 4), catalog.version("proceso", key, 5)
+
+        assert v4 is not None and v5 is not None
+        assert v4.estado == v5.estado == "publicada"
+        assert [r.rule_key for r in catalog.rules(v5.id)] == [
+            r.rule_key for r in catalog.rules(v4.id)
+        ]
+
+    def test_only_certificaciones_identification_and_order_changed(self, db: Session) -> None:
+        catalog = CatalogRepository(db)
+        changed: list[tuple[str, str]] = []
+        for key in sorted(TEMPLATES):
+            v4, v5 = catalog.version("proceso", key, 4), catalog.version("proceso", key, 5)
+            assert v4 is not None and v5 is not None
+            before = {r.rule_key: r.texto for r in catalog.rules(v4.id)}
+            changed += [
+                (key, r.rule_key) for r in catalog.rules(v5.id) if before[r.rule_key] != r.texto
+            ]
+
+        assert {key for key, _ in changed} == {"certificaciones"}
+        assert {rule.split(".")[0] for _, rule in changed} == {"IDENTIFICAR", "PEDIDO"}
+
+    def test_a_chosen_package_is_added_first_and_no_sample_phrase_is_left(
+        self, db: Session
+    ) -> None:
+        catalog = CatalogRepository(db)
+        v5 = catalog.version("proceso", "certificaciones", 5)
+
+        assert v5 is not None
+        texts = "\n".join(r.texto for r in catalog.rules(v5.id))
+        assert "Si ya dijo qué certificación o paquete quiere, agrégalo ya" in texts
+        assert "¡Buenísimo! Ya tienes" not in texts
 
 
 class TestPublishedIsFrozen:

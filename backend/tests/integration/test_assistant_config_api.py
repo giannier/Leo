@@ -348,7 +348,7 @@ class TestProcessAndRules:
             "servicios": False,
         }
         assert changed.json()["template_key"] == "certificaciones"
-        assert changed.json()["template_version"] == 4  # v4: migration 0067
+        assert changed.json()["template_version"] == 5  # v5: migration 0068
         assert bad.status_code == 422 and bad.json()["error"] == "invalid_options"
         assert switched.json()["apagada"] is True
         assert cobro["reglas"][0]["texto"].split("\n")[0] not in preview.json()["prompt"]

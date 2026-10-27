@@ -339,3 +339,39 @@ corregido y probado; falta instalar la línea del cron (RUNBOOK sección 6), cam
 **Para el dueño (configuración, no código):** en Nayu, «Mayorista: ofrécele precio al por mayor» choca con que todo es a cotizar
 (mejor: «el precio por mayor lo cotiza una persona»); y las descripciones traen saludos («¡Hola! Soy Nayu…») que conviene quitar.
 **Sin evals con el modelo real** en este cambio (por el costo, a pedido de Giannier); verificado con la suite automática.
+
+## C-13: gpt-4.1-mini para todo, y el prompt escrito para un modelo literal (2026-10-27)
+**Decisión de Giannier (costo del LLM):** «usaremos gpt 4.1 mini, para todo». Pasa a ser el modelo por defecto
+(`openai_chat_model`, `deploy/env.reference`, `deploy/env.prod.example`); en producción manda la línea `OPENAI_CHAT_MODEL` de
+`deploy/.env.prod`, que cambia Giannier o el despliegue con su visto bueno. Precio de lista: US$0,40 / 1,60 por millón de tokens de
+entrada / salida, contra 0,75 / 4,50 de gpt-5.4-mini. En la comparación del mismo día gpt-4.1-mini fue más flojo en pedidos
+(certificaciones), por eso se revisó el prompt y el proceso para él antes de cambiar.
+**Cómo lee gpt-4.1-mini (guía de prompting de OpenAI para GPT-4.1):** sigue las instrucciones al pie de la letra; si dos chocan,
+gana la que está más abajo; copia tal cual las frases de ejemplo; conviene repetir lo crítico al inicio y al final, y pedirle una
+herramienta a la vez. Lo que se vio en los evals: recorría «Paso 1, Paso 2, Paso 3» con un cliente que ya había dicho qué paquete
+quería y no agregaba nada; pedía permiso («¿quieres que te cuente…?») en vez de hacerlo; pedía el DNI antes de que hubiera pedido
+(el ESTADO decía «faltan DNI»); copiaba «¡Buenísimo! Ya tienes [X]…» palabra por palabra; y tras la lista de paquetes escribía «ya
+puedes elegir el que prefieras», un segundo mensaje que decía lo mismo.
+**Cambios:**
+1. Orden del prompt: lo general arriba y un bloque final corto «ANTES DE RESPONDER» (datos solo de herramientas; si el cliente pide
+   algo que una herramienta hace, hacerlo en el turno sin pedir permiso; no repetir lo que una herramienta ya envió; responder y
+   terminar con el siguiente paso). Las reglas numeradas de la plataforma siguen arriba y «nunca se rompen».
+2. VENTA sin frases de ejemplo (el modelo las copiaba); «no pidas permiso para contarle o enviarle algo: hazlo. Al pedido, solo lo
+   que pidió» (un modelo literal agregaría lo que solo se recomendó); señal de compra = agregar al pedido en ese mismo turno. Ya no
+   pide «nombre y cómo contactarlo» por su cuenta.
+3. ESTADO: las líneas de datos del cliente y métodos de pago solo aparecen si hay pedido o la etapa es de pedido. La línea de pago
+   del negocio dice que los datos para pagar se envían aparte (no los escribe el modelo).
+4. Avisos del sistema (uno por turno, como los demás): el cliente dijo «lo quiero / agrégalo» y no se llamó a `gestionar_pedido`
+   (solo si aún no hay nada en el pedido: con pedido, «lo quiero para mañana» habla del pedido hecho y agregarlo otra vez lo
+   duplicaría); preguntó cómo pagar y no se llamó a `enviar_metodos_pago` (solo si no se enviaron ya: el proceso dice «revisa el
+   mensaje anterior»); el mensaje pide permiso para contar o enviar algo («¿te lo agrego?» no cuenta: es la pregunta de cierre).
+5. Plantilla certificaciones v5 (migración 0068): si el cliente ya dijo qué certificación o paquete quiere, se agrega ya; el precio
+   por unidad solo si aún no eligió; en PEDIDO, «cuántas tiene y cuántas le faltan» con sus palabras.
+6. Mensajes duplicados: el texto del modelo se descarta si repite lo que una herramienta acaba de enviar (70 % de las palabras
+   significativas, no solo el texto idéntico) o si, tras un menú, solo invita a elegir otra vez. `mostrar_opciones` envía un menú
+   por turno (antes podía mandar dos con textos distintos). Los archivos y los métodos de pago ya se enviaban una sola vez.
+7. `parallel_tool_calls=false` en OpenAI: una herramienta por paso, en orden (lo recomienda la guía; evita dos envíos a la vez).
+8. Descripciones de `gestionar_pedido` («úsala en cuanto quiera algo de precio fijo, sin pedirle datos antes») y
+   `enviar_metodos_pago` («no los escribas tú»).
+**Pendiente:** una pasada de validación con gpt-4.1-mini (flujos, calidad y Nayu, ~US$0,40) con el visto bueno de Giannier, y el
+despliegue con su «despliega». Gasto de evals de la sesión hasta aquí: ~US$0,86.

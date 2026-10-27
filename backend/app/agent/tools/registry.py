@@ -182,6 +182,9 @@ class ToolContext:
     rubro_version_id: uuid.UUID | None = None
     # A tool that ends the turn writes here; the agent loop stops after it.
     ending: TurnEnding = field(default_factory=TurnEnding)
+    # The option menus sent this turn. Shared by the copies `ToolCatalog.for_stage` makes, so
+    # `mostrar_opciones` sends one menu per turn whatever stage scope runs it.
+    options_this_turn: list[str] = field(default_factory=list)
 
 
 ToolHandler = Callable[[ToolContext, dict[str, Any]], Awaitable[str | ToolResult]]

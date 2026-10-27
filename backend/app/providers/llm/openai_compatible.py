@@ -55,6 +55,7 @@ class OpenAICompatibleProvider:
         embedding_dimensions: int | None = None,
         send_embedding_input_type: bool = True,
         max_tokens_field: str = "max_tokens",
+        parallel_tool_calls: bool | None = None,
         vision_model: str | None = None,
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
@@ -71,6 +72,7 @@ class OpenAICompatibleProvider:
         self._embedding_dimensions = embedding_dimensions
         # Some compatible endpoints require `input_type`; OpenAI rejects it.
         self._send_embedding_input_type = send_embedding_input_type
+        self._parallel_tool_calls = parallel_tool_calls
         # What this vendor calls the output cap. OpenAI's newer models
         # reject `max_tokens` outright and demand
         # `max_completion_tokens`; some compatible endpoints still take
@@ -235,6 +237,8 @@ class OpenAICompatibleProvider:
         }
         if tools:
             payload["tools"] = self._encode_tools(tools)
+            if self._parallel_tool_calls is not None:
+                payload["parallel_tool_calls"] = self._parallel_tool_calls
 
         started = time.perf_counter()
         body = await self._post("/chat/completions", payload)

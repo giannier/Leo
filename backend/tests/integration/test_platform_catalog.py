@@ -121,7 +121,7 @@ class TestTheCycle:
         await api.post(f"{CAT}/proceso/servicios/versions", headers=headers)
 
         response = await api.put(
-            f"{CAT}/proceso/servicios/versions/5",
+            f"{CAT}/proceso/servicios/versions/6",
             headers=headers,
             json={"reglas": [{"rule_key": "COBRO.x", "texto": "Sin etapa."}]},
         )

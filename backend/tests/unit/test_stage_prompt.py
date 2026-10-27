@@ -435,7 +435,11 @@ def test_the_priority_line_is_there_even_without_situations() -> None:
     text = build_stage_prompt(make_config(), Facts(), Stage.COBRO, now=NOW).text
 
     assert "SITUACIONES DEL NEGOCIO" not in text
-    assert text.rstrip().endswith("nunca se rompen.")
+    assert "nunca se rompen." in text
+    # The state of the conversation and the closing reminder come after it (gpt-4.1 follows the
+    # later of two instructions that disagree, so the rules that decide a turn go last).
+    assert text.index("PRIORIDAD:") < text.index("ETAPA ACTUAL:") < text.index("ANTES DE RESPONDER")
+    assert text.rstrip().endswith("termina con el siguiente paso.")
 
 
 def test_the_style_says_how_to_address_the_customer() -> None:
@@ -595,7 +599,8 @@ def test_the_business_section_has_one_line_per_topic() -> None:
 
     for start in (
         "Negocio: Escuela Capacita (rubro instituto).",
-        "Métodos de pago: Yape, transferencia bancaria; se paga antes de entregar.",
+        "Métodos de pago: Yape, transferencia bancaria; se paga antes de entregar "
+        "(los datos para pagar se envían aparte).",
         "Entregas: delivery, zonas: Zona 1 de reparto S/ 8.50 (mismo día)",
         "recojo en tienda; envío gratis desde S/ 150.00.",
         "Locales: Sede 1: Av. Principal 100, Chiclayo · lunes: 09:00 a 18:00",
@@ -854,11 +859,24 @@ def test_without_turn_context_there_is_no_this_turn_block() -> None:
     assert "ETAPA ACTUAL: IDENTIFICAR" in text
 
 
-def test_the_current_stage_ends_the_state_block_and_its_instructions_follow() -> None:
+def test_the_current_stage_ends_the_state_block_and_the_closing_reminder_follows() -> None:
     text = _prompt(Stage.DATOS, Facts(datos_faltantes=["dni"]))
 
-    expected = "ETAPA ACTUAL: DATOS\n\nPROCESO: INSTRUCCIONES DE LA ETAPA\nEl pedido está completo."
-    assert expected in text
+    assert "ETAPA ACTUAL: DATOS\n\nANTES DE RESPONDER" in text
+    # The stage's instructions come before, after the general rules and before the specific ones.
+    assert text.index("PROCESO: INSTRUCCIONES DE LA ETAPA\nEl pedido está completo.") < text.index(
+        "\nNEGOCIO"
+    )
+
+
+def test_customer_data_and_payment_status_are_shown_only_with_an_order() -> None:
+    """«Datos del cliente: faltan DNI» before any order made gpt-4.1-mini ask for the DNI in its
+    greeting and refuse to add the product until it had it."""
+    before = _prompt(Stage.IDENTIFICAR, Facts(datos_faltantes=["dni", "apellidos"]))
+    during = _prompt(Stage.DATOS, Facts(datos_faltantes=["dni", "apellidos"]))
+
+    assert "Datos del cliente" not in before and "- Métodos de pago:" not in before
+    assert "Datos del cliente: faltan dni, apellidos" in during
 
 
 def test_an_unknown_time_zone_does_not_break_the_state_block() -> None:
