@@ -21,7 +21,7 @@ import pytest
 
 from app.providers.email.base import EmailAuthError, EmailError, EmailMessage
 from app.providers.email.resend_provider import RESEND_URL, ResendEmailProvider
-from app.providers.llm.base import ChatMessage, LLMError, ToolSpec
+from app.providers.llm.base import ChatMessage, LLMError, LLMRateLimitError, ToolSpec
 from app.providers.llm.openai_compatible import OpenAICompatibleProvider
 
 CHAT_BODY: dict[str, Any] = {
@@ -428,3 +428,88 @@ def _json(request: httpx.Request) -> dict[str, Any]:
 
     decoded: dict[str, Any] = json.loads(request.content)
     return decoded
+
+
+class TestWhenTheVendorAsksToWait:
+    """Twenty businesses share one OpenAI organization: a burst gets 429 and a short wait. Without a
+    retry the customer read the canned «no pude procesar tu mensaje» (2026-10-27)."""
+
+    @staticmethod
+    def _sequence(
+        *responses: httpx.Response,
+    ) -> tuple[OpenAICompatibleProvider, list[httpx.Request], list[float]]:
+        seen: list[httpx.Request] = []
+        waits: list[float] = []
+        queue = list(responses)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return queue.pop(0) if len(queue) > 1 else queue[0]
+
+        async def sleep(seconds: float) -> None:
+            waits.append(seconds)
+
+        provider = OpenAICompatibleProvider(
+            api_key="k",
+            base_url="https://vendor.invalid/v1",
+            chat_model="c",
+            embedding_model="e",
+            transport=httpx.MockTransport(handler),
+            sleep=sleep,
+        )
+        return provider, seen, waits
+
+    async def test_a_rate_limit_is_waited_out_as_the_vendor_says(self) -> None:
+        provider, seen, waits = self._sequence(
+            httpx.Response(429, headers={"retry-after": "1.5"}, json={"error": {}}),
+            httpx.Response(200, json=CHAT_BODY),
+        )
+
+        result = await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert result.content == "Buenas, en que te ayudo?"
+        assert len(seen) == 2 and waits == [1.5]
+
+    async def test_a_vendor_hiccup_is_retried(self) -> None:
+        provider, seen, waits = self._sequence(
+            httpx.Response(503, text="overloaded"), httpx.Response(200, json=CHAT_BODY)
+        )
+
+        await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert len(seen) == 2 and waits == [1.0]
+
+    async def test_it_gives_up_after_two_retries(self) -> None:
+        provider, seen, waits = self._sequence(httpx.Response(429, json={"error": {}}))
+
+        with pytest.raises(LLMRateLimitError):
+            await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert len(seen) == 3 and waits == [1.0, 2.0]
+
+    async def test_an_exhausted_quota_is_not_retried(self) -> None:
+        body = {"error": {"code": "insufficient_quota", "type": "insufficient_quota"}}
+        provider, seen, waits = self._sequence(httpx.Response(429, json=body))
+
+        with pytest.raises(LLMRateLimitError):
+            await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert len(seen) == 1 and waits == []
+
+    async def test_a_wait_of_a_minute_is_not_waited_for(self) -> None:
+        provider, seen, waits = self._sequence(
+            httpx.Response(429, headers={"retry-after": "60"}, json={"error": {}})
+        )
+
+        with pytest.raises(LLMRateLimitError):
+            await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert len(seen) == 1 and waits == []
+
+    async def test_a_client_error_is_not_retried(self) -> None:
+        provider, seen, waits = self._sequence(httpx.Response(400, json={"error": "bad"}))
+
+        with pytest.raises(LLMError):
+            await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert len(seen) == 1 and waits == []

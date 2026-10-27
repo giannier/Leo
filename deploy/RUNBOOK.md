@@ -198,6 +198,19 @@ El panel y WhatsApp los leen por enlaces firmados que sirve la propia API (`/api
   enlaces se arman con ella y WhatsApp los descarga desde ahí; el compose de producción ya la deriva de
   `LEO_DOMAIN`.
 
+### Capacidad: cuántas conversaciones a la vez
+
+- **El worker responde hasta 20 conversaciones a la vez** (`max_jobs` en `app/workers/settings.py`); las
+  tareas pesadas (indexar documentos, importar chats, evals del catálogo) van de 2 en 2 para no quitarles
+  lugar. Cada conversación ocupa una conexión a Postgres mientras el modelo piensa: el worker tiene
+  `DB_POOL_SIZE=20` y `DB_MAX_OVERFLOW=10` (en `docker-compose.prod.yml`); cada proceso web, 5 + 10. En total
+  ~60 de las 100 conexiones que Postgres permite por defecto. Si se suben, revisar esa suma.
+- **Todos los negocios comparten la cuenta de OpenAI** y su límite de tokens por minuto. Ante un «espera»
+  (429) o una falla momentánea (5xx), la llamada se reintenta dos veces (la espera que indique OpenAI, como
+  máximo 8 s). Si la cuenta se queda **sin saldo**, no se reintenta: el cliente recibe el mensaje de
+  respaldo y, tras 3 fallas en un minuto, ese negocio queda 2 minutos sin asistente y se le avisa por correo
+  (`llm_caido`). El nivel de la cuenta y sus límites se ven en platform.openai.com → Settings → Limits.
+
 ### Monitor (opcional)
 
 ```bash
