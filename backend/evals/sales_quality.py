@@ -329,6 +329,57 @@ AUTOMATION = Scenario(
 FRESH_SCENARIOS = (VETERINARY, COMPETITOR, AUTOMATION)
 
 
+# A second batch, written after the first had been used to fix things. `SALES_QUALITY_SET=fresh2`.
+CEVICHERIA = Scenario(
+    "lote 2: cevichería que quiere la carta en el celular",
+    (
+        "Hola, tengo una cevichería y quiero que mis clientes vean la carta desde el celular",
+        "también quisiera recibir pedidos por WhatsApp",
+        "¿cuánto me saldría todo?",
+    ),
+    (
+        Check(
+            "pregunta o entiende antes de recomendar",
+            lambda t: _asks(_text(t[0])) or _asks(_text(t[1])),
+        ),
+        Check(
+            "recomienda algo concreto",
+            lambda t: any(
+                _RECOMMENDS.search(_text(x))
+                or re.search(r"p[aá]gina web|automatiz", _text(x), re.I)
+                for x in t[1:3]
+            ),
+        ),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+        Check("cada mensaje termina con un siguiente paso", _every_reply_ends_with_a_step),
+    ),
+)
+
+HOSTING_CHOICE = Scenario(
+    "lote 2: duda entre hosting básico y empresarial",
+    (
+        "Hola, ¿qué diferencia hay entre el hosting básico y el empresarial?",
+        "tengo una tienda online pequeña, unas 100 visitas al día",
+        "ok, voy con ese",
+    ),
+    (
+        Check(
+            "recomienda uno para su caso",
+            lambda t: bool(
+                _RECOMMENDS.search(_text(t[1])) or re.search(r"b[aá]sico", _text(t[1]), re.I)
+            ),
+        ),
+        Check("ante 'voy con ese' cierra", lambda t: bool(_CLOSING.search(_text(t[2])))),
+        Check("no ofrece 'te cuento' en vez de contar", _no_passive_offers),
+        Check("sin palabras de duda", _no_hedging),
+        Check("cada mensaje termina con un siguiente paso", _every_reply_ends_with_a_step),
+    ),
+)
+
+FRESH2_SCENARIOS = (CEVICHERIA, HOSTING_CHOICE)
+
+
 # ------------------------------------------------------------------ the runner
 
 

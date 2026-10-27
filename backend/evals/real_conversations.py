@@ -782,6 +782,95 @@ NAYU_FRESH: tuple[Scenario, ...] = (
     ),
 )
 
+# A second batch, written after the first had been used to fix things (2026-10-27). `REAL_SET=fresh2`.
+NAYU_FRESH2: tuple[Scenario, ...] = (
+    _nayu(
+        "nayu lote 2-1: pregunta si llegan a provincia y sigue",
+        (
+            say("hola, distribuyen a Huacho? tengo una tienda", "distrito", "uso"),
+            say("quiero agua alcalina, unas 120 botellas", "producto", "cantidad"),
+            say("cada mes", "frecuencia"),
+            say("para el 10 de noviembre", "fecha"),
+        ),
+        ("120", "noviembre", "Huacho"),
+        4,
+    ),
+    _nayu(
+        "nayu lote 2-2: mensajes cortos con emojis",
+        (
+            say("hola 👋"),
+            say("bidon 20 lt 💧", "producto"),
+            say("5", "cantidad"),
+            say("mañana", "fecha"),
+            say("SJL", "distrito"),
+            say("casa", "uso"),
+            say("cada semana", "frecuencia"),
+        ),
+        ("5", "SJL"),
+        7,
+    ),
+    _nayu(
+        "nayu lote 2-3: empresa con dirección completa",
+        (
+            say(
+                "Buenas, soy Carmen. Necesito 50 botellas de agua de mesa de 625 ml para una "
+                "reunión de mi empresa",
+                "producto",
+                "cantidad",
+                "uso",
+            ),
+            say("el viernes 7", "fecha"),
+            say("Av. Javier Prado Este 4200, Surco", "distrito"),
+        ),
+        ("50", "viernes", "Surco"),
+        3,
+    ),
+    _nayu(
+        "nayu lote 2-4: pide un asesor desde el inicio",
+        (say("Hola, quiero hablar con un asesor de ventas"),),
+        (),
+        1,
+    ),
+    _nayu(
+        "nayu lote 2-5: cambia la fecha",
+        (
+            say(
+                "Necesito 3 cajas de agua de 20 L para mi casa en Breña",
+                "producto",
+                "cantidad",
+                "uso",
+                "distrito",
+            ),
+            say("para el sábado", "fecha"),
+            say("mejor el domingo", "fecha"),
+            say("solo una vez", "frecuencia"),
+        ),
+        ("3", "domingo", "Breña"),
+        4,
+    ),
+    _nayu(
+        "nayu lote 2-6: pregunta algo técnico que el negocio no dijo",
+        (
+            say("¿el agua de 7 litros es tratada con ozono?", "producto"),
+            say("ok, igual quiero 15 para mi oficina", "cantidad", "uso"),
+            say("en La Molina", "distrito"),
+            say("el lunes 10", "fecha"),
+        ),
+        ("15", "Molina"),
+        4,
+    ),
+    _nayu(
+        "nayu lote 2-7: impaciente con el precio",
+        (
+            say("hola, cuánto está el bidón de 20?", "producto"),
+            say("solo quiero el precio, no me hagas tantas preguntas"),
+            say("entonces pásame con alguien que me dé el precio"),
+        ),
+        (),
+        3,
+    ),
+)
+
 ALL_SCENARIOS = SCENARIOS + HELD_OUT + NAYU
 
 

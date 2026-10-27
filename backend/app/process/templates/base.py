@@ -106,9 +106,11 @@ INICIO_TOOLS_GREET_ONLY: tuple[str, ...] = ()
 
 _TOOLS_BY_STAGE: Mapping[Stage, tuple[str, ...]] = MappingProxyType(
     {
-        # With the search: CALIFICAR answers a price question before the path is chosen (its rule
-        # says so, and without the tool it dodged «¿qué diferencia hay entre los paquetes?»).
-        Stage.CALIFICAR: ("mostrar_opciones", "elegir_camino", "buscar_productos", "ver_producto"),
+        # As IDENTIFICAR: a customer who says what they want before the path is chosen gets an
+        # answer and, if they want it, the order in that same turn (without the search it dodged
+        # «¿qué diferencia hay entre los paquetes?»; without the order «la quiero» drifted into
+        # asking for the DNI). An order outranks the path in the stage engine.
+        Stage.CALIFICAR: (*_SEARCH_AND_ORDER, "elegir_camino"),
         Stage.ANUNCIO: (*_SEARCH_AND_ORDER, "elegir_camino"),
         Stage.IDENTIFICAR: (*_SEARCH_AND_ORDER, "elegir_camino"),
         Stage.PEDIDO: ("gestionar_pedido", "buscar_productos", "ver_producto", "mostrar_opciones"),

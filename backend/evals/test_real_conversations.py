@@ -17,6 +17,7 @@ from evals.real_conversations import (
     HELD_OUT,
     NAYU,
     NAYU_FRESH,
+    NAYU_FRESH2,
     SCENARIOS,
     run_all,
 )
@@ -33,9 +34,13 @@ class TestRealConversations:
     async def test_the_assistant_holds_a_reasonable_conversation(self, db: Session, llm) -> None:  # type: ignore[no-untyped-def]
         mode = os.getenv("JUDGE", "")
         only = os.getenv("REAL_ONLY")
-        pool = {"owner": SCENARIOS, "new": HELD_OUT, "nayu": NAYU, "fresh": NAYU_FRESH}.get(
-            os.getenv("REAL_SET", ""), ALL_SCENARIOS
-        )
+        pool = {
+            "owner": SCENARIOS,
+            "new": HELD_OUT,
+            "nayu": NAYU,
+            "fresh": NAYU_FRESH,
+            "fresh2": NAYU_FRESH2,
+        }.get(os.getenv("REAL_SET", ""), ALL_SCENARIOS)
         # `REAL_ONLY="nayu 1;nayu 7"`: the scenarios whose name starts with any of them.
         prefixes = [p for p in (only or "").split(";") if p]
         scenarios = [s for s in pool if not prefixes or s.name.startswith(tuple(prefixes))]

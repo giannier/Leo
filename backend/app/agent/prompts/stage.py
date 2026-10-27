@@ -211,9 +211,9 @@ QUOTE_QUALIFIES = "\n6. Cotizar es interés ALTO: llama también a calificar_cli
 # had just sent.
 CLOSING_RULES = """\
 ANTES DE RESPONDER
-- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
-- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
-- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Precios, pedidos, pagos y datos del cliente salen de tus herramientas, no de memoria.
+- Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
+- No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso."""
 
 
