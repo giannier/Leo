@@ -421,5 +421,17 @@ que el negocio lo diga; anota «40 al mes» como cantidad y no la frecuencia, y 
 palabras del cliente, así que vuelve a preguntar y la cotización no se cierra. Lectura: con este proceso (varias herramientas,
 reglas literales), gpt-4.1-mini queda en ~70 % de flujos y ~60 % de cotizaciones; los controles en código sirven con cualquier
 modelo. Producción sigue con gpt-5.4-mini (`.env.prod`); el cambio de modelo no se despliega solo con el código.
-Gasto de evals del día: ~US$1,86. **Pendiente (decisión de Giannier, costo del LLM):** comparar el lote 3 con gpt-5.4-mini
-(~US$0,45) antes de decidir el modelo de la conversación.
+**Comparación con el mismo lote 3 (autorizada, ~US$0,55):**
+
+| | gpt-4.1-mini | gpt-5.4-mini | meta |
+|---|---|---|---|
+| Flujos | 10/14 (71 %) | 12/14 (86 %) | 90 % |
+| Nayu | 6/10 (60 %) | 8/10 (80 %) | 85 % |
+| Calidad | 93 % (un monto inventado) | 83 % | 75 % |
+| Juez: conversación razonable | 3/10 | 7/10 | — |
+| Costo por conversación de Nayu (lista) | ~US$0,010 | ~US$0,028 | — |
+
+Las dos fallas de Nayu de gpt-5.4-mini (y una de gpt-4.1-mini) eran nuestras: «40 al mes» anotado como «mensual» se rechazaba
+por no ser las palabras del cliente; corregido (3b1baad). gpt-5.4-mini dijo «ya quedó registrada» sin agregar: ahora recibe aviso.
+Gasto de evals del día: ~US$2,41. **Pendiente (decisión de Giannier, costo del LLM):** qué modelo atiende la conversación;
+producción sigue con gpt-5.4-mini. Propuesta aparte para bajar el costo: caché de prompt (ESTADO al final, medir `cached_tokens`).
