@@ -413,4 +413,13 @@ corregidas después (sin medir aún):
 Siguen vistos sin corregir: inventó cómo es el proceso de certificar («un examen y documentos»: no está en ningún dato); anota a
 veces un dato un turno tarde («reunión de mi empresa» no quedó como uso); la plantilla de certificaciones pide el nombre y el
 camino antes de todo (diseño del dueño). Gasto de evals del día: ~US$1,62.
-**Pendiente:** una pasada con un tercer lote nuevo, con el visto bueno de Giannier, y el despliegue con su «despliega».
+**Tercera pasada (lote 3, nuevo, autorizada, ~US$0,24):** flujos 10/14, Nayu 6/10, calidad 93 % (con un monto inventado). Las
+tres mediciones honestas (cada lote corrido por primera vez) no suben: flujos 68 % → 75 % → 71 %, Nayu 75 % → 57 % → 60 %,
+calidad 88 % → 90 % → 93 %. Cada corrección resuelve un tipo de falla y aparece otro: tras pedir consentimiento para agregar,
+ahora pregunta «¿quieres que te lo agregue?» a quien dijo «quiero certificar Excel y Power BI»; dijo «Sí, emitimos factura» sin
+que el negocio lo diga; anota «40 al mes» como cantidad y no la frecuencia, y la verificación rechaza «mensual» por no ser las
+palabras del cliente, así que vuelve a preguntar y la cotización no se cierra. Lectura: con este proceso (varias herramientas,
+reglas literales), gpt-4.1-mini queda en ~70 % de flujos y ~60 % de cotizaciones; los controles en código sirven con cualquier
+modelo. Producción sigue con gpt-5.4-mini (`.env.prod`); el cambio de modelo no se despliega solo con el código.
+Gasto de evals del día: ~US$1,86. **Pendiente (decisión de Giannier, costo del LLM):** comparar el lote 3 con gpt-5.4-mini
+(~US$0,45) antes de decidir el modelo de la conversación.
