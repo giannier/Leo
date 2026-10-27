@@ -224,6 +224,14 @@ async def mostrar_opciones(context: ToolContext, arguments: dict[str, Any]) -> T
         return ToolResult.error(
             "tipo no es válido: usa caminos, categorias, productos o promociones."
         )
+    if context.options_this_turn:
+        # Two menus in one turn are two messages to read and two places to tap.
+        return ToolResult.omitido(
+            decir=(
+                "Ya le enviaste opciones en este turno. No envíes otras: responde corto o no "
+                "escribas nada."
+            )
+        )
     body = _truncate(str(arguments.get("texto") or ""), MAX_BODY)
     if not body:
         return ToolResult.error("Falta el texto que acompaña las opciones.")
@@ -264,6 +272,7 @@ async def mostrar_opciones(context: ToolContext, arguments: dict[str, Any]) -> T
 
     context.budget.consume()
     label = tipo if filtro is None else f"{tipo}:{filtro}"
+    context.options_this_turn.append(label)
     shown_before = _remembered(context, "opciones_mostradas")
     if label not in shown_before:
         context.facts_patch["opciones_mostradas"] = [*shown_before, label]

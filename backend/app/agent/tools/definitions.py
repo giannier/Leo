@@ -459,8 +459,8 @@ def _definitions() -> list[ToolDefinition]:
         ToolDefinition(
             name="gestionar_pedido",
             description=(
-                "Crea o modifica el pedido del cliente. Cada cambio pasa por aquí; los "
-                "totales los calcula el sistema."
+                "Crea o modifica el pedido del cliente; los totales los calcula el sistema. Úsala "
+                "en cuanto quiera algo de precio fijo, sin pedirle datos antes."
             ),
             parameters=_order_schema,
             handler=gestionar_pedido,
@@ -476,7 +476,10 @@ def _definitions() -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="enviar_metodos_pago",
-            description="Envía al cliente los métodos de pago del negocio.",
+            description=(
+                "Envía los datos para pagar (cuentas, números, QR) cuando hay pedido y pregunta "
+                "cómo pagar o toca cobrar. No los escribas tú."
+            ),
             parameters=_methods_schema,
             handler=enviar_metodos_pago,
             effect=True,

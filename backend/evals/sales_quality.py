@@ -266,6 +266,9 @@ class QualityOutcome:
     passed: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     invented: list[str] = field(default_factory=list)
+    # What the model was asked and wrote, so a run says what it cost.
+    tokens_in: int = 0
+    tokens_out: int = 0
 
 
 async def run_scenario(
@@ -304,6 +307,9 @@ async def run_scenario(
             process_config=ProcessConfigService(session, cache=ProcessConfigCache()),
         )
         result = await pipeline.run(conversation.id, InboundTurn(text=text))
+        if result.reply:
+            outcome.tokens_in += result.reply.input_tokens
+            outcome.tokens_out += result.reply.output_tokens
         said = [m.content for m in result.messages if m.content]
         outcome.replies.append(said)
         outcome.transcript.append(f"- Cliente: {text}")
@@ -341,7 +347,11 @@ class QualityReport:
         return self.score >= PASS_RATIO and not self.invented_amounts
 
     def render(self) -> str:
-        lines = [f"# Calidad de venta · {self.score:.0%} ({self.total} comprobaciones)\n"]
+        lines = [
+            f"# Calidad de venta · {self.score:.0%} ({self.total} comprobaciones)",
+            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
+            f"{sum(o.tokens_out for o in self.outcomes)} de salida\n",
+        ]
         for outcome in self.outcomes:
             lines.append(f"## {outcome.template} · {outcome.scenario.name}")
             lines.append(f"Pasó: {len(outcome.passed)} · Falló: {len(outcome.failed)}")

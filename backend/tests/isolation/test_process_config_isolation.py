@@ -118,9 +118,9 @@ class TestEachTenantReadsItsOwnConfiguration:
         b = service.effective(tenant_b.tenant_id)
 
         # Each reads the published rules of its own template (017, TASK-460).
-        assert a.instructions_for(Stage.IDENTIFICAR).startswith("Paso 1 · El tema.")
+        assert a.instructions_for(Stage.IDENTIFICAR).startswith("Si ya dijo qué certificación")
         assert b.instructions_for(Stage.IDENTIFICAR).startswith("Entiende qué necesita")
-        assert (a.process_version, b.process_version) == (4, 4)  # v4: migration 0067
+        assert (a.process_version, b.process_version) == (5, 5)  # v5: migration 0068
         assert a.info.entregas is not None and a.info.entregas.hace_delivery is True
         assert b.info.entregas is not None and b.info.entregas.hace_delivery is False
         assert (a.payment_methods, b.payment_methods) == (("yape",), ("plin",))
@@ -158,7 +158,7 @@ class TestDefaults:
             "equilibrado",
             "moderado",
         )
-        assert config.process_version == 4  # v4: migration 0067
+        assert config.process_version == 5  # v5: migration 0068
         assert config.currency == "PEN"
         assert config.business_name is None
         assert config.payment_methods == ()

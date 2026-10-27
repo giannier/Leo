@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import re
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -72,6 +73,7 @@ from app.process.interactive import InteractiveReply, apply_interactive
 from app.process.service import EffectiveProcessConfig, ProcessConfigService
 from app.process.state import StateConflict, StateRepo, facts_snapshot
 from app.process.templates.base import Stage
+from app.process.text import plain
 from app.process.turn import IMAGE_RECEIVED_LINE, TurnContext
 from app.providers.llm.base import LLMProvider
 from app.providers.whatsapp.base import Referral
@@ -333,10 +335,14 @@ class TurnPipeline:
         bubbles = to_bubbles(reply.content, config.behavior.detalle, budget)
         if reply.silent and tool_messages:
             bubbles = []
-        # The model often writes again the text it just sent as the body of the
-        # buttons or the list; the customer would read it twice (TASK-447).
-        already = {_same_text(m.content) for m in tool_messages if m.msg_type == "interactive"}
-        bubbles = [bubble for bubble in bubbles if _same_text(bubble) not in already]
+        # The model often writes again what a tool just sent (the body of the buttons or the list,
+        # the payment methods, a file's caption), word for word (TASK-447) or in other words: the
+        # customer would read it twice. gpt-4.1-mini did it after a list of packages: «Elige el que
+        # prefieras» on the list, then «ya puedes elegir el paquete que prefieras. ¿Cuál te
+        # interesa?».
+        tool_texts = [m.content for m in tool_messages if m.content]
+        options_shown = any(m.msg_type == "interactive" for m in tool_messages)
+        bubbles = [b for b in bubbles if not _repeats(b, tool_texts, after_options=options_shown)]
         text_messages = [
             self._messages.append(
                 conversation_id=conversation_id,
@@ -591,6 +597,81 @@ class TurnPipeline:
 def _same_text(text: str) -> str:
     """Text compared for repetition: case, spacing and WhatsApp markup aside."""
     return " ".join(text.replace("*", "").replace("_", "").split()).casefold()
+
+
+# Words too common to tell two messages apart.
+_COMMON = frozenset(
+    [
+        "para",
+        "este",
+        "esta",
+        "estos",
+        "estas",
+        "como",
+        "pero",
+        "tienes",
+        "puedes",
+        "quieres",
+        "puede",
+        "gracias",
+        "perfecto",
+        "claro",
+        "listo",
+        "bien",
+        "ahora",
+        "aqui",
+        "todo",
+        "toda",
+        "todos",
+        "todas",
+        "cual",
+        "cuales",
+        "mismo",
+        "cuando",
+        "donde",
+        "desde",
+        "hasta",
+        "sobre",
+        "entre",
+        "tambien",
+        "solo",
+        "tengo",
+        "tenemos",
+        "nuestro",
+        "nuestra",
+        "nuestros",
+        "nuestras",
+    ]
+)
+_REPEATED_SHARE = 0.7
+# What a reply says after a list or buttons that only repeats their invitation.
+_CHOOSE_AGAIN = re.compile(
+    r"\b(elig|eleg|escog|seleccion|toca |toque )|cu[aá]l (te |prefieres|de )|"
+    r"opci[oó]n que prefieras"
+)
+_MAX_INVITATION = 220
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]{4,}", plain(text)) if w not in _COMMON}
+
+
+def _repeats(bubble: str, sent: Sequence[str], *, after_options: bool) -> bool:
+    """Whether a bubble only says again what a tool already put on the customer's screen."""
+    if any(_same_text(bubble) == _same_text(text) for text in sent):
+        return True
+    words = _words(bubble)
+    if len(words) >= 3:
+        for text in sent:
+            if len(words & _words(text)) / len(words) >= _REPEATED_SHARE:
+                return True
+    plain_bubble = plain(bubble)
+    return (
+        after_options
+        and len(bubble) <= _MAX_INVITATION
+        and not re.search(r"\d", plain_bubble)
+        and bool(_CHOOSE_AGAIN.search(plain_bubble))
+    )
 
 
 def _entry_from(referral: Referral, now: datetime) -> dict[str, Any]:

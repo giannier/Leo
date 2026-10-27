@@ -41,6 +41,7 @@ from app.agent.tools.handover import current_quote
 from app.agent.tools.quote import unnoted_answer
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.models.conversation import Message
+from app.process.text import plain
 from app.providers.llm.base import (
     ChatMessage,
     ChatResult,
@@ -306,6 +307,39 @@ UNNOTED_NOTE = (
 )
 
 
+# What gpt-4.1-mini skipped in the sales flows (2026-10-27): «sí, agrégala» got «antes necesito tu
+# DNI» and nothing was added; «¿cómo pago?» got the methods from memory instead of
+# enviar_metodos_pago; and it asked «¿quieres que te cuente más?» instead of telling. One nudge per
+# turn, as the others.
+WANTS_IT = re.compile(
+    r"\b(agreg|anad|ponme|me (lo|la|los|las) llevo|(lo|la|los|las) quiero|quiero (comprar|pedir)|"
+    r"lo compro|la compro|quiero (el|la|los|las|un|una) (?!precio|costo|info|detalle|dato|cotiza))"
+)
+ASKS_HOW_TO_PAY = re.compile(
+    r"\b(como|donde|adonde) (te |le )?(pago|deposito|transfiero|yapeo|plineo)\b|"
+    r"(metodos?|medios?|formas?) de pago|numero de cuenta|a que (numero|cuenta)"
+)
+ASKS_PERMISSION = re.compile(
+    r"\b(quieres|deseas|te gustaria|prefieres) que te (cuente|explique|envie|mande|muestre|deje|"
+    r"pase|comparta|ayude a)\b"
+)
+# Not «¿te lo agrego?»: after a recommendation that is the closing question, and adding what the
+# customer did not confirm puts it in the order uninvited. Wanting it is `WANTS_IT`.
+ADD_NOTE = (
+    "Aviso del sistema: el cliente dijo que lo quiere y no lo agregaste. Si es de precio fijo, "
+    "agrégalo ahora con gestionar_pedido (con lo que ya dijo: cantidad, temas); si es a cotizar, "
+    "anota sus datos con anotar_cotizacion. No le pidas datos personales antes."
+)
+PAY_NOTE = (
+    "Aviso del sistema: el cliente preguntó cómo pagar. Envíale los métodos con "
+    "enviar_metodos_pago; no los escribas de memoria."
+)
+PERMISSION_NOTE = (
+    "Aviso del sistema: no le preguntes si quiere que lo hagas: hazlo ahora (con tu herramienta si "
+    "hace falta) y termina con el siguiente paso."
+)
+
+
 def _quote_is_open(context: ToolContext) -> bool:
     """Whether a quote is being put together and still misses something the business asks for."""
     quote = current_quote(context)
@@ -330,6 +364,24 @@ def _missed_note(
         datum = unnoted_answer(context, customer_message)
         if datum is not None:
             return UNNOTED_NOTE.format(dato=datum)
+    said = plain(customer_message)
+    acted = {"gestionar_pedido", "anotar_cotizacion", "derivar_a_humano"} & set(called)
+    # Only before there is something in the order: with one, «lo quiero para mañana» is about the
+    # order already made, and adding it again would put it in twice.
+    order = context.facts.pedido
+    nothing_ordered = order is None or not order.items
+    if "gestionar_pedido" in available and not acted and nothing_ordered and WANTS_IT.search(said):
+        return ADD_NOTE
+    # Methods already sent for this order: the process tells the customer to look at that message.
+    if (
+        "enviar_metodos_pago" in available
+        and "enviar_metodos_pago" not in called
+        and not context.facts.metodos_pago_enviados
+        and ASKS_HOW_TO_PAY.search(said)
+    ):
+        return PAY_NOTE
+    if ASKS_PERMISSION.search(plain(content)):
+        return PERMISSION_NOTE
     if UNBACKED_PITCH.search(content):
         return PITCH_NOTE
     if (

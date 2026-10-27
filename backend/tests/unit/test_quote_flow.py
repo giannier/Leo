@@ -14,7 +14,10 @@ from typing import Any
 import pytest
 
 from app.agent.core import (
+    ADD_NOTE,
     NEXT_STEP_NOTE,
+    PAY_NOTE,
+    PERMISSION_NOTE,
     PITCH_NOTE,
     UNBACKED_CLAIMS,
     UNNOTED_NOTE,
@@ -44,7 +47,7 @@ from app.agent.tools.quote import (
     unnoted_answer,
 )
 from app.agent.tools.registry import ToolContext, ToolScope, tools_of_stage
-from app.process.facts import Cotizacion, Facts
+from app.process.facts import Cotizacion, Facts, Pedido, PedidoItem
 from app.process.templates import QUOTE_TOOL_NAMES, TEMPLATES
 from app.process.templates.base import EffectiveOptions, Stage
 from app.process.text import plain
@@ -714,3 +717,83 @@ class TestAReplyThatAsksNothing:
         context = replace(_context(None), options=_options())
 
         assert _missed_note("Hola 😊", [], ("buscar_productos",), context, "hola") is None
+
+
+class TestWhatGpt41MiniSkipped:
+    """The nudges for what gpt-4.1-mini skipped in the sales flows (2026-10-27)."""
+
+    SELLING = ("buscar_productos", "gestionar_pedido")
+
+    @pytest.mark.parametrize(
+        "said", ["Sí, agrégala", "Quiero el paquete de 5 certificaciones", "me lo llevo"]
+    )
+    def test_wanting_it_without_adding_it_gets_the_add_note(self, said: str) -> None:
+        note = _missed_note("¿Me das tu DNI?", [], self.SELLING, _context(None), said)
+
+        assert note == ADD_NOTE
+
+    def test_adding_it_or_quoting_it_is_enough(self) -> None:
+        for called in (["gestionar_pedido"], ["anotar_cotizacion"], ["derivar_a_humano"]):
+            note = _missed_note(
+                "Listo. ¿Algo más?", called, self.SELLING, _context(None), "lo quiero"
+            )
+            assert note != ADD_NOTE
+
+    @pytest.mark.parametrize("said", ["quiero el precio del bidón", "quiero saber más"])
+    def test_asking_is_not_wanting_it(self, said: str) -> None:
+        assert (
+            _missed_note("Cuesta S/ 10. ¿Lo agrego?", [], self.SELLING, _context(None), said)
+            is None
+        )
+
+    def test_how_to_pay_without_the_methods_tool_gets_the_pay_note(self) -> None:
+        offered = ("enviar_metodos_pago", "gestionar_pedido")
+
+        note = _missed_note("Puedes pagar por Yape.", [], offered, _context(None), "¿Cómo pago?")
+
+        assert note == PAY_NOTE
+
+    def test_wanting_it_with_an_order_already_made_is_left_to_the_model(self) -> None:
+        """«Lo quiero para mañana» in the data stage is about the order made, not a new line."""
+        context = _context(None)
+        ordered = replace(
+            context,
+            facts=Facts(pedido=Pedido(items=[PedidoItem(nombre="Polo básico")])),
+        )
+
+        note = _missed_note(
+            "¿A qué dirección te lo enviamos?", [], self.SELLING, ordered, "lo quiero para mañana"
+        )
+
+        assert note is None
+
+    def test_how_to_pay_after_the_methods_went_is_left_to_the_model(self) -> None:
+        """The charge stage tells the customer to look at the message already sent."""
+        offered = ("enviar_metodos_pago", "gestionar_pedido")
+        sent = replace(_context(None), facts=Facts(metodos_pago_enviados=True))
+
+        assert _missed_note("Revisa el mensaje anterior.", [], offered, sent, "¿Cómo pago?") is None
+
+    def test_how_to_pay_where_the_tool_is_not_offered_is_left_to_the_model(self) -> None:
+        assert (
+            _missed_note("Con Yape o Plin.", [], self.SELLING, _context(None), "¿cómo pago?")
+            is None
+        )
+
+    @pytest.mark.parametrize(
+        "content",
+        ["¿Quieres que te cuente más detalles?", "¿Deseas que te envíe los datos para el pago?"],
+    )
+    def test_asking_permission_gets_the_permission_note(self, content: str) -> None:
+        assert _missed_note(content, [], self.SELLING, _context(None), "hola") == PERMISSION_NOTE
+
+    def test_offering_to_add_it_is_the_closing_question_not_asking_permission(self) -> None:
+        """After a recommendation «¿te lo agrego?» waits for the customer to say yes."""
+        content = "El de 5 te conviene. ¿Quieres que te agregue el paquete de 5?"
+
+        assert _missed_note(content, [], self.SELLING, _context(None), "¿cuál me conviene?") is None
+
+    def test_a_question_about_the_customer_s_choice_is_not_asking_permission(self) -> None:
+        content = "¿Prefieres que te lo envíe a domicilio o lo recoges?"
+
+        assert _missed_note(content, [], self.SELLING, _context(None), "hola") is None

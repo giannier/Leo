@@ -74,6 +74,7 @@ SECTION_CAPS: Mapping[str, int] = {
     "agenda": 200,
     "captacion": 220,
     "cotizacion": 410,
+    "cierre": 140,
     "postventa": 170,
     "estilo": 300,
     "estado": 500,
@@ -85,7 +86,7 @@ SECTION_CAPS: Mapping[str, int] = {
     # after the sale (a business with every capability on; the whole prompt still fits 6 000),
     # and 20 for telling the model what a shared pin means as an address (feature 016).
     "ejemplos": 350,
-    "herramientas": 2120,
+    "herramientas": 2150,
 }
 
 # No tokenizer ships with the project (no new dependencies), so tokens are
@@ -132,13 +133,14 @@ Eres {nombre_asistente}, asistente virtual de {nombre_negocio}.
 # discounts the business did not load (rule 2).
 SALES_PLAYBOOK = """\
 VENTA: así conversas para vender
-1. Sondea antes de ofrecer. Pregunta de a UNA, abierta y sobre lo último que dijo el cliente: qué quiere lograr, cómo lo resuelve hoy, para cuándo. Con 2 respuestas ya recomiendas.
-2. Si aún no eligió, recomienda con seguridad UNA opción y por qué le sirve a SU caso. Si ya dijo qué quiere, no lo recomiendes otra vez: avanza. Varía cómo lo dices; no recites el catálogo ni preguntes "¿quieres / prefieres que te cuente, te explique, te deje...?": hazlo.
-3. Habla en firme y con hechos, sin "quizás", "tal vez" ni "normalmente". Solo dices lo que sale de tus herramientas o del negocio; si no lo sabes, dilo y di quién lo confirma. Nunca inventes casos, clientes, plazos, cifras, popularidad, escasez, urgencia ni razones de venta.
-4. Cierra cada mensaje con un siguiente paso concreto: elegir entre dos opciones, un dato que falta o confirmar; si ya tienes todo, avanza. Nunca con "¿algo más?".
-5. Ante una objeción (precio, "lo pienso", comparar, desconfianza): reconócela en una frase, pregunta qué pesa más para él, responde a ESO con el valor real del negocio y vuelve al siguiente paso. Si dice "lo pienso", respeta su tiempo, resume el valor en una línea y ofrécele resolver una duda o enviarle la propuesta. No discutas, no rebajes, no menciones descuentos ni digas que no hay promoción (solo ofrece la que el ESTADO traiga) y no derives por una objeción de precio.
-6. Señal de compra (pregunta precio, plazo o cómo pagar; dice "me interesa"): resume en una línea lo que recibirá y propón cerrar ya ("Te lo dejo listo: ¿pagas por Yape o transferencia?"). Si ya eligió, no reabras la decisión ni ofrezcas lo que no esté en tus herramientas: avanza.
-7. Cercanía: usa su nombre si lo dio, retoma sus palabras, mensajes cortos. Si hay interés real, pide su nombre y cómo contactarlo, diciendo para qué."""
+1. Antes de ofrecer, entiende qué necesita: una pregunta a la vez, sobre lo último que dijo. Con 2 respuestas, recomienda.
+2. Si no ha elegido, recomienda UNA opción y por qué le sirve a su caso, con datos del catálogo. Si ya eligió, no recomiendes otra vez: avanza.
+3. Habla en firme y solo con lo que dicen tus herramientas o el negocio; si no lo sabes, dilo. Nunca inventes casos, clientes, plazos, cifras, popularidad, escasez, urgencia ni razones de venta.
+4. No pidas permiso para contarle o enviarle algo: hazlo. Al pedido, solo lo que pidió.
+5. Termina cada mensaje con un siguiente paso concreto (elegir, un dato que falta o confirmar), nunca con «¿algo más?».
+6. Objeción (precio, «lo pienso», comparar, desconfianza): reconócela en una frase, pregunta qué pesa más y responde a eso con el valor real del negocio; si dice «lo pienso», respeta su tiempo y ofrécele resolver una duda. No discutas, no rebajes, no menciones descuentos (solo la promoción que traiga el ESTADO) y no derives por el precio.
+7. Señal de compra («lo quiero», «agrégalo», pregunta cómo pagar): agrégalo al pedido en ese mismo turno y avanza al cierre; no reabras la decisión.
+8. Cercanía: usa su nombre si lo dio, retoma sus palabras, mensajes cortos y variados."""
 
 SERVICE_ONLY_PLAYBOOK = """\
 VENTA: tu prioridad es resolver dudas con claridad y calidez. No presiones ni ofrezcas lo que el cliente no pidió; si muestra ganas de comprar, ayúdalo a concretar."""
@@ -156,6 +158,12 @@ _SELLING_STAGES = frozenset(
         Stage.COBRO,
         Stage.ASESORIA,
     }
+)
+
+
+# The stages of an order: where the customer's data and the payment methods matter.
+_ORDER_STAGES = frozenset(
+    {Stage.PEDIDO, Stage.DATOS, Stage.COBRO, Stage.VERIFICACION, Stage.CERRADO}
 )
 
 
@@ -196,6 +204,18 @@ COTIZACIÓN: lo «a cotizar» no tiene precio: tú juntas los datos y una person
 # A business that also qualifies leads: asking for a quote is clear interest, and with the quote
 # tool at hand the model noted it and handed over without qualifying (the sales flows caught it).
 QUOTE_QUALIFIES = "\n6. Cotizar es interés ALTO: llama también a calificar_cliente en ese turno."
+
+
+# The rules that decide a turn, said again last: gpt-4.1 follows instructions literally and, when two
+# disagree, the one nearer the end (OpenAI's GPT-4.1 prompting guide), and it answered from memory
+# what a tool does (payment methods), asked permission instead of acting, and wrote again what a tool
+# had just sent.
+CLOSING_RULES = """\
+ANTES DE RESPONDER
+- Lo que se vende, precios, pedidos, pagos y datos del cliente salen de tus herramientas: no los respondas de memoria ni los adivines.
+- Si el cliente pide algo que una herramienta hace (agregar al pedido, enviar los métodos de pago, anotar un dato), hazlo en este turno sin pedir permiso.
+- No repitas lo que una herramienta ya le envió (opciones, métodos de pago, archivos).
+- Responde a lo que dijo y termina con el siguiente paso."""
 
 
 def _quote_block(config: EffectiveProcessConfig, stage: Stage) -> str:
@@ -282,7 +302,7 @@ _DISCOUNT_TEXT: Mapping[str, str] = {
 }
 _PRIORITY = (
     "PRIORIDAD: si dos instrucciones chocan, manda la situación del negocio, luego el NEGOCIO, luego "
-    "el RUBRO, luego el PROCESO. Las reglas 1 a 9 del inicio nunca se rompen."
+    "el RUBRO, luego el PROCESO. Las reglas numeradas del inicio nunca se rompen."
 )
 _SITUATION_FIELD_CHARS = 400
 _WHATSAPP_FORMAT = (
@@ -675,7 +695,9 @@ def _payment_line(config: EffectiveProcessConfig) -> str | None:
         if config.options.modalidad_pago == "contra_entrega"
         else "se paga antes de entregar"
     )
-    return f"Métodos de pago: {', '.join(labels)}; {when}."
+    # Which ones, not how: the numbers and accounts go with enviar_metodos_pago once there is an
+    # order. Read as an answer, «Métodos de pago: Yape» was what gpt-4.1-mini said to «¿cómo pago?».
+    return f"Métodos de pago: {', '.join(labels)}; {when} (los datos para pagar se envían aparte)."
 
 
 def _promotion_lines(config: EffectiveProcessConfig) -> list[str]:
@@ -838,13 +860,18 @@ def _state_lines(
     if facts.cotizacion is not None:
         lines.append(_quote_line(facts.cotizacion, limits))
 
-    if facts.datos_faltantes:
-        lines.append(f"- Datos del cliente: faltan {', '.join(facts.datos_faltantes)}")
-    else:
-        lines.append("- Datos del cliente: completos")
-    lines.append(
-        f"- Métodos de pago: {'enviados' if facts.metodos_pago_enviados else 'no enviados'}"
-    )
+    # The customer's data and the payment methods belong to an order. Shown before there is one,
+    # «Datos del cliente: faltan DNI, apellidos» made gpt-4.1-mini ask for the DNI in its greeting
+    # and answer «antes de agregarla necesito tu DNI» to «sí, agrégala».
+    has_order = facts.pedido is not None and bool(facts.pedido.items)
+    if has_order or stage in _ORDER_STAGES:
+        if facts.datos_faltantes:
+            lines.append(f"- Datos del cliente: faltan {', '.join(facts.datos_faltantes)}")
+        else:
+            lines.append("- Datos del cliente: completos")
+        lines.append(
+            f"- Métodos de pago: {'enviados' if facts.metodos_pago_enviados else 'no enviados'}"
+        )
 
     if facts.recursos_enviados:
         sent = ", ".join(facts.recursos_enviados[: limits.listed_keys])
@@ -940,10 +967,20 @@ def build_stage_prompt(
     """
     values = _placeholder_values(config, facts)
     offered = {spec.name for spec in tool_specs} if tool_specs else None
+    # From the general to the specific, because gpt-4.1 follows the later of two instructions that
+    # disagree: the platform, how to sell, the template's stage, the rubro, then what each capability
+    # of this business does, the business itself, its style and its situations. The state of the
+    # conversation (what changes every turn) and the closing reminder go last.
     parts: dict[str, str] = {"plataforma": _platform_block(values, offered)}
     sales = _sales_block(config, stage)
     if sales:
         parts["venta"] = sales
+    parts["etapa"] = "PROCESO: INSTRUCCIONES DE LA ETAPA\n" + resolve_placeholders(
+        config.instructions_for(stage), values
+    )
+    rubro = _rubro_block(config)
+    if rubro:
+        parts["rubro"] = rubro
     quote = _quote_block(config, stage)
     if quote:
         parts["cotizacion"] = quote
@@ -956,20 +993,14 @@ def build_stage_prompt(
     aftersale = _aftersale_block(config)
     if aftersale:
         parts["postventa"] = aftersale
-    parts |= {
-        "estilo": _style_block(config),
-        "estado": _state_block(config, facts, stage, turn or TurnContext(), now),
-        "etapa": "PROCESO: INSTRUCCIONES DE LA ETAPA\n"
-        + resolve_placeholders(config.instructions_for(stage), values),
-    }
-    rubro = _rubro_block(config)
-    if rubro:
-        parts["rubro"] = rubro
     parts["negocio"] = _business_block(config)
+    parts["estilo"] = _style_block(config)
     parts["situaciones"] = _situations_block(situations)
     shown = _examples_block(examples)
     if shown:
         parts["ejemplos"] = shown
+    parts["estado"] = _state_block(config, facts, stage, turn or TurnContext(), now)
+    parts["cierre"] = CLOSING_RULES
     text = "\n\n".join(parts.values())
     sections = {name: estimate_tokens(part) for name, part in parts.items()}
     sections["herramientas"] = _tools_tokens(tool_specs)

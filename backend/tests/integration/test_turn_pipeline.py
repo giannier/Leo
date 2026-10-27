@@ -508,7 +508,8 @@ class TestTheTrace:
                 tool_calls=(_call("mostrar_opciones", tipo="caminos", texto="¿Qué buscas?"),),
             )
         )
-        llm.queue(ChatResult(content="Elige una opción."))
+        # Not an invitation to choose: that one would be dropped as a repeat of the menu.
+        llm.queue(ChatResult(content="Cualquier duda sobre los precios, aquí estoy."))
 
         result = await _pipeline(db, tenant, conversation, llm).run(
             conversation.id, InboundTurn(text="info")

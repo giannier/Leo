@@ -792,6 +792,9 @@ class FlowOutcome:
     failures: list[str] = field(default_factory=list)
     transcript: list[str] = field(default_factory=list)
     final_stage: str = ""
+    # What the model was asked and wrote, so a run says what it cost.
+    tokens_in: int = 0
+    tokens_out: int = 0
 
     @property
     def ok(self) -> bool:
@@ -893,6 +896,9 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
             json.dumps(m.payload, ensure_ascii=False) for m in result.messages if m.payload
         )
         calls = result.reply.tools_called if result.reply else []
+        if result.reply:
+            outcome.tokens_in += result.reply.input_tokens
+            outcome.tokens_out += result.reply.output_tokens
         for call in calls:
             tools.add(str(call.get("tool")))
             if call.get("tool") == "enviar_recurso" and call.get("status") == "hecho":
@@ -949,7 +955,12 @@ class FlowReport:
         return all(self.ratio(t) >= PASS_RATIOS.get(t, PASS_RATIO) for t in run)
 
     def render(self) -> str:
-        lines = ["# Evals de flujos de venta (TASK-447)", ""]
+        lines = [
+            "# Evals de flujos de venta (TASK-447)",
+            f"tokens del agente: {sum(o.tokens_in for o in self.outcomes)} de entrada, "
+            f"{sum(o.tokens_out for o in self.outcomes)} de salida",
+            "",
+        ]
         for template in BUSINESSES:
             mine = [o for o in self.outcomes if o.case.template == template]
             lines.append(
