@@ -277,7 +277,8 @@ UNBACKED_CLAIMS: dict[str, re.Pattern[str]] = {
 # the customer is told it is not. Only statements count: «¿te lo agrego?» is an offer.
 ADDED_CLAIM = re.compile(
     r"\b(agrego|agregu[eé]|a[ñn]ad[ií]|a[ñn]ado|sum[eé])\b[^?!\n]{0,80}\bpedido\b|"
-    r"\b(qued[oó]|est[aá]) (registrad|agregad|separad|reservad)[oa]",
+    r"\b(qued[oó]|est[aá]) (registrad|agregad|separad|reservad)[oa]|"
+    r"\bya qued[oó] (la|el|los|las|tu) ",
     re.IGNORECASE,
 )
 # «quedó registrada» is also the honest word for a return, an appointment or the customer's data.
@@ -339,7 +340,8 @@ UNNOTED_NOTE = (
 # turn, as the others.
 WANTS_IT = re.compile(
     r"\b(agreg|anad|ponme|me (lo |la |los |las )?llevo|(lo|la|los|las) quiero|"
-    r"quiero (comprar|pedir|contratar|llevar|reservar)|(lo|la) (compro|contrato)|"
+    r"quiero (comprar|pedir|contratar|llevar|reservar|regalar|certificar|encargar|separar)|"
+    r"(lo|la) (compro|contrato)|"
     r"quiero (el|la|los|las|un|una) (?!precio|costo|info|detalle|dato|cotiza))"
 )
 ASKS_HOW_TO_PAY = re.compile(
@@ -414,10 +416,9 @@ def _quote_is_open(context: ToolContext) -> bool:
 # A notice from the system to the model, never from the customer. Sent as the customer («user»),
 # it was answered as if the customer had said it: «Tienes razón: no la agregué», to someone who had
 # only said «quiero regalar una mochila» (gpt-5.4-mini, 2026-10-27).
-NOTICE_SUFFIX = (
-    " El cliente no ve este aviso: no lo menciones ni te disculpes por él; escribe solo tu "
-    "respuesta para el cliente."
-)
+# Not «escribe solo tu respuesta»: read literally, that is «no tools», and the notice that asks for
+# a tool call («agrégalo ahora con gestionar_pedido») was answered with text alone.
+NOTICE_SUFFIX = " (El cliente no ve este aviso: no lo menciones ni te disculpes por él.)"
 
 
 def _notice(text: str) -> ChatMessage:

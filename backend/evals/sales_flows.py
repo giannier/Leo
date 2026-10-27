@@ -1328,6 +1328,20 @@ def _order_amounts(result: TurnResult) -> set[Decimal]:
     return values
 
 
+def _stored_order_amounts(
+    session: Session, tenant_id: uuid.UUID, conversation_id: uuid.UUID
+) -> set[Decimal]:
+    """The subtotal, discount and shipping of the order as stored: the order fact carries only the
+    total, and a reply that showed «Subtotal: S/ 70.00 · Descuento: S/ 35.00» (2x1) was flagged."""
+    from app.repositories.orders import OrderRepository
+
+    order = OrderRepository(session, tenant_id).active_for_conversation(conversation_id)
+    if order is None:
+        return set()
+    found = (order.subtotal, order.descuento, order.envio, order.total)
+    return {Decimal(str(v)).quantize(Decimal("0.01")) for v in found if v is not None}
+
+
 async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> FlowOutcome:
     business = BUSINESSES[case.template]
     tenant = seed(session, business)
@@ -1371,7 +1385,9 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
             process_config=ProcessConfigService(session, cache=ProcessConfigCache()),
         )
         result = await pipeline.run(conversation.id, InboundTurn(text=text))
-        allowed |= _order_amounts(result)
+        allowed |= _order_amounts(result) | _stored_order_amounts(
+            session, tenant.id, conversation.id
+        )
         said = [m.content for m in result.messages]
         replies.extend(said)
         # What the customer reads in a list or on the buttons counts as said.

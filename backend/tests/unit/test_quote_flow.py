@@ -888,7 +888,13 @@ class TestWhatGpt41MiniSkipped:
         assert _missed_note(content, ["anotar_cotizacion"], quoting, _context(quote), "8") is None
 
     @pytest.mark.parametrize(
-        "said", ["me llevo un polo básico, ¿cómo te pago?", "quiero contratar el mantenimiento"]
+        "said",
+        [
+            "me llevo un polo básico, ¿cómo te pago?",
+            "quiero contratar el mantenimiento",
+            "quiero regalar una mochila ejecutiva a mi papá",
+            "quiero certificar Excel avanzado y Power BI, las dos individuales",
+        ],
     )
     def test_other_ways_of_wanting_it(self, said: str) -> None:
         note = _missed_note("¿Te lo agrego?", [], self.SELLING, _context(None), said)
@@ -901,6 +907,19 @@ class TestWhatGpt41MiniSkipped:
         note = _missed_note(content, [], self.SELLING, _context(None), "lo necesito")
 
         assert note == ADDED_CLAIM_NOTE
+
+    def test_saying_it_is_done_in_other_words_without_the_tool_is_a_claim(self) -> None:
+        content = "Perfecto, Luz. Ya quedó la *Certificación individual SIAF* para seguir."
+
+        note = _missed_note(content, [], self.SELLING, _context(None), "hola")
+
+        assert note == ADDED_CLAIM_NOTE
+
+    def test_the_notice_does_not_discourage_a_tool_call(self) -> None:
+        """«escribe solo tu respuesta» read as «no tools»: the add nudge got text alone."""
+        from app.agent.core import NOTICE_SUFFIX
+
+        assert "solo" not in NOTICE_SUFFIX and "no lo menciones" in NOTICE_SUFFIX
 
     def test_saying_it_is_registered_without_the_tool_is_a_claim(self) -> None:
         content = "Listo, Luz: ya quedó registrada la *Certificación individual SIAF*."
