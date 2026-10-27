@@ -411,6 +411,19 @@ def _quote_is_open(context: ToolContext) -> bool:
     return bool(asks)
 
 
+# A notice from the system to the model, never from the customer. Sent as the customer («user»),
+# it was answered as if the customer had said it: «Tienes razón: no la agregué», to someone who had
+# only said «quiero regalar una mochila» (gpt-5.4-mini, 2026-10-27).
+NOTICE_SUFFIX = (
+    " El cliente no ve este aviso: no lo menciones ni te disculpes por él; escribe solo tu "
+    "respuesta para el cliente."
+)
+
+
+def _notice(text: str) -> ChatMessage:
+    return ChatMessage("system", text + NOTICE_SUFFIX)
+
+
 def accepted_an_offer_to_add(previous_reply: str, customer_message: str) -> bool:
     """Whether the customer said yes to the assistant's «¿te lo agrego?»."""
     return (
@@ -706,7 +719,7 @@ class AgentCore:
                     break
                 nudged = True
                 messages.append(ChatMessage("assistant", result.content))
-                messages.append(ChatMessage("user", missed))
+                messages.append(_notice(missed))
                 continue
 
             # The full turn, tool calls included. Replaying only the text
@@ -825,7 +838,7 @@ class AgentCore:
         )
 
         messages.append(ChatMessage("assistant", content))
-        messages.append(ChatMessage("user", build_name_correction(invented, guard.catalogue)))
+        messages.append(_notice(build_name_correction(invented, guard.catalogue)))
         try:
             retry = await self._llm.chat(messages, tools=(), cache_key=cache_key)
         except LLMError:

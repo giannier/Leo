@@ -167,6 +167,25 @@ def _chosen(
     return match_product(heard, quoted) if heard else None
 
 
+# How often, said inside another datum: «25 bidones cada semana», «unos 40 al mes». The model put it
+# all in «cantidad» and asked «¿cada semana o con otra frecuencia?» twice; the quote never closed.
+_HOW_OFTEN = re.compile(
+    r"\b(cada (semana|quincena|mes|dia|\d+ dias)|semanal\w*|quincenal\w*|mensual\w*|diari\w*|"
+    r"al mes|por mes|por semana|a la semana|al dia|todas las semanas|todos los (meses|dias))\b"
+)
+
+
+def _frequency_from_the_quantity(datos: dict[str, str], required: Sequence[str]) -> None:
+    """Note how often from what was noted as the quantity, when the business asks for it."""
+    wanted = next((name for name in required if plain(name) == "frecuencia"), None)
+    if wanted is None or any(plain(k) == "frecuencia" for k in datos):
+        return
+    quantity = next((v for k, v in datos.items() if plain(k) == "cantidad"), None)
+    found = _HOW_OFTEN.search(plain(quantity)) if quantity else None
+    if found is not None:
+        datos[wanted] = found.group(0)
+
+
 def _canonical(name: str, required: Sequence[str]) -> str:
     """The business's spelling of a datum, if the model used another case or accents."""
     same = plain(name)
@@ -414,6 +433,7 @@ async def anotar_cotizacion(context: ToolContext, arguments: dict[str, Any]) -> 
         return ToolResult.error(f"Una cotización guarda como máximo {MAX_QUOTE_DATA} datos.")
     producto = chosen.name if chosen is not None else (before.producto if before else None)
     producto_id = str(chosen.id) if chosen is not None else (before.producto_id if before else None)
+    _frequency_from_the_quantity(datos, required)
     missing = [name for name in required if plain(name) not in {plain(k) for k in datos}]
     if len(missing) == 1 and customer_refused(context) and not (refused or unclear):
         # «todavía no sé la fecha» and nothing else is missing: it is «sin dato», whether or not the

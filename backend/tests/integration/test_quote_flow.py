@@ -551,7 +551,7 @@ class TestInTheTurn:
 
         assert len(llm.chat_calls) == 3
         nudge = llm.chat_calls[1].messages[-1]
-        assert nudge.role == "user" and "no llamaste a anotar_cotizacion" in nudge.content
+        assert nudge.role == "system" and "no llamaste a anotar_cotizacion" in nudge.content
         assert _stored(db, tenant, conversation)["cotizacion"]["datos"] == {"cantidad": "5"}
         assert _outbound(db, conversation) == ["Anotado. ¿Para qué fecha lo necesitas?"]
 
@@ -591,7 +591,7 @@ class TestInTheTurn:
 
         assert len(second.chat_calls) == 3
         nudge = second.chat_calls[1].messages[-1]
-        assert nudge.role == "user" and "respondido «fecha»" in nudge.content
+        assert nudge.role == "system" and "respondido «fecha»" in nudge.content
         datos = _stored(db, tenant, conversation)["cotizacion"]["datos"]
         assert datos == {"cantidad": "5", "fecha": "el lunes"}
         assert _outbound(db, conversation)[-1] == "Anotado. ¿En qué distrito sería?"

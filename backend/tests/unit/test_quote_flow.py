@@ -43,6 +43,7 @@ from app.agent.tools.quote import (
     _DATE,
     _QUANTITY,
     NO_DATA,
+    _frequency_from_the_quantity,
     _given,
     _grounded,
     _is_a_use,
@@ -214,6 +215,21 @@ class TestADatumIsWhatTheCustomerSaid:
         )
 
         assert data == {"frecuencia": "única"} and unclear == []
+
+    def test_how_often_said_inside_the_quantity_is_noted_as_the_frequency(self) -> None:
+        """«25 bidones cada semana» went into «cantidad» and the frequency was asked twice."""
+        datos = {"cantidad": "25 bidones de 20 L cada semana", "fecha": "lunes"}
+
+        _frequency_from_the_quantity(datos, ["cantidad", "fecha", "frecuencia"])
+
+        assert datos["frecuencia"] == "cada semana"
+
+    def test_a_quantity_with_no_frequency_leaves_it_to_ask(self) -> None:
+        datos = {"cantidad": "25 bidones de 20 L"}
+
+        _frequency_from_the_quantity(datos, ["cantidad", "frecuencia"])
+
+        assert "frecuencia" not in datos
 
     @pytest.mark.parametrize("heard", ["solo esa vez", "por esta vez nomás", "es ocasional"])
     def test_a_one_off_said_another_way_is_a_frequency(self, heard: str) -> None:
