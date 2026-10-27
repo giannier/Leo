@@ -466,3 +466,11 @@ del cliente. El orden de las secciones que lee el modelo es el mismo; solo el hi
 lleva `prompt_cache_key` = la conversación (solo OpenAI y la clave propia de OpenAI de un negocio; otros endpoints podrían rechazarlo).
 (3) Se registran los tokens leídos de la caché (`agent_traces.cached_input_tokens`, migración 0069) y los reportes de evals muestran el
 costo estimado con precios de lista.
+**Validación con gpt-5.4-mini (lote 3, autorizada, ~US$0,48 en dos corridas):** la caché funciona: 51–67 % de la entrada salió de
+caché y la misma pasada costó ~US$0,28 contra ~US$0,55 a precio completo. Primera corrida: Nayu 9/10, calidad 83 %, flujos 10/14.
+Encontró un error grave: los avisos del sistema iban como mensaje del cliente («user») y gpt-5.4-mini los contestó como si el cliente
+los hubiera dicho («Tienes razón: no la agregué»). Ahora van como mensaje de sistema que dice que el cliente no los ve (5a1882d).
+Segunda corrida: ninguna fuga, el juez vio razonables las 10 de Nayu; Nayu 7/10, pero dos eran falsas alarmas del eval («te digo cuál te
+conviene» no es un argumento inventado; corregido), y flujos 9/14. La terminación «escribe solo tu respuesta» del aviso, leída literal,
+desalentaba llamar a la herramienta que el aviso pedía: quitada. La misma corrida varía ±2 casos de una vez a otra (Nayu 8, 9, 7 de 10
+con el mismo modelo y casos). Lo que sigue fallando se concentra en una decisión: cuándo agregar al pedido sin preguntar.

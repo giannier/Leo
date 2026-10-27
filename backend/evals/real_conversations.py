@@ -179,7 +179,8 @@ _ASKED_AVAILABILITY = re.compile(r"cuentan|tienen|distribuyen|manejan|disponible
 # Reasons nobody gave it: the catalogue has no rotation, no «formato más fuerte», no «te conviene».
 _INVENTED = re.compile(
     r"alta rotaci[oó]n|m[aá]s rota|rota m[aá]s|pensada para volumen|formato (m[aá]s )?fuerte|"
-    r"te conviene(?! (definir|elegir|decidir|empezar|revisar|ver|pensar|aclarar))|le conviene|"
+    r"(?<!cu[aá]l )te conviene(?! (definir|elegir|decidir|empezar|revisar|ver|pensar|aclarar|seg[uú]n))|"
+    r"le conviene|"
     r"ideal para (revender|negocio)|opci[oó]n destacada|m[aá]s (pedid[oa]|usad[oa]|vendid[oa])",
     re.I,
 )
