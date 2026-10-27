@@ -348,6 +348,20 @@ def test_the_prompt_of_every_stage_matches_its_snapshot(template_key: str) -> No
 # --------------------------------------------------------------------- budget
 
 
+@pytest.mark.parametrize("template_key", ["productos", "certificaciones", "servicios"])
+def test_the_prompt_splits_into_what_stays_and_what_changes(template_key: str) -> None:
+    """The head goes before the conversation and the tail after it (the provider's cache)."""
+    config = make_config(template_key, full=True)
+    prompt = build_stage_prompt(
+        config, full_facts(), Stage.IDENTIFICAR, now=NOW, situations=long_situations()
+    )
+
+    assert f"{prompt.head}\n\n{prompt.tail}" == prompt.text
+    assert "ESTADO DE LA CONVERSACIÓN" in prompt.tail and "ANTES DE RESPONDER" in prompt.tail
+    assert "Hoy:" not in prompt.head and "SITUACIONES DEL NEGOCIO" not in prompt.head
+    assert prompt.head.startswith("Eres ")
+
+
 @pytest.mark.parametrize("template_key", sorted(TEMPLATES))
 @pytest.mark.parametrize("stage", list(Stage))
 def test_a_full_business_stays_under_6000_tokens_in_every_stage(

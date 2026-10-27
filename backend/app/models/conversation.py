@@ -215,6 +215,8 @@ class AgentTrace(Base, UUIDPrimaryKeyMixin, CreatedAtMixin):
     )
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    # Of `input_tokens`, those the provider read from its prompt cache (migration 0069).
+    cached_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # What the catalogue post-guard did, when it did anything:
     # {"status": "corrected"|"blocked", "invented": [...], "still_invented": [...]}

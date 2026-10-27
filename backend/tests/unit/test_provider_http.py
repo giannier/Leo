@@ -14,6 +14,7 @@ request can be inspected and the response dictated.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -428,6 +429,33 @@ def _json(request: httpx.Request) -> dict[str, Any]:
 
     decoded: dict[str, Any] = json.loads(request.content)
     return decoded
+
+
+class TestThePromptCache:
+    async def test_the_conversation_key_goes_to_a_provider_that_takes_it(self) -> None:
+        provider, seen = _llm(send_cache_key=True)
+
+        await provider.chat([ChatMessage(role="user", content="hola")], cache_key="conv-1")
+
+        assert json.loads(seen[0].content)["prompt_cache_key"] == "conv-1"
+
+    async def test_an_endpoint_that_only_copies_the_protocol_does_not_get_it(self) -> None:
+        provider, seen = _llm()
+
+        await provider.chat([ChatMessage(role="user", content="hola")], cache_key="conv-1")
+
+        assert "prompt_cache_key" not in json.loads(seen[0].content)
+
+    async def test_the_cached_part_of_the_prompt_is_read(self) -> None:
+        body = {
+            **CHAT_BODY,
+            "usage": {**CHAT_BODY["usage"], "prompt_tokens_details": {"cached_tokens": 24}},
+        }
+        provider, _ = _llm(response=httpx.Response(200, json=body))
+
+        result = await provider.chat([ChatMessage(role="user", content="hola")])
+
+        assert (result.input_tokens, result.cached_input_tokens) == (31, 24)
 
 
 class TestWhenTheVendorAsksToWait:

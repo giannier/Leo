@@ -31,6 +31,12 @@ class RecordedChat:
     tools: tuple[ToolSpec, ...]
     temperature: float
     max_tokens: int
+    cache_key: str | None = None
+
+    @property
+    def system(self) -> str:
+        """Every system message of the call: the prompt before the conversation and after it."""
+        return "\n\n".join(m.content for m in self.messages if m.role == "system")
 
 
 @dataclass
@@ -92,8 +98,11 @@ class MockLLMProvider:
         tools: Sequence[ToolSpec] = (),
         temperature: float = 0.2,
         max_tokens: int = 1024,
+        cache_key: str | None = None,
     ) -> ChatResult:
-        self.chat_calls.append(RecordedChat(tuple(messages), tuple(tools), temperature, max_tokens))
+        self.chat_calls.append(
+            RecordedChat(tuple(messages), tuple(tools), temperature, max_tokens, cache_key)
+        )
         if not self._responses:
             raise LLMError(
                 "MockLLMProvider ran out of queued responses. Queue one per "

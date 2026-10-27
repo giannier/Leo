@@ -225,7 +225,7 @@ class TestTypedOutbounds:
         )
 
         assert response.status_code == 200, response.text
-        assert "[El cliente envió una imagen]" in llm.chat_calls[0].messages[0].content
+        assert "[El cliente envió una imagen]" in llm.chat_calls[0].system
         # The photo is kept in private storage for the turn that expects a receipt.
         assert len(storage.objects) == 1
 
@@ -467,6 +467,6 @@ class TestSituationDrafts:
         entered = tried.json()["debug"]["situaciones"]
         assert [(s["titulo"], s["borrador"]) for s in entered] == [("Factura", True)]
         assert entered[0]["distancia"] is not None
-        assert "SITUACIONES DEL NEGOCIO" in llm.chat_calls[-1].messages[0].content
-        assert "«Factura»" in llm.chat_calls[-1].messages[0].content
+        assert "SITUACIONES DEL NEGOCIO" in llm.chat_calls[-1].system
+        assert "«Factura»" in llm.chat_calls[-1].system
         assert tried.json()["debug"]["reglas_apagadas"] == {}

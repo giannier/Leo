@@ -453,3 +453,16 @@ anuncio real; un anuncio que lleva a la web y de ahí a WhatsApp necesita el enl
 **Plantillas y rubros:** 3 plantillas de proceso (cómo avanza la venta) y 13 rubros (lo que se sabe de cada industria), entre ellos
 «otros», el genérico por defecto. Recomendación: no una plantilla por rubro (cada una pide sus evals con el modelo real); enriquecer los
 rubros (hoy ~4 reglas cada uno) y crear una plantilla solo donde la venta fluye distinto. Pendiente: los rubros de las 20 empresas.
+
+## C-15: gpt-5.4-mini para la conversación y el prompt ordenado para la caché (2026-10-27)
+**Decisión de Giannier (costo del LLM):** «dale» a la recomendación tras la comparación de C-13: gpt-5.4-mini atiende la conversación
+(vuelve a ser el modelo por defecto en el código; producción ya lo usaba) y se baja el costo con la caché de prompt de OpenAI.
+**Por qué la caché casi no servía:** OpenAI cobra a una fracción (90 % menos en gpt-5.4-mini, 75 % en gpt-4.1-mini) la parte inicial del
+prompt que es idéntica a una llamada anterior. El bloque ESTADO (con la hora) estaba en medio del prompt del sistema: todo lo que venía
+después, incluido el historial de la conversación, nunca se repetía igual.
+**Cambios:** (1) el prompt se parte en dos (`StagePrompt.head` y `.tail`): lo que no cambia de un turno a otro va antes de la
+conversación; las situaciones y ejemplos del mensaje, el ESTADO y «ANTES DE RESPONDER» van después del historial, justo antes del mensaje
+del cliente. El orden de las secciones que lee el modelo es el mismo; solo el historial queda antes de la parte final. (2) Cada llamada
+lleva `prompt_cache_key` = la conversación (solo OpenAI y la clave propia de OpenAI de un negocio; otros endpoints podrían rechazarlo).
+(3) Se registran los tokens leídos de la caché (`agent_traces.cached_input_tokens`, migración 0069) y los reportes de evals muestran el
+costo estimado con precios de lista.

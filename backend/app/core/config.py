@@ -139,9 +139,10 @@ class Settings(BaseSettings):
     # OpenAI - paid.
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-    # gpt-4.1-mini since 2026-10-27 (Giannier's decision, C-13): about half of gpt-5.4-mini's
-    # cost, with the prompt written for a model that follows instructions literally.
-    openai_chat_model: str = "gpt-4.1-mini"
+    # gpt-5.4-mini (Giannier, 2026-10-27, 019 C-13): tried against gpt-4.1-mini on the same new
+    # cases it sold and quoted clearly better (flows 86 % vs 71 %, quotes 80 % vs 60 %) at about
+    # twice the cost per conversation, which the prompt cache brings down.
+    openai_chat_model: str = "gpt-5.4-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     # The model behind each intelligence level (TASK-445, C-02). Unset: the level
     # runs on `openai_chat_model`, so choosing a level changes nothing until the

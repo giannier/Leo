@@ -79,6 +79,8 @@ class ChatResult:
     output_tokens: int = 0
     latency_ms: int = 0
     finish_reason: str = ""
+    # Of `input_tokens`, those the provider read from its prompt cache (billed at a fraction).
+    cached_input_tokens: int = 0
 
     @property
     def wants_tool(self) -> bool:
@@ -112,8 +114,13 @@ class LLMProvider(Protocol):
         tools: Sequence[ToolSpec] = (),
         temperature: float = 0.2,
         max_tokens: int = 1024,
+        cache_key: str | None = None,
     ) -> ChatResult:
-        """Produce one assistant turn."""
+        """Produce one assistant turn.
+
+        `cache_key` groups the calls that share a long prompt (one conversation), so the provider
+        keeps them where its cache is; a provider without such a thing ignores it.
+        """
         ...
 
     async def embed(

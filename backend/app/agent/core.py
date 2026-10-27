@@ -521,6 +521,7 @@ class _GuardOutcome:
     blocked: bool = False
     input_tokens: int = 0
     output_tokens: int = 0
+    cached_input_tokens: int = 0
 
 
 @dataclass
@@ -533,6 +534,8 @@ class AgentReply:
     rag_sources: list[dict[str, object]] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
+    # Of `input_tokens`, those read from the provider's prompt cache (billed at a fraction).
+    cached_input_tokens: int = 0
     latency_ms: int = 0
     # True when the answer is the canned fallback rather than the model's.
     degraded: bool = False
@@ -601,6 +604,7 @@ class AgentCore:
         conversation_id: uuid.UUID,
         customer_message: str,
         system_prompt: str | None = None,
+        system_tail: str | None = None,
         context: ToolContext | None = None,
         current_message_ids: Collection[uuid.UUID] = (),
     ) -> AgentReply:
@@ -620,8 +624,12 @@ class AgentCore:
             *self.history(
                 conversation_id, exclude=current_message_ids, current_text=customer_message
             ),
+            # What changes every turn goes after the conversation, so the prompt before it and the
+            # conversation so far stay the same prefix from one turn to the next (`StagePrompt`).
+            *([ChatMessage("system", system_tail)] if system_tail else []),
             ChatMessage("user", customer_message),
         ]
+        cache_key = str(conversation_id)
 
         if context is None:
             context = ToolContext(session=self._session, tenant_id=self._tenant_id, llm=self._llm)
@@ -640,6 +648,7 @@ class AgentCore:
         rag_sources: list[dict[str, object]] = []
         input_tokens = 0
         output_tokens = 0
+        cached_input_tokens = 0
         result: ChatResult | None = None
         rounds_used = 0
         nudged = False
@@ -654,6 +663,7 @@ class AgentCore:
                     messages,
                     tools=self._registry.specs() if offer_tools else (),
                     temperature=AGENT_TEMPERATURE,
+                    cache_key=cache_key,
                 )
             except LLMError:
                 logger.exception("agent turn failed", extra={"tenant_id": str(self._tenant_id)})
@@ -664,6 +674,7 @@ class AgentCore:
                     rag_sources=rag_sources,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cached_input_tokens=cached_input_tokens,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     degraded=True,
                     llm_failed=True,
@@ -671,6 +682,7 @@ class AgentCore:
 
             input_tokens += result.input_tokens
             output_tokens += result.output_tokens
+            cached_input_tokens += result.cached_input_tokens
 
             if not result.wants_tool:
                 missed = (
@@ -731,6 +743,7 @@ class AgentCore:
                     rag_sources=rag_sources,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
+                    cached_input_tokens=cached_input_tokens,
                     latency_ms=int((time.perf_counter() - started) * 1000),
                     tool_rounds=rounds_used,
                 )
@@ -743,11 +756,14 @@ class AgentCore:
 
         guard_note: dict[str, object] | None = None
         if not unusable:
-            guarded = await self._enforce_catalogue_names(messages, content, _chosen_names(context))
+            guarded = await self._enforce_catalogue_names(
+                messages, content, _chosen_names(context), cache_key=cache_key
+            )
             content = guarded.content
             guard_note = guarded.note
             input_tokens += guarded.input_tokens
             output_tokens += guarded.output_tokens
+            cached_input_tokens += guarded.cached_input_tokens
             unusable = guarded.blocked
 
         logger.info(
@@ -765,6 +781,7 @@ class AgentCore:
             rag_sources=rag_sources,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            cached_input_tokens=cached_input_tokens,
             latency_ms=int((time.perf_counter() - started) * 1000),
             degraded=result is None or unusable,
             catalog_guard=guard_note,
@@ -773,7 +790,12 @@ class AgentCore:
         )
 
     async def _enforce_catalogue_names(
-        self, messages: list[ChatMessage], content: str, extra_names: Sequence[str] = ()
+        self,
+        messages: list[ChatMessage],
+        content: str,
+        extra_names: Sequence[str] = (),
+        *,
+        cache_key: str | None = None,
     ) -> _GuardOutcome:
         """Refuse to send a product name the tenant's catalogue does not have.
 
@@ -805,7 +827,7 @@ class AgentCore:
         messages.append(ChatMessage("assistant", content))
         messages.append(ChatMessage("user", build_name_correction(invented, guard.catalogue)))
         try:
-            retry = await self._llm.chat(messages, tools=())
+            retry = await self._llm.chat(messages, tools=(), cache_key=cache_key)
         except LLMError:
             # The retry was the only thing that could have rescued this
             # answer. Without it the original still names a product that does
@@ -831,6 +853,7 @@ class AgentCore:
             # hides it under-reports the cost of a prompt that keeps slipping.
             input_tokens=retry.input_tokens,
             output_tokens=retry.output_tokens,
+            cached_input_tokens=retry.cached_input_tokens,
         )
 
     def _catalogue_guard(self, extra_names: Sequence[str] = ()) -> CatalogueGuard:
@@ -993,6 +1016,7 @@ class AgentCore:
             rag_sources=reply.rag_sources,
             input_tokens=reply.input_tokens,
             output_tokens=reply.output_tokens,
+            cached_input_tokens=reply.cached_input_tokens,
             # The price in force now (Feature 010); None when the model has none.
             cost_usd=call_cost(
                 self._session,

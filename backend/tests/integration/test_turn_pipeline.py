@@ -198,7 +198,7 @@ class TestWalkingTheFirstStages:
             ("CALIFICAR", "IDENTIFICAR"),
         ]
         # The prompt of that turn was the one of IDENTIFICAR, not of the stage before.
-        system = llm.chat_calls[-1].messages[0].content
+        system = llm.chat_calls[-1].system
         assert "ETAPA ACTUAL: IDENTIFICAR" in system
 
     async def test_a_turn_that_changes_nothing_writes_no_event(self, db: Session) -> None:
@@ -281,7 +281,7 @@ class TestTheStagePromptAndTools:
             conversation.id, InboundTurn(text="hola")
         )
 
-        system = llm.chat_calls[0].messages[0].content
+        system = llm.chat_calls[0].system
         assert "ETAPA ACTUAL: INICIO" in system
         assert "- Hoy:" in system
         assert "ESTADO DE LA CONVERSACIÓN" in system
@@ -299,7 +299,7 @@ class TestTheStagePromptAndTools:
             conversation.id, InboundTurn(text="Excel avanzado", interactive=(tap,))
         )
 
-        system = llm.chat_calls[0].messages[0].content
+        system = llm.chat_calls[0].system
         assert "ESTE TURNO" in system
         assert "El cliente eligió: Excel avanzado (producto_id=abc-123)" in system
 
@@ -312,7 +312,7 @@ class TestTheStagePromptAndTools:
         await _pipeline(db, tenant, conversation, llm).run(conversation.id, InboundTurn(image=True))
 
         call = llm.chat_calls[0]
-        assert "[El cliente envió una imagen]" in call.messages[0].content
+        assert "[El cliente envió una imagen]" in call.system
         assert call.messages[-1].content == "[El cliente envió una imagen]"
 
     async def test_the_ad_the_customer_came_from_is_stored(self, db: Session) -> None:
@@ -330,7 +330,7 @@ class TestTheStagePromptAndTools:
         assert stored["ad_id"] == "ad-9"
         assert stored["headline"] == "Certifícate"
         assert result.facts.entrada_anuncio is not None
-        assert "Llegó por anuncio" in llm.chat_calls[0].messages[0].content
+        assert "Llegó por anuncio" in llm.chat_calls[0].system
 
     async def test_a_package_named_before_the_topics_is_kept_for_the_next_turn(
         self, db: Session
@@ -361,7 +361,7 @@ class TestTheStagePromptAndTools:
         assert result.stage_after.value == "IDENTIFICAR"
 
         await pipeline.run(conversation.id, InboundTurn(text="SIAF y Excel avanzado"))
-        system = llm.chat_calls[1].messages[0].content
+        system = llm.chat_calls[1].system
         assert '- Paquete que ya pidió: "Paquete 5 certificaciones"' in system
         # Topics alone do not forget the package.
         assert _stored(db, tenant, conversation)["paquete_pedido"] == "Paquete 5 certificaciones"
@@ -394,7 +394,7 @@ class TestTheStagePromptAndTools:
         )
 
         assert "paquete_pedido" not in _stored(db, tenant, conversation)
-        assert "Paquete que ya pidió" not in llm.chat_calls[0].messages[0].content
+        assert "Paquete que ya pidió" not in llm.chat_calls[0].system
 
 
 class TestWhatTheTurnSends:
@@ -481,6 +481,44 @@ class TestTheTrace:
         assert trace.tools_enabled == list(result.tools_enabled)
         assert trace.outbound_count == 1
         assert trace.model_tier == "economico"
+
+    async def test_the_prompt_is_laid_out_for_the_cache_and_the_cached_part_is_kept(
+        self, db: Session
+    ) -> None:
+        """What stays turn after turn, then the conversation, then what changes every turn (the
+        state, with its clock): the provider caches the longest prefix it has seen, so the state in
+        the middle left nothing after it cached (2026-10-27)."""
+        tenant = _tenant(db)
+        conversation = _conversation(db, tenant)
+        db.add(
+            Message(
+                tenant_id=tenant.id,
+                conversation_id=conversation.id,
+                direction="inbound",
+                author="customer",
+                content="buenas",
+            )
+        )
+        db.flush()
+        llm = MockLLMProvider()
+        llm.queue(ChatResult(content="¡Hola! ¿Cómo te llamas?", cached_input_tokens=1200))
+
+        result = await _pipeline(db, tenant, conversation, llm).run(
+            conversation.id, InboundTurn(text="hola")
+        )
+
+        sent = llm.chat_calls[0]
+        roles = [m.role for m in sent.messages]
+        assert roles[0] == "system" and roles[-2:] == ["system", "user"]
+        assert "ESTADO DE LA CONVERSACIÓN" not in sent.messages[0].content
+        assert "ESTADO DE LA CONVERSACIÓN" in sent.messages[-2].content
+        assert "ANTES DE RESPONDER" in sent.messages[-2].content
+        assert any(m.content == "buenas" for m in sent.messages[1:-2])
+        assert sent.cache_key == str(conversation.id)
+        trace = db.execute(
+            select(AgentTrace).where(AgentTrace.message_id == result.text_messages[0].id)
+        ).scalar_one()
+        assert trace.cached_input_tokens == 1200
 
     async def test_a_tenant_with_its_own_model_has_no_level(self, db: Session) -> None:
         tenant = _tenant(db)
@@ -739,7 +777,7 @@ class TestTheLiveChannel:
 
         await ConversationResponder(db, tenant.id, llm=llm).respond_turn(conversation.id)
 
-        assert "[El cliente envió una imagen]" in llm.chat_calls[0].messages[0].content
+        assert "[El cliente envió una imagen]" in llm.chat_calls[0].system
 
 
 class FakeWhatsApp:

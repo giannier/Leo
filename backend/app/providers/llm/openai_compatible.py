@@ -76,6 +76,17 @@ def _hinted_wait(headers: httpx.Headers) -> float | None:
     return None
 
 
+def _cached_tokens(usage: dict[str, Any]) -> int:
+    """The prompt tokens the provider read from its cache, when it says."""
+    details = usage.get("prompt_tokens_details")
+    if not isinstance(details, dict):
+        return 0
+    try:
+        return int(details.get("cached_tokens") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _out_of_quota(response: httpx.Response) -> bool:
     try:
         body = response.json()
@@ -106,6 +117,7 @@ class OpenAICompatibleProvider:
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         transport: httpx.AsyncBaseTransport | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        send_cache_key: bool = False,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -133,6 +145,8 @@ class OpenAICompatibleProvider:
         self._timeout = timeout
         # How a retry waits; the tests pass one that does not.
         self._sleep = sleep
+        # OpenAI's `prompt_cache_key`: endpoints that copy the protocol may reject an unknown field.
+        self._send_cache_key = send_cache_key
         # The seam that makes everything below testable without a network.
         # `None` is httpx's own default, so production behaviour is untouched;
         # the suite passes a `MockTransport` and gets to assert on the exact
@@ -287,6 +301,7 @@ class OpenAICompatibleProvider:
         tools: Sequence[ToolSpec] = (),
         temperature: float = 0.2,
         max_tokens: int = 1024,
+        cache_key: str | None = None,
     ) -> ChatResult:
         payload: dict[str, Any] = {
             "model": self._chat_model,
@@ -299,6 +314,8 @@ class OpenAICompatibleProvider:
             payload["tools"] = self._encode_tools(tools)
             if self._parallel_tool_calls is not None:
                 payload["parallel_tool_calls"] = self._parallel_tool_calls
+        if cache_key and self._send_cache_key:
+            payload["prompt_cache_key"] = cache_key
 
         started = time.perf_counter()
         body = await self._post("/chat/completions", payload)
@@ -319,6 +336,7 @@ class OpenAICompatibleProvider:
             output_tokens=int(usage.get("completion_tokens") or 0),
             latency_ms=latency_ms,
             finish_reason=choice.get("finish_reason") or "",
+            cached_input_tokens=_cached_tokens(usage),
         )
 
     # ---------------------------------------------------------------- vision

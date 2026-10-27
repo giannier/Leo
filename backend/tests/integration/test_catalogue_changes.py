@@ -135,7 +135,7 @@ class TestAConversationGoingOnIsToldTheCatalogueChanged:
             conversation.id, InboundTurn(text="¿y cuánto era el bidón?")
         )
 
-        assert CATALOGUE_CHANGED_LINE in llm.chat_calls[0].messages[0].content
+        assert CATALOGUE_CHANGED_LINE in llm.chat_calls[0].system
 
     async def test_without_a_change_nothing_is_said(self, db: Session) -> None:
         tenant = _tenant(db, template="productos")
@@ -160,4 +160,4 @@ class TestAConversationGoingOnIsToldTheCatalogueChanged:
             conversation.id, InboundTurn(text="¿cuánto cuesta el bidón?")
         )
 
-        assert CATALOGUE_CHANGED_LINE not in llm.chat_calls[0].messages[0].content
+        assert CATALOGUE_CHANGED_LINE not in llm.chat_calls[0].system
