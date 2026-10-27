@@ -753,7 +753,9 @@ class TestTheCatalogueGuard:
         )
 
         correction = llm.chat_calls[1].messages[-1]
-        assert correction.role == "user"
+        # From the system, never as the customer: answered as the customer's, it leaked into the
+        # reply («Tienes razón: no la agregué», 2026-10-27).
+        assert correction.role == "system" and "El cliente no ve este aviso" in correction.content
         assert "«lomo saltado criollo»" in correction.content
         assert "- Lomo saltado" in correction.content
         # The offending answer is replayed, or the model is being corrected
