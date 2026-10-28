@@ -456,6 +456,9 @@ class Template:
     tipo_pedido: Literal["carrito", "paquete"]
     # Most lines an order may have (services: 1 to 3), or None for no limit.
     max_lineas: int | None = None
+    # Offered to businesses (the template list, a manual choice). The universal process (feature 020)
+    # is not until it passes the real-model evals: the platform administration moves a business to it.
+    visible: bool = True
 
     def stage(self, stage: Stage) -> StageSpec:
         return self.stages[stage]

@@ -40,7 +40,8 @@ from app.models.sales_config import Promotion
 from app.process.capabilities import derive_objective
 from app.process.facts import FactsConfig
 from app.process.layers import LayerResolver, stage_texts_from
-from app.process.templates import TEMPLATES, get_template
+from app.process.offer import closings_of
+from app.process.templates import TEMPLATES, UNIVERSAL, get_template
 from app.process.templates.base import EffectiveOptions, Stage, Template
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.payment import PaymentMethodRepository
@@ -121,6 +122,9 @@ class EffectiveProcessConfig:
     # Where `consultar_conocimiento` finds the rubro's FAQs and objections.
     rubro_version_id: uuid.UUID | None = None
     behavior: Behavior = field(default_factory=Behavior)
+    # How the business's live items close (feature 020, `process/offer.py`): the universal process
+    # tells the model only those.
+    cierres: tuple[str, ...] = ()
     # The tenant's configured intelligence level (`agent_configs.nivel_inteligencia`).
     intelligence_level: str = DEFAULT_INTELLIGENCE_LEVEL
     business_name: str | None = None
@@ -209,6 +213,18 @@ def _options_for(template: Template, config: AgentConfig | None) -> EffectiveOpt
             "invalid process options; using the defaults", extra={"template": template.key}
         )
         return template.resolve()
+
+
+@dataclass(frozen=True)
+class _ClosingRow:
+    modo_venta: str
+    agendable: bool
+
+
+def _closings(session: Session, tenant_id: uuid.UUID) -> tuple[str, ...]:
+    """How the business's live items close (feature 020), each once, in a fixed order."""
+    rows = ProductRepository(session, tenant_id).closing_fields()
+    return closings_of([_ClosingRow(mode, bookable) for mode, bookable in rows])
 
 
 def _info_view(sections: Mapping[str, dict[str, Any]]) -> BusinessInfoView:
@@ -316,6 +332,7 @@ class ProcessConfigService:
             info=_info_view(sections),
             payment_methods=tuple(method.method for method in methods),
             promotions=tuple(_detach(promotion) for promotion in promotions),
+            cierres=_closings(self._session, tenant_id) if template.key == UNIVERSAL else (),
         )
 
 

@@ -128,6 +128,16 @@ class ProductRepository(BaseRepository[Product]):
         )
         return list(self._session.execute(statement).scalars().all())
 
+    def closing_fields(self) -> list[tuple[str, bool]]:
+        """`(modo_venta, agendable)` of every live item: how the catalogue closes (feature 020)."""
+        statement = (
+            select(Product.modo_venta, Product.agendable)
+            .where(self._tenant_predicate)
+            .where(Product.deleted_at.is_(None), Product.is_active.is_(True))
+            .distinct()
+        )
+        return [(mode, bookable) for mode, bookable in self._session.execute(statement).all()]
+
     def quote_fields(self) -> tuple[str, ...]:
         """What the business asks for before a quote, across its live quoted products, once each.
 

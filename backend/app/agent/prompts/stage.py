@@ -58,6 +58,7 @@ from app.models.business import MAX_SALUDO
 from app.process.engine import anuncio_vigente
 from app.process.facts import Cotizacion, Facts, PromoCierre
 from app.process.service import EffectiveProcessConfig
+from app.process.templates import UNIVERSAL
 from app.process.templates.base import PLACEHOLDER_PATTERN, Stage
 from app.process.turn import TurnContext
 from app.providers.llm.base import ToolSpec
@@ -74,6 +75,8 @@ SECTION_CAPS: Mapping[str, int] = {
     "agenda": 200,
     "captacion": 220,
     "cotizacion": 410,
+    # Feature 020: one line per closing the business's catalogue uses.
+    "como_se_cierra": 240,
     "cierre": 140,
     "postventa": 170,
     "estilo": 300,
@@ -215,6 +218,46 @@ ANTES DE RESPONDER
 - Si te pide algo que una herramienta hace (enviar los métodos de pago, anotar un dato), hazlo ya: sin pedir permiso ni dejarlo para después. Al pedido solo va lo que dijo que quiere.
 - No repitas lo que una herramienta ya envió.
 - Responde a lo que dijo y termina con el siguiente paso."""
+
+
+# Feature 020, the universal process: how each item closes, said once, with only the closings the
+# business's catalogue uses (a shop that never quotes never reads the quote line). The item itself
+# says which applies when the model searches it (`[a cotizar]`, `[se agenda]`, «lo arma una persona»).
+_CLOSING_STAGES = frozenset({Stage.INICIO, Stage.CALIFICAR, Stage.ANUNCIO, Stage.IDENTIFICAR})
+CLOSING_HEAD = "CÓMO SE CIERRA (cada producto o servicio lo dice al buscarlo):"
+CLOSING_LINES: Mapping[str, str] = {
+    "pedido": (
+        "- Precio fijo: cuando diga que lo quiere, agrégalo con gestionar_pedido en ese turno (si es "
+        "un paquete, con lo que ya eligió en seleccion); después vienen sus datos y el pago."
+    ),
+    "cotizacion": "- A cotizar: sigue COTIZACIÓN: juntas los datos y una persona da el precio.",
+    "cotizacion_sin_herramienta": (
+        "- A cotizar: entiende qué necesita y pásalo con "
+        'derivar_a_humano(motivo="cotizacion") con un resumen.'
+    ),
+    "cita": "- Se agenda: sigue AGENDA: ofrece horarios y reserva.",
+    "cita_sin_agenda": (
+        "- Se agenda: pásalo a una persona con derivar_a_humano para coordinar la fecha."
+    ),
+    "informar": (
+        "- Lo arma una persona: explícalo, entiende qué necesita (máximo 2 preguntas) y pásalo con "
+        'derivar_a_humano(motivo="asesoria") con un resumen.'
+    ),
+}
+
+
+def _closing_block(config: EffectiveProcessConfig, stage: Stage) -> str:
+    if config.template.key != UNIVERSAL or stage not in _CLOSING_STAGES or not config.cierres:
+        return ""
+    lines = [CLOSING_HEAD]
+    for closing in config.cierres:
+        key = closing
+        if closing == "cotizacion" and not config.options.cotizar:
+            key = "cotizacion_sin_herramienta"
+        elif closing == "cita" and not config.options.agendar:
+            key = "cita_sin_agenda"
+        lines.append(CLOSING_LINES[key])
+    return "\n".join(lines)
 
 
 def _quote_block(config: EffectiveProcessConfig, stage: Stage) -> str:
@@ -984,6 +1027,9 @@ def build_stage_prompt(
     parts["etapa"] = "PROCESO: INSTRUCCIONES DE LA ETAPA\n" + resolve_placeholders(
         config.instructions_for(stage), values
     )
+    closing = _closing_block(config, stage)
+    if closing:
+        parts["como_se_cierra"] = closing
     rubro = _rubro_block(config)
     if rubro:
         parts["rubro"] = rubro

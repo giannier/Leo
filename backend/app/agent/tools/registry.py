@@ -182,6 +182,9 @@ class ToolContext:
     rubro_version_id: uuid.UUID | None = None
     # A tool that ends the turn writes here; the agent loop stops after it.
     ending: TurnEnding = field(default_factory=TurnEnding)
+    # The universal process (feature 020) shows how each item closes in the search; the three
+    # templates it replaces read the catalogue as before.
+    closings_shown: bool = False
     # The option menus sent this turn. Shared by the copies `ToolCatalog.for_stage` makes, so
     # `mostrar_opciones` sends one menu per turn whatever stage scope runs it.
     options_this_turn: list[str] = field(default_factory=list)
@@ -367,7 +370,12 @@ def _guarded(definition: ToolDefinition, scope: ToolScope) -> ToolHandler:
             refusal = guard(scope, arguments)
             if refusal is not None:
                 return refusal
-        bound = replace(context, options=scope.options, max_lines=scope.template.max_lineas)
+        bound = replace(
+            context,
+            options=scope.options,
+            max_lines=scope.template.max_lineas,
+            closings_shown=scope.template.key == "universal",
+        )
         return await definition.handler(bound, arguments)
 
     return run

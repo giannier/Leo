@@ -194,6 +194,9 @@ def make_config(
             [_promotion(f"Promo automática número {i}") for i in range(1, 13 if full else 2)]
             + [_promotion("Cupón 20 %", use="cierre")]
         ),
+        # How the catalogue closes (feature 020): only the universal process reads it. A full
+        # business uses all four, the worst case for the budget.
+        "cierres": ("pedido", "cotizacion", "cita", "informar") if full else ("pedido",),
     }
     values.update(overrides)
     return EffectiveProcessConfig(**values)

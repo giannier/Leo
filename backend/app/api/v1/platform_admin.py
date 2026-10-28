@@ -50,6 +50,7 @@ from app.services.admin import (
     TenantNotFound,
 )
 from app.services.emails import build_number_connected_email, build_number_rejected_email
+from app.services.process_switch import NoAgent, back_to_templates, to_universal
 from app.workers.channel import PROCESS_EVENT_JOB
 
 logger = logging.getLogger(__name__)
@@ -485,6 +486,41 @@ async def extend_trial(
         knowledge_chars=usage.knowledge_chars,
         has_number=usage.has_number,
     )
+
+
+class ProcessSwitchPayload(BaseModel):
+    # True: the universal process (feature 020); False: back to the template its capabilities
+    # derive.
+    universal: bool
+
+
+class ProcessSwitchResponse(BaseModel):
+    template_key: str
+
+
+@router.put(
+    "/tenants/{tenant_id}/process",
+    summary="Move a business to the universal process, or back",
+    responses=error_responses((404, "`not_found`"), *ADMIN_RESPONSES),
+)
+async def switch_process(
+    tenant_id: uuid.UUID,
+    payload: ProcessSwitchPayload,
+    admin: PlatformAdminDep,
+    session: SessionDep,
+) -> ProcessSwitchResponse:
+    """Feature 020: the universal process is hidden from businesses until it passes the
+    real-model evals; the platform moves them one at a time, audited. Going back is the same call
+    with false."""
+    try:
+        key = (
+            to_universal(session, tenant_id, actor_id=admin.id)
+            if payload.universal
+            else back_to_templates(session, tenant_id, actor_id=admin.id)
+        )
+    except NoAgent as exc:
+        raise _not_found("Tenant") from exc
+    return ProcessSwitchResponse(template_key=key)
 
 
 class ChannelHealth(BaseModel):
