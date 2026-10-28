@@ -267,6 +267,28 @@ class TestAddingAndChangingLines:
         assert result.data["pedido"] is None
         assert active_order(db, tenant, conversation) is None
 
+    async def test_what_a_person_puts_together_is_handed_to_an_advisor(
+        self,
+        db: Session,
+        tenant: Tenant,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        """Feature 020 (D7): «solo informar» never enters an order."""
+        programme = Product(
+            tenant_id=tenant.id, name="Programa a medida", price=D("0"), modo_venta="informar"
+        )
+        db.add(programme)
+        db.flush()
+
+        result = await act(
+            make_context(db, tenant, conversation), accion="agregar", producto_id=str(programme.id)
+        )
+
+        assert result.status == "no_disponible"
+        assert 'derivar_a_humano(motivo="asesoria")' in (result.decir or "")
+        assert active_order(db, tenant, conversation) is None
+
     @pytest.mark.parametrize("which", ["unknown", "deleted"])
     async def test_a_product_that_does_not_exist_is_not_available(
         self,

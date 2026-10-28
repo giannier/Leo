@@ -336,6 +336,14 @@ def _agregar(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
     try:
         turn.service.assert_sellable(product)
     except NotSellable:
+        if product.modo_venta == "informar":
+            return turn.result(
+                "no_disponible",
+                turn.active(),
+                f"{product.name} lo arma una persona del negocio: no se agrega al pedido. "
+                "Explícale lo que sabes, entiende qué necesita y pásalo con "
+                'derivar_a_humano(motivo="asesoria") con un resumen.',
+            )
         return turn.result(
             "no_disponible",
             turn.active(),

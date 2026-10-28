@@ -392,6 +392,9 @@ class OrderService:
             raise TenantScopeError("the product belongs to another tenant")
         if product.modo_venta == "cotizacion":
             raise NotSellable(f"{product.name} is quoted, not sold at a fixed price")
+        if product.modo_venta == "informar":
+            # Feature 020 (D7): a person puts it together; the assistant explains and hands over.
+            raise NotSellable(f"{product.name} is put together by a person, not sold here")
 
     def add_product(
         self,
@@ -666,25 +669,42 @@ class OrderService:
         return (pending or packages)[0]
 
     def _resolve_selection(self, package: OrderItem, name: str) -> dict[str, Any]:
-        """The stored form of a selection: a catalogue product, or a free name."""
+        """The stored form of a selection: a catalogue product, or a free name.
+
+        A package with `bundle_categoria` (feature 020) takes its choices from that category only:
+        «paquete de 3 herramientas» admits the hammer, not the paint.
+        """
+        owner = self._products.get(package.product_id) if package.product_id else None
+        category = (owner.bundle_categoria or "").casefold() if owner is not None else ""
+
+        def eligible(product: Product) -> bool:
+            if product.bundle_size:
+                return False
+            return not category or (product.category or "").casefold() == category
+
         matches = [
             product
             for product in self._products.search_active(name, limit=25)
-            if product.name.casefold() == name.casefold() and not product.bundle_size
+            if product.name.casefold() == name.casefold() and eligible(product)
         ]
         if matches:
             return {"nombre": matches[0].name, "product_id": str(matches[0].id)}
-        owner = self._products.get(package.product_id) if package.product_id else None
-        if owner is not None and owner.bundle_permite_libres:
+        named_elsewhere = any(
+            product.name.casefold() == name.casefold() and not product.bundle_size
+            for product in self._products.search_active(name, limit=25)
+        )
+        if owner is not None and owner.bundle_permite_libres and not named_elsewhere:
             return {"nombre": name, "product_id": None}
-        options = [
-            product.name
-            for product in self._products.search_active("", limit=SUGGESTIONS + 1)
-            if not product.bundle_size
-        ][:SUGGESTIONS]
+        pool = self._products.search_active(
+            "",
+            categoria=owner.bundle_categoria if category and owner is not None else None,
+            limit=SUGGESTIONS * 3,
+        )
+        options = [product.name for product in pool if eligible(product)][:SUGGESTIONS]
+        where = f"the category {owner.bundle_categoria}" if category and owner else "the catalogue"
         raise SelectionRefused(
             "not_in_catalog",
-            f"{name} is not in the catalogue and {package.nombre} only admits catalogue products",
+            f"{name} is not in {where} and {package.nombre} only admits items from it",
             options,
         )
 

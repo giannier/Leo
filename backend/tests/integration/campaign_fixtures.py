@@ -137,8 +137,11 @@ def customer(
     permission: str | None = "granted",
     tags: list[str] | None = None,
     opted_out: bool = False,
+    now: datetime | None = None,
 ) -> Contact:
-    now = datetime.now(UTC)
+    # `now`: the clock the test runs the campaign at. Without it «10 days ago» counted from the real
+    # day drifted toward a campaign run at a fixed date, and the result changed with the calendar.
+    now = now or datetime.now(UTC)
     contact = Contact(
         tenant_id=tenant.id,
         phone_e164=phone or f"+5198{uuid.uuid4().int % 10**7:07d}",

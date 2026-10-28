@@ -347,7 +347,7 @@ class TestQuality:
 class TestTheAnswer:
     async def test_a_reply_continues_the_thread_and_counts(self, db: Session) -> None:
         tenant, number = business(db)
-        contact = customer(db, tenant, wrote_hours_ago=24 * 10)
+        contact = customer(db, tenant, wrote_hours_ago=24 * 10, now=NOON)
         old = Conversation(
             tenant_id=tenant.id, channel="whatsapp", contact_id=contact.id, status="open"
         )

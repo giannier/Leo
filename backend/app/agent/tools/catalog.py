@@ -209,9 +209,11 @@ def _product_data(
         "categoria": product.category,
         "descripcion": description,
         "stock": product.stock,
+        "tipo": product.tipo,
         "modo_venta": product.modo_venta,
         "periodo": product.periodo,
         "bundle_size": product.bundle_size,
+        "bundle_categoria": product.bundle_categoria,
         "destacado": product.destacado,
         "es_digital": product.es_digital,
         "datos_a_pedir": list(product.datos_a_pedir or []),
@@ -256,6 +258,15 @@ def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool 
     )
     if item["bundle_size"]:
         parts.append(f"[paquete de {item['bundle_size']} selecciones]")
+        if item.get("bundle_categoria"):
+            # Feature 020 (D2): only items of that category complete it.
+            parts.append(f"[se eligen de la categoría {item['bundle_categoria']}]")
+    if item["modo_venta"] == "informar":
+        # Feature 020 (D7): nothing to order or quote; a person puts it together.
+        parts.append(
+            "[lo arma una persona del negocio: explícalo y pásalo a un asesor con "
+            'derivar_a_humano(motivo="asesoria"); no va al pedido]'
+        )
     if item["modo_venta"] == "cotizacion":
         parts.append("[a cotizar: sin precio fijo]")
         if item["datos_a_pedir"] and quote_tool:

@@ -1171,3 +1171,67 @@ class TestSubmitting:
 
         assert customer_snapshot(told)["telefono"] == "+51911111111"
         assert customer_snapshot(silent) == {}
+
+
+class TestAPackageThatChoosesFromOneCategory:
+    """Feature 020 (D2): «paquete de 3 herramientas» admits the hammer, not the paint."""
+
+    @staticmethod
+    def _hardware(db: Session, tenant: Tenant, *, free: bool = False) -> Product:
+        for name, category in (
+            ("Martillo", "Herramientas"),
+            ("Taladro", "Herramientas"),
+            ("Escuadra", "Herramientas"),
+            ("Pintura látex", "Pinturas"),
+        ):
+            db.add(Product(tenant_id=tenant.id, name=name, price=Decimal("30"), category=category))
+        kit = Product(
+            tenant_id=tenant.id,
+            name="Kit de 3 herramientas",
+            price=Decimal("80"),
+            bundle_size=3,
+            bundle_categoria="herramientas",
+            bundle_permite_libres=free,
+        )
+        db.add(kit)
+        db.flush()
+        return kit
+
+    def test_an_item_of_the_category_is_taken(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        kit = self._hardware(db, tenant)
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        assert svc.add_selection(order, "martillo")["nombre"] == "Martillo"
+
+    def test_an_item_of_another_category_is_refused_with_the_category_s_options(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        kit = self._hardware(db, tenant)
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        with pytest.raises(SelectionRefused) as raised:
+            svc.add_selection(order, "Pintura látex")
+
+        assert raised.value.code == "not_in_catalog"
+        assert set(raised.value.suggestions) == {"Escuadra", "Martillo", "Taladro"}
+
+    def test_with_free_names_a_new_name_is_taken_but_not_another_category_s_item(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        kit = self._hardware(db, tenant, free=True)
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        assert svc.add_selection(order, "Sierra de mano") == {
+            "nombre": "Sierra de mano",
+            "product_id": None,
+        }
+        with pytest.raises(SelectionRefused):
+            svc.add_selection(order, "Pintura látex")

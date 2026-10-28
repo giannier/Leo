@@ -36,7 +36,8 @@ cambie el prompt llega a producción sin evals con el modelo real (constitución
 - **T2.3** Bloque «Cómo se cierra» del prompt: solo los cierres que el negocio usa; el cierre del ítem del que se habla lo
   decide el código (`cierre()`), no el modelo.
 - **T2.4** Caminos para cualquier rubro (D4).
-- **T2.5** Interruptor por negocio y vuelta atrás; las conversaciones en curso siguen con su versión.
+- **T2.5** Interruptor por negocio y vuelta atrás; las conversaciones abiertas siguen en el proceso nuevo sin perder etapa,
+  pedido, cotización ni datos (spec §7).
 - **T2.6** Pruebas: presupuesto de 6 000 tokens, coherencia prompt-herramientas, flujos con el modelo simulado (mock) por tipo
   de negocio, aislamiento.
 - **T2.7** Conversaciones simuladas con Claude como agente (sin la API de OpenAI) sobre la batería universal; informe de lo que

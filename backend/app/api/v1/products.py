@@ -46,7 +46,15 @@ PREVIEW_SECONDS = 600
 
 ProductName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 ShortText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)]
-SaleMode = Literal["precio_fijo", "cotizacion"]
+# How the item closes (feature 020): `informar` is explained and handed to an advisor.
+SaleMode = Literal["precio_fijo", "cotizacion", "informar"]
+# Only products and services are sold (feature 020, D1).
+ItemType = Literal["producto", "servicio"]
+# The category a package's choices come from (feature 020, D2).
+ChoiceCategory = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)
+]
+ONLY_PACKAGES = "la categoría de elección es solo para paquetes"
 PricePeriod = Literal["unico", "mes", "ano"]
 BundleSize = Annotated[int, Field(ge=BUNDLE_MIN_SIZE, le=BUNDLE_MAX_SIZE)]
 
@@ -86,12 +94,14 @@ class ProductRequest(BaseModel):
     stock: int | None = Field(default=None, ge=0)
     category: ShortText | None = None
     is_active: bool = True
+    tipo: ItemType = "producto"
     # Fit for sale (Feature 004). A bundle is a product with a `bundle_size`.
     modo_venta: SaleMode = "precio_fijo"
     periodo: PricePeriod = "unico"
     es_digital: bool = False
     bundle_size: BundleSize | None = None
     bundle_permite_libres: bool = False
+    bundle_categoria: ChoiceCategory | None = None
     destacado: bool = False
     # Up to ten labels; the agent also finds the product by them (Feature 018).
     tags: Tags = Field(default_factory=list)
@@ -110,6 +120,8 @@ class ProductRequest(BaseModel):
     def _bookable_has_a_duration(self) -> ProductRequest:
         if self.agendable and not self.duracion_min:
             raise ValueError("un servicio que se agenda necesita su duración")
+        if self.bundle_categoria and not self.bundle_size:
+            raise ValueError(ONLY_PACKAGES)
         return self
 
 
@@ -120,6 +132,7 @@ class ProductPatch(BaseModel):
     stock: int | None = Field(default=None, ge=0)
     category: ShortText | None = None
     is_active: bool | None = None
+    tipo: ItemType | None = None
     modo_venta: SaleMode | None = None
     periodo: PricePeriod | None = None
     es_digital: bool | None = None
@@ -127,6 +140,8 @@ class ProductPatch(BaseModel):
     # a package back into a single product.
     bundle_size: BundleSize | None = None
     bundle_permite_libres: bool | None = None
+    # May be sent as null: the choices come from any item again.
+    bundle_categoria: ChoiceCategory | None = None
     destacado: bool | None = None
     tags: Tags | None = None
     datos_a_pedir: AskFields | None = None
@@ -142,6 +157,7 @@ class ProductPatch(BaseModel):
         return _clean(value)
 
     @field_validator(
+        "tipo",
         "modo_venta",
         "periodo",
         "es_digital",
@@ -167,11 +183,13 @@ class ProductResponse(BaseModel):
     stock: int | None
     category: str | None
     is_active: bool
+    tipo: ItemType = "producto"
     modo_venta: SaleMode
     periodo: PricePeriod
     es_digital: bool
     bundle_size: int | None
     bundle_permite_libres: bool
+    bundle_categoria: str | None = None
     destacado: bool
     tags: list[str]
     datos_a_pedir: list[str] = Field(default_factory=list)
@@ -353,6 +371,17 @@ async def update_product(
                 message="Un servicio que se agenda necesita su duración.",
             )
     current = catalog.get(product_id)
+    # A package turned back into a single item no longer chooses from a category; a category for
+    # choices needs a package (the database refuses the pair otherwise).
+    if "bundle_size" in values and values["bundle_size"] is None:
+        values["bundle_categoria"] = None
+    size = (
+        values["bundle_size"] if "bundle_size" in values else getattr(current, "bundle_size", None)
+    )
+    if values.get("bundle_categoria") and not size:
+        raise ApiError(
+            status_code=400, error="validation_error", message=ONLY_PACKAGES.capitalize()
+        )
     before = {key: _shown(getattr(current, key, None)) for key in values} if current else {}
     product = catalog.update(product_id, **values)
     if product is None:

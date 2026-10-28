@@ -220,7 +220,11 @@ Capacita conserva su forma de vender, pero como **su configuración**, no como c
 - Se crea el proceso **`universal` v1** (código y reglas en la base). Las tres plantillas viejas se **congelan**: no se
   tocan más y siguen funcionando para los negocios que aún estén en ellas.
 - **Interruptor por negocio** (`agent_configs.process_template_key = "universal"`), con vuelta atrás.
-- Las **conversaciones en curso** siguen con la versión con la que empezaron (`template_version`, ya existe).
+- Las **conversaciones abiertas** pasan al proceso nuevo en su siguiente mensaje **sin perder nada**: las etapas, el pedido, la
+  cotización y los datos del cliente son los mismos en los dos procesos (el motor de etapas y los hechos no cambian). Se
+  revisó el código: cada mensaje ya usa el proceso actual del negocio (`conversation_state.template_version` solo registra
+  con cuál empezó), así que mantener una conversación en el proceso viejo agregaría complejidad sin beneficio. Por eso la
+  migración se hace en un horario tranquilo y con el visto bueno de Giannier.
 - **Orden de migración:** negocios de prueba → Nayu (inactivo) → el negocio activo de producción. Cada paso, después de que
   pasen las pruebas y con el visto bueno de Giannier.
 - Al migrar un negocio, se le **aplica la plantilla de su rubro** y se convierte lo que hoy viene de su plantilla vieja
