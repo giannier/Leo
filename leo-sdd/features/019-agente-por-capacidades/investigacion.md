@@ -133,3 +133,39 @@ pide el DNI en el chat, y la sección 3 pide no hacerlo; la decisión es de Gian
 - Si Yape y Plin ofrecen API de cobro para comercios, y cómo se enlaza un pago con la boleta electrónica.
 - La clasificación exacta de los permisos de Google Calendar (`freebusy`, `events`) para la verificación.
 - Los costos exactos de Meta a partir del 1-oct-2026.
+
+## 7. Un agente general para todo negocio: cómo lo hacen los grandes (2026-10-28)
+
+**Pregunta de Giannier:** Leo debe atender, vender, cotizar y agendar para cualquier negocio sin modificaciones por cada uno; lo que se
+vende son productos (físicos o digitales) o servicios, y el proceso es el mismo; las plantillas por rubro ayudan a negocios
+desordenados como punto de partida que pueden cambiar. ¿Cómo lo hacen Ventor y los grandes?
+
+| Empresa | Motor | Lo propio de cada negocio | Plantillas | Pruebas |
+|---|---|---|---|---|
+| **Ventor** (ventorchat.com) | Un asistente general | Formularios + un cuadro de texto libre («escribe cómo quieres que responda»: proceso, reglas, excepciones, derivación), catálogo, «situaciones» de envío multimedia, banco de documentos | **No tiene plantillas por rubro**; un mercado de automatizaciones que comparten otros usuarios (Ventor Share) | Chat de prueba |
+| **Intercom Fin** | Un agente general que responde con el contenido del negocio | **Procedures**: «cuándo usarlo» + pasos en lenguaje natural + condiciones + herramientas + guía | Borrador por IA a partir de una descripción, o **plantilla por industria** (SaaS, ecommerce, fintech, gaming) y escenario («cancelar o pausar una suscripción») | Simulaciones con criterio de éxito (pasa/falla) antes de «Set live» |
+| **Decagon** | Un agente general | **AOPs**: procedimientos en lenguaje natural que escribe el equipo no técnico y la plataforma convierte en lógica ejecutable; las acciones delicadas con controles | — | Pruebas, versiones y alertas |
+| **Salesforce Agentforce** | Un agente con **temas** (límites de cada tarea) | Instrucciones y acciones por tema | Temas y acciones estándar que cada cliente extiende | Trazador del plan |
+| **Sierra** | Agent OS | **Journeys** (recorridos) sin código o con SDK, conocimiento, guía de marca | — | Simulaciones antes de publicar |
+| **respond.io** | Agente de IA entrenado con documentos y URLs | Información que juntar (presupuesto, interés, ubicación) antes de pasar a una persona | Plantillas listas o desde cero | — |
+
+**El patrón común:** (1) un solo motor para todos los clientes, que mantiene la plataforma; (2) el conocimiento del negocio como datos
+(catálogo, documentos); (3) lo propio de cada negocio como **procedimientos** cortos en lenguaje natural con «cuándo aplica», pasos y
+herramientas, que el negocio escribe o parte de una **plantilla editable por industria y escenario**; (4) las acciones (crear pedido,
+agendar, derivar) las construye la plataforma una vez y las usan todos; (5) se prueba con simulaciones antes de publicar.
+Nadie mantiene un proceso de venta distinto por cliente en el código.
+
+**Lectura para Leo:** las «situaciones» ya son un procedimiento ligero (cuándo aplica, qué hace, archivos, derivar) y estructurado, mejor
+que el cuadro de texto libre de Ventor; los rubros son la biblioteca de plantillas (hoy delgada y solo se puede apagar, no editar). Lo
+que no encaja con el patrón son las tres plantillas de proceso en código, sobre todo «certificaciones», que es el proceso de Capacita.
+
+**Qué es oficial y qué no:** todo sale de las páginas de cada proveedor (marketing o ayuda); las cifras de resultados (Decagon: Chime y
+Hertz con más de 70 % de resolución, según una nota de Futurum) no se verificaron. Ventor se leyó en su web pública, sin entrar al panel.
+
+Fuentes: [Ventor](https://www.ventorchat.com/), [Ventor funcionalidades](https://www.ventorchat.com/docs/funcionalidades),
+[Intercom: Building Fin Procedures](https://www.intercom.com/help/en/articles/13449439-building-fin-procedures),
+[Decagon AOP](https://decagon.ai/product/aop), [Decagon: why we built AOP](https://decagon.ai/blog/why-we-built-aop),
+[Futurum sobre Decagon](https://futurumgroup.com/press-release/decagon-aims-to-simplify-ai-agent-development-with-natural-language/),
+[Salesforce: instrucciones en Agentforce](https://developer.salesforce.com/blogs/2025/01/how-to-write-effective-natural-language-instructions-for-agentforce),
+[Sierra Agent Studio](https://sierra.ai/blog/meet-agent-studio),
+[respond.io AI Agents](https://respond.io/faqs/what-can-respondio-ai-agents-handle-and-how-are-they-trained).
