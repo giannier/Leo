@@ -64,7 +64,10 @@ DISCOUNT_POLICIES = ("no_ofrece", "solo_promociones", "negociable")
 DEFAULT_PROCESS_TEMPLATE = "productos"
 # How a product is sold: `precio_fijo` goes into an order, `cotizacion` is handed
 # to a person with a summary (Feature 004).
-SALE_MODES = ("precio_fijo", "cotizacion")
+# `informar` (feature 020, D7): what a person puts together is explained and handed to an advisor.
+SALE_MODES = ("precio_fijo", "cotizacion", "informar")
+# Only products and services are sold (feature 020, D1).
+ITEM_TYPES = ("producto", "servicio")
 # What a price covers: once, per month or per year (migration 0050).
 PRICE_PERIODS = ("unico", "mes", "ano")
 # What the agent does (migration 0051). `agendar` and `captar` are planned: the column accepts them,
@@ -312,6 +315,13 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "NOT agendable OR duracion_min IS NOT NULL", name="products_agendable_con_duracion"
         ),
         enum_check("periodo", PRICE_PERIODS, "periodo"),
+        enum_check("modo_venta", SALE_MODES, "modo_venta"),
+        enum_check("tipo", ITEM_TYPES, "tipo"),
+        CheckConstraint(
+            "bundle_categoria IS NULL OR "
+            "(bundle_size IS NOT NULL AND char_length(btrim(bundle_categoria)) BETWEEN 1 AND 80)",
+            name="bundle_categoria",
+        ),
         Index("ix_products_tags", "tags", postgresql_using="gin"),
         # Partial index: soft-deleted rows are never listed, so keeping them
         # out of the index keeps it small and the catalog query fast.
@@ -343,7 +353,10 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     image_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Fit for sale (Feature 004, migration 0018).
+    # A product or a service (feature 020, migration 0070).
+    tipo: Mapped[str] = mapped_column(Text, nullable=False, server_default="producto")
+    # How it closes (Feature 004, migration 0018; `informar` since 0070). With `agendable` it is the
+    # whole answer: `process/offer.py` reads both, so the closing is never stored twice.
     modo_venta: Mapped[str] = mapped_column(Text, nullable=False, server_default="precio_fijo")
     # What the price covers: `unico`, `mes` or `ano`. Shown and spoken; totals add the amount.
     periodo: Mapped[str] = mapped_column(Text, nullable=False, server_default="unico")
@@ -356,6 +369,9 @@ class Product(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     bundle_permite_libres: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    # Where a package's choices come from (feature 020, D2): one category («herramientas»), or any
+    # item of the business when empty. Free names still need `bundle_permite_libres`.
+    bundle_categoria: Mapped[str | None] = mapped_column(Text, nullable=True)
     # The assistant pushes a highlighted product first.
     destacado: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # A service that can be booked (feature 019, phase D): how long it takes and the gap after it.

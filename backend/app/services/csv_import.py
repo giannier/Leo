@@ -61,6 +61,9 @@ CANONICAL_COLUMNS = (
     "bundle_size",
     "bundle_permite_libres",
     "destacado",
+    # Feature 020: product or service, and the category a package's choices come from.
+    "tipo",
+    "bundle_categoria",
     # Feature 018: "oferta, verano" in one cell.
     "tags",
 )
@@ -91,6 +94,15 @@ _SALE_MODES = {
     "cotizacion": "cotizacion",
     "cotización": "cotizacion",
     "cotizar": "cotizacion",
+    "informar": "informar",
+    "solo informar": "informar",
+    "asesor": "informar",
+}
+_ITEM_TYPES = {
+    "producto": "producto",
+    "productos": "producto",
+    "servicio": "servicio",
+    "servicios": "servicio",
 }
 
 # Spanish headers as a customer's own spreadsheet would spell them.
@@ -127,6 +139,12 @@ _HEADER_ALIASES = {
     "permite_libres": "bundle_permite_libres",
     "libres": "bundle_permite_libres",
     "destacado": "destacado",
+    "tipo": "tipo",
+    "producto o servicio": "tipo",
+    "bundle_categoria": "bundle_categoria",
+    "elegir de": "bundle_categoria",
+    "categoria del paquete": "bundle_categoria",
+    "categoría del paquete": "bundle_categoria",
     "etiquetas": "tags",
     "etiqueta": "tags",
     "tags": "tags",
@@ -404,6 +422,16 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         if not BUNDLE_MIN_SIZE <= bundle_size <= BUNDLE_MAX_SIZE:
             return InvalidRow(row=number, reason="paquete_invalido")
 
+    item_type = _ITEM_TYPES.get((record.get("tipo") or "").strip().lower())
+    if item_type is None:
+        if (record.get("tipo") or "").strip():
+            return InvalidRow(row=number, reason="tipo_invalido")
+        item_type = "producto"
+
+    choice_category = (record.get("bundle_categoria") or "").strip()[:80] or None
+    if choice_category and bundle_size is None:
+        return InvalidRow(row=number, reason="categoria_de_paquete_sin_paquete")
+
     flags: dict[str, bool] = {}
     for column in ("es_digital", "bundle_permite_libres", "destacado"):
         try:
@@ -427,9 +455,11 @@ def _parse_row(record: dict[str, str], number: int) -> dict[str, object] | Inval
         "price": str(price.quantize(Decimal("0.01"))),
         "stock": stock,
         "category": neutralise_formula(category) or None,
+        "tipo": item_type,
         "modo_venta": sale_mode,
         "periodo": period,
         "bundle_size": bundle_size,
+        "bundle_categoria": neutralise_formula(choice_category) if choice_category else None,
         "tags": tags,
         **flags,
     }

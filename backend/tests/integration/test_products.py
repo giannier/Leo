@@ -399,3 +399,132 @@ class TestSaleColumns:
         item = (await api.get(PRODUCTS, headers=headers)).json()["items"][0]
         assert item["modo_venta"] == "precio_fijo"
         assert item["destacado"] is False
+
+
+class TestProductsAndServices:
+    """Feature 020: what an item is, «solo informar», and the category a package chooses from."""
+
+    async def test_a_new_item_is_a_product_unless_told(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "X", "price": "1.00"})
+
+        assert created.json()["tipo"] == "producto"
+        assert created.json()["bundle_categoria"] is None
+
+    async def test_a_service_that_only_informs(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={
+                "name": "Programa a medida",
+                "price": "0",
+                "tipo": "servicio",
+                "modo_venta": "informar",
+            },
+        )
+
+        assert created.status_code == 201
+        body = (await api.get(f"{PRODUCTS}/{created.json()['id']}", headers=headers)).json()
+        assert (body["tipo"], body["modo_venta"]) == ("servicio", "informar")
+
+    async def test_a_package_that_chooses_from_a_category(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={
+                "name": "Kit de 3",
+                "price": "80",
+                "bundle_size": 3,
+                "bundle_categoria": " Herramientas ",
+            },
+        )
+
+        assert created.json()["bundle_categoria"] == "Herramientas"
+
+    async def test_a_category_to_choose_from_needs_a_package(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        refused = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={"name": "X", "price": "1", "bundle_categoria": "Herramientas"},
+        )
+        created = await api.post(PRODUCTS, headers=headers, json={"name": "Y", "price": "1"})
+        patched = await api.put(
+            f"{PRODUCTS}/{created.json()['id']}",
+            headers=headers,
+            json={"bundle_categoria": "Herramientas"},
+        )
+
+        assert refused.status_code == 400
+        assert patched.status_code == 400
+
+    async def test_a_package_turned_single_forgets_its_category(
+        self, api: AsyncClient, mail: Any
+    ) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={"name": "Kit", "price": "80", "bundle_size": 3, "bundle_categoria": "Herr"},
+        )
+
+        updated = await api.put(
+            f"{PRODUCTS}/{created.json()['id']}", headers=headers, json={"bundle_size": None}
+        )
+
+        assert updated.status_code == 200
+        assert (updated.json()["bundle_size"], updated.json()["bundle_categoria"]) == (None, None)
+
+    async def test_the_import_reads_the_type_and_the_package_category(
+        self, api: AsyncClient, mail: Any, redis: FakeRedis
+    ) -> None:
+        headers = await _owner(api, mail)
+        csv = (
+            "nombre,precio,tipo,modo,paquete,elegir de\n"
+            "Kit de 3,80,producto,,3,Herramientas\n"
+            "Asesoría,0,servicio,solo informar,,\n"
+            "Raro,1,objeto,,,\n"
+            "Suelto,1,,,,Herramientas\n"
+        ).encode()
+        preview = await api.post(
+            f"{PRODUCTS}/import", headers=headers, files={"file": ("c.csv", csv, "text/csv")}
+        )
+        body = preview.json()
+        assert body["valid_rows"] == 2
+        reasons = {row["reason"] for row in body["invalid_rows"]}
+        assert reasons == {"tipo_invalido", "categoria_de_paquete_sin_paquete"}
+        await api.post(f"{PRODUCTS}/import/{body['preview_id']}/confirm", headers=headers)
+
+        items = {
+            item["name"]: item
+            for item in (await api.get(PRODUCTS, headers=headers)).json()["items"]
+        }
+        assert items["Kit de 3"]["bundle_categoria"] == "Herramientas"
+        assert (items["Asesoría"]["tipo"], items["Asesoría"]["modo_venta"]) == (
+            "servicio",
+            "informar",
+        )
+
+    async def test_a_duplicate_keeps_what_the_item_is(self, api: AsyncClient, mail: Any) -> None:
+        headers = await _owner(api, mail)
+        created = await api.post(
+            PRODUCTS,
+            headers=headers,
+            json={
+                "name": "Kit",
+                "price": "80",
+                "tipo": "producto",
+                "bundle_size": 3,
+                "bundle_categoria": "Herramientas",
+            },
+        )
+
+        copy = await api.post(f"{PRODUCTS}/{created.json()['id']}/duplicate", headers=headers)
+
+        assert copy.json()["bundle_categoria"] == "Herramientas"
