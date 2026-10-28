@@ -41,7 +41,8 @@ cambie el prompt llega a producción sin evals con el modelo real (constitución
 - **T2.6** Pruebas: presupuesto de 6 000 tokens, coherencia prompt-herramientas, flujos con el modelo simulado (mock) por tipo
   de negocio, aislamiento.
 - **T2.7** Conversaciones simuladas con Claude como agente (sin la API de OpenAI) sobre la batería universal; informe de lo que
-  muestran y de lo que no pueden medir.
+  muestran y de lo que no pueden medir. **Se corre al cerrar F3**, junto con las plantillas de rubro (educación incluida), para
+  no hacer dos pasadas.
 
 ## F3 · Plantillas de rubro editables
 

@@ -214,6 +214,7 @@ def _product_data(
         "periodo": product.periodo,
         "bundle_size": product.bundle_size,
         "bundle_categoria": product.bundle_categoria,
+        "agendable": product.agendable,
         "destacado": product.destacado,
         "es_digital": product.es_digital,
         "datos_a_pedir": list(product.datos_a_pedir or []),
@@ -241,7 +242,9 @@ def _product_data(
     }
 
 
-def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool = False) -> str:
+def _product_line(
+    item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool = False, closings: bool = False
+) -> str:
     """One product as text the model can quote, with its files and promotions.
 
     The id is there so the model can pass it to `ver_producto` and, later, to
@@ -261,6 +264,10 @@ def _product_line(item: dict[str, Any], symbol: str = "S/", *, quote_tool: bool 
         if item.get("bundle_categoria"):
             # Feature 020 (D2): only items of that category complete it.
             parts.append(f"[se eligen de la categoría {item['bundle_categoria']}]")
+    if closings and item.get("agendable") and item["modo_venta"] != "informar":
+        # The universal process (feature 020): a bookable item closes with an appointment (CÓMO SE
+        # CIERRA), whatever its price.
+        parts.append("[se agenda]")
     if item["modo_venta"] == "informar":
         # Feature 020 (D7): nothing to order or quote; a person puts it together.
         parts.append(
@@ -375,7 +382,10 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
     items = _enrich(context, rows)
     symbol = currency_symbol(context.session, context.tenant_id)
     quote_tool = bool(context.options and context.options.cotizar)
-    listing = "\n".join(_product_line(item, symbol, quote_tool=quote_tool) for item in items)
+    listing = "\n".join(
+        _product_line(item, symbol, quote_tool=quote_tool, closings=context.closings_shown)
+        for item in items
+    )
     if missed:
         asked = query or categoria or "paquetes"
         texto = (
@@ -416,9 +426,8 @@ async def ver_producto(context: ToolContext, arguments: dict[str, Any]) -> ToolR
     symbol = currency_symbol(context.session, context.tenant_id)
     context.facts_patch["vio_productos"] = True
     quote_tool = bool(context.options and context.options.cotizar)
-    return ToolResult.hecho(
-        data=item, texto="Producto:\n" + _product_line(item, symbol, quote_tool=quote_tool)
-    )
+    line = _product_line(item, symbol, quote_tool=quote_tool, closings=context.closings_shown)
+    return ToolResult.hecho(data=item, texto="Producto:\n" + line)
 
 
 def build_default_registry() -> ToolRegistry:

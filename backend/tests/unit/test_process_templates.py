@@ -31,7 +31,8 @@ from app.schemas.process_options import Calificacion, Camino, ProcessOptions
 # `tool_name(` as the default texts write a call.
 CALL = re.compile(r"(?<![a-z_])([a-z_]+)\(")
 
-TEMPLATE_KEYS = ["productos", "certificaciones", "servicios"]
+# The three templates of feature 004 and the universal process of feature 020, which replaces them.
+TEMPLATE_KEYS = ["productos", "certificaciones", "servicios", "universal"]
 ALL_TEMPLATES = [TEMPLATES[key] for key in TEMPLATE_KEYS]
 
 SEARCH = ("buscar_productos", "ver_producto", "mostrar_opciones")
@@ -54,6 +55,7 @@ INICIO_TOOLS = {
     "productos": SEARCH_AND_ORDER,
     "certificaciones": (),
     "servicios": SEARCH,
+    "universal": SEARCH_AND_ORDER,
 }
 
 
@@ -237,7 +239,7 @@ class TestWhatDiffersBetweenTemplates:
     def test_identificar_has_its_own_text_in_each_template(self) -> None:
         texts = {t.key: t.stage(Stage.IDENTIFICAR).instrucciones for t in ALL_TEMPLATES}
 
-        assert len(set(texts.values())) == 3
+        assert len(set(texts.values())) == len(ALL_TEMPLATES)
         assert "SIEMPRE SÍ" in texts["certificaciones"]
         assert "cotización" in texts["servicios"]
         assert "para qué lo necesita" in texts["productos"]
@@ -505,3 +507,31 @@ class TestSystemMessages:
 
     def test_the_handover_message_has_no_placeholders(self) -> None:
         assert placeholders_in(DEFAULT_SYSTEM_MESSAGES["derivacion"]) == set()
+
+
+class TestTheUniversalProcess:
+    """Feature 020: one process for every business, hidden until the real-model evals pass."""
+
+    def test_it_is_not_offered_to_businesses_yet(self) -> None:
+        assert TEMPLATES["universal"].visible is False
+        assert all(TEMPLATES[key].visible for key in ("productos", "certificaciones", "servicios"))
+
+    def test_it_has_no_line_limit_and_takes_cash_on_delivery(self) -> None:
+        universal = TEMPLATES["universal"]
+
+        assert universal.max_lineas is None
+        assert universal.validate_options({"modalidad_pago": "contra_entrega"})
+
+    def test_nothing_of_one_business_is_in_its_texts(self) -> None:
+        """Capacita's steps (the name first, «SIEMPRE SÍ», the anchor price) are its own
+        configuration, not the platform's."""
+        texts = " ".join(spec.instrucciones for spec in TEMPLATES["universal"].stages.values())
+
+        for particular in ("SIEMPRE SÍ", "ancla", "certific", "Paso 1", "pídele su nombre"):
+            assert particular not in texts
+
+    def test_every_deciding_stage_points_to_how_items_close(self) -> None:
+        universal = TEMPLATES["universal"]
+
+        for stage in (Stage.INICIO, Stage.ANUNCIO, Stage.IDENTIFICAR):
+            assert "CÓMO SE CIERRA" in universal.stage(stage).instrucciones

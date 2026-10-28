@@ -489,7 +489,7 @@ def _keys(session: Session, tenant_id: uuid.UUID) -> tuple[str, str | None]:
 
 @router.get("/templates", response_model=TemplateList, responses=error_responses(*AUTH_RESPONSES))
 def list_templates(principal: ConfigurationManagerDep, session: SessionDep) -> TemplateList:
-    _, rubro_key = _keys(session, principal.tenant_id)
+    current_key, rubro_key = _keys(session, principal.tenant_id)
     rubro = CatalogRepository(session).rubro(rubro_key)
     return TemplateList(
         items=[
@@ -501,7 +501,10 @@ def list_templates(principal: ConfigurationManagerDep, session: SessionDep) -> T
                 opciones_default=t.defaults.model_dump(mode="json", exclude_none=True),
                 sugerida_por_rubro=rubro is not None and rubro.plantilla_sugerida == t.key,
             )
+            # A hidden template (the universal process, feature 020) is listed only to the business
+            # already on it, so the panel can show its options.
             for t in TEMPLATES.values()
+            if t.visible or t.key == current_key
         ]
     )
 
@@ -546,7 +549,9 @@ def put_process(
     body: ProcessRequest, principal: ConfigurationManagerDep, session: SessionDep
 ) -> ProcessView:
     template = TEMPLATES.get(body.template_key)
-    if template is None:
+    current_key, _ = _keys(session, principal.tenant_id)
+    # A hidden template cannot be chosen; a business already on it may still save its options.
+    if template is None or (not template.visible and template.key != current_key):
         raise ApiError(status_code=422, error="unknown_template", message=body.template_key)
     try:
         options = template.validate_options(body.options)

@@ -31,7 +31,13 @@ RUBROS = (
 )
 
 
+# The three templates of feature 004 and their history of versions. The universal process (feature
+# 020) has its own version 1 and its own tests (`test_universal_process.py`).
+FEATURE_004_TEMPLATES = ["certificaciones", "productos", "servicios"]
+
+
 class TestTheSplit:
+    # Every template, the universal process included: its texts are stored as rules too.
     @pytest.mark.parametrize("key", sorted(TEMPLATES))
     def test_every_shipped_stage_text_round_trips(self, key: str) -> None:
         for stage in Stage:
@@ -61,7 +67,7 @@ LATEST_PROCESS_VERSION = 5
 
 
 class TestVersionOne:
-    @pytest.mark.parametrize("key", sorted(TEMPLATES))
+    @pytest.mark.parametrize("key", FEATURE_004_TEMPLATES)
     def test_the_prompt_text_from_the_database_is_today_s_text(self, db: Session, key: str) -> None:
         from uuid import uuid4
 
@@ -101,7 +107,7 @@ class TestVersionOne:
 class TestVersionFour:
     """Migration 0067: the quote flow, as the fourth published version of each template."""
 
-    @pytest.mark.parametrize("key", sorted(TEMPLATES))
+    @pytest.mark.parametrize("key", FEATURE_004_TEMPLATES)
     def test_it_keeps_every_rule_key_of_version_three(self, db: Session, key: str) -> None:
         catalog = CatalogRepository(db)
         v3, v4 = catalog.version("proceso", key, 3), catalog.version("proceso", key, 4)
@@ -116,7 +122,7 @@ class TestVersionFour:
     def test_only_the_servicios_identification_text_changed(self, db: Session) -> None:
         catalog = CatalogRepository(db)
         changed: list[tuple[str, str]] = []
-        for key in sorted(TEMPLATES):
+        for key in FEATURE_004_TEMPLATES:
             v3, v4 = catalog.version("proceso", key, 3), catalog.version("proceso", key, 4)
             assert v3 is not None and v4 is not None
             before = {r.rule_key: r.texto for r in catalog.rules(v3.id)}
@@ -141,7 +147,7 @@ class TestVersionFour:
 class TestVersionFive:
     """Migration 0068: certificaciones for a literal model, as the fifth published version."""
 
-    @pytest.mark.parametrize("key", sorted(TEMPLATES))
+    @pytest.mark.parametrize("key", FEATURE_004_TEMPLATES)
     def test_it_keeps_every_rule_key_of_version_four(self, db: Session, key: str) -> None:
         catalog = CatalogRepository(db)
         v4, v5 = catalog.version("proceso", key, 4), catalog.version("proceso", key, 5)
@@ -155,7 +161,7 @@ class TestVersionFive:
     def test_only_certificaciones_identification_and_order_changed(self, db: Session) -> None:
         catalog = CatalogRepository(db)
         changed: list[tuple[str, str]] = []
-        for key in sorted(TEMPLATES):
+        for key in FEATURE_004_TEMPLATES:
             v4, v5 = catalog.version("proceso", key, 4), catalog.version("proceso", key, 5)
             assert v4 is not None and v5 is not None
             before = {r.rule_key: r.texto for r in catalog.rules(v4.id)}

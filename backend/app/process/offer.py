@@ -16,6 +16,7 @@ book).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal, Protocol
 
 Closing = Literal["pedido", "cotizacion", "cita", "informar"]
@@ -23,8 +24,11 @@ CLOSINGS: tuple[Closing, ...] = ("pedido", "cotizacion", "cita", "informar")
 
 
 class _Item(Protocol):
-    modo_venta: str
-    agendable: bool
+    @property
+    def modo_venta(self) -> str: ...
+
+    @property
+    def agendable(self) -> bool: ...
 
 
 def closing_of(item: _Item) -> Closing:
@@ -38,7 +42,7 @@ def closing_of(item: _Item) -> Closing:
     return "pedido"
 
 
-def closings_of(items: list[_Item] | tuple[_Item, ...]) -> tuple[Closing, ...]:
+def closings_of(items: Sequence[_Item]) -> tuple[Closing, ...]:
     """The closings a catalogue uses, in a fixed order, each once."""
     used = {closing_of(item) for item in items}
     return tuple(c for c in CLOSINGS if c in used)

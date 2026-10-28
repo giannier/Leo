@@ -7,7 +7,7 @@ a template changes (`conversation_state.template_version`).
 
 from __future__ import annotations
 
-from app.process.templates import certificaciones, productos, servicios
+from app.process.templates import certificaciones, productos, servicios, universal
 from app.process.templates.base import (
     GLOBAL_TOOLS,
     KNOWN_PLACEHOLDERS,
@@ -24,8 +24,16 @@ from app.process.templates.base import (
 
 TEMPLATES: dict[str, Template] = {
     template.key: template
-    for template in (productos.TEMPLATE, certificaciones.TEMPLATE, servicios.TEMPLATE)
+    for template in (
+        productos.TEMPLATE,
+        certificaciones.TEMPLATE,
+        servicios.TEMPLATE,
+        universal.TEMPLATE,
+    )
 }
+
+# The key of the universal process (feature 020).
+UNIVERSAL = universal.TEMPLATE.key
 
 
 def get_template(key: str) -> Template:
@@ -45,6 +53,7 @@ __all__ = [
     "KNOWN_PLACEHOLDERS",
     "TEMPLATES",
     "TOOL_NAMES",
+    "UNIVERSAL",
     "EffectiveOptions",
     "Stage",
     "StageSpec",
