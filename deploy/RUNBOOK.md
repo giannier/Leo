@@ -127,17 +127,21 @@ Antes de una actualización con migraciones, corre un backup (sección 6).
 
 ## 6. Backups
 
-Diario, cifrado, 14 días de retención, con el cron del usuario que opera el servidor. `BACKUP_DIR` tiene que
-existir y ese usuario tiene que poder escribir en él (en el VPS actual: `/home/gerente_ti/backups/leo`; la
-ruta por defecto `/var/backups/leo` necesita root y no existía, así que el backup nunca corrió):
+**Mensual** (decisión de Giannier, 2026-10-28): el día 1 de cada mes a las 04:15 (hora de Lima), cifrado, con el
+cron del usuario que opera el servidor, guardando ~3 meses (`BACKUP_KEEP_DAYS=100`; con el valor por defecto, 14, cada
+copia mensual borraría la anterior). Además se saca una copia a mano antes de cada despliegue. Lo que pase entre dos
+copias mensuales no está respaldado: si eso pesa, se cambia el `1` del día por `*` (diaria). `BACKUP_DIR` tiene que
+existir y ese usuario tiene que poder escribir en él (en el VPS actual: `/home/gerente_ti/backups/leo`; la ruta por
+defecto `/var/backups/leo` necesita root):
 
 ```bash
 crontab -e
-15 4 * * * cd /home/gerente_ti/apps/Leo && BACKUP_DIR=/home/gerente_ti/backups/leo deploy/backup.sh >> /home/gerente_ti/backups/leo/backup.log 2>&1
+15 4 1 * * cd /home/gerente_ti/apps/Leo && BACKUP_DIR=/home/gerente_ti/backups/leo BACKUP_KEEP_DAYS=100 deploy/backup.sh >> /home/gerente_ti/backups/leo/backup.log 2>&1
 ```
+Instalado el 2026-10-28.
 
 El script lee solo las cuatro claves que necesita de `deploy/.env.prod` (no hace `source`: el archivo no es
-bash válido) y no las muestra. Escribe en `BACKUP_DIR` un archivo por día: `leo-db-*.dump.enc`. Es la base completa, y **las
+bash válido) y no las muestra. Escribe en `BACKUP_DIR` un archivo por copia: `leo-db-*.dump.enc`. Es la base completa, y **las
 fotos, documentos y comprobantes van dentro**, porque viven en Postgres: no hay una segunda copia que
 acordarse de hacer. **Cópialo fuera del VPS** al menos una vez por semana (por ejemplo, `rsync` a otra
 máquina): un backup en el mismo disco no sobrevive a perder el disco.
