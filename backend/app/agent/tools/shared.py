@@ -64,6 +64,13 @@ def price_text(
     return f"{money(amount, symbol)}{_PERIOD_SUFFIX.get(periodo, '')}"
 
 
+def advisor_price_text(amount: Decimal, symbol: str, *, periodo: str = "unico") -> str:
+    """The price of what a person puts together (feature 020, D7): «S/ 0.00» read as free (T2.7)."""
+    if amount <= 0:
+        return "precio con un asesor"
+    return f"desde {money(amount, symbol)}{_PERIOD_SUFFIX.get(periodo, '')}"
+
+
 def clip(text: str, limit: int) -> str:
     """`text` on one line, at most `limit` characters, ending in an ellipsis if cut."""
     flat = " ".join(text.split())

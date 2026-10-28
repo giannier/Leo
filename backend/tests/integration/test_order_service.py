@@ -1235,3 +1235,59 @@ class TestAPackageThatChoosesFromOneCategory:
         }
         with pytest.raises(SelectionRefused):
             svc.add_selection(order, "Pintura látex")
+
+    def test_a_short_name_takes_the_one_item_it_names(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        # T2.7 (simulation): the customer says «martillo, wincha y alicate», never the full names.
+        kit = self._hardware(db, tenant)
+        db.add(
+            Product(
+                tenant_id=tenant.id,
+                name="Wincha 5 m",
+                price=Decimal("18"),
+                category="Herramientas",
+            )
+        )
+        db.flush()
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        assert svc.add_selection(order, "wincha")["nombre"] == "Wincha 5 m"
+        assert svc.add_selection(order, "taladros")["nombre"] == "Taladro"
+
+    def test_a_name_of_two_items_is_refused_offering_those_two_first(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        kit = self._hardware(db, tenant)
+        db.add(
+            Product(
+                tenant_id=tenant.id,
+                name="Martillo de goma",
+                price=Decimal("25"),
+                category="Herramientas",
+            )
+        )
+        db.flush()
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        with pytest.raises(SelectionRefused) as raised:
+            svc.add_selection(order, "martillo grande")
+
+        assert list(raised.value.suggestions[:2]) == ["Martillo", "Martillo de goma"]
+
+    def test_with_free_names_a_short_name_is_kept_as_the_customer_wrote_it(
+        self, db: Session, tenant: Tenant, conversation: Conversation
+    ) -> None:
+        kit = self._hardware(db, tenant, free=True)
+        order = draft(db, tenant, conversation)
+        svc = service(db, tenant)
+        svc.add_product(order, kit)
+
+        assert svc.add_selection(order, "taladro percutor") == {
+            "nombre": "taladro percutor",
+            "product_id": None,
+        }

@@ -91,7 +91,9 @@ class TestVersionOne:
             assert catalog.rules(version.id)
             assert len(catalog.faqs(version.id)) == 5
             assert len(catalog.objections(version.id)) == 5
-            assert 3 <= len(catalog.suggested_situations(version.id)) <= 5
+            # The education template (feature 020, migration 0073) brings nine; the cap is ten.
+            most = 10 if key == "instituto" else 5
+            assert 3 <= len(catalog.suggested_situations(version.id)) <= most
         instituto = catalog.rubro("instituto")
         assert instituto is not None and instituto.plantilla_sugerida == "certificaciones"
 

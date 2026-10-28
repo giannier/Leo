@@ -96,7 +96,7 @@ class TestHowTheCatalogueCloses:
 
 
 class TestWhatTheSearchShows:
-    async def _search(self, db: Session, template_key: str) -> str:
+    async def _search(self, db: Session, template_key: str, query: str = "asesoría") -> str:
         tenant = _tenant(db, template=template_key)
         _catalogue(db, tenant.id)
         conversation = _conversation(db, tenant)
@@ -113,7 +113,7 @@ class TestWhatTheSearchShows:
             options=options,
             sandbox=True,
         )
-        result: Any = await tool.handler(context, {"consulta": "asesoría"})
+        result: Any = await tool.handler(context, {"consulta": query})
         return str(result.texto)
 
     async def test_a_bookable_item_says_so_in_the_universal_process(self, db: Session) -> None:
@@ -121,6 +121,12 @@ class TestWhatTheSearchShows:
 
     async def test_the_old_templates_read_the_catalogue_as_before(self, db: Session) -> None:
         assert "[se agenda]" not in await self._search(db, "productos")
+
+    async def test_what_a_person_puts_together_does_not_read_as_free(self, db: Session) -> None:
+        # T2.7: «Colección a medida» showed «S/ 0.00».
+        text = await self._search(db, UNIVERSAL, "colección")
+
+        assert "precio con un asesor" in text and "S/ 0.00" not in text
 
 
 class TestATurn:

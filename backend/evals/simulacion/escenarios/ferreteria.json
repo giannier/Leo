@@ -1,0 +1,120 @@
+{
+ "negocio": "ferreteria",
+ "turnos": [
+  {
+   "cliente": "buenas, cuánto está el martillo? y tienen algo para pintar una pared",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "martillo"
+       }
+      },
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "pintura pared"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Hola! Soy Leo de Ferretería El Tornillo 👋\nEl *martillo de uña 16 oz* está S/ 38.00.\nPara la pared tenemos *pintura látex blanca de 1 galón* a S/ 58.00.\n¿Cuántos metros mide más o menos la pared que vas a pintar?"
+    }
+   ]
+  },
+  {
+   "cliente": "como 3 por 2.5 metros, que dos manos. dame el martillo y 2 galones. ah y ese kit de 3 herramientas qué trae?",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "agregar",
+        "producto_id": "{id:Martillo de uña 16 oz}",
+        "cantidad": 1
+       }
+      },
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "agregar",
+        "producto_id": "{id:Pintura látex blanca 1 galón}",
+        "cantidad": 2
+       }
+      }
+     ]
+    },
+    {
+     "texto": "Listo, te separé el *martillo* y *2 galones de pintura látex blanca*. El rendimiento por galón no lo tengo a la mano; si quieres, una persona del equipo te lo confirma.\nEl *Kit 3 herramientas* cuesta S/ 60.00 y tú eliges 3 herramientas de mano: martillo, destornillador, wincha o alicate.\n¿Te interesa el kit o seguimos con tu pedido así?"
+    }
+   ]
+  },
+  {
+   "cliente": "ah ya, entonces cambia: en vez del martillo suelto pon el kit con martillo, wincha y alicate",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "quitar",
+        "producto_id": "{id:Martillo de uña 16 oz}"
+       }
+      },
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "agregar",
+        "producto_id": "{id:Kit 3 herramientas}",
+        "cantidad": 1,
+        "seleccion": "martillo, wincha, alicate"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "Hecho ✅ Quedó así:\n• *Kit 3 herramientas* (martillo de uña, wincha 5 m y alicate universal): S/ 60.00\n• *2 galones de pintura látex blanca*: S/ 116.00\n*Total: S/ 176.00*\nPara el envío, pásame tu nombre completo y la dirección de entrega."
+    }
+   ]
+  },
+  {
+   "cliente": "Rosa Quispe, Jr Las Begonias 456 San Martín de Porres. oye y puedo cambiar el alicate del kit por otra pintura?",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "registrar_datos_cliente",
+       "args": {
+        "nombres": "Rosa Quispe",
+        "direccion": "Jr. Las Begonias 456, San Martín de Porres"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "Gracias, Rosa 🙌 Ya tengo tus datos.\nEl kit solo admite herramientas de mano, así que la pintura no puede ir dentro; si quieres otro galón, va aparte a S/ 58.00.\nTu pedido: *Kit 3 herramientas* (martillo, wincha y alicate) + *2 galones de pintura látex blanca*. *Total: S/ 176.00*.\n¿Lo confirmas así?"
+    }
+   ]
+  },
+  {
+   "cliente": "sí así nomás, confirmo",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "enviar_metodos_pago",
+       "args": {}
+      }
+     ]
+    },
+    {
+     "texto": "¡Perfecto, Rosa! Ahí tienes cómo pagar. Cuando hagas el Yape, envíame por aquí la foto del comprobante y lo pasamos a revisión."
+    }
+   ]
+  }
+ ]
+}

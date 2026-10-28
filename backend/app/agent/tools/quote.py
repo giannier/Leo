@@ -42,7 +42,7 @@ from app.agent.tools.handover import (
 from app.agent.tools.registry import ToolContext, ToolResult
 from app.models.business import Product
 from app.process.quote_data import QuoteDatum, data_of, topic_of
-from app.process.text import plain
+from app.process.text import NAME_WORD, match_name, plain
 from app.repositories.conversation import MessageRepository
 from app.repositories.product import ProductRepository
 
@@ -77,7 +77,7 @@ _PLAUSIBLE = {"fecha": _DATE, "cantidad": _QUANTITY, "personas": _QUANTITY}
 _ALL_PRODUCTS = re.compile(
     r"\b(todos?|todas?|ambos|ambas|vari[oa]s|cualquiera|(los|las) (dos|tres|cuatro))\b"
 )
-_NAME_WORD = 4
+_NAME_WORD = NAME_WORD
 LAST_HEARD = 40
 
 
@@ -113,31 +113,9 @@ def _required(chosen: Product | None, quoted: Sequence[Product]) -> list[str]:
     return [datum.label for datum, _ in _data(chosen, quoted)]
 
 
-def _tokens(text: str) -> set[str]:
-    """The stems of a product name: 4 letters of a word, or a number («20»)."""
-    spaced = re.sub(r"(\d)([a-z])", r"\1 \2", re.sub(r"([a-z])(\d)", r"\1 \2", plain(text)))
-    return {
-        w[:_NAME_WORD] if w.isalpha() else w
-        for w in re.findall(r"[a-z0-9]+", spaced)
-        if (w.isalpha() and len(w) >= _NAME_WORD) or w.isdigit()
-    }
-
-
 def match_product(value: str, products: Sequence[Product]) -> Product | None:
-    """The one product `value` names, if it names exactly one of `products`.
-
-    Only the words that tell the products apart count: «bidón de 20 L» names the Bidón when the
-    other one is the Caja de 20 L (both have «agua» and «20»), «agua de 20 L» names neither.
-    """
-    if not products:
-        return None
-    names = [_tokens(p.name) for p in products]
-    shared = set.intersection(*names) if len(names) > 1 else set()
-    said = _tokens(value)
-    scores = [len(said & (tokens - shared)) for tokens in names]
-    best = max(scores)
-    winners = [p for p, score in zip(products, scores, strict=True) if score == best]
-    return winners[0] if best > 0 and len(winners) == 1 else None
+    """The one product `value` names, if it names exactly one of `products` (`match_name`)."""
+    return match_name(value, products)
 
 
 def _chosen(

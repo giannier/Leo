@@ -42,6 +42,7 @@ from app.models.conversation import Conversation
 from app.models.orders import FULFILLMENT_STAGES, Order, OrderItem
 from app.orders.pricing import Delivery, Line, Rule, Totales, Zone, cents, price
 from app.process.inbound import location_of
+from app.process.text import FILLER_WORDS, NAME_WORD, match_name, name_tokens, plain
 from app.providers.whatsapp.base import InboundLocation
 from app.repositories.base import TenantScopeError
 from app.repositories.conversation import MessageRepository
@@ -77,6 +78,8 @@ MAX_NOTES = 20
 MAX_SELECTION_CHARS = 80
 # How many catalogue names an error offers the model when a choice is not valid.
 SUGGESTIONS = 10
+# The items a package's choice is matched against (a category, or the catalogue).
+MAX_POOL = 200
 
 _SPACES = re.compile(r"\s+")
 
@@ -689,18 +692,32 @@ class OrderService:
         ]
         if matches:
             return {"nombre": matches[0].name, "product_id": str(matches[0].id)}
+        pool = [
+            product
+            for product in self._products.search_active(
+                "",
+                categoria=owner.bundle_categoria if category and owner is not None else None,
+                limit=MAX_POOL,
+            )
+            if eligible(product)
+        ]
+        if owner is not None and not owner.bundle_permite_libres:
+            # «martillo» for the Martillo de uña 16 oz: customers rarely say a full name. Only when
+            # it names one item of the pool; a package that takes free names keeps what the
+            # customer wrote («Excel avanzado» is a topic, not the catalogue's Excel course).
+            named = match_name(name, pool)
+            if named is not None and _no_other_detail(name, named.name):
+                return {"nombre": named.name, "product_id": str(named.id)}
         named_elsewhere = any(
             product.name.casefold() == name.casefold() and not product.bundle_size
             for product in self._products.search_active(name, limit=25)
         )
         if owner is not None and owner.bundle_permite_libres and not named_elsewhere:
             return {"nombre": name, "product_id": None}
-        pool = self._products.search_active(
-            "",
-            categoria=owner.bundle_categoria if category and owner is not None else None,
-            limit=SUGGESTIONS * 3,
-        )
-        options = [product.name for product in pool if eligible(product)][:SUGGESTIONS]
+        # Those sharing a word with what was said go first: «martillo» with two hammers offers both.
+        said = name_tokens(name)
+        near = [product.name for product in pool if said & name_tokens(product.name)]
+        options = (near + [p.name for p in pool if p.name not in near])[:SUGGESTIONS]
         where = f"the category {owner.bundle_categoria}" if category and owner else "the catalogue"
         raise SelectionRefused(
             "not_in_catalog",
@@ -726,6 +743,20 @@ class OrderService:
                 f"Conversation {conversation.id!s} belongs to tenant "
                 f"{conversation.tenant_id!s}, not to {self._tenant_id!s}"
             )
+
+
+def _no_other_detail(said: str, product_name: str) -> bool:
+    """Whether every short word and number the customer said is in the product's name.
+
+    The name matcher keeps the long words; «Product B» must not take the Product A, nor «wincha
+    de 8 m» the Wincha 5 m.
+    """
+    words = set(re.findall(r"[a-z0-9]+", plain(product_name)))
+    return all(
+        word in words
+        for word in re.findall(r"[a-z0-9]+", plain(said))
+        if (word.isdigit() or len(word) < NAME_WORD) and word not in FILLER_WORDS
+    )
 
 
 def pin_of(location: InboundLocation, at: datetime) -> dict[str, Any]:

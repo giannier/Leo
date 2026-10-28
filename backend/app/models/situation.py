@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -55,6 +55,10 @@ class Situation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # None: every stage.
     etapas: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     siempre: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The item of the rubro template it came from, and the version (feature 020, migration 0072).
+    # Where it started; the business's later edits do not change them.
+    plantilla_clave: Mapped[str | None] = mapped_column(Text, nullable=True)
+    plantilla_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     estado: Mapped[str] = mapped_column(Text, nullable=False, server_default="borrador")
     origen: Mapped[str] = mapped_column(Text, nullable=False, server_default="manual")
     # Of `cuando_aplica`, computed by the worker after a save; None until then.

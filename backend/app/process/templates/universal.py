@@ -72,21 +72,21 @@ El pedido está completo: pide los datos que faltan ({datos_faltantes}) en UN so
 - Si cambia algo del pedido, hazlo con gestionar_pedido (busca lo nuevo con buscar_productos).
 - No envíes los métodos de pago todavía."""
 
+# Each line names how the business is paid ({pago_previo} or {pago_contra_entrega}): the prompt keeps only
+# the lines of the business's way, so a cash-on-delivery shop never reads about a tool it does not have.
 COBRO = """\
 El pedido y los datos están completos.
-Si el pago es previo:
-- Si los métodos de pago no se enviaron, llama a enviar_metodos_pago y dile que, cuando pague, envíe por aquí la foto del comprobante.
-- Si quiere pagar con tarjeta, dale este enlace: {link_pago_tarjeta}
-- Si ya se enviaron y vuelve a preguntar, dile que están en el mensaje anterior y pídele la foto del comprobante.
-Si el pago es contra entrega:
-- Resume el pedido (qué lleva, total y entrega) y pregúntale si lo confirma; cuando confirme, llama a gestionar_pedido(accion="confirmar").
-Si envió una imagen y ESTE TURNO dice que no es un comprobante, pídele la foto del comprobante.
-Si el ESTADO trae el motivo de un rechazo anterior, explícaselo y ayúdalo a corregirlo."""
+- {pago_previo}: si los métodos de pago no se enviaron, llama a enviar_metodos_pago y dile que, cuando pague, envíe por aquí la foto del comprobante.
+- {pago_previo}: si quiere pagar con tarjeta, dale este enlace: {link_pago_tarjeta}
+- {pago_previo}: si ya se enviaron y vuelve a preguntar, dile que están en el mensaje anterior y pídele la foto del comprobante.
+- {pago_previo}: si envió una imagen y ESTE TURNO dice que no es un comprobante, pídele la foto del comprobante.
+- {pago_previo}: si el ESTADO trae el motivo de un rechazo anterior, explícaselo y ayúdalo a corregirlo.
+- {pago_contra_entrega}: si aún no confirmó, resume el pedido (qué lleva, total y entrega) y pregúntale si lo confirma; cuando confirme, llama a gestionar_pedido(accion="confirmar") en ese turno."""
 
 VERIFICACION = """\
 - Si el pago está por verificar: dile que su comprobante o su pedido está en revisión y que le avisamos apenas se confirme. No pidas el comprobante otra vez, no reenvíes los métodos de pago y no digas que está confirmado.
 - Si quiere cambiar el pedido mientras está en revisión, explícale que ahora no se puede y deja anotado lo que pide con gestionar_pedido(accion="solicitar_cambio", nota=...).
-- Si el pago fue rechazado, el ESTADO trae el motivo: explícaselo con amabilidad y ayúdalo a corregirlo (otra foto, otro pago, o un cambio en el pedido o en sus datos). Con el pago rechazado el pedido sí se puede cambiar: hazlo en ese mismo turno con gestionar_pedido (agregar, quitar o cambiar_cantidad), nunca con solicitar_cambio. Puedes reenviar los métodos de pago una vez.
+- Si el pago fue rechazado, el ESTADO trae el motivo: explícaselo con amabilidad y ayúdalo a corregirlo (otra foto, otro pago, o un cambio en el pedido o en sus datos). Con el pago rechazado el pedido sí se puede cambiar: hazlo en ese mismo turno con gestionar_pedido (agregar, quitar o cantidad), nunca con solicitar_cambio. Puedes reenviar los métodos de pago una vez.
 - Si no se resuelve, usa derivar_a_humano.
 - Dudas generales (tiempos, entrega): respóndelas con consultar_conocimiento. No vuelvas a vender."""
 

@@ -292,7 +292,10 @@ def _hours_schema(scope: ToolScope) -> dict[str, Any]:
     return _object(
         {
             "producto_id": _text("producto_id del servicio, el que devolvió buscar_productos."),
-            "desde": _text("Opcional: AAAA-MM-DD, si pidió un día."),
+            "desde": _text(
+                "Opcional: AAAA-MM-DD si pidió un día; AAAA-MM-DDTHH:MM si pidió una hora o una "
+                "parte del día (la tarde: T14:00)."
+            ),
         },
         ["producto_id"],
     )

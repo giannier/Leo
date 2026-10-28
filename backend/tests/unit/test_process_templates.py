@@ -479,6 +479,8 @@ class TestPlaceholders:
             "caminos",
             "datos_requeridos",
             "datos_faltantes",
+            "pago_previo",
+            "pago_contra_entrega",
         } == KNOWN_PLACEHOLDERS
 
 

@@ -156,7 +156,21 @@ async def registrar_datos_cliente(context: ToolContext, arguments: dict[str, Any
         if not invalid:
             return ToolResult.error("No recibí ningún dato para guardar.")
         return ToolResult("error", data, f"No se guardó nada. {text}", None)
-    return ToolResult.hecho(data=data, texto=text, decir=_say(invalid, missing, valid_zones))
+    say = _say(invalid, missing, valid_zones)
+    if (
+        not missing
+        and not invalid
+        and context.closings_shown
+        and order is not None
+        and order.estado == "borrador"
+        and service.is_complete(order)
+    ):
+        # The universal process (feature 020, T2.7): the payment tools open on the next turn, so
+        # «sigue con el siguiente paso» led to «te envío los métodos de pago» with nothing sent.
+        # Confirming the order is a step the assistant can take now, and the customer's «sí» opens
+        # the payment.
+        say = CONFIRM_THE_ORDER
+    return ToolResult.hecho(data=data, texto=text, decir=say)
 
 
 def _settle_delivery_type(service: OrderService, order: Order) -> str | None:
@@ -191,6 +205,13 @@ def _describe(
         "Faltan: " + ", ".join(missing) + "." if missing else "Ya no falta ningún dato del cliente."
     )
     return "\n".join(lines)
+
+
+CONFIRM_THE_ORDER = (
+    "Ya están todos los datos. Resume el pedido (qué lleva y el total, del último resultado del "
+    "pedido) y pregúntale si lo confirma. No digas que ya le enviaste cómo pagar: eso va cuando "
+    "confirme."
+)
 
 
 def _say(invalid: dict[str, str], missing: list[str], zones: tuple[str, ...] = ()) -> str:

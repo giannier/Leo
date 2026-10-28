@@ -42,6 +42,13 @@ class LayerRule:
     texto: str
     etapa: str | None
     apagada: bool
+    # The business's own wording of a rubro rule (feature 020, D3); None: as published.
+    texto_propio: str | None = None
+
+    @property
+    def vigente(self) -> str:
+        """The text the assistant reads."""
+        return self.texto_propio or self.texto
 
 
 @dataclass(frozen=True)
@@ -70,6 +77,9 @@ class News:
     version: int
     seen: int
     rules: tuple[LayerRule, ...]
+    # Rules whose published text changed since the version seen (feature 020): a business that wrote
+    # its own text keeps it until it accepts the new one.
+    improved: tuple[LayerRule, ...] = ()
 
 
 class LayerResolver:
@@ -96,8 +106,9 @@ class LayerResolver:
         rubro_rules: tuple[str, ...] = ()
         if rubro is not None:
             off_rubro = off.get("rubro", frozenset())
+            own = self._switches.own_texts("rubro")
             rubro_rules = tuple(
-                rule.texto
+                own.get(rule.rule_key) or rule.texto
                 for rule in self._catalog.rules(rubro.id)
                 if rule.rule_key not in off_rubro
             )
@@ -121,10 +132,32 @@ class LayerResolver:
         if version is None:
             return []
         off = self._switches.off_keys(kind)
+        own = self._switches.own_texts(kind)
         return [
-            LayerRule(rule.rule_key, rule.texto, rule.etapa, rule.rule_key in off)
+            LayerRule(
+                rule.rule_key, rule.texto, rule.etapa, rule.rule_key in off, own.get(rule.rule_key)
+            )
             for rule in self._catalog.rules(version.id)
         ]
+
+    def rewrite(
+        self, key: str | None, rule_key: str, texto: str | None, *, by: uuid.UUID | None
+    ) -> LayerRule:
+        """Write a rubro rule in the business's own words, or go back to the catalogue's (None).
+
+        Only rubro rules: the process is the platform's (feature 020, D3). Raises `UnknownRule`.
+        """
+        version = self._published("rubro", key)
+        rules = {r.rule_key: r for r in self._catalog.rules(version.id)} if version else {}
+        rule = rules.get(rule_key)
+        if rule is None:
+            raise UnknownRule(rule_key)
+        cleaned = " ".join((texto or "").split()) or None
+        row = self._switches.set_text("rubro", rule_key, cleaned, by=by)
+        from app.process.service import DEFAULT_CACHE
+
+        DEFAULT_CACHE.invalidate(self._tenant_id)
+        return LayerRule(rule.rule_key, rule.texto, rule.etapa, row.apagada, cleaned)
 
     def switch(
         self, kind: str, key: str | None, rule_key: str, *, apagada: bool, by: uuid.UUID | None
@@ -135,12 +168,12 @@ class LayerResolver:
         rule = rules.get(rule_key)
         if rule is None:
             raise UnknownRule(rule_key)
-        self._switches.set(kind, rule_key, apagada=apagada, by=by)
+        row = self._switches.set(kind, rule_key, apagada=apagada, by=by)
         # The next turn must see it; other workers within the cache's 60 s.
         from app.process.service import DEFAULT_CACHE
 
         DEFAULT_CACHE.invalidate(self._tenant_id)
-        return LayerRule(rule.rule_key, rule.texto, rule.etapa, apagada)
+        return LayerRule(rule.rule_key, rule.texto, rule.etapa, apagada, row.texto_propio)
 
     def news(self, kind: str, key: str | None) -> News | None:
         """What the published version added since the one the reviewer saw.
@@ -159,14 +192,21 @@ class LayerResolver:
         if seen >= version.version:
             return None
         before = self._catalog.version(kind, key, seen)
-        known = {r.rule_key for r in self._catalog.rules(before.id)} if before else set()
+        known = {r.rule_key: r.texto for r in self._catalog.rules(before.id)} if before else {}
         off = self._switches.off_keys(kind)
+        own = self._switches.own_texts(kind)
+        current = self._catalog.rules(version.id)
         added = tuple(
-            LayerRule(r.rule_key, r.texto, r.etapa, r.rule_key in off)
-            for r in self._catalog.rules(version.id)
+            LayerRule(r.rule_key, r.texto, r.etapa, r.rule_key in off, own.get(r.rule_key))
+            for r in current
             if r.rule_key not in known
         )
-        return News(kind, key, version.version, seen, added)
+        improved = tuple(
+            LayerRule(r.rule_key, r.texto, r.etapa, r.rule_key in off, own.get(r.rule_key))
+            for r in current
+            if r.rule_key in known and known[r.rule_key] != r.texto
+        )
+        return News(kind, key, version.version, seen, added, improved)
 
     def mark_seen(self, kind: str, key: str | None) -> None:
         version = self._published(kind, key)

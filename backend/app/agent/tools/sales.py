@@ -31,6 +31,7 @@ from typing import Any
 from app.agent.outbound import OutboundFailed
 from app.agent.tools.registry import ToolContext, ToolResult
 from app.agent.tools.shared import (
+    advisor_price_text,
     automatic,
     clip,
     currency_symbol,
@@ -165,6 +166,8 @@ def _category_rows(context: ToolContext) -> list[ListRow]:
 
 def _price_label(product: Product, symbol: str) -> str:
     price: Decimal = product.price
+    if product.modo_venta == "informar":
+        return advisor_price_text(price, symbol, periodo=product.periodo)
     if product.modo_venta == "cotizacion":
         return (
             "Se cotiza"

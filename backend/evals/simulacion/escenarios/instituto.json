@@ -1,0 +1,135 @@
+{
+ "negocio": "instituto",
+ "turnos": [
+  {
+   "cliente": "hola buenas tardes, quería info para certificarme, trabajo hace 6 años en almacén",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "certificación almacén"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Hola, buenas tardes! Soy Leo, asesor virtual del Instituto Aprende Perú 👋\nCon 6 años en almacén, el *Certificado en Gestión de almacenes* (S/ 120.00) respalda justamente esa experiencia.\n¿Cómo te llamas?"
+    }
+   ]
+  },
+  {
+   "cliente": "Carlos. y si saco 3 certificados cuánto sería? quiero ese, el de seguridad y salud y uno de inventarios",
+   "situaciones": [
+    "educacion.precio_por_certificado",
+    "educacion.cualquier_tema"
+   ],
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "registrar_datos_cliente",
+       "args": {
+        "nombres": "Carlos"
+       }
+      },
+      {
+       "name": "elegir_camino",
+       "args": {
+        "camino": "certificacion"
+       }
+      },
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "pack certificados"
+       }
+      }
+     ]
+    },
+    {
+     "tools": [
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "agregar",
+        "producto_id": "{id:Pack 3 certificados}",
+        "cantidad": 1,
+        "seleccion": "Certificado en Gestión de almacenes, Certificado en Seguridad y salud en el trabajo, Inventarios"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "Carlos, cada certificado por separado cuesta *S/ 120.00*, y con el *Pack 3 certificados* los tres quedan en *S/ 300.00*.\nYa te lo separé con: Gestión de almacenes, Seguridad y salud en el trabajo e *Inventarios* (ese tema también lo certificamos).\nPara emitir tus certificados necesito tu DNI, tus apellidos y tu correo."
+    }
+   ]
+  },
+  {
+   "cliente": "72345678, Ramírez Soto, carlos.rs@gmail.com",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "registrar_datos_cliente",
+       "args": {
+        "dni": "72345678",
+        "apellidos": "Ramírez Soto",
+        "correo": "carlos.rs@gmail.com"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "Gracias, Carlos. Tu pedido: *Pack 3 certificados* (Gestión de almacenes, Seguridad y salud en el trabajo e Inventarios), total *S/ 300.00*. ¿Lo confirmas?"
+    }
+   ]
+  },
+  {
+   "cliente": "sí dale. ah y el diplomado de logística cuánto cuesta? me interesa para el próximo año",
+   "situaciones": [
+    "educacion.programa_completo"
+   ],
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "enviar_metodos_pago",
+       "args": {}
+      },
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "diplomado logística"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Listo, Carlos! Ahí tienes cómo pagar tu pack (S/ 300.00); cuando pagues, envíame la foto del comprobante por aquí.\nSobre el *Diplomado en Logística y cadena de suministro*: el precio y los detalles te los da un asesor. ¿En qué horario podrías estudiar el próximo año?"
+    }
+   ]
+  },
+  {
+   "cliente": "en las noches, después de las 7",
+   "situaciones": [
+    "educacion.programa_completo"
+   ],
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "derivar_a_humano",
+       "args": {
+        "motivo": "asesoria",
+        "resumen": "Carlos (ya compró el Pack 3 certificados, pago pendiente de comprobante) quiere información del Diplomado en Logística y cadena de suministro para el próximo año; puede estudiar en las noches, después de las 7.",
+        "animo": "tranquilo"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -143,6 +143,11 @@ class ConfigHistoryService:
         if not {"kind", "rule_key", "key"} <= set(before):
             raise HistoryError("not_undoable", "No quedó guardado cómo estaba la regla.")
         try:
+            if "texto_propio" in before:  # a rubro rule in the business's words (feature 020)
+                LayerResolver(self._session, self._tenant_id).rewrite(
+                    before["key"], before["rule_key"], before["texto_propio"], by=self._actor
+                )
+                return entry.resumen
             LayerResolver(self._session, self._tenant_id).switch(
                 before["kind"],
                 before["key"],
