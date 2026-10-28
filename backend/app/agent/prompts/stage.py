@@ -439,6 +439,14 @@ def _one_line(text: str, limit: int = _MAX_STATE_TEXT) -> str:
     return " ".join(text.split())[:limit]
 
 
+def _choice(text: str, limit: int = 40) -> str:
+    """A package choice, cut at a word: «…salud en el t» read as a different topic (020, T2.7)."""
+    flat = " ".join(text.split())
+    if len(flat) <= limit:
+        return flat
+    return flat[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;") + "…"
+
+
 def _symbol(currency: str) -> str:
     return _CURRENCY_SYMBOLS.get(currency.upper(), currency.upper())
 
@@ -814,9 +822,7 @@ def _order_line(facts: Facts, limits: _StateLimits) -> str:
     for item in order.items[: limits.order_items]:
         text = f"{item.cantidad}× {_one_line(item.nombre, 60)}"
         if item.selecciones:
-            text += (
-                f" [{', '.join(_one_line(s, 40) for s in item.selecciones[: limits.selections])}]"
-            )
+            text += f" [{', '.join(_choice(s) for s in item.selecciones[: limits.selections])}]"
         items.append(text)
     if len(order.items) > limits.order_items:
         items.append(f"y {len(order.items) - limits.order_items} más")
@@ -981,6 +987,12 @@ def _placeholder_values(config: EffectiveProcessConfig, facts: Facts) -> dict[st
         "caminos": paths or None,
         "datos_requeridos": ", ".join(options.datos_requeridos) or None,
         "datos_faltantes": ", ".join(facts.datos_faltantes) or None,
+        # How the business is paid (the universal process's COBRO, feature 020): the lines of the
+        # other way are dropped.
+        "pago_previo": "Pago previo" if facts.modalidad_pago != "contra_entrega" else None,
+        "pago_contra_entrega": (
+            "Pago contra entrega" if facts.modalidad_pago == "contra_entrega" else None
+        ),
     }
     values.update({f"var.{key}": value for key, value in options.variables.items()})
     return values

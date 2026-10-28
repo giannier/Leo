@@ -39,7 +39,8 @@ class TestResolution:
     def test_the_rubro_rules_reach_the_configuration(self, db: Session, tenant: Tenant) -> None:
         config = _config(db, tenant)
 
-        assert config.rubro_version == 1
+        # Version 2: the education template of feature 020 (migration 0073).
+        assert config.rubro_version == 2
         assert any("asesor académico" in rule for rule in config.rubro_rules)
 
     def test_a_rubro_rule_switched_off_is_gone(self, db: Session, tenant: Tenant) -> None:
@@ -98,7 +99,7 @@ class TestNewVersions:
         self, db: Session, tenant: Tenant
     ) -> None:
         resolver = LayerResolver(db, tenant.id)
-        assert resolver.news("rubro", "instituto") is None  # starts at v1
+        assert resolver.news("rubro", "instituto") is None  # starts at the published v2
         resolver.switch("rubro", "instituto", "rubro.vocabulario", apagada=True, by=None)
 
         self._publish_with(db, ("rubro.nueva", "Regla nueva del rubro."))
@@ -107,7 +108,7 @@ class TestNewVersions:
         assert "Regla nueva del rubro." in rules
         assert not any("evita" in r for r in rules)
         news = resolver.news("rubro", "instituto")
-        assert news is not None and (news.seen, news.version) == (1, 2)
+        assert news is not None and (news.seen, news.version) == (2, 3)
         assert [r.rule_key for r in news.rules] == ["rubro.nueva"]
 
         resolver.mark_seen("rubro", "instituto")

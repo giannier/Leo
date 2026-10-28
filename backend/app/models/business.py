@@ -180,6 +180,8 @@ class AgentConfig(Base):
     piloto_pct: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
     # True when the owner picked the template by hand: capabilities then leave it alone.
     plantilla_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The version of its rubro's template the business applied (feature 020); NULL until it does.
+    plantilla_rubro_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     agent_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="Leo")
     tone: Mapped[str] = mapped_column(Text, nullable=False, server_default="cercano")

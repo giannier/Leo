@@ -22,6 +22,7 @@ from app.learning.rubro import candidates
 from app.models.catalog import CatalogSuggestedSituation
 from app.repositories.catalog import CatalogRepository
 from app.services.admin import record_audit
+from app.services.rubro_template import key_from_title
 
 router = APIRouter(prefix="/platform-admin/learning", tags=["platform-admin"])
 ADMIN = ((401, "`not_authenticated`"), (404, "`not_found` for anybody but the operator"))
@@ -116,6 +117,7 @@ def adopt(body: AdoptIn, admin: PlatformAdminDep, session: SessionDep) -> AdoptO
         CatalogSuggestedSituation(
             version_id=draft.id,
             orden=len(existing) + 1,
+            clave=key_from_title(body.titulo),
             titulo=body.titulo,
             cuando_aplica=body.cuando_aplica,
             que_hace=body.que_hace,

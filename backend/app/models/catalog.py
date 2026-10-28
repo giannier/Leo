@@ -28,6 +28,7 @@ from typing import Any
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Integer,
@@ -88,6 +89,9 @@ class CatalogVersion(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     # The result of the eval run that allowed publishing it (TASK-466).
     evals: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     notas: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # A rubro version's template content beyond its rows (feature 020, migration 0072): the paths,
+    # the customer data to ask before charging and the payment. Frozen with the version.
+    plantilla: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     publicada_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     publicada_por: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id"), nullable=True
@@ -143,6 +147,13 @@ class CatalogSuggestedSituation(_VersionChild, Base):
     que_hace: Mapped[str] = mapped_column(Text, nullable=False)
     # {campo: etiqueta}: what the business fills in ("minimo_unidades": "Desde cuántas...").
     campos: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    # Its key across versions (feature 020): what tells a business that an item is new or improved.
+    # Rows written before migration 0072 have none and are keyed by their title.
+    clave: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Copied to the business's situation: the stages it enters at, and whether it always enters
+    # there (a suggestion about the moment, like greeting, is not found by the customer's words).
+    etapas: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    siempre: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
 
 
 class CatalogEmbedding(Base):
@@ -168,17 +179,26 @@ class CatalogEmbedding(Base):
 
 
 class TenantRuleSwitch(Base):
-    """A template or rubro rule a business switched off (017, C-01 and C-04)."""
+    """A template or rubro rule a business switched off (017, C-01 and C-04), or a rubro rule it
+    rewrote in its own words (feature 020, D3)."""
 
     __tablename__ = "tenant_rule_switches"
-    __table_args__ = (enum_check("kind", CATALOG_KINDS, "kind"),)
+    __table_args__ = (
+        enum_check("kind", CATALOG_KINDS, "kind"),
+        CheckConstraint(
+            "texto_propio IS NULL OR char_length(btrim(texto_propio)) BETWEEN 1 AND 600",
+            name="texto_propio",
+        ),
+    )
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
     )
     kind: Mapped[str] = mapped_column(Text, primary_key=True)
     rule_key: Mapped[str] = mapped_column(Text, primary_key=True)
-    apagada: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    apagada: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # The business's own wording of a rubro rule (feature 020, migration 0072); NULL: as published.
+    texto_propio: Mapped[str | None] = mapped_column(Text, nullable=True)
     cambiado_por: Mapped[uuid.UUID | None] = mapped_column(
         PgUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

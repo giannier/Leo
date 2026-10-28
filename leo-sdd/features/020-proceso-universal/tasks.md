@@ -40,17 +40,26 @@ cambie el prompt llega a producción sin evals con el modelo real (constitución
   pedido, cotización ni datos (spec §7).
 - **T2.6** Pruebas: presupuesto de 6 000 tokens, coherencia prompt-herramientas, flujos con el modelo simulado (mock) por tipo
   de negocio, aislamiento.
-- **T2.7** Conversaciones simuladas con Claude como agente (sin la API de OpenAI) sobre la batería universal; informe de lo que
-  muestran y de lo que no pueden medir. **Se corre al cerrar F3**, junto con las plantillas de rubro (educación incluida), para
-  no hacer dos pasadas.
+- **T2.7** ✅ Conversaciones simuladas con Claude como agente (sin la API de OpenAI): cinco negocios (pedido con paquete por
+  categoría, cita + pedido, cotización, «lo arma una persona», educación con la plantilla aplicada). Informe en
+  [simulacion-t27.md](simulacion-t27.md): ocho fallas encontradas y corregidas (C-04), entre ellas siete rubros que mandaban
+  derivar toda reserva por encima de la agenda (migración 0074). Arnés y escenarios en `backend/evals/simulacion/`.
 
 ## F3 · Plantillas de rubro editables
 
-- **T3.1** Modelo de «aplicar plantilla»: las piezas se copian al negocio con su origen; editar, apagar y borrar.
-- **T3.2** Novedades por cambio cuando se publica una versión nueva de la plantilla (extiende `tenant_catalog_seen`).
-- **T3.3** Las reglas de rubro de hoy pasan a ser situaciones sugeridas (D3), con migración de los negocios existentes.
-- **T3.4** Contenido: plantilla de educación (con certificaciones), luego los rubros de las 20 empresas, luego el resto, y
+- **T3.1** ✅ Modelo de «aplicar plantilla» (migración 0072, `services/rubro_template.py`): las situaciones sugeridas se copian
+  al negocio con su clave y versión (activas si están completas, borradores si piden un dato), y los caminos, datos y pago de
+  la plantilla llenan solo las opciones que el negocio no definió (C-02). API `GET /assistant/rubro/plantilla`,
+  `POST …/aplicar`; historial con deshacer.
+- **T3.2** ✅ Novedades por elemento cuando se publica una versión nueva: «nueva» o «mejorada», aceptar una por una o marcarlas
+  vistas (C-03). API `POST …/novedades/{clave}/aceptar` y `POST …/novedades/vistas`. Las reglas mejoradas también se avisan.
+- **T3.3** ✅ D3 cumplida con C-01: las reglas del rubro siguen siendo reglas, pero el negocio las escribe con sus palabras
+  (`PUT /assistant/rules/rubro/{rule_key}/texto`) o las apaga. Las copias hechas antes desde las sugeridas se reconocen.
+- **T3.4** Contenido: ✅ plantilla de educación con certificaciones (migración 0073, rubro `instituto` v2: 5 reglas, 9
+  situaciones, 2 caminos, datos y pago); pendiente: los rubros de las 20 empresas (falta saber cuáles son), el resto, y
   «otros» genérico.
+  *Verificación:* `tests/integration/test_rubro_template.py` (36 pruebas: aplicar, valores, idempotencia, copias anteriores,
+  opciones propias, novedades, aceptar, vistas, texto propio, historial, permisos, aislamiento).
 
 ## F4 · Panel y administración
 

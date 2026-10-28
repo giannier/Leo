@@ -40,3 +40,11 @@ scenarios must pass (measured: 16 to 18 of 18, 24 of 26 on the three sets togeth
 transcripts and `OPENAI_CHAT_MODEL=<model>` runs it on another model (it does not touch production). Model answers vary: run it more
 than once before trusting a change, read the transcripts and not only the percentage (a stronger model, gpt-5.4, answered as stiffly
 as the mini when the instructions were a form), and when you find a bad conversation, add it here before fixing it.
+
+## Simulated conversations, without the API (`simulacion/`)
+
+`simulacion/harness.py` runs the real system (stages, prompt, tools, orders, agenda, database) inside a transaction that is
+rolled back, and takes the model's answers from the steps in `simulacion/escenarios/*.json`. When the script runs out it saves
+the exact call the model would receive, to decide the next step. It calls no API and does **not** replace the real-model evals:
+it shows whether the prompt and the tools lead to a close, not how the model reads them. First run's report:
+`leo-sdd/features/020-proceso-universal/simulacion-t27.md`.

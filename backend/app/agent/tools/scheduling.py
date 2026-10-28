@@ -13,7 +13,7 @@ but every check runs, so the owner sees the conversation as it would go.
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, time
 from typing import Any
 
 from app.agent.tools.registry import ToolContext, ToolResult
@@ -93,13 +93,36 @@ def _day(raw: object) -> date | None:
         return None
 
 
+def _hour(raw: object) -> time | None:
+    """The hour in «2026-10-29T15:00»: the customer asked for one («el jueves en la tarde»)."""
+    text = str(raw or "").strip()
+    if len(text) < 16 or text[10] not in "T ":
+        return None
+    try:
+        return time.fromisoformat(text[11:16])
+    except ValueError:
+        return None
+
+
 async def consultar_horarios(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
     scheduling = Scheduling(context.session, context.tenant_id)
     product = _product(context, scheduling, arguments)
     refused = _not_bookable(product)
     if refused is not None or product is None:
         return refused or ToolResult.error("producto_id no es válido.")
-    slots = scheduling.offer(product, on_or_after=_day(arguments.get("desde")))
+    day = _day(arguments.get("desde"))
+    slots = scheduling.offer(product, on_or_after=day)
+    hour = _hour(arguments.get("desde"))
+    if day is not None and hour is not None:
+        # Feature 020, T2.7: «el jueves por la tarde» was offered Thursday 09:00. That day, from
+        # that hour; the days after, as they are.
+        zone = scheduling.zone()
+        later = [
+            s
+            for s in slots
+            if s.start.astimezone(zone).date() != day or s.start.astimezone(zone).time() >= hour
+        ]
+        slots = later or slots
     if not slots:
         return ToolResult.no_disponible(
             decir=(

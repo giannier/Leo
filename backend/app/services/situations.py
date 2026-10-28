@@ -177,7 +177,7 @@ class SituationService:
                 f"{label}: {valores[key].strip()}" for key, label in suggestion.campos.items()
             )
             que_hace = f"{que_hace} ({filled})"
-        return self.create(
+        situation = self.create(
             SituationInput(
                 titulo=suggestion.titulo[:80],
                 cuando_aplica=suggestion.cuando_aplica,
@@ -186,6 +186,13 @@ class SituationService:
             by=by,
             origen="sugerida_rubro",
         )
+        # Its key in the template (feature 020): applying the template later does not copy it again.
+        from app.services.rubro_template import item_key
+
+        situation.plantilla_clave = item_key(suggestion)
+        situation.plantilla_version = version.version if version is not None else None
+        self._session.flush()
+        return situation
 
     def set_migrated_text(self, text: str | None) -> Situation | None:
         """The wizard's old free text, kept as the migrated situation (RF-011)."""

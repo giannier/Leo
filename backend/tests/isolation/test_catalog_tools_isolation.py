@@ -247,6 +247,33 @@ class TestSearching:
             "estado: hecho\nNo hay ningún producto que coincida con 'zapatillas'."
         )
 
+    async def test_a_phrase_matched_word_by_word_stays_in_the_tenant(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        # Feature 020, T2.7: «pintura pared» names no product whole; its words do.
+        _add(db, tenant_a, "Pintura látex blanca 1 galón")
+        _add(db, tenant_a, "Martillo")
+        _add(db, tenant_b, "Pintura para pared exterior")
+
+        result = await buscar_productos(_context(db, tenant_a), {"consulta": "pintura pared"})
+
+        assert result.data["coincidencia"] is False  # partial: not what the customer named
+        assert [p["nombre"] for p in result.data["productos"]] == ["Pintura látex blanca 1 galón"]
+        assert "coinciden con alguna de sus palabras" in _text(result)
+
+    async def test_a_phrase_whose_words_are_all_in_a_name_is_a_match(
+        self, db: Session, tenant_a: TenantFixture, tenant_b: TenantFixture
+    ) -> None:
+        _add(db, tenant_a, "Crema hidratante de aloe 200 ml")
+        _add(db, tenant_b, "Crema de aloe vera")
+
+        result = await buscar_productos(_context(db, tenant_a), {"consulta": "crema aloe"})
+
+        assert result.data["coincidencia"] is True
+        assert [p["nombre"] for p in result.data["productos"]] == [
+            "Crema hidratante de aloe 200 ml"
+        ]
+
     async def test_a_missed_category_names_the_category(
         self, db: Session, tenant_a: TenantFixture
     ) -> None:

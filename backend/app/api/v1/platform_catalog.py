@@ -33,6 +33,7 @@ from app.repositories.catalog import CatalogRepository
 from app.services.admin import record_audit
 from app.services.catalog_evals import EVALS_JOB, evals_allow_publishing
 from app.services.catalog_knowledge import INDEX_CATALOG_JOB
+from app.services.rubro_template import key_from_title
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +72,20 @@ class ObjectionIn(BaseModel):
 
 
 class SuggestedIn(BaseModel):
+    # The item's stable key across versions (feature 020); given from the title when missing.
+    clave: (
+        Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]+(\.[a-z0-9_]+)*$", max_length=80)]
+        | None
+    ) = None
     titulo: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
     cuando_aplica: Short
     que_hace: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)
     ]
     campos: dict[str, Short] = Field(default_factory=dict)
+    # The stages it enters at (none: all) and whether it always enters there (feature 020).
+    etapas: list[Stage] | None = None
+    siempre: bool = False
 
 
 class VersionContent(BaseModel):
@@ -150,10 +159,13 @@ def _view(session: SessionDep, version: CatalogVersion) -> VersionView:
         ],
         situaciones_sugeridas=[
             SuggestedIn(
+                clave=s.clave,
                 titulo=s.titulo,
                 cuando_aplica=s.cuando_aplica,
                 que_hace=s.que_hace,
                 campos=dict(s.campos),
+                etapas=[Stage(e) for e in s.etapas] if s.etapas else None,
+                siempre=s.siempre,
             )
             for s in catalog.suggested_situations(version.id)
         ],
@@ -264,6 +276,24 @@ def put_draft(
         raise ApiError(
             status_code=422, error="invalid_content", message="A rubro rule has no stage."
         )
+    # An item keeps its key when the operator edits it (by title if the screen did not send it):
+    # it is how a business that applied the template recognises it in the next version.
+    kept = {
+        s.titulo: s.clave
+        for s in CatalogRepository(session).suggested_situations(version.id)
+        if s.clave
+    }
+    suggested = [
+        {
+            **s.model_dump(mode="json"),
+            "clave": s.clave or kept.get(s.titulo) or key_from_title(s.titulo),
+        }
+        for s in body.situaciones_sugeridas
+    ]
+    if len({s["clave"] for s in suggested}) != len(suggested):
+        raise ApiError(
+            status_code=422, error="invalid_content", message="Repeated suggested situation key."
+        )
     for model in (CatalogRule, CatalogFaq, CatalogObjection, CatalogSuggestedSituation):
         for row in session.query(model).filter(model.version_id == version.id):
             session.delete(row)
@@ -274,10 +304,8 @@ def put_draft(
         session.add(CatalogFaq(version_id=version.id, orden=i, **faq.model_dump()))
     for i, objection in enumerate(body.objeciones, start=1):
         session.add(CatalogObjection(version_id=version.id, orden=i, **objection.model_dump()))
-    for i, situation in enumerate(body.situaciones_sugeridas, start=1):
-        session.add(
-            CatalogSuggestedSituation(version_id=version.id, orden=i, **situation.model_dump())
-        )
+    for i, situation in enumerate(suggested, start=1):
+        session.add(CatalogSuggestedSituation(version_id=version.id, orden=i, **situation))
     version.notas = body.notas
     record_audit(
         session,

@@ -158,24 +158,34 @@
    "texto": "El pedido y los datos están completos."
   },
   {
-   "rule_key": "universal.COBRO.pago_es_previo_metodos_pago",
+   "rule_key": "universal.COBRO.pago_previo_metodos_pago_no",
    "etapa": "COBRO",
-   "texto": "Si el pago es previo:\n- Si los métodos de pago no se enviaron, llama a enviar_metodos_pago y dile que, cuando pague, envíe por aquí la foto del comprobante.\n- Si quiere pagar con tarjeta, dale este enlace: {link_pago_tarjeta}\n- Si ya se enviaron y vuelve a preguntar, dile que están en el mensaje anterior y pídele la foto del comprobante."
+   "texto": "- {pago_previo}: si los métodos de pago no se enviaron, llama a enviar_metodos_pago y dile que, cuando pague, envíe por aquí la foto del comprobante."
   },
   {
-   "rule_key": "universal.COBRO.pago_es_contra_entrega_resume",
+   "rule_key": "universal.COBRO.pago_previo_quiere_pagar_con",
    "etapa": "COBRO",
-   "texto": "Si el pago es contra entrega:\n- Resume el pedido (qué lleva, total y entrega) y pregúntale si lo confirma; cuando confirme, llama a gestionar_pedido(accion=\"confirmar\")."
+   "texto": "- {pago_previo}: si quiere pagar con tarjeta, dale este enlace: {link_pago_tarjeta}"
   },
   {
-   "rule_key": "universal.COBRO.envio_imagen_este_turno_dice",
+   "rule_key": "universal.COBRO.pago_previo_ya_se_enviaron",
    "etapa": "COBRO",
-   "texto": "Si envió una imagen y ESTE TURNO dice que no es un comprobante, pídele la foto del comprobante."
+   "texto": "- {pago_previo}: si ya se enviaron y vuelve a preguntar, dile que están en el mensaje anterior y pídele la foto del comprobante."
   },
   {
-   "rule_key": "universal.COBRO.estado_trae_motivo_rechazo_anterior",
+   "rule_key": "universal.COBRO.pago_previo_envio_imagen_este",
    "etapa": "COBRO",
-   "texto": "Si el ESTADO trae el motivo de un rechazo anterior, explícaselo y ayúdalo a corregirlo."
+   "texto": "- {pago_previo}: si envió una imagen y ESTE TURNO dice que no es un comprobante, pídele la foto del comprobante."
+  },
+  {
+   "rule_key": "universal.COBRO.pago_previo_estado_trae_motivo",
+   "etapa": "COBRO",
+   "texto": "- {pago_previo}: si el ESTADO trae el motivo de un rechazo anterior, explícaselo y ayúdalo a corregirlo."
+  },
+  {
+   "rule_key": "universal.COBRO.pago_contra_entrega_aun_no",
+   "etapa": "COBRO",
+   "texto": "- {pago_contra_entrega}: si aún no confirmó, resume el pedido (qué lleva, total y entrega) y pregúntale si lo confirma; cuando confirme, llama a gestionar_pedido(accion=\"confirmar\") en ese turno."
   },
   {
    "rule_key": "universal.VERIFICACION.pago_esta_por_verificar_dile",
@@ -190,7 +200,7 @@
   {
    "rule_key": "universal.VERIFICACION.pago_fue_rechazado_estado_trae",
    "etapa": "VERIFICACION",
-   "texto": "- Si el pago fue rechazado, el ESTADO trae el motivo: explícaselo con amabilidad y ayúdalo a corregirlo (otra foto, otro pago, o un cambio en el pedido o en sus datos). Con el pago rechazado el pedido sí se puede cambiar: hazlo en ese mismo turno con gestionar_pedido (agregar, quitar o cambiar_cantidad), nunca con solicitar_cambio. Puedes reenviar los métodos de pago una vez."
+   "texto": "- Si el pago fue rechazado, el ESTADO trae el motivo: explícaselo con amabilidad y ayúdalo a corregirlo (otra foto, otro pago, o un cambio en el pedido o en sus datos). Con el pago rechazado el pedido sí se puede cambiar: hazlo en ese mismo turno con gestionar_pedido (agregar, quitar o cantidad), nunca con solicitar_cambio. Puedes reenviar los métodos de pago una vez."
   },
   {
    "rule_key": "universal.VERIFICACION.no_se_resuelve_usa_derivar",

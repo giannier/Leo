@@ -47,6 +47,31 @@ def _shop(db: Session) -> tuple[Tenant, Product, Conversation]:
 
 
 class TestOffering:
+    async def test_an_hour_asked_for_drops_the_earlier_ones_of_that_day(self, db: Session) -> None:
+        # Feature 020, T2.7: «el jueves por la tarde» was offered Thursday 09:00.
+        tenant, service, conversation = _shop(db)
+        context = _context(db, tenant, conversation)
+        tomorrow = at(9, days=1).astimezone(LIMA).date().isoformat()
+
+        result = await consultar_horarios(
+            context, {"producto_id": str(service.id), "desde": f"{tomorrow}T14:00"}
+        )
+
+        assert result.texto is not None
+        offered = [line for line in result.texto.split("\n") if line.startswith("- slot ")]
+        assert offered and f"slot {slot_token(at(9, days=1), LIMA)}" not in result.texto
+        assert f"slot {slot_token(at(15, days=1), LIMA)}" in result.texto
+
+    async def test_a_day_alone_offers_from_the_morning(self, db: Session) -> None:
+        tenant, service, conversation = _shop(db)
+        tomorrow = at(9, days=1).astimezone(LIMA).date().isoformat()
+
+        result = await consultar_horarios(
+            _context(db, tenant, conversation), {"producto_id": str(service.id), "desde": tomorrow}
+        )
+
+        assert f"slot {slot_token(at(9, days=1), LIMA)}" in (result.texto or "")
+
     async def test_at_most_three_slots_the_model_can_pass_back(self, db: Session) -> None:
         tenant, service, conversation = _shop(db)
         context = _context(db, tenant, conversation)

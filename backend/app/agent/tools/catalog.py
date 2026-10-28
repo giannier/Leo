@@ -19,6 +19,7 @@ model can relay; an empty list is an absence it will be tempted to fill.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -29,6 +30,7 @@ from app.agent.tools.handover import latest_customer_text
 from app.agent.tools.quote import match_product
 from app.agent.tools.registry import ToolContext, ToolRegistry, ToolResult
 from app.agent.tools.shared import (
+    advisor_price_text,
     applies_to,
     automatic,
     clip,
@@ -41,6 +43,7 @@ from app.models.business import Product
 from app.models.media import MediaAsset
 from app.models.sales_config import Promotion
 from app.process.quote_data import data_of
+from app.process.text import FILLER_WORDS, NAME_WORD, name_tokens, plain
 from app.repositories.media import MediaAssetRepository
 from app.repositories.product import ProductRepository
 from app.repositories.sales_config import PromotionRepository
@@ -48,6 +51,8 @@ from app.services.catalog_knowledge import search_rubro
 from app.services.knowledge import retrieve
 
 MAX_CATALOG_RESULTS = 12
+# The live products a phrase is matched against word by word (featured first, then by name).
+MAX_SCANNED = 500
 MAX_KNOWLEDGE_RESULTS = 4
 # Long enough to answer, short enough that four of them plus the catalogue do
 # not crowd the conversation out of the context window.
@@ -252,7 +257,9 @@ def _product_line(
     """
     parts = [f"- {item['nombre']} (producto_id: {item['producto_id']}):"]
     parts.append(
-        price_text(
+        advisor_price_text(Decimal(item["precio"]), symbol, periodo=item["periodo"])
+        if item["modo_venta"] == "informar"
+        else price_text(
             Decimal(item["precio"]),
             symbol,
             periodo=item["periodo"],
@@ -345,6 +352,43 @@ def _enrich(
     ]
 
 
+def _by_words(
+    products: ProductRepository, query: str, only_bundles: bool
+) -> tuple[list[Product], bool]:
+    """The products that match the most words of a phrase no name contains whole, and whether
+    they match every word («crema aloe» is the Crema hidratante de aloe; «pintura pared», only
+    partly the paint).
+
+    «pintura pared» found nothing and fell back to the whole catalogue (feature 020, T2.7): with
+    hundreds of products the paint would not even be in the listing.
+    """
+    # By stems and without accents, in Python: «certificación almacén» is the Certificado en Gestión
+    # de almacenes, which no `ILIKE` of either word finds.
+    said = name_tokens(query)
+    if not said:
+        return [], False
+    short = {
+        w
+        for w in re.findall(r"[a-z0-9]+", plain(query))
+        if w.isalpha() and len(w) < NAME_WORD and w not in FILLER_WORDS
+    }
+    scored: list[tuple[int, Product]] = []
+    for product in products.search_active(solo_paquetes=only_bundles, limit=MAX_SCANNED):
+        hits = len(said & name_tokens(" ".join([product.name, *(product.tags or [])])))
+        if hits:
+            scored.append((hits, product))
+    scored.sort(key=lambda hit: -hit[0])  # stable: featured first among equals
+
+    def names_all(product: Product) -> bool:
+        # «Paquete B» is not the Paquete A: the short words count too, as whole words.
+        return short <= set(re.findall(r"[a-z0-9]+", plain(product.name)))
+
+    every = [p for hits, p in scored if hits == len(said) and names_all(p)]
+    if every:
+        return every[:MAX_CATALOG_RESULTS], True
+    return [product for _, product in scored][:MAX_CATALOG_RESULTS], False
+
+
 async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> ToolResult:
     """Search the tenant's live products, featured first.
 
@@ -369,8 +413,12 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
         rows = products.search_active(
             categoria, solo_paquetes=only_bundles, limit=MAX_CATALOG_RESULTS
         )
+    partial = False
+    if not rows and query:
+        rows, whole = _by_words(products, query, only_bundles)
+        partial = bool(rows) and not whole
     narrowed = bool(query or categoria or only_bundles)
-    missed = False
+    missed = partial
     if not rows and narrowed:
         rows = products.search_active(limit=MAX_CATALOG_RESULTS)
         missed = True
@@ -386,7 +434,12 @@ async def buscar_productos(context: ToolContext, arguments: dict[str, Any]) -> T
         _product_line(item, symbol, quote_tool=quote_tool, closings=context.closings_shown)
         for item in items
     )
-    if missed:
+    if partial:
+        texto = (
+            f"No hay ningún producto que coincida con '{query}'. Estos son los que coinciden con "
+            f"alguna de sus palabras:\n{listing}"
+        )
+    elif missed:
         asked = query or categoria or "paquetes"
         texto = (
             f"No hay ningún producto que coincida con '{asked}'. "

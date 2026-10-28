@@ -39,6 +39,7 @@ from app.process.templates.base import Stage
 from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.repositories.catalog import CatalogRepository
 from app.services.capabilities import automatic_again
+from app.services.rubro_template import RubroTemplateService, TemplateError, TemplateItem
 from app.services.situations import (
     EMBED_JOB,
     MAX_QUE_HACE,
@@ -379,6 +380,8 @@ class RuleView(BaseModel):
     rule_key: str
     texto: str
     apagada: bool
+    # The business's own wording of a rubro rule (feature 020); None: as published.
+    texto_propio: str | None = None
 
 
 class StageView(BaseModel):
@@ -391,6 +394,9 @@ class NewsView(BaseModel):
     version: int
     vista: int
     reglas: list[RuleView]
+    # Rules whose text the new version improved (feature 020); one written in the business's own
+    # words keeps that text until the business takes the new one.
+    mejoradas: list[RuleView] = Field(default_factory=list)
 
 
 class TemplateView(BaseModel):
@@ -423,6 +429,11 @@ class ProcessRequest(BaseModel):
 
 class SwitchRequest(BaseModel):
     apagada: bool
+
+
+class RewriteRequest(BaseModel):
+    # None (or empty): back to the catalogue's text.
+    texto: Annotated[str, StringConstraints(strip_whitespace=True, max_length=600)] | None = None
 
 
 class FaqView(BaseModel):
@@ -468,13 +479,21 @@ class PromptPreview(BaseModel):
 
 
 def _rules(rules: list[LayerRule]) -> list[RuleView]:
-    return [RuleView(rule_key=r.rule_key, texto=r.texto, apagada=r.apagada) for r in rules]
+    return [
+        RuleView(rule_key=r.rule_key, texto=r.texto, apagada=r.apagada, texto_propio=r.texto_propio)
+        for r in rules
+    ]
 
 
 def _news(news: News | None) -> NewsView | None:
-    if news is None or not news.rules:
+    if news is None or not (news.rules or news.improved):
         return None
-    return NewsView(version=news.version, vista=news.seen, reglas=_rules(list(news.rules)))
+    return NewsView(
+        version=news.version,
+        vista=news.seen,
+        reglas=_rules(list(news.rules)),
+        mejoradas=_rules(list(news.improved)),
+    )
 
 
 def _keys(session: Session, tenant_id: uuid.UUID) -> tuple[str, str | None]:
@@ -619,7 +638,12 @@ def switch_rule(
             despues={"kind": kind, "key": key, "rule_key": rule_key, "apagada": body.apagada},
         )
     session.commit()
-    return RuleView(rule_key=rule.rule_key, texto=rule.texto, apagada=rule.apagada)
+    return RuleView(
+        rule_key=rule.rule_key,
+        texto=rule.texto,
+        apagada=rule.apagada,
+        texto_propio=rule.texto_propio,
+    )
 
 
 @router.get("/rubro", response_model=RubroView, responses=error_responses(*AUTH_RESPONSES))
@@ -704,3 +728,218 @@ def prompt_preview(
         secciones=dict(prompt.sections),
         herramientas=list(registry.names()),
     )
+
+
+# ------------------------------------------------- the rubro's own words and its template (020, F3)
+
+
+@router.put(
+    "/rules/rubro/{rule_key}/texto",
+    response_model=RuleView,
+    responses=error_responses(*AUTH_RESPONSES, (404, "`unknown_rule`")),
+)
+def rewrite_rule(
+    rule_key: str, body: RewriteRequest, principal: ReviewerDep, session: SessionDep
+) -> RuleView:
+    """Write a rubro rule in the business's own words, or go back to the catalogue's (D3)."""
+    _, rubro_key = _keys(session, principal.tenant_id)
+    resolver = LayerResolver(session, principal.tenant_id)
+    was = next(
+        (r.texto_propio for r in resolver.rules("rubro", rubro_key) if r.rule_key == rule_key),
+        None,
+    )
+    try:
+        rule = resolver.rewrite(rubro_key, rule_key, body.texto, by=principal.user_id)
+    except UnknownRule as exc:
+        raise ApiError(status_code=404, error="unknown_rule", message=rule_key) from exc
+    where = {"kind": "rubro", "key": rubro_key, "rule_key": rule_key}
+    if was != rule.texto_propio:
+        _history(session, principal).record(
+            "interruptor",
+            "editar",
+            f"Escribió con sus palabras la regla «{rule.texto[:70]}»"
+            if rule.texto_propio
+            else f"Volvió al texto de la plantilla en «{rule.texto[:70]}»",
+            antes={**where, "texto_propio": was},
+            despues={**where, "texto_propio": rule.texto_propio},
+        )
+    session.commit()
+    return RuleView(
+        rule_key=rule.rule_key,
+        texto=rule.texto,
+        apagada=rule.apagada,
+        texto_propio=rule.texto_propio,
+    )
+
+
+class TemplateItemView(BaseModel):
+    clave: str
+    titulo: str
+    cuando_aplica: str
+    que_hace: str
+    campos: dict[str, str]
+    etapas: list[str] | None = None
+    siempre: bool = False
+
+
+class TemplateNewsView(BaseModel):
+    tipo: Literal["nueva", "mejorada"]
+    item: TemplateItemView
+    situacion_id: uuid.UUID | None = None
+
+
+class RubroTemplateView(BaseModel):
+    rubro: str | None
+    nombre: str | None
+    version: int | None
+    situaciones: list[TemplateItemView]
+    opciones: dict[str, Any]
+    aplicada: int | None
+    novedades: list[TemplateNewsView]
+
+
+class ApplyTemplateRequest(BaseModel):
+    # {clave de la situación: {campo: valor}}: the values a suggestion needs to be active.
+    valores: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+
+class AppliedView(BaseModel):
+    version: int
+    activas: int
+    borradores: int
+    ya_estaban: int
+    opciones: list[str]
+
+
+class AcceptRequest(BaseModel):
+    valores: dict[str, str] = Field(default_factory=dict)
+
+
+class AcceptedView(BaseModel):
+    situacion_id: uuid.UUID
+    estado: str
+
+
+def _item(item: TemplateItem) -> TemplateItemView:
+    return TemplateItemView(
+        clave=item.clave,
+        titulo=item.titulo,
+        cuando_aplica=item.cuando_aplica,
+        que_hace=item.que_hace,
+        campos=dict(item.campos),
+        etapas=list(item.etapas) if item.etapas else None,
+        siempre=item.siempre,
+    )
+
+
+@router.get(
+    "/rubro/plantilla",
+    response_model=RubroTemplateView,
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def get_rubro_template(principal: ReviewerDep, session: SessionDep) -> RubroTemplateView:
+    """What the template of the business's rubro brings, whether it applied it, and its news."""
+    view = RubroTemplateService(session, principal.tenant_id).view()
+    return RubroTemplateView(
+        rubro=view.rubro,
+        nombre=view.nombre,
+        version=view.version,
+        situaciones=[_item(item) for item in view.items],
+        opciones=dict(view.opciones),
+        aplicada=view.aplicada,
+        novedades=[
+            TemplateNewsView(tipo=n.tipo, item=_item(n.item), situacion_id=n.situation_id)
+            for n in view.novedades
+        ],
+    )
+
+
+@router.post(
+    "/rubro/plantilla/aplicar",
+    response_model=AppliedView,
+    responses=error_responses(*AUTH_RESPONSES, (422, "`no_template`")),
+)
+async def apply_rubro_template(
+    body: ApplyTemplateRequest,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    queue: JobQueueDep,
+) -> AppliedView:
+    """Copy the template to the business; applying it again only brings what is missing."""
+    try:
+        applied = RubroTemplateService(session, principal.tenant_id).apply(
+            body.valores, by=principal.user_id
+        )
+    except TemplateError as exc:
+        raise ApiError(status_code=422, error=exc.code, message=str(exc)) from exc
+    history = _history(session, principal)
+    for situation in applied.creadas:
+        history.record(
+            "situacion",
+            "crear",
+            f"Creó la situación «{situation.titulo}» desde la plantilla de su rubro",
+            entidad_id=situation.id,
+            despues=situation_snapshot(situation),
+        )
+    if applied.opciones_antes is not None:
+        history.record(
+            "perfil",
+            "editar",
+            "Tomó de la plantilla de su rubro: " + ", ".join(applied.opciones),
+            antes=dict(applied.opciones_antes),
+        )
+    session.commit()
+    await _embed_later(queue, principal.tenant_id)
+    return AppliedView(
+        version=applied.version,
+        activas=applied.activas,
+        borradores=applied.borradores,
+        ya_estaban=applied.ya_estaban,
+        opciones=list(applied.opciones),
+    )
+
+
+@router.post(
+    "/rubro/plantilla/novedades/{clave}/aceptar",
+    response_model=AcceptedView,
+    responses=error_responses(*AUTH_RESPONSES, (404, "`unknown_item`")),
+)
+async def accept_template_news(
+    clave: str,
+    body: AcceptRequest,
+    principal: ConfigurationManagerDep,
+    session: SessionDep,
+    queue: JobQueueDep,
+) -> AcceptedView:
+    service = RubroTemplateService(session, principal.tenant_id)
+    existing = service.from_template().get(clave)
+    before = situation_snapshot(existing) if existing is not None else None
+    try:
+        situation = service.accept(clave, body.valores, by=principal.user_id)
+    except TemplateError as exc:
+        raise ApiError(status_code=404, error=exc.code, message=str(exc)) from exc
+    _history(session, principal).record(
+        "situacion",
+        "editar" if before is not None else "crear",
+        f"Tomó la versión mejorada de «{situation.titulo}» de la plantilla de su rubro"
+        if before is not None
+        else f"Agregó «{situation.titulo}», nueva en la plantilla de su rubro",
+        entidad_id=situation.id,
+        antes=before,
+        despues=situation_snapshot(situation),
+    )
+    session.commit()
+    await _embed_later(queue, principal.tenant_id)
+    return AcceptedView(situacion_id=situation.id, estado=situation.estado)
+
+
+@router.post(
+    "/rubro/plantilla/novedades/vistas",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(*AUTH_RESPONSES),
+)
+def template_news_seen(principal: ConfigurationManagerDep, session: SessionDep) -> Response:
+    """What was not accepted stays as the business has it."""
+    RubroTemplateService(session, principal.tenant_id).mark_seen()
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

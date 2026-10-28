@@ -937,3 +937,32 @@ def test_a_long_description_is_cut_at_a_sentence_not_mid_word() -> None:
 
     assert line.endswith(".") or line.endswith("…")
     assert "empres\n" not in text and not line.endswith(" empres")
+
+
+class TestTheUniversalChargeReadsOnlyTheBusinessWay:
+    """Feature 020, T2.7: COBRO carried both ways; a cash-on-delivery shop read about a tool it
+    does not have."""
+
+    def test_paid_up_front(self) -> None:
+        prompt = _prompt(Stage.COBRO, Facts(), template_key="universal")
+
+        assert "- Pago previo: si los métodos de pago no se enviaron" in prompt
+        assert "contra entrega:" not in prompt.split("ESTADO DE LA")[0]
+
+    def test_cash_on_delivery(self) -> None:
+        prompt = _prompt(
+            Stage.COBRO, Facts(modalidad_pago="contra_entrega"), template_key="universal"
+        )
+        stage_text = prompt.split("ESTADO DE LA")[0]
+
+        assert "- Pago contra entrega: si aún no confirmó, resume el pedido" in stage_text
+        assert "enviar_metodos_pago" not in stage_text and "Pago previo" not in stage_text
+
+
+def test_a_long_package_choice_is_cut_at_a_word() -> None:
+    from app.agent.prompts.stage import _choice
+
+    assert _choice("Certificado en Seguridad y salud en el trabajo") == (
+        "Certificado en Seguridad y salud en el…"
+    )
+    assert _choice("Inventarios") == "Inventarios"

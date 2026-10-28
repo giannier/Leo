@@ -1,0 +1,40 @@
+{
+ "negocio": "uniformes",
+ "turnos": [
+  {
+   "cliente": "hola! ustedes diseñan ropa para marcas? tengo una tienda de ropa deportiva y quiero sacar mi propia línea",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "diseño"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Hola! Soy Leo de Confecciones Lumen 👋\nSí, hacemos *diseño de colección para marca propia*: lo arma una persona de nuestro equipo contigo, según lo que necesites.\nPara pasarle tu idea bien armada: ¿qué prendas tienes en mente para tu línea deportiva?"
+    }
+   ]
+  },
+  {
+   "cliente": "polos dry fit, shorts y casacas cortavientos, unas 300 prendas para empezar",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "derivar_a_humano",
+       "args": {
+        "motivo": "asesoria",
+        "resumen": "Tienda de ropa deportiva quiere lanzar su propia línea: polos dry fit, shorts y casacas cortavientos, unas 300 prendas para empezar. Interesada en el diseño de colección para marca propia.",
+        "animo": "tranquilo"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

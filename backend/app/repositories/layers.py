@@ -40,6 +40,31 @@ class TenantRuleSwitchRepository(BaseRepository[TenantRuleSwitch]):
             found.setdefault(row.kind, set()).add(row.rule_key)
         return {kind: frozenset(keys) for kind, keys in found.items()}
 
+    def own_texts(self, kind: str) -> dict[str, str]:
+        """The rules of `kind` this business wrote in its own words (feature 020), by key."""
+        statement = self._scoped().where(
+            TenantRuleSwitch.kind == kind, TenantRuleSwitch.texto_propio.is_not(None)
+        )
+        return {
+            row.rule_key: row.texto_propio
+            for row in self._session.execute(statement).scalars()
+            if row.texto_propio
+        }
+
+    def set_text(
+        self, kind: str, rule_key: str, texto: str | None, *, by: uuid.UUID | None
+    ) -> TenantRuleSwitch:
+        """Write the business's own text of a rule, or clear it (None) to read the catalogue's."""
+        row = self._row(kind, rule_key)
+        if row is None:
+            return self.add(
+                kind=kind, rule_key=rule_key, apagada=False, texto_propio=texto, cambiado_por=by
+            )
+        row.texto_propio = texto
+        row.cambiado_por = by
+        self._session.flush()
+        return row
+
     def set(
         self, kind: str, rule_key: str, *, apagada: bool, by: uuid.UUID | None
     ) -> TenantRuleSwitch:

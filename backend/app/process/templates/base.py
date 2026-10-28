@@ -165,6 +165,9 @@ KNOWN_PLACEHOLDERS: frozenset[str] = frozenset(
         "caminos",
         "datos_requeridos",
         "datos_faltantes",
+        # How the business is paid (feature 020): a line with one is kept only for that way.
+        "pago_previo",
+        "pago_contra_entrega",
     }
 )
 

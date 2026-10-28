@@ -1,0 +1,105 @@
+{
+ "negocio": "spa",
+ "turnos": [
+  {
+   "cliente": "holaa, quiero sacar cita para una limpieza facial, el jueves por la tarde se puede? cuánto cuesta",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "limpieza facial"
+       }
+      }
+     ]
+    },
+    {
+     "tools": [
+      {
+       "name": "consultar_horarios",
+       "args": {
+        "producto_id": "{id:Limpieza facial profunda}",
+        "desde": "2026-10-29T14:00"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Hola! Soy Leo de Spa Raíces 🌿\nLa *limpieza facial profunda* cuesta S/ 95.00 y dura 60 minutos.\nEl jueves 29 en la tarde tengo libre a las *15:00* o a las *16:30*. ¿Cuál te acomoda?"
+    }
+   ]
+  },
+  {
+   "cliente": "a las 4 y media porfa. y también me quiero llevar la crema de aloe, la tienen?",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "crema aloe"
+       }
+      }
+     ]
+    },
+    {
+     "tools": [
+      {
+       "name": "gestionar_pedido",
+       "args": {
+        "accion": "agregar",
+        "producto_id": "{id:Crema hidratante de aloe 200 ml}",
+        "cantidad": 1
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Sí la tenemos! Te separé la *crema hidratante de aloe 200 ml* (S/ 49.00).\nPara reservarte la limpieza facial el *jueves 29 a las 16:30*, ¿me dices tu nombre completo?"
+    }
+   ]
+  },
+  {
+   "cliente": "Lucía Fernández",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "registrar_datos_cliente",
+       "args": {
+        "nombres": "Lucía Fernández"
+       }
+      },
+      {
+       "name": "agendar_cita",
+       "args": {
+        "producto_id": "{id:Limpieza facial profunda}",
+        "slot": "2026-10-29T16:30"
+       }
+      }
+     ]
+    },
+    {
+     "texto": "¡Listo, Lucía! 🌿 Tu *limpieza facial profunda* quedó agendada para el *jueves 29 de octubre a las 16:30*. Si necesitas cambiarla, me escribes por aquí.\nY tu pedido: *1 crema hidratante de aloe 200 ml*, total *S/ 49.00*. ¿Lo confirmas?"
+    }
+   ]
+  },
+  {
+   "cliente": "sí confirmo, la crema la recojo el jueves cuando vaya",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "enviar_metodos_pago",
+       "args": {}
+      }
+     ]
+    },
+    {
+     "texto": "Perfecto, ahí tienes cómo pagar la crema (S/ 49.00). Cuando pagues, envíame la foto del comprobante por aquí y la dejamos lista para el jueves."
+    }
+   ]
+  }
+ ]
+}

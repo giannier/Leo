@@ -490,7 +490,7 @@ def _solicitar_cambio(turn: _Turn, arguments: Mapping[str, Any]) -> ToolResult:
         # and then told the customer the order could not change. It can.
         return ToolResult.error(
             "El pedido no está en revisión y sí se puede cambiar: llama ahora a gestionar_pedido "
-            "con la acción que corresponde (agregar, quitar, cambiar_cantidad). No le digas al "
+            "con la acción que corresponde (agregar, quitar o cantidad). No le digas al "
             "cliente que no se puede."
         )
     note = " ".join(str(arguments.get("nota") or "").split())

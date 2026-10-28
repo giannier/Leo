@@ -1,0 +1,57 @@
+{
+ "negocio": "uniformes",
+ "turnos": [
+  {
+   "cliente": "Buenas tardes, escribo de una clínica dental. Necesitamos uniformes para 45 personas: chaqueta y pantalón, con el logo bordado. Cuánto nos saldría?",
+   "agente": [
+    {
+     "tools": [
+      {
+       "name": "buscar_productos",
+       "args": {
+        "consulta": "uniformes"
+       }
+      }
+     ]
+    },
+    {
+     "tools": [
+      {
+       "name": "derivar_a_humano",
+       "args": {
+        "motivo": "cotizacion",
+        "resumen": "Clínica dental pide cotización de uniformes para 45 personas: chaqueta y pantalón con logo bordado.",
+        "animo": "tranquilo",
+        "datos": [
+         {
+          "dato": "producto",
+          "valor": "Uniformes corporativos por volumen"
+         },
+         {
+          "dato": "cantidad",
+          "valor": "45 personas"
+         },
+         {
+          "dato": "prendas",
+          "valor": "chaqueta y pantalón"
+         },
+         {
+          "dato": "bordado",
+          "valor": "logo bordado"
+         },
+         {
+          "dato": "cliente",
+          "valor": "clínica dental"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cliente": "ok gracias. y ustedes también diseñan la ropa? queremos algo con nuestra marca para vender en la clínica"
+  }
+ ]
+}

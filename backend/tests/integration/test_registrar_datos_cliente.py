@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agent.pipeline import InboundTurn, TurnPipeline
-from app.agent.tools.customer import registrar_datos_cliente
+from app.agent.tools.customer import CONFIRM_THE_ORDER, registrar_datos_cliente
 from app.agent.tools.definitions import registry_for_stage
 from app.agent.tools.orders import gestionar_pedido
 from app.agent.tools.registry import ToolContext, ToolResult
@@ -617,3 +617,44 @@ class TestThePersonalDataNeverReachTheTraces:
         rendered = result.render()
         for secret in ("1234567", EMAIL, "Ana Quispe"):
             assert secret not in rendered
+
+
+class TestTheUniversalProcessAsksToConfirm:
+    """Feature 020, T2.7: the payment opens on the next turn, so the last datum asks to confirm."""
+
+    async def test_with_the_order_complete_the_last_datum_asks_to_confirm_it(
+        self,
+        db: Session,
+        tenant: Tenant,
+        contact: Contact,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        ctx = replace(context(db, tenant, conversation, required=["nombres"]), closings_shown=True)
+        await order_with(ctx, catalogue["digital"])
+
+        result = await save(ctx, nombres="Ana Quispe")
+
+        assert result.decir == CONFIRM_THE_ORDER
+
+    async def test_without_an_order_or_in_an_old_template_it_says_what_it_said(
+        self,
+        db: Session,
+        tenant: Tenant,
+        contact: Contact,
+        conversation: Conversation,
+        catalogue: dict[str, Product],
+    ) -> None:
+        universal = replace(
+            context(db, tenant, conversation, required=["nombres"]), closings_shown=True
+        )
+        no_order = await save(universal, nombres="Ana Quispe")
+        old = context(db, tenant, conversation, required=["nombres"])
+        await order_with(old, catalogue["digital"])
+        old_template = await save(old, nombres="Ana Quispe Ríos")
+
+        assert no_order.decir != CONFIRM_THE_ORDER
+        assert (
+            old_template.decir
+            == "Ya están todos los datos. Sigue con el siguiente paso del pedido."
+        )

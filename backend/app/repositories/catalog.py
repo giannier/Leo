@@ -111,7 +111,14 @@ class CatalogRepository:
             )
         ).scalar_one()
         source = self.version(kind, key, latest) if latest is not None else None
-        draft = CatalogVersion(kind=kind, key=key, version=(latest or 0) + 1, notas=notas)
+        draft = CatalogVersion(
+            kind=kind,
+            key=key,
+            version=(latest or 0) + 1,
+            notas=notas,
+            # What a rubro template suggests for the process (feature 020) carries over too.
+            plantilla=dict(source.plantilla) if source is not None and source.plantilla else None,
+        )
         self._session.add(draft)
         self._session.flush()
         if source is not None:
@@ -152,6 +159,9 @@ class CatalogRepository:
                 CatalogSuggestedSituation(
                     version_id=target,
                     orden=situation.orden,
+                    clave=situation.clave,
+                    etapas=list(situation.etapas) if situation.etapas else None,
+                    siempre=situation.siempre,
                     titulo=situation.titulo,
                     cuando_aplica=situation.cuando_aplica,
                     que_hace=situation.que_hace,
