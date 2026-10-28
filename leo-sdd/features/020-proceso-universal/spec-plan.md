@@ -260,17 +260,19 @@ Capacita conserva su forma de vender, pero como **su configuración**, no como c
   **Dos corridas** por umbral: la misma prueba varía ±2 casos de una vez a otra.
 - **Comparación:** antes de migrar un negocio, el proceso universal debe igualar o superar a su plantilla actual en los
   mismos casos.
-- **Costo estimado** (decisión D5): ~US$0,6–0,9 por pasada completa con la caché; dos pasadas por umbral.
+- **Costo estimado** (decisión D5): ~US$0,6–0,9 por pasada completa con la caché; dos pasadas por umbral. **No aprobado
+  por ahora:** hasta que Giannier apruebe el presupuesto se prueba con la suite automática y con conversaciones simuladas con
+  Claude como agente; el paso de un negocio de producción al proceso universal espera esa prueba (constitución).
 
 ## 10. Fases
 
 | Fase | Qué | Se cierra cuando |
 |---|---|---|
 | F0 | Este diseño y las decisiones de Giannier | Giannier lo aprueba |
-| F1 | Oferta: tipo producto o servicio, cómo se cierra cada ítem, paquetes por categoría; migración de datos (se deduce de `modo_venta`, `agendable` y `es_digital`); formulario del producto | Suite en verde |
+| F1 | Oferta (backend y API): tipo producto o servicio, cómo se cierra cada ítem, paquetes por categoría; migración de datos (se deduce de `modo_venta` y `agendable`) | Suite en verde |
 | F2 | Proceso universal v1 (texto desde cero, bloque «Cómo se cierra», cierre por ítem), detrás del interruptor | Suite en verde y primera batería con el modelo real |
 | F3 | Plantillas de rubro editables: aplicar, copias propias, novedades; contenido de educación y de los rubros de las 20 empresas, luego el resto | Suite en verde |
-| F4 | Panel y administración | Capturas a 1 900, 1 280 y 390 px |
+| F4 | Panel y administración (incluye el formulario del producto o servicio) | Capturas a 1 900, 1 280 y 390 px |
 | F5 | Batería universal (dos corridas) → migración por negocio → retiro de las plantillas viejas | Umbrales cumplidos y «despliega» de Giannier |
 
 Cada fase termina con la suite en verde. Nada se despliega sin el «despliega» de Giannier.
