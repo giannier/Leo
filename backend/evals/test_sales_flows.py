@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from evals.sales_flows import (
+    AGENDA_RUBRO_FLOW_CASES,
     FLOW_CASES,
     FRESH2_FLOW_CASES,
     FRESH3_FLOW_CASES,
@@ -33,6 +34,8 @@ class TestSalesFlows:
             "fresh": FRESH_FLOW_CASES,
             "fresh2": FRESH2_FLOW_CASES,
             "fresh3": FRESH3_FLOW_CASES,
+            # Migration 0074 (020, T2.7): the agenda books in the seven rubros that handed it over.
+            "agenda_rubros": AGENDA_RUBRO_FLOW_CASES,
         }.get(os.getenv("SALES_FLOWS_SET", ""), FLOW_CASES)
         cases = [c for c in pool if not only or c.template == only]
         report = await run_flows(db, cases, llm=llm)
