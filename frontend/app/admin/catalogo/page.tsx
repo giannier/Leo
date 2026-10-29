@@ -177,6 +177,46 @@ function Editor({
           </div>
         ) : null}
 
+        {kind === "rubro" && content.situaciones_sugeridas?.length ? (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-ink">
+              Situaciones sugeridas ({content.situaciones_sugeridas.length})
+            </p>
+            <p className="text-xs text-ink-faint">
+              La clave identifica cada una entre versiones: es lo que le dice a un negocio que aplicó la plantilla si
+              es nueva o mejorada. Se conservan al guardar el borrador.
+            </p>
+            <div className="grid gap-2 md:grid-cols-2">
+              {content.situaciones_sugeridas.map((s) => (
+                <div key={s.clave ?? s.titulo} className="rounded-lg border border-line p-3 text-sm">
+                  <p className="font-mono text-xs text-ink-faint">
+                    {s.clave ?? "sin clave"}
+                    {s.etapas?.length ? ` · solo en ${s.etapas.join(", ")}` : ""}
+                    {s.siempre ? " · siempre" : ""}
+                  </p>
+                  <p className="mt-1 font-medium text-ink">{s.titulo}</p>
+                  <p className="text-ink-soft">Cuándo: {s.cuando_aplica}</p>
+                  <p className="text-ink-soft">Qué hace: {s.que_hace}</p>
+                  {Object.keys(s.campos ?? {}).length ? (
+                    <p className="mt-1 text-xs text-ink-faint">
+                      Pide al negocio: {Object.values(s.campos ?? {}).join("; ")}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {kind === "rubro" && version.plantilla ? (
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-ink">Lo que la plantilla sugiere para el proceso</p>
+            <pre className="overflow-auto rounded-lg bg-surface-muted p-3 text-xs text-ink">
+              {JSON.stringify(version.plantilla, null, 2)}
+            </pre>
+          </div>
+        ) : null}
+
         {draft ? (
           <TextArea
             label="Notas de la versión"

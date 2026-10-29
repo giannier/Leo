@@ -227,6 +227,11 @@ def _closings(session: Session, tenant_id: uuid.UUID) -> tuple[str, ...]:
     return closings_of([_ClosingRow(mode, bookable) for mode, bookable in rows])
 
 
+def closings_for(session: Session, tenant_id: uuid.UUID) -> tuple[str, ...]:
+    """The closings the business's catalogue uses, for the panel («cómo vende tu agente»)."""
+    return _closings(session, tenant_id)
+
+
 def _info_view(sections: Mapping[str, dict[str, Any]]) -> BusinessInfoView:
     parsed: dict[str, Any] = {}
     for name, data in sections.items():

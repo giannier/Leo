@@ -13,10 +13,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ActivationSteps, ProgressBar } from "@/components/assistant/overview";
+import { RubroTemplateCard } from "@/components/assistant/rubro-template";
 import { Alert, Skeleton } from "@/components/ui";
 import { api, type Checklist, type Overview } from "@/lib/api/client";
 import type { StepProps } from "./shared";
-import { SuggestedSituations } from "./suggested-situations";
+
 
 export function StepSummary({
   checklist,
@@ -64,7 +65,8 @@ export function StepSummary({
         <Skeleton className="h-40 w-full" />
       )}
 
-      <SuggestedSituations />
+      {/* The rubro's template (feature 020): a starting point the business applies and then owns. */}
+      <RubroTemplateCard canConfigure compact onChanged={() => undefined} />
 
       {checklist.activation_ready ? (
         <Alert tone="success" title="Todo listo para activar">

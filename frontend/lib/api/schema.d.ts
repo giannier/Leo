@@ -616,6 +616,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assistant/rules/rubro/{rule_key}/texto": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rewrite Rule
+         * @description Write a rubro rule in the business's own words, or go back to the catalogue's (D3).
+         */
+        put: operations["rewrite_rule_api_v1_assistant_rules_rubro__rule_key__texto_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rubro/plantilla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rubro Template
+         * @description What the template of the business's rubro brings, whether it applied it, and its news.
+         */
+        get: operations["get_rubro_template_api_v1_assistant_rubro_plantilla_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rubro/plantilla/aplicar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Rubro Template
+         * @description Copy the template to the business; applying it again only brings what is missing.
+         */
+        post: operations["apply_rubro_template_api_v1_assistant_rubro_plantilla_aplicar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rubro/plantilla/novedades/{clave}/aceptar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Template News */
+        post: operations["accept_template_news_api_v1_assistant_rubro_plantilla_novedades__clave__aceptar_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assistant/rubro/plantilla/novedades/vistas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Template News Seen
+         * @description What was not accepted stays as the business has it.
+         */
+        post: operations["template_news_seen_api_v1_assistant_rubro_plantilla_novedades_vistas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assistant/business-info/{section}": {
         parameters: {
             query?: never;
@@ -3171,6 +3268,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform-admin/tenants/{tenant_id}/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a business to the universal process, or back
+         * @description Feature 020: the universal process is hidden from businesses until it passes the
+         *     real-model evals; the platform moves them one at a time, audited. Going back is the same call
+         *     with false.
+         */
+        put: operations["switch_process_api_v1_platform_admin_tenants__tenant_id__process_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform-admin/channel-health": {
         parameters: {
             query?: never;
@@ -4077,6 +4196,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenant/rubros": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The rubros a business can choose
+         * @description By name, with «Otro tipo de negocio» last: the panel's list comes from here.
+         */
+        get: operations["list_rubros_api_v1_tenant_rubros_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenant/agent-config": {
         parameters: {
             query?: never;
@@ -4115,6 +4254,23 @@ export interface components {
             full_name?: string | null;
             /** Password */
             password?: string | null;
+        };
+        /** AcceptRequest */
+        AcceptRequest: {
+            /** Valores */
+            valores?: {
+                [key: string]: string;
+            };
+        };
+        /** AcceptedView */
+        AcceptedView: {
+            /**
+             * Situacion Id
+             * Format: uuid
+             */
+            situacion_id: string;
+            /** Estado */
+            estado: string;
         };
         /** ActionIn */
         ActionIn: {
@@ -4232,6 +4388,28 @@ export interface components {
             csat_activo: boolean;
             /** Reporte Mensual */
             reporte_mensual: boolean;
+        };
+        /** AppliedView */
+        AppliedView: {
+            /** Version */
+            version: number;
+            /** Activas */
+            activas: number;
+            /** Borradores */
+            borradores: number;
+            /** Ya Estaban */
+            ya_estaban: number;
+            /** Opciones */
+            opciones: string[];
+        };
+        /** ApplyTemplateRequest */
+        ApplyTemplateRequest: {
+            /** Valores */
+            valores?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
         };
         /** AppointmentIn */
         AppointmentIn: {
@@ -4634,7 +4812,7 @@ export interface components {
             /** Business Name */
             business_name?: string | null;
             /** Industry */
-            industry?: ("restaurante" | "instituto" | "retail" | "servicios" | "salud" | "tecnologia" | "belleza" | "inmobiliaria" | "automotriz" | "hogar" | "turismo" | "b2b" | "otros") | null;
+            industry?: string | null;
             /** Description */
             description?: string | null;
             /** Website */
@@ -6650,6 +6828,8 @@ export interface components {
             vista: number;
             /** Reglas */
             reglas: components["schemas"]["RuleView"][];
+            /** Mejoradas */
+            mejoradas?: components["schemas"]["RuleView"][];
         };
         /** NoteBody */
         NoteBody: {
@@ -7106,6 +7286,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ProcessSwitchPayload */
+        ProcessSwitchPayload: {
+            /** Universal */
+            universal: boolean;
+        };
+        /** ProcessSwitchResponse */
+        ProcessSwitchResponse: {
+            /** Template Key */
+            template_key: string;
+        };
         /** ProcessView */
         ProcessView: {
             /** Template Key */
@@ -7124,6 +7314,8 @@ export interface components {
             /** Etapas */
             etapas: components["schemas"]["StageView"][];
             novedades?: components["schemas"]["NewsView"] | null;
+            /** Cierres */
+            cierres?: ("pedido" | "cotizacion" | "cita" | "informar")[];
         };
         /** ProductPage */
         ProductPage: {
@@ -7150,8 +7342,10 @@ export interface components {
             category?: string | null;
             /** Is Active */
             is_active?: boolean | null;
+            /** Tipo */
+            tipo?: ("producto" | "servicio") | null;
             /** Modo Venta */
-            modo_venta?: ("precio_fijo" | "cotizacion") | null;
+            modo_venta?: ("precio_fijo" | "cotizacion" | "informar") | null;
             /** Periodo */
             periodo?: ("unico" | "mes" | "ano") | null;
             /** Es Digital */
@@ -7160,6 +7354,8 @@ export interface components {
             bundle_size?: number | null;
             /** Bundle Permite Libres */
             bundle_permite_libres?: boolean | null;
+            /** Bundle Categoria */
+            bundle_categoria?: string | null;
             /** Destacado */
             destacado?: boolean | null;
             /** Tags */
@@ -7191,11 +7387,17 @@ export interface components {
              */
             is_active: boolean;
             /**
+             * Tipo
+             * @default producto
+             * @enum {string}
+             */
+            tipo: "producto" | "servicio";
+            /**
              * Modo Venta
              * @default precio_fijo
              * @enum {string}
              */
-            modo_venta: "precio_fijo" | "cotizacion";
+            modo_venta: "precio_fijo" | "cotizacion" | "informar";
             /**
              * Periodo
              * @default unico
@@ -7214,6 +7416,8 @@ export interface components {
              * @default false
              */
             bundle_permite_libres: boolean;
+            /** Bundle Categoria */
+            bundle_categoria?: string | null;
             /**
              * Destacado
              * @default false
@@ -7256,10 +7460,16 @@ export interface components {
             /** Is Active */
             is_active: boolean;
             /**
+             * Tipo
+             * @default producto
+             * @enum {string}
+             */
+            tipo: "producto" | "servicio";
+            /**
              * Modo Venta
              * @enum {string}
              */
-            modo_venta: "precio_fijo" | "cotizacion";
+            modo_venta: "precio_fijo" | "cotizacion" | "informar";
             /**
              * Periodo
              * @enum {string}
@@ -7271,6 +7481,8 @@ export interface components {
             bundle_size: number | null;
             /** Bundle Permite Libres */
             bundle_permite_libres: boolean;
+            /** Bundle Categoria */
+            bundle_categoria?: string | null;
             /** Destacado */
             destacado: boolean;
             /** Tags */
@@ -7828,6 +8040,11 @@ export interface components {
             motivos: string[];
             resumen: components["schemas"]["Summary"];
         };
+        /** RewriteRequest */
+        RewriteRequest: {
+            /** Texto */
+            texto?: string | null;
+        };
         /** Row */
         Row: {
             /** Id */
@@ -7836,6 +8053,39 @@ export interface components {
             title: string;
             /** Description */
             description?: string | null;
+        };
+        /** RubroList */
+        RubroList: {
+            /** Items */
+            items: components["schemas"]["RubroOption"][];
+        };
+        /** RubroOption */
+        RubroOption: {
+            /** Key */
+            key: string;
+            /** Nombre */
+            nombre: string;
+            /** Aviso Politica */
+            aviso_politica?: string | null;
+        };
+        /** RubroTemplateView */
+        RubroTemplateView: {
+            /** Rubro */
+            rubro: string | null;
+            /** Nombre */
+            nombre: string | null;
+            /** Version */
+            version: number | null;
+            /** Situaciones */
+            situaciones: components["schemas"]["TemplateItemView"][];
+            /** Opciones */
+            opciones: {
+                [key: string]: unknown;
+            };
+            /** Aplicada */
+            aplicada: number | null;
+            /** Novedades */
+            novedades: components["schemas"]["TemplateNewsView"][];
         };
         /** RubroView */
         RubroView: {
@@ -7882,6 +8132,8 @@ export interface components {
             texto: string;
             /** Apagada */
             apagada: boolean;
+            /** Texto Propio */
+            texto_propio?: string | null;
         };
         /**
          * Saliente
@@ -8325,6 +8577,8 @@ export interface components {
         };
         /** SuggestedIn */
         SuggestedIn: {
+            /** Clave */
+            clave?: string | null;
             /** Titulo */
             titulo: string;
             /** Cuando Aplica */
@@ -8335,6 +8589,13 @@ export interface components {
             campos?: {
                 [key: string]: string;
             };
+            /** Etapas */
+            etapas?: components["schemas"]["Stage"][] | null;
+            /**
+             * Siempre
+             * @default false
+             */
+            siempre: boolean;
         };
         /** SuggestedView */
         SuggestedView: {
@@ -8477,10 +8738,43 @@ export interface components {
             /** Header Media Asset Id */
             header_media_asset_id?: string | null;
         };
+        /** TemplateItemView */
+        TemplateItemView: {
+            /** Clave */
+            clave: string;
+            /** Titulo */
+            titulo: string;
+            /** Cuando Aplica */
+            cuando_aplica: string;
+            /** Que Hace */
+            que_hace: string;
+            /** Campos */
+            campos: {
+                [key: string]: string;
+            };
+            /** Etapas */
+            etapas?: string[] | null;
+            /**
+             * Siempre
+             * @default false
+             */
+            siempre: boolean;
+        };
         /** TemplateList */
         TemplateList: {
             /** Items */
             items: components["schemas"]["TemplateView"][];
+        };
+        /** TemplateNewsView */
+        TemplateNewsView: {
+            /**
+             * Tipo
+             * @enum {string}
+             */
+            tipo: "nueva" | "mejorada";
+            item: components["schemas"]["TemplateItemView"];
+            /** Situacion Id */
+            situacion_id?: string | null;
         };
         /** TemplateOut */
         TemplateOut: {
@@ -8572,6 +8866,10 @@ export interface components {
             knowledge_chars: number;
             /** Has Number */
             has_number: boolean;
+            /** Process Template Key */
+            process_template_key?: string | null;
+            /** Industry */
+            industry?: string | null;
         };
         /** TenantResponse */
         TenantResponse: {
@@ -8840,6 +9138,10 @@ export interface components {
             evals_vigentes: boolean;
             /** Publicada En */
             publicada_en: string | null;
+            /** Plantilla */
+            plantilla?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** VoidIn */
         VoidIn: {
@@ -10894,6 +11196,228 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PromptPreview"];
                 };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rewrite_rule_api_v1_assistant_rules_rubro__rule_key__texto_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_rule` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_rubro_template_api_v1_assistant_rubro_plantilla_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubroTemplateView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    apply_rubro_template_api_v1_assistant_rubro_plantilla_aplicar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppliedView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    accept_template_news_api_v1_assistant_rubro_plantilla_novedades__clave__aceptar_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clave: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptedView"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant`, `tenant_access_denied` or `insufficient_role` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `unknown_item` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    template_news_seen_api_v1_assistant_rubro_plantilla_novedades_vistas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */
             401: {
@@ -18821,6 +19345,50 @@ export interface operations {
             };
         };
     };
+    switch_process_api_v1_platform_admin_tenants__tenant_id__process_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessSwitchPayload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessSwitchResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_found` - including for a caller who is not a platform admin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     channel_health_api_v1_platform_admin_channel_health_get: {
         parameters: {
             query?: never;
@@ -21540,6 +22108,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `not_authenticated`, `token_expired` or `invalid_token` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description `email_not_verified`, `no_active_tenant` or `tenant_access_denied` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_rubros_api_v1_tenant_rubros_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RubroList"];
                 };
             };
             /** @description `not_authenticated`, `token_expired` or `invalid_token` */

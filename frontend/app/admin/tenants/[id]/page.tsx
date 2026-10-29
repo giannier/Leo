@@ -83,8 +83,11 @@ export default function AdminTenantPage() {
             value={`${tenant.knowledge_chars.toLocaleString("es-PE")} caracteres`}
           />
           <Stat label="Numero conectado" value={tenant.has_number ? "Si" : "No"} />
+          <Stat label="Rubro" value={tenant.industry ?? "Sin rubro"} />
         </dl>
       </Card>
+
+      <SalesProcess id={id} current={tenant.process_template_key ?? null} onChanged={load} />
 
       <ExtendTrial id={id} onExtended={load} />
     </div>
@@ -97,6 +100,63 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-xs text-ink-faint">{label}</dt>
       <dd className="tabular mt-0.5 text-sm font-medium text-ink">{value}</dd>
     </div>
+  );
+}
+
+/** Feature 020: the universal process stays hidden until it passes the real-model evals; the
+ * operator moves one business at a time, audited, and can move it back. */
+function SalesProcess({
+  id,
+  current,
+  onChanged,
+}: {
+  id: string;
+  current: string | null;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const universal = current === "universal";
+
+  async function move(to: boolean) {
+    setBusy(true);
+    setResult(null);
+    try {
+      const { template_key } = await api.admin.setUniversalProcess(id, to);
+      setResult({ tone: "success", text: `Ahora usa el proceso «${template_key}».` });
+      await onChanged();
+    } catch (caught) {
+      setResult({ tone: "danger", text: humanMessage(caught) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card
+      title="Proceso de venta"
+      description="El proceso universal vende todo el catálogo con un solo proceso. Está oculto para los negocios hasta pasar los evals con el modelo real; muévelos de a uno. Queda en el registro de auditoría."
+    >
+      <div className="space-y-3">
+        {result ? <Alert tone={result.tone}>{result.text}</Alert> : null}
+        <p className="text-sm text-ink">
+          Proceso actual: <span className="font-semibold">{current ?? "sin configurar"}</span>
+        </p>
+        <Button
+          type="button"
+          variant={universal ? "secondary" : "primary"}
+          loading={busy}
+          onClick={() => {
+            const question = universal
+              ? "¿Volver a las plantillas de antes? Las conversaciones abiertas siguen con su pedido."
+              : "¿Pasar este negocio al proceso universal? Sus conversaciones abiertas siguen con su pedido.";
+            if (window.confirm(question)) void move(!universal);
+          }}
+        >
+          {universal ? "Volver a las plantillas" : "Pasar al proceso universal"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 

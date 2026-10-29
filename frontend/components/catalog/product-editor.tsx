@@ -27,7 +27,10 @@ interface Draft {
   name: string;
   description: string;
   price: string;
-  modo_venta: "precio_fijo" | "cotizacion";
+  /** Feature 020: only products and services are sold. */
+  tipo: "producto" | "servicio";
+  /** How it closes: an order, a quote, or a person who puts it together (feature 020, D7). */
+  modo_venta: "precio_fijo" | "cotizacion" | "informar";
   periodo: "unico" | "mes" | "ano";
   category: string;
   tracksStock: boolean;
@@ -36,6 +39,8 @@ interface Draft {
   isBundle: boolean;
   bundle_size: string;
   bundle_permite_libres: boolean;
+  /** The category a package's choices come from; empty: any item (feature 020, D2). */
+  bundle_categoria: string;
   destacado: boolean;
   is_active: boolean;
   tags: string[];
@@ -47,11 +52,19 @@ interface Draft {
   buffer_min: string;
 }
 
+/** What each closing means, said under the field (feature 020, «CÓMO SE CIERRA» of the prompt). */
+const CLOSING_HINTS: Record<Draft["modo_venta"], string> = {
+  precio_fijo: "El asistente lo agrega al pedido, pide los datos y envía cómo pagar. Si se agenda, reserva la cita.",
+  cotizacion: "El asistente junta los datos que pongas abajo y una persona da el precio.",
+  informar: "El asistente lo explica y lo pasa a un asesor de tu equipo; no va al pedido.",
+};
+
 function draftOf(product: Product | null): Draft {
   return {
     name: product?.name ?? "",
     description: product?.description ?? "",
     price: product ? Number(product.price).toFixed(2) : "",
+    tipo: product?.tipo ?? "producto",
     modo_venta: product?.modo_venta ?? "precio_fijo",
     periodo: product?.periodo ?? "unico",
     category: product?.category ?? "",
@@ -61,6 +74,7 @@ function draftOf(product: Product | null): Draft {
     isBundle: product?.bundle_size != null,
     bundle_size: product?.bundle_size != null ? String(product.bundle_size) : "5",
     bundle_permite_libres: product?.bundle_permite_libres ?? true,
+    bundle_categoria: product?.bundle_categoria ?? "",
     destacado: product?.destacado ?? false,
     is_active: product?.is_active ?? true,
     tags: product?.tags ?? [],
@@ -79,7 +93,8 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
   const errors: Errors = {};
   if (!draft.name.trim()) errors.name = "Ponle un nombre.";
   const amount = Number(draft.price.replace(",", "."));
-  const quoted = draft.modo_venta === "cotizacion";
+  // A quote and what a person puts together may carry no price (or a reference one).
+  const quoted = draft.modo_venta !== "precio_fijo";
   if (!quoted && (!draft.price.trim() || Number.isNaN(amount) || amount < 0)) {
     errors.price = "Escribe un precio válido, por ejemplo 12.50";
   }
@@ -115,6 +130,7 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
       description: draft.description.trim() || null,
       // Money as a two-decimal string: the column is NUMERIC(12,2).
       price: quoted && !draft.price.trim() ? "0.00" : amount.toFixed(2),
+      tipo: draft.agendable ? "servicio" : draft.tipo,
       modo_venta: draft.modo_venta,
       periodo: draft.periodo,
       category: draft.category.trim() || null,
@@ -122,6 +138,7 @@ function validate(draft: Draft): { errors: Errors; body: ProductBody | null } {
       es_digital: draft.es_digital,
       bundle_size: draft.isBundle ? size : null,
       bundle_permite_libres: draft.isBundle ? draft.bundle_permite_libres : false,
+      bundle_categoria: draft.isBundle ? draft.bundle_categoria.trim() || null : null,
       destacado: draft.destacado,
       is_active: draft.is_active,
       tags: draft.tags,
@@ -198,7 +215,8 @@ export function ProductEditor({
     }
   }
 
-  const title = current ? "Editar producto" : "Nuevo producto";
+  const noun = draft.tipo === "servicio" ? "servicio" : "producto";
+  const title = current ? `Editar ${noun}` : `Nuevo ${noun}`;
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onClick={onClose}>
@@ -245,24 +263,41 @@ export function ProductEditor({
               onChange={(e) => set("description", e.target.value)}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <Select
-                label="Cómo se vende"
+                label="Qué es"
+                value={draft.agendable ? "servicio" : draft.tipo}
+                disabled={draft.agendable}
+                onChange={(e) => set("tipo", e.target.value as Draft["tipo"])}
+                hint={draft.agendable ? "Se agenda, así que es un servicio." : undefined}
+                options={[
+                  { value: "producto", label: "Producto (físico o digital)" },
+                  { value: "servicio", label: "Servicio" },
+                ]}
+              />
+              <Select
+                label="Cómo se cierra"
                 value={draft.modo_venta}
                 onChange={(e) => set("modo_venta", e.target.value as Draft["modo_venta"])}
+                hint={CLOSING_HINTS[draft.modo_venta]}
                 options={[
-                  { value: "precio_fijo", label: "Precio fijo" },
-                  { value: "cotizacion", label: "Se cotiza (lo ve una persona)" },
+                  { value: "precio_fijo", label: "Lo pide y lo paga" },
+                  { value: "cotizacion", label: "Se cotiza" },
+                  { value: "informar", label: "Lo arma una persona" },
                 ]}
               />
               <Field
-                label={draft.modo_venta === "cotizacion" ? "Precio referencial" : "Precio (S/)"}
-                required={draft.modo_venta !== "cotizacion"}
+                label={draft.modo_venta === "precio_fijo" ? "Precio (S/)" : "Precio referencial"}
+                required={draft.modo_venta === "precio_fijo"}
                 inputMode="decimal"
                 placeholder="12.50"
                 value={draft.price}
                 error={errors.price}
-                hint={draft.modo_venta === "cotizacion" ? "Opcional." : undefined}
+                hint={
+                  draft.modo_venta === "precio_fijo"
+                    ? undefined
+                    : "Opcional: el asistente dice «desde» ese precio."
+                }
                 onChange={(e) => set("price", e.target.value)}
               />
             </div>
@@ -362,6 +397,21 @@ export function ProductEditor({
                     error={errors.bundle_size}
                     onChange={(e) => set("bundle_size", e.target.value)}
                   />
+                  <Select
+                    label="Se eligen de"
+                    value={draft.bundle_categoria}
+                    onChange={(e) => set("bundle_categoria", e.target.value)}
+                    hint="Ej.: un kit de 3 herramientas solo admite herramientas, no pintura."
+                    options={[
+                      { value: "", label: "Cualquier producto del catálogo" },
+                      ...[
+                        ...categories,
+                        ...(draft.bundle_categoria && !categories.includes(draft.bundle_categoria)
+                          ? [draft.bundle_categoria]
+                          : []),
+                      ].map((c) => ({ value: c, label: `La categoría ${c}` })),
+                    ]}
+                  />
                   <Checkbox
                     label="Puede elegir opciones que no están en el catálogo"
                     checked={draft.bundle_permite_libres}
@@ -411,7 +461,7 @@ export function ProductEditor({
 
           <footer className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
             <Button type="submit" loading={busy}>
-              {current ? "Guardar cambios" : "Crear producto"}
+              {current ? "Guardar cambios" : `Crear ${noun}`}
             </Button>
             <Button type="button" variant="secondary" onClick={onClose}>
               Cerrar
