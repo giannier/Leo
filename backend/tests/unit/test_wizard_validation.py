@@ -12,7 +12,7 @@ from __future__ import annotations
 import typing
 
 from app.api.v1 import wizard
-from app.models.business import AGENT_OBJECTIVES, AGENT_TONES, INDUSTRIES
+from app.models.business import AGENT_OBJECTIVES, AGENT_TONES
 from app.services.wizard import WizardService
 
 
@@ -21,9 +21,6 @@ def _members(literal: object) -> set[str]:
 
 
 class TestTheApiMatchesTheSchema:
-    def test_industries(self) -> None:
-        assert _members(wizard.Industry) == set(INDUSTRIES)
-
     def test_tones(self) -> None:
         assert _members(wizard.Tone) == set(AGENT_TONES)
 

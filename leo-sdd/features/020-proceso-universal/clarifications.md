@@ -97,3 +97,20 @@ plantilla sino del sistema o del contenido.
   selector solo en el primer mensaje (afina C-01).
 **Registrado por:** Claude — lectura conservadora, por ratificar.
 
+## C-05: Los rubros son datos, y los de las empresas de Giannier (lectura conservadora, 2026-10-29)
+**Situación:** Giannier dio los rubros de sus empresas (más de veinte líneas de negocio, y vendrán más). La lista de rubros
+estaba escrita en cuatro lugares del código.
+**Decisiones:**
+- El rubro de un negocio apunta a la tabla `rubros` (migración 0075) y el panel lee la lista de `GET /tenant/rubros`: un rubro
+  nuevo es contenido publicado por Zentek360, no un cambio de código.
+- Quince rubros nuevos con su plantilla ([rubros-investigacion.md](rubros-investigacion.md)); los demás negocios caen en rubros
+  que ya existían (inmobiliaria, educación, tecnología, B2B para «supply», salud para medicina).
+- «Bebidas» es agua y bebidas sin alcohol (Giannier, 2026-10-29); Nayu (agua en bidones) hoy está en `b2b` y podría pasar a
+  `bebidas` cuando Giannier lo decida.
+- **Cobranza y productos médicos:** la política de WhatsApp los prohíbe aunque haya licencia. Sus plantillas existen, con un
+  aviso que manda la venta o la cobranza al chat web; activar el agente de esas empresas en WhatsApp es decisión de Giannier,
+  con ese riesgo a la vista.
+- Las plantillas nuevas no sugieren caminos (calificación): solo datos del cliente. Se agregan cuando haya conversaciones reales.
+**Registrado por:** Claude — lectura conservadora, por ratificar. Cambia el prompt de los negocios de esos rubros: necesita
+la pasada con el modelo real antes de producción.
+
