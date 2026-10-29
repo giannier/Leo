@@ -301,6 +301,8 @@ export type Usage = Ok<Ops["/api/v1/tenant/usage"]["get"]>;
 export type ChecklistItem = Checklist["items"][number];
 
 export type BusinessProfile = Ok<Ops["/api/v1/tenant/business-profile"]["get"]>;
+/** The rubros a business can choose, read from the catalogue (feature 020, migration 0075). */
+export type RubroOption = Ok<Ops["/api/v1/tenant/rubros"]["get"]>["items"][number];
 export type BusinessProfilePatch = JsonBody<
   Ops["/api/v1/tenant/business-profile"]["put"]["requestBody"]
 >;
@@ -313,6 +315,7 @@ type ProductCreate = JsonBody<Ops["/api/v1/tenant/products"]["post"]["requestBod
 /** Fields the server fills in when omitted (TASK-406); the generated type lists
  * them as required because the schema is read from the response side. */
 type ProductServerDefaults =
+  | "tipo"
   | "modo_venta"
   | "es_digital"
   | "bundle_permite_libres"
@@ -718,6 +721,10 @@ export type ProcessTemplate = Ok<Ops["/api/v1/assistant/templates"]["get"]>["ite
 export type ProcessView = Ok<Ops["/api/v1/assistant/process"]["get"]>;
 export type RuleView = ProcessView["etapas"][number]["reglas"][number];
 export type RubroView = Ok<Ops["/api/v1/assistant/rubro"]["get"]>;
+/** The template of the business's rubro: what it brings, whether it was applied, its news (020, F3). */
+export type RubroTemplate = Ok<Ops["/api/v1/assistant/rubro/plantilla"]["get"]>;
+export type TemplateItem = RubroTemplate["situaciones"][number];
+export type TemplateApplied = Ok<Ops["/api/v1/assistant/rubro/plantilla/aplicar"]["post"]>;
 export type PromptPreview = Ok<Ops["/api/v1/assistant/prompt-preview"]["get"]>;
 export type Situation = Ok<Ops["/api/v1/assistant/situations"]["get"]>["items"][number];
 export type SituationBody = JsonBody<Ops["/api/v1/assistant/situations"]["post"]["requestBody"]>;
@@ -782,6 +789,8 @@ export const api = {
   },
 
   profile: {
+    rubros: () =>
+      request<{ items: RubroOption[] }>("/tenant/rubros").then((page) => page.items),
     get: () => request<BusinessProfile>("/tenant/business-profile"),
     save: (body: BusinessProfilePatch) =>
       request<BusinessProfile>("/tenant/business-profile", { method: "PUT", body }),
@@ -974,6 +983,12 @@ export const api = {
     tenants: (query?: { search?: string; status?: string }) =>
       request<AdminTenant[]>("/platform-admin/tenants", { query }),
     tenant: (id: string) => request<AdminTenantDetail>(`/platform-admin/tenants/${id}`),
+    /** Feature 020: move a business to the universal process (hidden until its evals) or back. */
+    setUniversalProcess: (id: string, universal: boolean) =>
+      request<{ template_key: string }>(`/platform-admin/tenants/${id}/process`, {
+        method: "PUT",
+        body: { universal },
+      }),
 
     deadLetters: () => request<DeadLetter[]>("/platform-admin/dead-letters"),
 
@@ -1251,6 +1266,25 @@ export const api = {
         body: { apagada },
       }),
     rubro: () => request<RubroView>("/assistant/rubro"),
+    /** A rubro rule in the business's own words; null goes back to the template's text. */
+    rewriteRule: (ruleKey: string, texto: string | null) =>
+      request<RuleView>(`/assistant/rules/rubro/${encodeURIComponent(ruleKey)}/texto`, {
+        method: "PUT",
+        body: { texto },
+      }),
+    rubroTemplate: () => request<RubroTemplate>("/assistant/rubro/plantilla"),
+    applyRubroTemplate: (valores: Record<string, Record<string, string>>) =>
+      request<TemplateApplied>("/assistant/rubro/plantilla/aplicar", {
+        method: "POST",
+        body: { valores },
+      }),
+    acceptTemplateNews: (clave: string, valores: Record<string, string>) =>
+      request<{ situacion_id: string; estado: string }>(
+        `/assistant/rubro/plantilla/novedades/${encodeURIComponent(clave)}/aceptar`,
+        { method: "POST", body: { valores } },
+      ),
+    templateNewsSeen: () =>
+      request<void>("/assistant/rubro/plantilla/novedades/vistas", { method: "POST" }),
     newsSeen: (kind: CatalogKind) =>
       request<void>(`/assistant/novedades/${kind}/vistas`, { method: "POST" }),
     preview: (stage: string) =>

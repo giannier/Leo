@@ -20,11 +20,12 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from app.api.deps import (
     EmailProviderDep,
@@ -39,6 +40,7 @@ from app.models.channel import WebhookEvent
 from app.models.whatsapp import WhatsAppNumber
 from app.providers.email.base import EmailProvider
 from app.providers.whatsapp.base import NumberCredentials
+from app.repositories.business import AgentConfigRepository, BusinessProfileRepository
 from app.services.admin import (
     CredentialsRequired,
     DeadLetterNotFound,
@@ -160,6 +162,31 @@ class TenantDetailResponse(BaseModel):
     products: int
     knowledge_chars: int
     has_number: bool
+    # The business's sales process and rubro (feature 020): the operator may move it to the
+    # universal process.
+    process_template_key: str | None = None
+    industry: str | None = None
+
+
+def _detail(session: Session, usage: Any) -> TenantDetailResponse:
+    tenant_id = usage.tenant.id
+    agent = AgentConfigRepository(session, tenant_id).current()
+    profile = BusinessProfileRepository(session, tenant_id).current()
+    return TenantDetailResponse(
+        id=tenant_id,
+        name=usage.tenant.name,
+        status=usage.tenant.status,
+        trial_ends_at=usage.tenant.trial_ends_at,
+        paused_at=usage.tenant.paused_at,
+        created_at=usage.tenant.created_at,
+        owner_email=usage.owner_email,
+        members=usage.members,
+        products=usage.products,
+        knowledge_chars=usage.knowledge_chars,
+        has_number=usage.has_number,
+        process_template_key=agent.process_template_key if agent else None,
+        industry=profile.industry if profile else None,
+    )
 
 
 def _not_found(what: str) -> ApiError:
@@ -357,19 +384,7 @@ async def get_tenant(
     except TenantNotFound as exc:
         raise _not_found("Tenant") from exc
 
-    return TenantDetailResponse(
-        id=usage.tenant.id,
-        name=usage.tenant.name,
-        status=usage.tenant.status,
-        trial_ends_at=usage.tenant.trial_ends_at,
-        paused_at=usage.tenant.paused_at,
-        created_at=usage.tenant.created_at,
-        owner_email=usage.owner_email,
-        members=usage.members,
-        products=usage.products,
-        knowledge_chars=usage.knowledge_chars,
-        has_number=usage.has_number,
-    )
+    return _detail(session, usage)
 
 
 @router.get(
@@ -473,19 +488,7 @@ async def extend_trial(
     except TenantNotFound as exc:
         raise _not_found("Tenant") from exc
 
-    return TenantDetailResponse(
-        id=usage.tenant.id,
-        name=usage.tenant.name,
-        status=usage.tenant.status,
-        trial_ends_at=usage.tenant.trial_ends_at,
-        paused_at=usage.tenant.paused_at,
-        created_at=usage.tenant.created_at,
-        owner_email=usage.owner_email,
-        members=usage.members,
-        products=usage.products,
-        knowledge_chars=usage.knowledge_chars,
-        has_number=usage.has_number,
-    )
+    return _detail(session, usage)
 
 
 class ProcessSwitchPayload(BaseModel):

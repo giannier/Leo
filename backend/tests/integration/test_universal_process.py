@@ -95,6 +95,19 @@ class TestHowTheCatalogueCloses:
         assert config.cierres == ()
 
 
+class TestThePanel:
+    async def test_the_process_says_how_the_catalogue_closes(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        owner, owner_id = await _register(api, mail, db)
+        tenant_id = _tenant_of(db, owner_id)
+        _catalogue(db, tenant_id)
+
+        view = (await api.get(f"{ASSISTANT}/process", headers=owner)).json()
+
+        assert view["cierres"] == ["pedido", "cotizacion", "cita", "informar"]
+
+
 class TestWhatTheSearchShows:
     async def _search(self, db: Session, template_key: str, query: str = "asesoría") -> str:
         tenant = _tenant(db, template=template_key)
@@ -175,6 +188,8 @@ class TestTheSwitch:
             f"{PLATFORM}/tenants/{tenant_id}/process", headers=admin, json={"universal": True}
         )
         assert moved.status_code == 200 and moved.json()["template_key"] == UNIVERSAL
+        detail = (await api.get(f"{PLATFORM}/tenants/{tenant_id}", headers=admin)).json()
+        assert detail["process_template_key"] == UNIVERSAL
         agent = db.execute(
             select(AgentConfig).where(AgentConfig.tenant_id == tenant_id)
         ).scalar_one()

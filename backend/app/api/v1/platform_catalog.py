@@ -104,6 +104,8 @@ class VersionView(VersionContent):
     evals: dict[str, Any] | None
     evals_vigentes: bool
     publicada_en: str | None
+    # What a rubro's template suggests for the process (feature 020); carried to the next draft.
+    plantilla: dict[str, Any] | None = None
 
 
 class VersionSummary(BaseModel):
@@ -148,6 +150,7 @@ def _view(session: SessionDep, version: CatalogVersion) -> VersionView:
         evals_vigentes=evals_allow_publishing(session, version),
         publicada_en=version.publicada_en.isoformat() if version.publicada_en else None,
         notas=version.notas,
+        plantilla=dict(version.plantilla) if version.plantilla else None,
         reglas=[
             RuleIn(rule_key=r.rule_key, etapa=r.etapa, texto=r.texto)
             for r in catalog.rules(version.id)

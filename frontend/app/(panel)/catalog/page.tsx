@@ -31,8 +31,13 @@ const PERIOD_SUFFIX = { unico: "", mes: " al mes", ano: " al año" } as const;
 
 function priceOf(product: Product): string {
   const period = PERIOD_SUFFIX[product.periodo];
+  const priced = Number(product.price) > 0;
+  if (product.modo_venta === "informar") {
+    // Short: the column is narrow. The editor says the whole thing («Lo arma una persona»).
+    return priced ? `Desde ${money(product.price)}${period} · con asesor` : "Con asesor";
+  }
   if (product.modo_venta !== "cotizacion") return `${money(product.price)}${period}`;
-  return Number(product.price) > 0 ? `Desde ${money(product.price)}${period} · se cotiza` : "Se cotiza";
+  return priced ? `Desde ${money(product.price)}${period} · se cotiza` : "Se cotiza";
 }
 
 export default function CatalogPage() {
@@ -238,7 +243,9 @@ export default function CatalogPage() {
             {items.map((product) => (
               <li
                 key={product.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 sm:flex-nowrap"
+                // The actions go on their own line: beside the name and the price they squeezed the
+                // name to nothing at 1 280 px and overflowed the card (feature 020 visual QA).
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3"
               >
                 {product.foto_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -268,10 +275,17 @@ export default function CatalogPage() {
                     {product.bundle_size ? (
                       <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
                         Paquete de {product.bundle_size}
+                        {product.bundle_categoria ? ` · de ${product.bundle_categoria}` : ""}
+                      </span>
+                    ) : null}
+                    {product.agendable ? (
+                      <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] text-success">
+                        Se agenda
                       </span>
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-xs text-ink-faint">
+                    {product.tipo === "servicio" ? "Servicio" : "Producto"} ·{" "}
                     {product.category ?? "Sin categoría"}
                     {product.stock !== null ? ` · ${product.stock} en stock` : ""}
                     {product.es_digital ? " · Digital" : ""}
@@ -295,7 +309,7 @@ export default function CatalogPage() {
                   {priceOf(product)}
                 </span>
                 {canEdit ? (
-                  <div className="flex w-full shrink-0 flex-wrap gap-1 sm:w-auto">
+                  <div className="flex w-full flex-wrap justify-end gap-1 border-t border-line pt-2">
                     <Button variant="secondary" onClick={() => setEditing(product)}>
                       Editar
                     </Button>

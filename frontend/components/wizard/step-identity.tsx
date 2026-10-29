@@ -11,30 +11,20 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Field, Select, Skeleton, TextArea } from "@/components/ui";
-import { api, type BusinessProfile, type BusinessProfilePatch } from "@/lib/api/client";
+import { Alert, Field, Select, Skeleton, TextArea } from "@/components/ui";
+import {
+  api,
+  type BusinessProfile,
+  type BusinessProfilePatch,
+  type RubroOption,
+} from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { useAutosave } from "@/lib/use-autosave";
 import { ReadMyWeb } from "./read-my-web";
 import { SaveStatus, StepIntro, type StepProps } from "./shared";
 
-/** Mirrors `INDUSTRIES` in `app/models/business.py`. */
-const INDUSTRIES = [
-  { value: "", label: "Elige tu rubro" },
-  { value: "restaurante", label: "Restaurante o comida" },
-  { value: "instituto", label: "Instituto o academia" },
-  { value: "retail", label: "Tienda o retail" },
-  { value: "servicios", label: "Servicios" },
-  { value: "salud", label: "Salud" },
-  { value: "tecnologia", label: "Tecnología y software" },
-  { value: "belleza", label: "Belleza, bienestar y fitness" },
-  { value: "inmobiliaria", label: "Inmobiliaria" },
-  { value: "automotriz", label: "Automotriz" },
-  { value: "hogar", label: "Servicios del hogar y técnicos" },
-  { value: "turismo", label: "Turismo y hotelería" },
-  { value: "b2b", label: "Distribución y mayorista (B2B)" },
-  { value: "otros", label: "Otros" },
-] as const;
+/** The empty option: the rubros themselves come from the catalogue (`GET /tenant/rubros`). */
+const NO_RUBRO = { value: "", label: "Elige tu rubro" };
 
 const CURRENCIES = [
   { value: "PEN", label: "Soles (PEN)" },
@@ -70,6 +60,7 @@ function toForm(profile: BusinessProfile): Form {
 
 export function StepIdentity({ onSaved }: StepProps) {
   const [form, setForm] = useState<Form | null>(null);
+  const [rubros, setRubros] = useState<RubroOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const seeded = useRef(false);
 
@@ -77,9 +68,8 @@ export function StepIdentity({ onSaved }: StepProps) {
     save: (values, expected) => {
       const body: BusinessProfilePatch = {
         business_name: values.business_name.trim() || null,
-        // The empty option means "not chosen yet"; sending "" would fail the
-        // enum check, so it goes as null.
-        industry: (values.industry || null) as BusinessProfilePatch["industry"],
+        // The empty option means "not chosen yet"; "" is not a rubro, so it goes as null.
+        industry: values.industry || null,
         description: values.description.trim() || null,
         website: values.website.trim() || null,
         currency: values.currency as BusinessProfilePatch["currency"],
@@ -96,9 +86,9 @@ export function StepIdentity({ onSaved }: StepProps) {
   useEffect(() => {
     if (seeded.current) return;
     seeded.current = true;
-    api.profile
-      .get()
-      .then((profile) => {
+    Promise.all([api.profile.get(), api.profile.rubros()])
+      .then(([profile, options]) => {
+        setRubros(options);
         setForm(toForm(profile));
         seed(profile.updated_at ?? null);
       })
@@ -116,6 +106,8 @@ export function StepIdentity({ onSaved }: StepProps) {
     },
     [schedule],
   );
+
+  const chosen = rubros.find((r) => r.key === form?.industry);
 
   if (loadError) {
     return <p className="text-sm text-danger">{loadError}</p>;
@@ -149,10 +141,16 @@ export function StepIdentity({ onSaved }: StepProps) {
         label="Rubro"
         name="industry"
         required
-        options={INDUSTRIES}
+        hint="Con tu rubro, Leo te sugiere una plantilla de partida que luego puedes cambiar."
+        options={[NO_RUBRO, ...rubros.map((r) => ({ value: r.key, label: r.nombre }))]}
         value={form.industry}
         onChange={(e) => set("industry", e.target.value)}
       />
+      {chosen?.aviso_politica && (
+        <Alert tone="warning" title="Antes de activar tu agente">
+          {chosen.aviso_politica}
+        </Alert>
+      )}
 
       <TextArea
         label="Cuéntale a Leo sobre tu negocio"

@@ -129,12 +129,15 @@ test.describe("Asistente por capas", () => {
     });
   });
 
-  test("el wizard termina con una situación sugerida del rubro activa", async ({ page }) => {
+  // Feature 020: the wizard ends with the rubro's template, applied in one step; its situations are
+  // then the business's own. One the business already made from the old suggestions is not copied.
+  test("el wizard termina aplicando la plantilla del rubro", async ({ page }) => {
     await page.goto("/onboarding?paso=6");
-    const suggestion = page.getByTestId("suggested-situation").filter({ hasText: "Si piden factura" });
-    await expect(suggestion).toBeVisible({ timeout: 15_000 });
-    await suggestion.getByRole("button", { name: "Activar" }).click();
-    await expect(suggestion.getByText("Activada.")).toBeVisible();
+    const template = page.getByTestId("rubro-template");
+    await expect(template).toBeVisible({ timeout: 15_000 });
+    await template.getByLabel("En cuánto tiempo emiten la factura").fill("72 horas");
+    await template.getByRole("button", { name: "Aplicar plantilla" }).click();
+    await expect(page.getByText("Plantilla aplicada")).toBeVisible();
 
     await page.goto("/asistente");
     await expect(page.getByText("Activa tu primera situación")).toBeVisible();

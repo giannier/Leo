@@ -56,20 +56,40 @@ cambie el prompt llega a producción sin evals con el modelo real (constitución
 - **T3.3** ✅ D3 cumplida con C-01: las reglas del rubro siguen siendo reglas, pero el negocio las escribe con sus palabras
   (`PUT /assistant/rules/rubro/{rule_key}/texto`) o las apaga. Las copias hechas antes desde las sugeridas se reconocen.
 - **T3.4** Contenido: ✅ plantilla de educación con certificaciones (migración 0073, rubro `instituto` v2: 5 reglas, 9
-  situaciones, 2 caminos, datos y pago); pendiente: los rubros de las 20 empresas (falta saber cuáles son), el resto, y
-  «otros» genérico.
+  situaciones, 2 caminos, datos y pago); ✅ los rubros de las empresas de Giannier (migración 0075: quince rubros nuevos con
+  plantilla, y el rubro pasa a ser dato: C-05, fuentes en [rubros-investigacion.md](rubros-investigacion.md)); pendiente:
+  plantillas (situaciones con clave y opciones) para los trece rubros de antes, y «otros» genérico.
   *Verificación:* `tests/integration/test_rubro_template.py` (36 pruebas: aplicar, valores, idempotencia, copias anteriores,
   opciones propias, novedades, aceptar, vistas, texto propio, historial, permisos, aislamiento).
 
 ## F4 · Panel y administración
 
-- **T4.1** Formulario de producto o servicio: tipo, cómo se cierra, paquete (cuántos y de dónde).
-- **T4.2** Asistente › Proceso sin elección de plantilla: «cómo vende tu agente», plantilla aplicada, novedades.
-- **T4.3** Configuración inicial: rubro → vista previa de la plantilla → aplicar.
-- **T4.4** Administración: proceso universal y plantillas de rubro, con evals al publicar.
-- *Verificación:* capturas a 1 900, 1 280 y 390 px; tipos y lint del frontend.
+- **T4.1** ✅ Formulario de producto o servicio: qué es (producto o servicio; si se agenda, servicio), cómo se cierra («lo
+  pide y lo paga», «se cotiza», «lo arma una persona», con su explicación) y de qué categoría se eligen las opciones de un
+  paquete. El catálogo muestra servicio/producto, «se agenda», el paquete con su categoría y «Con asesor».
+- **T4.2** ✅ Asistente › Proceso y rubro: en el proceso universal, «Cómo vende tu agente» con los cierres que usa el catálogo
+  (`ProcessView.cierres`) en lugar del selector de plantillas; en el rubro, la tarjeta de la plantilla (qué trae, aplicar con
+  los datos que piden algunas situaciones, novedades una por una con «Tomar» y «Marcar como vistas»), reglas del rubro con
+  «Escribir con mis palabras» y «Volver al texto de la plantilla», y las reglas mejoradas en las novedades.
+- **T4.3** ✅ Configuración inicial: el rubro se elige de la lista de la API (`GET /tenant/rubros`, C-05) con el aviso de política
+  de WhatsApp del rubro; el resumen termina con la plantilla del rubro en una columna, con «Aplicar plantilla» arriba.
+- **T4.4** ✅ Administración: en el detalle del negocio, su rubro, su proceso y «Pasar al proceso universal» / «Volver a las
+  plantillas» (auditado); en el catálogo, las situaciones sugeridas con clave, etapas y «siempre», y lo que la plantilla
+  sugiere para el proceso. Los evals al publicar ya existían (017, TASK-466).
+- *Verificación:* ✅ capturas a 1 900, 1 280 y 390 px con un negocio de prueba (instituto en el proceso universal): ninguna
+  pantalla se desborda a 390 px; al revisar se corrigieron el catálogo a 1 280 px (los nombres desaparecían y los botones
+  salían de la tarjeta: ya pasaba antes) y las reglas largas del proceso en el teléfono. Aplicar la plantilla y escribir una
+  regla con palabras propias probados en el panel. Tipos y lint del frontend limpios. La prueba e2e del asistente de
+  configuración se actualizó a la plantilla; no se corrió la suite e2e (necesita el entorno completo).
 
 ## F5 · Validación y migración
+
+- **T5.0 Validación adelantada de la 0074 y regresión de `main`** (Giannier, 2026-10-29: «adelántalo con un presupuesto
+  pequeño») — **a la espera de que confirme el monto.** Con gpt-5.4-mini: el conjunto `SALES_FLOWS_SET=agenda_rubros`
+  (16 casos: un negocio con agenda por cada uno de los 7 rubros, más 2 sin agenda que deben derivar) antes y después de la
+  0074, dos corridas cada uno; y la regresión completa (`make evals`: flujos, calidad con juez, conversaciones reales de
+  Nayu, recuperación, doradas) dos veces sobre `main`, porque desplegar la 0074 despliega también F1–F3 (lo del proceso
+  universal sigue oculto). Estimado ≈ US$2.5; tope US$5. Nada se despliega sin «despliega».
 
 - **T5.1** Batería universal con el modelo real, dos corridas por umbral — **bloqueada hasta que Giannier apruebe el
   presupuesto (D5)**.

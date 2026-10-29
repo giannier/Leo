@@ -33,6 +33,7 @@ from app.process.service import (
     DEFAULT_CACHE,
     DEFAULT_TEMPLATE_KEY,
     ProcessConfigService,
+    closings_for,
 )
 from app.process.templates import TEMPLATES
 from app.process.templates.base import Stage
@@ -420,6 +421,8 @@ class ProcessView(BaseModel):
     options: dict[str, Any]
     etapas: list[StageView]
     novedades: NewsView | None = None
+    # How the catalogue's items close, each once (feature 020): what the universal process reads.
+    cierres: list[Literal["pedido", "cotizacion", "cita", "informar"]] = Field(default_factory=list)
 
 
 class ProcessRequest(BaseModel):
@@ -549,6 +552,7 @@ def _process(session: Session, tenant_id: uuid.UUID) -> ProcessView:
             for stage in Stage
         ],
         novedades=_news(resolver.news("proceso", template_key)),
+        cierres=list(closings_for(session, tenant_id)),
     )
 
 

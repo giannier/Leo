@@ -12,8 +12,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { RubroTemplateCard } from "@/components/assistant/rubro-template";
 import { AssistantHeader } from "@/components/assistant/section-nav";
-import { Alert, Button, Card, Select, Skeleton, cx } from "@/components/ui";
+import { useToast } from "@/components/toast";
+import { Alert, Button, Card, Select, Skeleton, TextArea, cx } from "@/components/ui";
 import {
   api,
   type CatalogKind,
@@ -40,17 +42,61 @@ const STAGES: Record<string, string> = {
   DERIVADO: "Atiende una persona",
 };
 
+/** How each closing reads to the owner (feature 020, the prompt's «CÓMO SE CIERRA»). */
+const CLOSINGS: Record<string, { title: string; detail: string }> = {
+  pedido: {
+    title: "Pedido",
+    detail: "Lo que tiene precio fijo: lo agrega al pedido, pide los datos, confirma y envía cómo pagar.",
+  },
+  cotizacion: {
+    title: "Cotización",
+    detail: "Lo que se cotiza: junta los datos que pusiste en el producto y lo pasa a tu equipo.",
+  },
+  cita: { title: "Cita", detail: "Lo que se agenda: ofrece horarios libres y reserva la cita." },
+  informar: {
+    title: "Lo arma una persona",
+    detail: "Lo explica, entiende qué necesita y lo pasa a un asesor de tu equipo.",
+  },
+};
+
+/** The universal process's COBRO names the way of payment with a placeholder the prompt fills; the
+ * owner reads it in words. */
+function readable(text: string): string {
+  return text.replaceAll("{pago_previo}", "Pago previo").replaceAll("{pago_contra_entrega}", "Pago contra entrega");
+}
+
 function Switch({
   rule,
   kind,
   onChange,
+  canWrite = false,
 }: {
   rule: RuleView;
   kind: CatalogKind;
   onChange: (rule: RuleView) => void;
+  /** A rubro rule the business may write in its own words (feature 020, C-01). */
+  canWrite?: boolean;
 }) {
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const on = !rule.apagada;
+  const own = rule.texto_propio ?? null;
+
+  async function rewrite(texto: string | null) {
+    setBusy(true);
+    setFailure(null);
+    try {
+      onChange(await api.assistant.rewriteRule(rule.rule_key, texto));
+      setEditing(null);
+      toast.success(texto ? "Regla guardada con tus palabras" : "Volvió al texto de la plantilla");
+    } catch (caught) {
+      setFailure(humanMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <li className="flex items-start gap-3 py-2.5" data-testid="rule">
       <button
@@ -75,9 +121,65 @@ function Switch({
       >
         <span className={cx("size-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-5" : "translate-x-0.5")} />
       </button>
-      <p className={cx("whitespace-pre-line text-sm", on ? "text-ink" : "text-ink-faint line-through")}>
-        {rule.texto}
-      </p>
+      <div className="min-w-0 flex-1">
+        {editing !== null ? (
+          <div className="space-y-2">
+            <TextArea
+              label="Con tus palabras"
+              rows={3}
+              maxLength={600}
+              value={editing}
+              hint={`Texto de la plantilla: ${rule.texto}`}
+              onChange={(e) => setEditing(e.target.value)}
+            />
+            {failure ? <p className="text-sm text-danger">{failure}</p> : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                loading={busy}
+                disabled={!editing.trim()}
+                onClick={() => void rewrite(editing.trim())}
+              >
+                Guardar
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* A rule may hold a long call without spaces (gestionar_pedido(accion="elegir", …)): it
+                breaks anywhere rather than widen the page on a phone. */}
+            <p
+              className={cx(
+                "whitespace-pre-line text-sm [overflow-wrap:anywhere]",
+                on ? "text-ink" : "text-ink-faint line-through",
+              )}
+            >
+              {readable(own ?? rule.texto)}
+            </p>
+            {own ? <p className="mt-1 text-xs text-accent">Con tus palabras</p> : null}
+            {canWrite ? (
+              <div className="mt-1 flex flex-wrap gap-3 text-xs font-semibold">
+                <button type="button" className="text-accent" onClick={() => setEditing(own ?? rule.texto)}>
+                  {own ? "Editar mi texto" : "Escribir con mis palabras"}
+                </button>
+                {own ? (
+                  <button
+                    type="button"
+                    className="text-ink-soft"
+                    disabled={busy}
+                    onClick={() => void rewrite(null)}
+                  >
+                    Volver al texto de la plantilla
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
     </li>
   );
 }
@@ -108,12 +210,29 @@ function News({
         </Button>
       }
     >
-      <ul className="mt-1 list-disc space-y-1 pl-5">
-        {news.reglas.map((rule) => (
-          <li key={rule.rule_key}>{rule.texto}</li>
-        ))}
-      </ul>
-      <p className="mt-1">Ya están activas; puedes apagar las que no quieras abajo.</p>
+      {news.reglas.length ? (
+        <>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {news.reglas.map((rule) => (
+              <li key={rule.rule_key}>{rule.texto}</li>
+            ))}
+          </ul>
+          <p className="mt-1">Ya están activas; puedes apagar las que no quieras abajo.</p>
+        </>
+      ) : null}
+      {news.mejoradas?.length ? (
+        <>
+          <p className="mt-2 font-medium">Reglas con un texto mejorado:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {news.mejoradas.map((rule) => (
+              <li key={rule.rule_key}>
+                {rule.texto}
+                {rule.texto_propio ? " (tú la escribiste con tus palabras: se queda tu texto hasta que vuelvas al de la plantilla)" : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </Alert>
   );
 }
@@ -192,7 +311,32 @@ export default function ProcessPage() {
       {process && tab === "proceso" ? (
         <div className="space-y-6">
           {process.novedades ? <News kind="proceso" news={process.novedades} onSeen={() => void load()} /> : null}
-          {canConfigure && templates.length ? (
+          {process.template_key === "universal" ? (
+            <Card
+              title="Cómo vende tu agente"
+              description="Un solo proceso para todo tu catálogo: cada producto o servicio dice cómo se cierra. Lo cambias en el catálogo, no aquí."
+            >
+              {process.cierres?.length ? (
+                <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {process.cierres.map((closing) => (
+                    <li key={closing} className="rounded-lg border border-line p-4">
+                      <p className="font-semibold text-ink">{CLOSINGS[closing]?.title ?? closing}</p>
+                      <p className="mt-1 text-sm text-ink-soft">{CLOSINGS[closing]?.detail}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-ink-soft">
+                  Todavía no hay productos ni servicios activos.{" "}
+                  <Link href="/catalog" className="font-semibold text-accent">
+                    Agrega tu catálogo
+                  </Link>
+                  .
+                </p>
+              )}
+            </Card>
+          ) : null}
+          {canConfigure && templates.length && process.template_key !== "universal" ? (
             <Card
               title="Plantilla de proceso (avanzado)"
               description={
@@ -253,7 +397,7 @@ export default function ProcessPage() {
             </Card>
           ) : null}
           {/* The rules by stage on the left and what the model receives on the right, side by side. */}
-          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             <Card
               title="Etapas y sus reglas"
               description={`Versión ${process.template_version ?? "—"} de la plataforma. Apaga una regla y deja de llegar al asistente desde el siguiente mensaje.`}
@@ -319,32 +463,22 @@ export default function ProcessPage() {
               Tu negocio no tiene rubro. Elígelo en la <Link href="/onboarding" className="underline">configuración</Link>.
             </Alert>
           ) : null}
+          {rubro.key ? <RubroTemplateCard canConfigure={canConfigure} onChanged={() => void load()} /> : null}
           {rubro.novedades ? <News kind="rubro" news={rubro.novedades} onSeen={() => void load()} /> : null}
           {rubro.reglas.length ? (
-            <Card title="Reglas del rubro" description="Lo que la plataforma sabe de los negocios como el tuyo.">
+            <Card
+              title="Reglas del rubro"
+              description="Lo que la plataforma sabe de los negocios como el tuyo. Puedes apagarlas o escribirlas con tus palabras."
+            >
               <ul className="divide-y divide-line">
                 {rubro.reglas.map((rule) => (
-                  <Switch key={rule.rule_key} kind="rubro" rule={rule} onChange={replaceRule} />
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-          {rubro.situaciones_sugeridas.length ? (
-            <Card title="Situaciones sugeridas" description="Actívalas desde Situaciones, completando sus datos.">
-              <ul className="space-y-2">
-                {rubro.situaciones_sugeridas.map((s) => (
-                  <li key={s.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm">
-                    <div>
-                      <p className="font-medium text-ink">{s.titulo}</p>
-                      <p className="text-ink-soft">{s.que_hace}</p>
-                    </div>
-                    <Link
-                      href={`/asistente/situaciones?sugerida=${s.id}`}
-                      className="shrink-0 text-sm font-semibold text-accent"
-                    >
-                      Usar
-                    </Link>
-                  </li>
+                  <Switch
+                    key={rule.rule_key}
+                    kind="rubro"
+                    rule={rule}
+                    onChange={replaceRule}
+                    canWrite={canConfigure}
+                  />
                 ))}
               </ul>
             </Card>
