@@ -243,7 +243,71 @@ STUDIO = Business(
     payment="Transferencia BCP a nombre de Agencia Pixel SAC.",
     setup=_qualify_leads,
 )
-BUSINESSES = {b.template: b for b in (SHOP, SCHOOL, AGENCY, CLINIC, STUDIO)}
+# ------------------------------------------- the agenda in each rubro that books (020, T2.7)
+# Seven rubros told the assistant to hand every booking to a person, above the AGENDA block
+# (migration 0074). One business with an agenda per rubro, and two without one: the rule must
+# book where there is an agenda and hand over where there is none.
+AGENDA_RUBRO = "agenda_"
+_AGENDA_RUBROS: dict[str, tuple[str, str, tuple[tuple[str, str], ...]]] = {
+    # rubro: (business, what it does, (service, price))
+    "belleza": ("Spa Raíces", "Spa en Surco: faciales y masajes.", (
+        ("Limpieza facial profunda", "95.00"), ("Masaje descontracturante", "130.00"))),
+    "salud": ("Clínica Vida", "Clínica de medicina general y pediatría en Lince.", (
+        ("Consulta de medicina general", "80.00"), ("Consulta de pediatría", "100.00"))),
+    "servicios": ("Estudio Tributario Ruiz", "Asesoría tributaria y contable para empresas.", (
+        ("Asesoría tributaria de una hora", "150.00"), ("Revisión de libros contables", "250.00"))),
+    "hogar": ("Técnicos al Toque", "Gasfitería y electricidad a domicilio en Lima.", (
+        ("Visita técnica de gasfitería", "60.00"), ("Visita técnica de electricidad", "60.00"))),
+    "inmobiliaria": ("Inmobiliaria Horizonte", "Departamentos en preventa en Surco.", (
+        ("Visita guiada al proyecto Los Álamos", "0.00"),
+        ("Visita al departamento piloto", "0.00"))),
+    "automotriz": ("Autos del Sur", "Concesionario de autos nuevos y taller.", (
+        ("Prueba de manejo SUV", "0.00"), ("Mantenimiento de 10 000 km", "250.00"))),
+    "turismo": ("Andes Tours", "Tours guiados en Lima.", (
+        ("Tour Lima colonial", "80.00"), ("Tour de miradores", "70.00"))),
+}  # fmt: skip
+
+
+def _agenda(session: Session, tenant: Tenant) -> None:
+    """Capabilities to sell and book, Monday to Saturday hours, every service bookable."""
+    config = session.query(AgentConfig).filter(AgentConfig.tenant_id == tenant.id).one()
+    config.capacidades = ["atender", "vender", "agendar"]
+    profile = session.query(BusinessProfile).filter(BusinessProfile.tenant_id == tenant.id).one()
+    profile.timezone = "America/Lima"
+    days = ("mon", "tue", "wed", "thu", "fri", "sat")
+    profile.opening_hours = {day: [["09:00", "13:00"], ["15:00", "19:00"]] for day in days}
+    for product in ProductRepository(session, tenant.id).list():
+        product.tipo = "servicio"
+        product.agendable = True
+        product.duracion_min = 60
+
+
+def _no_agenda(session: Session, tenant: Tenant) -> None:
+    config = session.query(AgentConfig).filter(AgentConfig.tenant_id == tenant.id).one()
+    config.capacidades = ["atender", "vender"]
+
+
+def _agenda_business(rubro: str, *, books: bool) -> Business:
+    name, description, services = _AGENDA_RUBROS[rubro]
+    return Business(
+        name=name,
+        industry=rubro,
+        template=f"{AGENDA_RUBRO}{rubro}" + ("" if books else "_sin_agenda"),
+        description=description,
+        products=tuple(
+            (service, price, "Servicios", "precio_fijo", None, False, i == 0)
+            for i, (service, price) in enumerate(services)
+        ),
+        payment=f"Yape al 955111222 a nombre de {name}.",
+        setup=_agenda if books else _no_agenda,
+    )
+
+
+AGENDA_BUSINESSES = tuple(_agenda_business(rubro, books=True) for rubro in _AGENDA_RUBROS) + (
+    _agenda_business("belleza", books=False),
+    _agenda_business("salud", books=False),
+)
+BUSINESSES = {b.template: b for b in (SHOP, SCHOOL, AGENCY, CLINIC, STUDIO, *AGENDA_BUSINESSES)}
 
 
 def seed(session: Session, business: Business) -> Tenant:
@@ -268,10 +332,12 @@ def seed(session: Session, business: Business) -> Tenant:
                 tenant_id=tenant.id,
                 agent_name="Leo",
                 is_active=True,
-                # The clinic and the studio run the services template; the key only labels flows.
+                # The clinic, the studio and the agenda businesses of each rubro run the services
+                # template; the key only labels flows.
                 process_template_key=(
                     "servicios"
                     if business.template in ("agenda", "captacion")
+                    or business.template.startswith(AGENDA_RUBRO)
                     else business.template
                 ),
             ),
@@ -347,6 +413,8 @@ class FlowCase:
     # What happened before this customer wrote (a past order, say): called with the session,
     # the business, the customer's contact and the conversation of the case.
     prelude: Callable[[Session, Tenant, Contact, Conversation], None] | None = None
+    # Tools that must not be called (an agenda business must not hand the booking to a person).
+    never_tools: frozenset[str] = frozenset()
 
 
 def _case(
@@ -358,6 +426,7 @@ def _case(
     mentions_any: Sequence[str] = (),
     never: Sequence[str] = (),
     prelude: Callable[[Session, Tenant, Contact, Conversation], None] | None = None,
+    never_tools: Sequence[str] = (),
 ) -> FlowCase:
     return FlowCase(
         template,
@@ -368,6 +437,7 @@ def _case(
         tuple(mentions_any),
         tuple(never),
         prelude,
+        frozenset(never_tools),
     )
 
 
@@ -1342,6 +1412,72 @@ def _stored_order_amounts(
     return {Decimal(str(v)).quantize(Decimal("0.01")) for v in found if v is not None}
 
 
+# What the customer says in each rubro, and the name they give.
+_AGENDA_ASKS: dict[str, tuple[str, str]] = {
+    "belleza": ("una limpieza facial", "Lucía Fernández"),
+    "salud": ("una consulta de medicina general", "Jorge Salinas"),
+    "servicios": ("una asesoría tributaria", "Carmen Ruiz"),
+    "hogar": ("una visita técnica de gasfitería, tengo una fuga en el lavadero", "Pedro Huamán"),
+    "inmobiliaria": ("una visita al proyecto Los Álamos", "Andrea Torres"),
+    "automotriz": ("una prueba de manejo de la SUV", "Luis Chávez"),
+    "turismo": ("el tour Lima colonial para dos personas", "Sofía Quispe"),
+}
+_OPEN = ["INICIO", "IDENTIFICAR", "ASESORIA", "PEDIDO", "DATOS", "COBRO", "CERRADO"]
+_BOOKED = (
+    "ya quedó agendada",
+    "quedó agendada",
+    "ya está agendada",
+    "te reservé",
+    "quedó reservada",
+)
+
+
+def _agenda_cases() -> tuple[FlowCase, ...]:
+    cases: list[FlowCase] = []
+    for rubro, (what, who) in _AGENDA_ASKS.items():
+        key = f"{AGENDA_RUBRO}{rubro}"
+        cases.append(
+            _case(
+                key,
+                "agenda el horario que eligió, sin derivar",
+                [
+                    f"Hola, quisiera reservar {what}",
+                    "¿Qué horarios tienen esta semana?",
+                    f"Me sirve el primero que me diste. Soy {who}",
+                ],
+                _OPEN,
+                ["consultar_horarios", "agendar_cita"],
+                never_tools=["derivar_a_humano"],
+            )
+        )
+        cases.append(
+            _case(
+                key,
+                "ofrece horarios de la tarde que pidió, sin derivar",
+                [f"Buenas, quiero {what} para el jueves en la tarde, ¿tienen espacio?"],
+                _OPEN,
+                ["consultar_horarios"],
+                mentions_any=[":00", ":30"],
+                never_tools=["derivar_a_humano"],
+            )
+        )
+    for rubro in ("belleza", "salud"):
+        what, who = _AGENDA_ASKS[rubro]
+        cases.append(
+            _case(
+                f"{AGENDA_RUBRO}{rubro}_sin_agenda",
+                "sin agenda no reserva por su cuenta",
+                [f"Hola, quiero reservar {what} para el viernes a las 4 de la tarde. Soy {who}"],
+                [*_OPEN, "DERIVADO"],
+                never=_BOOKED,
+            )
+        )
+    return tuple(cases)
+
+
+AGENDA_RUBRO_FLOW_CASES = _agenda_cases()
+
+
 async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> FlowOutcome:
     business = BUSINESSES[case.template]
     tenant = seed(session, business)
@@ -1437,6 +1573,9 @@ async def run_case(session: Session, case: FlowCase, *, llm: LLMProvider) -> Flo
     missing = case.tools - tools
     if missing:
         outcome.failures.append(f"no usó {sorted(missing)}")
+    forbidden = case.never_tools & tools
+    if forbidden:
+        outcome.failures.append(f"usó {sorted(forbidden)}")
     if len(sent_resources) != len(set(sent_resources)):
         outcome.failures.append(f"recurso repetido: {sent_resources}")
     joined = " ".join(replies).lower()
@@ -1474,6 +1613,8 @@ class FlowReport:
         ]
         for template in BUSINESSES:
             mine = [o for o in self.outcomes if o.case.template == template]
+            if not mine:
+                continue
             lines.append(
                 f"## {template}: {sum(o.ok for o in mine)}/{len(mine)} ({self.ratio(template):.0%})"
             )
