@@ -31,6 +31,52 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", plain).strip("_")[:_CLAVE_ROOM].strip("_") or "producto"
 
 
+def _title(name: str) -> str:
+    return f"Foto de {name}"[:120]
+
+
+def _when(name: str) -> str:
+    return f"Cuando quiera ver {name} o pida una foto"[:300]
+
+
+def _free_clave(repo: MediaAssetRepository, name: str) -> str:
+    base = f"foto_{_slug(name)}"
+    for n in range(1, 100):
+        clave = f"{base}_{n}"
+        if repo.by_clave(clave) is None:
+            return clave
+    return f"foto_{uuid.uuid4().hex[:12]}"
+
+
+def follow_rename(session: Session, tenant_id: uuid.UUID, product: Product, old_name: str) -> int:
+    """A renamed product's photos take the new name, so the assistant stops reading the old one.
+
+    Giannier, 2026-10-29: «Agua de Mesa de 500 ml» became «… 625 ml» and its photo still offered
+    «Cuando quiera ver Agua de Mesa de 500 ml». Only what Leo wrote from the name changes (key,
+    title and «when to send it»); a text the business wrote itself is left as it is. Returns how
+    many photos changed.
+    """
+    old, new = " ".join(old_name.split()), " ".join(product.name.split())
+    if old == new:
+        return 0
+    repo = MediaAssetRepository(session, tenant_id)
+    prefix = f"foto_{_slug(old)}_"
+    changed = 0
+    for photo in repo.list(MediaAsset.product_id == product.id, MediaAsset.tipo == "imagen"):
+        before = (photo.clave, photo.titulo, photo.cuando_usar)
+        if photo.titulo == _title(old):
+            photo.titulo = _title(new)
+        if photo.cuando_usar == _when(old):
+            photo.cuando_usar = _when(new)
+        named_after_it = photo.clave.startswith(prefix) and photo.clave[len(prefix) :].isdigit()
+        if named_after_it and _slug(new) != _slug(old):
+            photo.clave = _free_clave(repo, new)
+        if (photo.clave, photo.titulo, photo.cuando_usar) != before:
+            changed += 1
+            session.flush()
+    return changed
+
+
 class ProductPhotos:
     def __init__(self, session: Session, tenant_id: uuid.UUID, storage: StorageProvider) -> None:
         self._session = session
@@ -42,14 +88,6 @@ class ProductPhotos:
         rows = self._repo.list(MediaAsset.product_id == product.id, MediaAsset.tipo == "imagen")
         return sorted(rows, key=lambda a: (a.orden, a.created_at, a.clave))
 
-    def _free_clave(self, product: Product) -> str:
-        base = f"foto_{_slug(product.name)}"
-        for n in range(1, 100):
-            clave = f"{base}_{n}"
-            if self._repo.by_clave(clave) is None:
-                return clave
-        return f"foto_{uuid.uuid4().hex[:12]}"
-
     def add(self, product: Product, data: bytes, filename: str) -> MediaAsset:
         photos = self.of(product)
         if len(photos) >= MAX_PHOTOS:
@@ -60,9 +98,9 @@ class ProductPhotos:
         asset = self._library.upload(
             data,
             filename,
-            clave=self._free_clave(product),
-            titulo=f"Foto de {name}"[:120],
-            cuando_usar=f"Cuando quiera ver {name} o pida una foto"[:300],
+            clave=_free_clave(self._repo, name),
+            titulo=_title(name),
+            cuando_usar=_when(name),
             product_id=product.id,
             orden=(photos[-1].orden + 1) if photos else 0,
         )
