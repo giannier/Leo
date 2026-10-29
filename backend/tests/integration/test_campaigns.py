@@ -119,12 +119,13 @@ class TestSegments:
 
     def test_the_filters_combine(self, db: Session) -> None:
         tenant, _ = business(db)
-        vip = customer(db, tenant, tags=["vip"])
-        buyer = customer(db, tenant, tags=["vip"])
+        # The segment is counted at NOON: the customers wrote relative to NOON too, not to today.
+        vip = customer(db, tenant, tags=["vip"], now=NOON)
+        buyer = customer(db, tenant, tags=["vip"], now=NOON)
         _bought(db, tenant, buyer, "Pan de yema", at=NOON - timedelta(days=3))
-        lead = customer(db, tenant)
+        lead = customer(db, tenant, now=NOON)
         _lead(db, tenant, lead, "por_pagar", product="Torta de chocolate")
-        old = customer(db, tenant, wrote_hours_ago=24 * 40)
+        old = customer(db, tenant, wrote_hours_ago=24 * 40, now=NOON)
 
         def ids(**raw: Any) -> int:
             return count(db, tenant.id, Segment.parse(raw), now=NOON)

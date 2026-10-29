@@ -37,7 +37,7 @@ from app.services.csv_import import (
     ImportError_,
 )
 from app.services.media_library import MAX_UPLOAD, MediaRejected
-from app.services.product_photos import ProductPhotos
+from app.services.product_photos import ProductPhotos, follow_rename
 from app.services.product_tags import TagsInvalid, clean_tags
 
 router = APIRouter(prefix="/tenant/products", tags=["products"])
@@ -383,9 +383,14 @@ async def update_product(
             status_code=400, error="validation_error", message=ONLY_PACKAGES.capitalize()
         )
     before = {key: _shown(getattr(current, key, None)) for key in values} if current else {}
+    old_name = current.name if current is not None else None
     product = catalog.update(product_id, **values)
     if product is None:
         raise _not_found()
+    # Its photos are named after it: they follow, or the assistant keeps reading the old name.
+    renamed = old_name is not None and old_name != product.name
+    if renamed and follow_rename(session, principal.tenant_id, product, str(old_name)):
+        session.commit()
     changes = {
         key: {"antes": before.get(key), "despues": _shown(getattr(product, key, None))}
         for key in values

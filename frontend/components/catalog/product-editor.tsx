@@ -52,6 +52,35 @@ interface Draft {
   buffer_min: string;
 }
 
+/** A size or a weight written in a text: «500 ml», «7 L», «20L», «1.5 kg», «20 litros». */
+const MEASURE = /(\d+(?:[.,]\d+)?)\s?(ml|lt|litros?|l|kg|gr|g|oz|cm|mm)\b/gi;
+const UNITS: Record<string, string> = { lt: "l", litro: "l", litros: "l", gr: "g" };
+
+/** Each measure as «value unit», with the unit spelled one way: «20L» and «20 litros» are «20 l». */
+function measuresIn(text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const match of text.matchAll(MEASURE)) {
+    const unit = match[2].toLowerCase();
+    const value = match[1].replace(",", ".");
+    found.set(`${value} ${UNITS[unit] ?? unit}`, match[0]);
+  }
+  return found;
+}
+
+/**
+ * The sizes the description or the quote questions say that contradict the name: the same unit,
+ * another number. Giannier, 2026-10-29: «Agua de Mesa de 500 ml» became «… 625 ml» and the
+ * assistant kept saying 500 ml, because the description and the first question still said it.
+ */
+function staleMeasures(draft: Draft): string[] {
+  const named = measuresIn(draft.name);
+  const units = new Set([...named.keys()].map((m) => m.split(" ")[1]));
+  const elsewhere = measuresIn(`${draft.description}\n${draft.datos_a_pedir}`);
+  return [...elsewhere.entries()]
+    .filter(([measure]) => units.has(measure.split(" ")[1]) && !named.has(measure))
+    .map(([, written]) => written);
+}
+
 /** What each closing means, said under the field (feature 020, «CÓMO SE CIERRA» of the prompt). */
 const CLOSING_HINTS: Record<Draft["modo_venta"], string> = {
   precio_fijo: "El asistente lo agrega al pedido, pide los datos y envía cómo pagar. Si se agenda, reserva la cita.",
@@ -217,6 +246,7 @@ export function ProductEditor({
 
   const noun = draft.tipo === "servicio" ? "servicio" : "producto";
   const title = current ? `Editar ${noun}` : `Nuevo ${noun}`;
+  const stale = staleMeasures(draft);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onClick={onClose}>
@@ -459,6 +489,14 @@ export function ProductEditor({
             </fieldset>
           </div>
 
+          {stale.length ? (
+            <div className="border-t border-line px-4 pt-3">
+              <Alert tone="warning" title="La medida no coincide con el nombre">
+                La descripción o las preguntas para cotizar dicen {stale.join(", ")}, y el nombre dice otra medida. El
+                asistente lee todo: corrígelas para que no le diga al cliente una medida que ya no es.
+              </Alert>
+            </div>
+          ) : null}
           <footer className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
             <Button type="submit" loading={busy}>
               {current ? "Guardar cambios" : `Crear ${noun}`}

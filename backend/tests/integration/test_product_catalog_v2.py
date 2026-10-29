@@ -136,6 +136,42 @@ class TestPhotos:
         assert [a.clave for a in assets] == ["foto_polo_basico_1"]
         assert assets[0].cuando_usar.startswith("Cuando quiera ver Polo Básico")
 
+    async def test_a_renamed_product_s_photos_follow_its_new_name(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        # Giannier, 2026-10-29: «Agua de Mesa de 500 ml» became «… 625 ml» and its photo still told
+        # the assistant «Cuando quiera ver Agua de Mesa de 500 ml».
+        headers = await _owner(api, mail)
+        product = await _product(api, headers, name="Agua de Mesa de 500 ml")
+        url = f"{PRODUCTS}/{product['id']}/photos"
+        await api.post(url, headers=headers, files={"file": ("a.png", PNG)})
+        await api.post(url, headers=headers, files={"file": ("b.png", PNG)})
+        row = db.get(Product, uuid.UUID(product["id"]))
+        assert row is not None
+        repo = MediaAssetRepository(db, row.tenant_id)
+        mine = repo.for_product(row.id)[1]
+        mine.cuando_usar = "Cuando pregunte por la botella chica"  # the business's own words
+        db.flush()
+
+        renamed = await api.put(
+            f"{PRODUCTS}/{product['id']}", headers=headers, json={"name": "Agua de Mesa de 625 ml"}
+        )
+
+        assert renamed.status_code == 200
+        assets = sorted(repo.for_product(row.id), key=lambda a: a.clave)
+        for asset in assets:
+            db.refresh(asset)
+        assert [a.clave for a in assets] == [
+            "foto_agua_de_mesa_de_625_ml_1",
+            "foto_agua_de_mesa_de_625_ml_2",
+        ]
+        assert {a.titulo for a in assets} == {"Foto de Agua de Mesa de 625 ml"}
+        assert sorted(a.cuando_usar for a in assets) == [
+            "Cuando pregunte por la botella chica",
+            "Cuando quiera ver Agua de Mesa de 625 ml o pida una foto",
+        ]
+        assert not any("500" in f"{a.clave} {a.titulo} {a.cuando_usar}" for a in assets)
+
     async def test_not_an_image_and_the_limit(self, api: AsyncClient, mail: Any) -> None:
         headers = await _owner(api, mail)
         product = await _product(api, headers)
