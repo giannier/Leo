@@ -573,3 +573,110 @@ class TestTheOperatorKeepsTheKeys:
     def test_a_title_gives_a_stable_key(self) -> None:
         assert key_from_title("¿Si piden FACTURA?") == "situacion.si_piden_factura"
         assert key_from_title("¡¡!!") == "situacion.sin_titulo"
+
+
+NEW_RUBROS = (
+    "agro",
+    "auditoria",
+    "bebidas",
+    "cobranza",
+    "conciliacion",
+    "contable",
+    "creativo",
+    "estacionamientos",
+    "infantil",
+    "insumos_medicos",
+    "legal",
+    "limpieza",
+    "rrhh",
+    "seguros",
+    "ssoma",
+)
+
+
+class TestTheRubrosOfGiannierCompanies:
+    """Migration 0075 (T3.4): fifteen rubros, each with its template, and rubros as data."""
+
+    @pytest.mark.parametrize("key", NEW_RUBROS)
+    def test_each_one_is_published_with_a_whole_template(self, db: Session, key: str) -> None:
+        from app.agent.prompts.stage import SECTION_CAPS, estimate_tokens
+        from app.process.templates import TEMPLATES
+        from app.schemas.process_options import ProcessOptions
+
+        catalog = CatalogRepository(db)
+        rubro = catalog.rubro(key)
+        version = catalog.published("rubro", key)
+        assert rubro is not None and version is not None and version.version == 1
+        assert rubro.plantilla_sugerida in TEMPLATES
+        assert set(rubro.capacidades_sugeridas) <= {
+            "atender",
+            "vender",
+            "cotizar",
+            "agendar",
+            "captar",
+        }
+        assert rubro.preguntas_calificacion and rubro.datos_a_pedir_sugeridos
+        rules = catalog.rules(version.id)
+        assert 4 <= len(rules) <= 6
+        assert all(r.rule_key.startswith("rubro.") and r.etapa is None for r in rules)
+        block = "RUBRO\n" + "\n".join(f"- {r.texto}" for r in rules)
+        assert estimate_tokens(block) <= SECTION_CAPS["rubro"]
+        assert len(catalog.faqs(version.id)) == 5 and len(catalog.objections(version.id)) == 5
+        items = catalog.suggested_situations(version.id)
+        assert 3 <= len(items) <= 5
+        assert all(item.clave and item.clave.startswith(f"{key}.") for item in items)
+        options = ProcessOptions.model_validate(version.plantilla)
+        TEMPLATES[rubro.plantilla_sugerida].validate_options(
+            options.model_dump(mode="json", exclude_none=True)
+        )
+        TEMPLATES[UNIVERSAL].validate_options(options.model_dump(mode="json", exclude_none=True))
+
+    @pytest.mark.parametrize("key", NEW_RUBROS)
+    def test_a_business_of_the_rubro_applies_it(self, db: Session, key: str) -> None:
+        tenant = _tenant(db, template=UNIVERSAL)
+        profile = db.execute(
+            select(BusinessProfile).where(BusinessProfile.tenant_id == tenant.id)
+        ).scalar_one()
+        profile.industry = key
+        db.flush()
+
+        applied = RubroTemplateService(db, tenant.id).apply(by=None)
+
+        assert applied.activas + applied.borradores >= 3
+        assert "datos_requeridos" in applied.opciones
+        assert _rubro_rules(db, tenant)
+
+    def test_what_whatsapp_forbids_is_said_where_it_applies(self, db: Session) -> None:
+        catalog = CatalogRepository(db)
+        for key in ("cobranza", "insumos_medicos"):
+            rubro = catalog.rubro(key)
+            assert rubro is not None and "prohíbe" in (rubro.aviso_politica or "")
+            assert "chat web" in (rubro.aviso_politica or "")
+        bebidas = catalog.rubro("bebidas")
+        assert bebidas is not None and bebidas.aviso_politica is None  # water, not alcohol
+
+
+class TestRubrosAreData:
+    async def test_the_panel_reads_the_list_and_a_new_rubro_can_be_chosen(
+        self, api: AsyncClient, mail: Any, db: Session
+    ) -> None:
+        tenant_id, headers = await _account(api, mail)
+
+        listed = (await api.get(f"{TENANT}/rubros", headers=headers)).json()["items"]
+        chosen = await api.put(
+            f"{TENANT}/business-profile", headers=headers, json={"industry": "estacionamientos"}
+        )
+        unknown = await api.put(
+            f"{TENANT}/business-profile", headers=headers, json={"industry": "no_existe"}
+        )
+
+        keys = [item["key"] for item in listed]
+        assert len(keys) == 28 and keys[-1] == "otros"
+        assert {"bebidas", "legal", "ssoma"} <= set(keys)
+        assert chosen.status_code == 200 and chosen.json()["industry"] == "estacionamientos"
+        assert unknown.status_code == 400 and unknown.json()["fields"]["industry"]
+        profile = db.execute(
+            select(BusinessProfile).where(BusinessProfile.tenant_id == tenant_id)
+        ).scalar_one()
+        db.refresh(profile)
+        assert profile.industry == "estacionamientos"

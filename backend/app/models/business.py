@@ -35,21 +35,6 @@ from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_chec
 # every turn, so the cap is also a cost cap: 120 until 2026-10-20, then 400 (migration 0047).
 MAX_SALUDO = 400
 
-INDUSTRIES = (
-    "restaurante",
-    "instituto",
-    "retail",
-    "servicios",
-    "salud",
-    "tecnologia",
-    "belleza",
-    "inmobiliaria",
-    "automotriz",
-    "hogar",
-    "turismo",
-    "b2b",
-    "otros",
-)
 AGENT_TONES = ("profesional", "cercano", "juvenil")
 AGENT_OBJECTIVES = ("vender", "atender", "ambos")
 # How fast the assistant moves a customer toward the close, how much it says
@@ -93,7 +78,6 @@ class BusinessProfile(Base):
     """Identity of the tenant's business. One row per tenant."""
 
     __tablename__ = "business_profiles"
-    __table_args__ = (enum_check("industry", INDUSTRIES, "business_profiles_industry"),)
 
     # The tenant id doubles as the primary key: this is a 1-to-1 extension of
     # `tenants`, not a collection.
@@ -102,7 +86,10 @@ class BusinessProfile(Base):
     )
 
     business_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    industry: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # A rubro of the catalogue (`rubros`): adding one is content, not code (migration 0075).
+    industry: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("rubros.key", onupdate="CASCADE", ondelete="RESTRICT"), nullable=True
+    )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     website: Mapped[str | None] = mapped_column(Text, nullable=True)
     social_links: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")

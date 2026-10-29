@@ -29,6 +29,25 @@ RUBROS = (
     "tecnologia",
     "turismo",
 )
+# The rubros of Giannier's companies (feature 020, migration 0075), with their own tests in
+# `test_rubro_template.py`.
+NEW_RUBROS = (
+    "agro",
+    "auditoria",
+    "bebidas",
+    "cobranza",
+    "conciliacion",
+    "contable",
+    "creativo",
+    "estacionamientos",
+    "infantil",
+    "insumos_medicos",
+    "legal",
+    "limpieza",
+    "rrhh",
+    "seguros",
+    "ssoma",
+)
 
 
 # The three templates of feature 004 and their history of versions. The universal process (feature
@@ -82,7 +101,7 @@ class TestVersionOne:
     def test_thirteen_rubros_with_content_and_a_suggested_template(self, db: Session) -> None:
         catalog = CatalogRepository(db)
 
-        assert [r.key for r in catalog.rubros()] == list(RUBROS)
+        assert [r.key for r in catalog.rubros()] == sorted((*RUBROS, *NEW_RUBROS))
         for key in RUBROS:
             rubro = catalog.rubro(key)
             version = catalog.published("rubro", key)

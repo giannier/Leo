@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, StringConstraints
 from app.api.deps import ConfigurationManagerDep, MemberDep, SessionDep
 from app.api.errors import ApiError, error_responses
 from app.models.business import MAX_SALUDO
+from app.repositories.catalog import CatalogRepository
 from app.repositories.tenant import TenantUserRepository
 from app.services.wizard import WizardService
 
@@ -30,21 +31,9 @@ router = APIRouter(prefix="/tenant", tags=["wizard"])
 # lets mypy and the generated OpenAPI schema both see the allowed values.
 # `tests/unit/test_wizard_validation.py` asserts these stay in step with the
 # CHECK constraints, so a divergence fails the build rather than production.
-Industry = Literal[
-    "restaurante",
-    "instituto",
-    "retail",
-    "servicios",
-    "salud",
-    "tecnologia",
-    "belleza",
-    "inmobiliaria",
-    "automotriz",
-    "hogar",
-    "turismo",
-    "b2b",
-    "otros",
-]
+# A rubro of the catalogue (`GET /tenant/rubros`): new ones are content, not code (migration 0075),
+# so the value is checked against the `rubros` table when it is saved, not listed here.
+Industry = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[a-z0-9_]{2,40}$")]
 Tone = Literal["profesional", "cercano", "juvenil"]
 Objective = Literal["vender", "atender", "ambos"]
 # What the screens offer: every capability of the platform.
@@ -245,10 +234,46 @@ async def put_business_profile(
     must not null out what an earlier one collected.
     """
     values = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
+    industry = values.get("industry")
+    if industry is not None and CatalogRepository(session).rubro(industry) is None:
+        raise ApiError(
+            status_code=400,
+            error="validation_error",
+            message="Ese rubro no existe.",
+            fields={"industry": "Elige un rubro de la lista."},
+        )
     outcome = WizardService(session, principal.tenant_id).save_business_profile(
         expected_updated_at=payload.expected_updated_at, **values
     )
     return _profile_response(outcome.record, overwrote_newer=outcome.overwrote_newer)
+
+
+class RubroOption(BaseModel):
+    key: str
+    nombre: str
+    # What the owner should know before turning the agent on in this rubro (WhatsApp policy).
+    aviso_politica: str | None = None
+
+
+class RubroList(BaseModel):
+    items: list[RubroOption]
+
+
+@router.get(
+    "/rubros",
+    summary="The rubros a business can choose",
+    responses=error_responses(*AUTH_RESPONSES),
+)
+async def list_rubros(principal: MemberDep, session: SessionDep) -> RubroList:
+    """By name, with «Otro tipo de negocio» last: the panel's list comes from here."""
+    rubros = sorted(
+        CatalogRepository(session).rubros(), key=lambda r: (r.key == "otros", r.nombre.casefold())
+    )
+    return RubroList(
+        items=[
+            RubroOption(key=r.key, nombre=r.nombre, aviso_politica=r.aviso_politica) for r in rubros
+        ]
+    )
 
 
 @router.get(
