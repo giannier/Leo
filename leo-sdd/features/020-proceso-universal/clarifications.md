@@ -127,5 +127,7 @@ los del logo de zentek360»; ante la pregunta de qué hacer con el panel, eligi�
 - **No cambia:** el nombre interno del código y del repositorio (Leo), los comentarios y la documentación técnica.
 - **Al desplegar:** el remitente de los correos sale de `EMAIL_FROM` en `.env.prod`, que hoy dice «Leo»: se cambia a Z-BOT.
 - De paso, la Bandeja se desbordaba a lo ancho en celulares (la cuadrícula no fijaba su columna): corregido con `grid-cols-1`.
+- **Ícono:** la «Z» de Zentek360 (archivo que subió Giannier) va junto al nombre en el panel y es el ícono de la pestaña y del
+  acceso directo en el celular (`app/icon.png`, `app/apple-icon.png`, `components/brand.tsx`).
 **Registrado por:** Claude, por decisión de Giannier. Cambia el nombre con que se presenta el asistente sin nombre propio:
 verificado con la suite sin API; Giannier lo prueba en el modo prueba.

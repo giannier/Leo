@@ -16,6 +16,7 @@ import { forwardRef, useId, useState } from "react";
 import Link from "next/link";
 
 import { AlertIcon, CheckIcon, EyeIcon, EyeOffIcon, InfoIcon, SpinnerIcon } from "./icons";
+import { BrandMark } from "@/components/brand";
 
 function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -246,7 +247,7 @@ export function AuthShell({
     <main className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-4 py-10">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-6 block text-center">
-          <span className="font-heading text-2xl font-bold tracking-tight text-brand">Z-BOT</span>
+          <BrandMark className="text-2xl text-brand" />
         </Link>
 
         <div className="rounded-xl border border-line bg-surface p-6 sm:p-8">

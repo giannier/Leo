@@ -39,6 +39,7 @@ import { Alert, Skeleton, cx } from "@/components/ui";
 import { api, type TenantSummary } from "@/lib/api/client";
 import { humanMessage } from "@/lib/api/errors";
 import { MANAGES_CONFIGURATION, useSession, type Role } from "@/lib/session";
+import { BrandMark } from "@/components/brand";
 
 /** The headings of the side menu: a long flat list is read item by item; three groups are scanned. */
 type NavGroup = "work" | "agent" | "business";
@@ -174,7 +175,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
         {/* Pinned to the screen: the menu and "Cerrar sesión" stay in reach however long the page is. */}
         <aside className="hidden w-64 shrink-0 border-r border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
           <div className="px-6 py-4">
-            <span className="font-heading text-xl font-bold tracking-tight text-brand">Z-BOT</span>
+            <BrandMark className="text-xl text-brand" />
             {tenant ? (
               <p className="mt-0.5 truncate text-sm text-ink-faint" title={tenant.name}>
                 {tenant.name}
@@ -249,7 +250,7 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           {/* Top bar: phones and tablets. */}
           <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
             <div className="min-w-0">
-              <span className="font-heading text-lg font-bold tracking-tight text-brand">Z-BOT</span>
+              <BrandMark className="text-lg text-brand" />
               {tenant ? (
                 <p className="truncate text-xs text-ink-faint" title={tenant.name}>
                   {tenant.name}
