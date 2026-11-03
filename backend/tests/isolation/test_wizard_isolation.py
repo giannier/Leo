@@ -92,7 +92,7 @@ class TestConfigurationIsPerTenant:
         )
 
         seen_by_b = (await api.get(f"{TENANT}/agent-config", headers=headers_b)).json()
-        assert seen_by_b["agent_name"] == "Leo"
+        assert seen_by_b["agent_name"] == "Z-BOT"
         assert seen_by_b["tone"] == "cercano"
 
     async def test_the_concurrency_check_does_not_cross_tenants(

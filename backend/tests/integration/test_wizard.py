@@ -153,7 +153,7 @@ class TestAgentConfig:
     async def test_defaults_before_the_first_save(self, api: AsyncClient, mail: Any) -> None:
         headers = await _owner(api, mail)
         body = (await api.get(f"{TENANT}/agent-config", headers=headers)).json()
-        assert body["agent_name"] == "Leo"
+        assert body["agent_name"] == "Z-BOT"
         assert body["tone"] == "cercano"
         assert body["is_active"] is False
 

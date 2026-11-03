@@ -247,7 +247,7 @@ function Writer({ onCard }: { onCard: (card: CardDraft) => void }) {
   }
 
   return (
-    <Card title="Escríbela con tus palabras" description="Cuéntale la regla como se la dirías a un vendedor y Leo la convierte en tarjeta y te avisa si choca con otra.">
+    <Card title="Escríbela con tus palabras" description="Cuéntale la regla como se la dirías a un vendedor y Z-BOT la convierte en tarjeta y te avisa si choca con otra.">
       <div className="space-y-3" data-testid="situation-writer">
         {error ? <Alert tone="danger">{error}</Alert> : null}
         <TextArea

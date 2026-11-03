@@ -150,7 +150,7 @@ export function HowItSells({ refreshKey }: { refreshKey: string }) {
         if (!live) return;
         const template: ProcessTemplate | undefined = templates.items.find((t) => t.key === process.template_key);
         setText(
-          `${template?.nombre ?? process.template_key}${process.plantilla_automatica ? " (elegida por Leo según lo que hace tu agente)" : " (la elegiste tú)"}`,
+          `${template?.nombre ?? process.template_key}${process.plantilla_automatica ? " (elegida por Z-BOT según lo que hace tu agente)" : " (la elegiste tú)"}`,
         );
       })
       .catch(() => live && setText(null));

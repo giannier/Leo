@@ -19,7 +19,7 @@ import { humanMessage } from "@/lib/api/errors";
 
 const ORIGINS: Record<string, string> = {
   subido: "Adjuntado por tu equipo",
-  generado: "Hecho por Leo",
+  generado: "Hecho por Z-BOT",
   electronico: "Emitido electrónicamente",
 };
 

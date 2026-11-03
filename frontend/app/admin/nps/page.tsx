@@ -24,7 +24,7 @@ export default function NpsPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-heading text-2xl font-semibold text-ink">NPS de Leo</h1>
+        <h1 className="font-heading text-2xl font-semibold text-ink">NPS de Z-BOT</h1>
         <p className="text-sm text-ink-soft">
           Se pregunta a dueños y administradores a los 30 días y luego cada 90. De −100 a 100.
         </p>

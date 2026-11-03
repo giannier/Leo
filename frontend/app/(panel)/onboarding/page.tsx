@@ -38,7 +38,7 @@ const STEPS = [
   { title: "Tu negocio", short: "Negocio", key: "business_profile_complete" },
   { title: "Tu agente", short: "Agente", key: "agent_config_complete" },
   { title: "Qué vendes", short: "Catálogo", key: "has_active_product" },
-  { title: "Lo que Leo debe saber", short: "Conocimiento", key: "knowledge" },
+  { title: "Lo que Z-BOT debe saber", short: "Conocimiento", key: "knowledge" },
   { title: "Cómo te pagan", short: "Pagos", key: "has_payment_method" },
   { title: "Resumen", short: "Resumen", key: "summary" },
 ] as const;

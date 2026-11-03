@@ -38,7 +38,7 @@ class TestDefaultsMatchTheColumns:
         assert wizard.PROFILE_DEFAULTS.updated_at is None
 
     def test_agent_defaults(self) -> None:
-        assert wizard.AGENT_DEFAULTS.agent_name == "Leo"
+        assert wizard.AGENT_DEFAULTS.agent_name == "Z-BOT"
         assert wizard.AGENT_DEFAULTS.tone == "cercano"
         assert wizard.AGENT_DEFAULTS.objective == "ambos"
         assert wizard.AGENT_DEFAULTS.is_active is False

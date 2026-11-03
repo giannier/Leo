@@ -188,7 +188,7 @@ function Editor({
             value={footer}
             maxLength={60}
             onChange={(e) => setFooter(e.target.value)}
-            hint={category === "marketing" ? "Si lo dejas vacío, Leo agrega cómo darse de baja." : undefined}
+            hint={category === "marketing" ? "Si lo dejas vacío, Z-BOT agrega cómo darse de baja." : undefined}
           />
           <Select
             label="Imagen arriba (opcional)"

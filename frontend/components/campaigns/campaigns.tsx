@@ -255,7 +255,7 @@ function Builder({
                   <p className="mt-2 text-ink">
                     Costo aprox. <strong>US$ {estimate.costo_estimado_usd}</strong>
                     <span className="block text-xs text-ink-faint">
-                      Lo cobra Meta a través de YCloud (US$ {estimate.tarifa_usd} por mensaje {estimate.categoria === "marketing" ? "de marketing" : "de utilidad"}), no Leo.
+                      Lo cobra Meta a través de YCloud (US$ {estimate.tarifa_usd} por mensaje {estimate.categoria === "marketing" ? "de marketing" : "de utilidad"}), no Z-BOT.
                     </span>
                   </p>
                 ) : null}

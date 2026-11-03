@@ -114,3 +114,18 @@ estaba escrita en cuatro lugares del código.
 **Registrado por:** Claude — lectura conservadora, por ratificar. Cambia el prompt de los negocios de esos rubros: necesita
 la pasada con el modelo real antes de producción.
 
+
+## C-06: El producto se presenta como Z-BOT, con los colores de Zentek360 (decisión de Giannier, 2026-11-03)
+Al pedir el video de presentación, Giannier: «muestren que el proyecto se llama Z-BOT y cambia los colores de la presentación a
+los del logo de zentek360»; ante la pregunta de qué hacer con el panel, eligió «Renombrar el panel a Z-BOT».
+- **Cambia lo que ve un cliente:** el panel (nombre, títulos, textos), los correos (asuntos, cuerpo y firma «El equipo de Z-BOT»),
+  el reporte mensual, el comprobante, el chat web y la descripción del webhook en YCloud. El nombre por defecto del asistente de
+  un negocio nuevo es Z-BOT (migración 0077); los asistentes que ya existen conservan el nombre que tienen.
+- **Colores:** carbón neutro y el naranja del logo. El naranja brillante (#f94a06) no alcanza contraste AA con texto blanco, así
+  que las acciones usan #c2410c (5,2:1) y el brillante queda para decoración; los avisos pasan a un ámbar amarillo (#a16207) para
+  no confundirse con una acción.
+- **No cambia:** el nombre interno del código y del repositorio (Leo), los comentarios y la documentación técnica.
+- **Al desplegar:** el remitente de los correos sale de `EMAIL_FROM` en `.env.prod`, que hoy dice «Leo»: se cambia a Z-BOT.
+- De paso, la Bandeja se desbordaba a lo ancho en celulares (la cuadrícula no fijaba su columna): corregido con `grid-cols-1`.
+**Registrado por:** Claude, por decisión de Giannier. Cambia el nombre con que se presenta el asistente sin nombre propio:
+verificado con la suite sin API; Giannier lo prueba en el modo prueba.

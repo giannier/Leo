@@ -170,7 +170,7 @@ class AgentConfig(Base):
     # The version of its rubro's template the business applied (feature 020); NULL until it does.
     plantilla_rubro_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    agent_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="Leo")
+    agent_name: Mapped[str] = mapped_column(Text, nullable=False, server_default="Z-BOT")
     tone: Mapped[str] = mapped_column(Text, nullable=False, server_default="cercano")
     objective: Mapped[str] = mapped_column(Text, nullable=False, server_default="ambos")
     escalation_rules: Mapped[list[str]] = mapped_column(

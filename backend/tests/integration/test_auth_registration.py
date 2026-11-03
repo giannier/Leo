@@ -200,7 +200,7 @@ class TestRegister:
 
         assert len(mail.sent) == 1
         assert mail.last.to == (body["email"],)
-        assert "Leo" in mail.last.subject
+        assert "Z-BOT" in mail.last.subject
         assert get_settings().frontend_base_url.rstrip("/") in mail.last.html
 
     async def test_email_expiry_matches_the_configured_window(

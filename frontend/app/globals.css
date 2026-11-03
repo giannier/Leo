@@ -1,45 +1,52 @@
 @import "tailwindcss";
 
-/* Design tokens for the Leo panel.
+/* Design tokens for the Z-BOT panel (the codebase is still called Leo).
  *
  * Semantic names, never raw hex in components: a component that says
  * `bg-surface` keeps working when the palette moves, and one that says
  * `bg-[#ffffff]` has to be found and edited.
  *
- * The palette is a professional navy with a blue call to action. The people
- * using this are shop owners checking their agent between customers, often on
- * a mid-range Android in a lit room - so contrast is generous everywhere and
- * nothing important is carried by colour alone.
+ * The palette is Zentek360's (Giannier, 2026-11-03): neutral charcoal with an
+ * orange call to action. The logo's bright orange (#f94a06) fails contrast with
+ * white text, so actions use a deeper orange that passes AA (#c2410c, 5.2:1);
+ * the bright one is for decoration only. The people using this are shop owners
+ * checking their agent between customers, often on a mid-range Android in a lit
+ * room - so contrast is generous everywhere and nothing important is carried by
+ * colour alone.
  */
 
 @theme {
   /* Brand ------------------------------------------------------------- */
-  --color-ink: #020617;
-  --color-ink-soft: #334155;
-  --color-ink-faint: #64748b;
+  --color-ink: #0b0f12;
+  --color-ink-soft: #3d4246;
+  --color-ink-faint: #6b7075;
 
-  --color-brand: #0f172a;
+  --color-brand: #16191c;
   --color-brand-fg: #ffffff;
 
   /* The one colour that means "press this". Used for primary actions only,
    * so that when it appears the eye knows what it is for. */
-  --color-accent: #0369a1;
-  --color-accent-hover: #075985;
+  --color-accent: #c2410c;
+  --color-accent-hover: #9a3412;
+  /* Zentek360's logo orange and its gradient, for decoration (never text on white). */
+  --color-flame: #f94a06;
+  --color-flame-to: #fda705;
   --color-accent-fg: #ffffff;
 
   /* Surfaces ---------------------------------------------------------- */
-  --color-canvas: #f8fafc;
+  --color-canvas: #fafafa;
   --color-surface: #ffffff;
-  --color-surface-muted: #f1f5f9;
-  --color-line: #e2e8f0;
-  --color-line-strong: #cbd5e1;
+  --color-surface-muted: #f4f4f5;
+  --color-line: #e4e4e7;
+  --color-line-strong: #d4d4d8;
 
   /* Status. Each one is always paired with an icon or a word in the UI -
    * roughly one man in twelve cannot tell the red from the green. */
   --color-danger: #dc2626;
   --color-danger-soft: #fef2f2;
-  --color-warning: #b45309;
-  --color-warning-soft: #fffbeb;
+  /* Amber leaning yellow, so a warning never reads as the orange of an action. */
+  --color-warning: #a16207;
+  --color-warning-soft: #fefce8;
   --color-success: #15803d;
   --color-success-soft: #f0fdf4;
   --color-info: #0369a1;

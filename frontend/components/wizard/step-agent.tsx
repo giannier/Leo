@@ -77,7 +77,7 @@ export function StepAgent({ onSaved }: StepProps) {
   const { state, schedule, seed } = useAutosave<Form, AgentConfig>({
     save: (values, expected) => {
       const body: AgentConfigPatch = {
-        agent_name: values.agent_name.trim() || "Leo",
+        agent_name: values.agent_name.trim() || "Z-BOT",
         tone: values.tone as AgentConfigPatch["tone"],
         objective: values.objective as AgentConfigPatch["objective"],
         capacidades: values.capacidades as AgentConfigPatch["capacidades"],
@@ -102,7 +102,7 @@ export function StepAgent({ onSaved }: StepProps) {
       .get()
       .then((config) => {
         setForm({
-          agent_name: config.agent_name ?? "Leo",
+          agent_name: config.agent_name ?? "Z-BOT",
           tone: config.tone ?? "cercano",
           objective: config.objective ?? "ambos",
           capacidades: config.capacidades ?? ["atender", "vender"],

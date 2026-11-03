@@ -68,7 +68,7 @@ class TestIdentity:
         """A tenant that has not opened the wizard still gets a usable agent,
         because the sandbox has to be reachable before the wizard is finished."""
         prompt = build_system_prompt(profile=None, config=None)
-        assert "Leo" in prompt
+        assert "Z-BOT" in prompt
         assert "REGLAS QUE NO PUEDES ROMPER" in prompt
 
 

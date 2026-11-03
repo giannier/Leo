@@ -119,7 +119,7 @@ export default function PlansPage() {
 
       {!overview.cobro_activo ? (
         <Alert tone="info" title="Modo pruebas">
-          Por ahora Leo no cobra: nada vence ni se pausa. Puedes ver los planes y probar el proceso.
+          Por ahora Z-BOT no cobra: nada vence ni se pausa. Puedes ver los planes y probar el proceso.
         </Alert>
       ) : null}
       {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}

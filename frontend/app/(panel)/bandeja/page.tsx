@@ -92,7 +92,7 @@ export default function BandejaPage() {
           Notification.permission === "granted" &&
           document.hidden
         ) {
-          new Notification("Leo: una conversación espera a una persona", {
+          new Notification("Z-BOT: una conversación espera a una persona", {
             body: "Abre la bandeja para atenderla.",
           });
         }
@@ -241,7 +241,7 @@ export default function BandejaPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {/* The two panes fill the height of the screen and each scrolls on its own: the list of
           conversations never pushes the one being read out of sight. */}
-      <div className="grid gap-4 lg:h-[calc(100dvh-11.5rem)] lg:min-h-[30rem] lg:grid-cols-[24rem_minmax(0,1fr)] 2xl:grid-cols-[28rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 lg:h-[calc(100dvh-11.5rem)] lg:min-h-[30rem] lg:grid-cols-[24rem_minmax(0,1fr)] 2xl:grid-cols-[28rem_minmax(0,1fr)]">
         <div className={cx("min-h-0 lg:h-full", selected && "hidden lg:block")}>
           <ConversationList
             items={items}

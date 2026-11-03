@@ -18,7 +18,7 @@ from html import escape
 
 from app.providers.email.base import EmailMessage
 
-VERIFICATION_SUBJECT = "Confirma tu correo para activar tu cuenta en Leo"
+VERIFICATION_SUBJECT = "Confirma tu correo para activar tu cuenta en Z-BOT"
 
 
 def _hours_label(hours: int) -> str:
@@ -50,7 +50,7 @@ def build_verification_email(
   <body style="font-family: Arial, Helvetica, sans-serif; color: #1f2933;">
     <p>Hola {safe_name}:</p>
     <p>
-      Gracias por crear tu cuenta en Leo. Para activarla y empezar tu prueba
+      Gracias por crear tu cuenta en Z-BOT. Para activarla y empezar tu prueba
       gratuita, confirma tu correo electr&oacute;nico.
     </p>
     <p>
@@ -66,7 +66,7 @@ def build_verification_email(
     </p>
     <p>El enlace vence en {validity} y solo se puede usar una vez.</p>
     <p>Si no creaste esta cuenta, puedes ignorar este mensaje.</p>
-    <p>El equipo de Leo</p>
+    <p>El equipo de Z-BOT</p>
   </body>
 </html>
 """
@@ -74,7 +74,7 @@ def build_verification_email(
     text_body = f"""\
 Hola {full_name}:
 
-Gracias por crear tu cuenta en Leo. Para activarla y empezar tu prueba
+Gracias por crear tu cuenta en Z-BOT. Para activarla y empezar tu prueba
 gratuita, confirma tu correo electronico abriendo este enlace:
 
 {verification_url}
@@ -83,7 +83,7 @@ El enlace vence en {validity} y solo se puede usar una vez.
 
 Si no creaste esta cuenta, puedes ignorar este mensaje.
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -94,7 +94,7 @@ El equipo de Leo
     )
 
 
-INVITATION_SUBJECT = "Te invitaron a un equipo en Leo"
+INVITATION_SUBJECT = "Te invitaron a un equipo en Z-BOT"
 
 
 def build_invitation_email(
@@ -124,17 +124,17 @@ def build_invitation_email(
     html_body = f"""\
 <p>Hola,</p>
 <p><strong>{safe_inviter}</strong> te invito a unirte al equipo de
-<strong>{safe_tenant}</strong> en Leo.</p>
+<strong>{safe_tenant}</strong> en Z-BOT.</p>
 <p><a href="{safe_url}">Aceptar la invitacion</a></p>
 <p>El enlace vence en {validity} y solo se puede usar una vez.</p>
 <p>Si no esperabas esta invitacion, puedes ignorar este mensaje.</p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
 Hola,
 
-{inviter_name} te invito a unirte al equipo de {tenant_name} en Leo.
+{inviter_name} te invito a unirte al equipo de {tenant_name} en Z-BOT.
 
 Acepta la invitacion aqui:
 {accept_url}
@@ -143,7 +143,7 @@ El enlace vence en {validity} y solo se puede usar una vez.
 
 Si no esperabas esta invitacion, puedes ignorar este mensaje.
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -154,7 +154,7 @@ El equipo de Leo
     )
 
 
-NUMBER_CONNECTED_SUBJECT = "Tu numero de WhatsApp ya esta conectado en Leo"
+NUMBER_CONNECTED_SUBJECT = "Tu numero de WhatsApp ya esta conectado en Z-BOT"
 
 
 def build_number_connected_email(
@@ -186,7 +186,7 @@ def build_number_connected_email(
   Te recomendamos enviar un mensaje de prueba desde otro telefono para
   confirmar que todo funciona como esperas.
 </p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -201,7 +201,7 @@ Ir a mi panel:
 Te recomendamos enviar un mensaje de prueba desde otro telefono para
 confirmar que todo funciona como esperas.
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -245,7 +245,7 @@ def build_number_rejected_email(
   Puedes corregir los datos y volver a enviar la solicitud desde tu panel.
 </p>
 <p><a href="{safe_url}">Corregir y reenviar</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -259,7 +259,7 @@ Motivo: {reason}
 Puedes corregir los datos y volver a enviar la solicitud desde tu panel:
 {panel_url}
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -271,9 +271,9 @@ El equipo de Leo
 
 
 TRIAL_NOTICE_SUBJECTS = {
-    "trial_ending_3d": "A tu prueba de Leo le quedan 3 dias",
-    "trial_ending_1d": "Manana termina tu prueba de Leo",
-    "trial_ended": "Tu prueba de Leo termino",
+    "trial_ending_3d": "A tu prueba de Z-BOT le quedan 3 dias",
+    "trial_ending_1d": "Manana termina tu prueba de Z-BOT",
+    "trial_ended": "Tu prueba de Z-BOT termino",
 }
 
 
@@ -339,7 +339,7 @@ def build_trial_notice_email(
 <p>Hola,</p>
 <p>{lead_html}</p>
 <p><a href="{safe_url}">{cta}</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -350,7 +350,7 @@ Hola,
 {cta}:
 {panel_url}
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -361,7 +361,7 @@ El equipo de Leo
     )
 
 
-WIZARD_REMINDER_SUBJECT = "Te falta poco para dejar listo tu agente en Leo"
+WIZARD_REMINDER_SUBJECT = "Te falta poco para dejar listo tu agente en Z-BOT"
 
 
 def build_wizard_reminder_email(
@@ -391,7 +391,7 @@ def build_wizard_reminder_email(
 </p>
 <ul>{items_html}</ul>
 <p><a href="{safe_url}">Continuar donde lo dejaste</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -404,7 +404,7 @@ Dejaste la configuracion de {tenant_name} a medio camino. Te falta esto:
 Continuar donde lo dejaste:
 {panel_url}
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -462,7 +462,7 @@ def build_quality_alert_email(
   <li>Atender rapido a quien pide hablar con una persona.</li>
 </ul>
 <p><a href="{safe_url}">Ver el estado de mi numero</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -483,7 +483,7 @@ Que ayuda ahora:
 Ver el estado de mi numero:
 {panel_url}
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -534,7 +534,7 @@ def build_quota_warning_email(
   bandeja, asi que no pierdes ninguno.
 </p>
 <p><a href="{safe_url}">Ver mi consumo</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
 
     text_body = f"""\
@@ -550,7 +550,7 @@ bandeja, asi que no pierdes ninguno.
 Ver mi consumo:
 {panel_url}
 
-El equipo de Leo
+El equipo de Z-BOT
 """
 
     return EmailMessage(
@@ -590,10 +590,10 @@ def _alert_email(
 <p>Hola,</p>
 {paragraphs}
 <p><a href="{safe_url}">{escape(link_label)}</a></p>
-<p>El equipo de Leo</p>
+<p>El equipo de Z-BOT</p>
 """
     text_body = (
-        "Hola,\n\n" + "\n\n".join(lines) + f"\n\n{link_label}:\n{panel_url}\n\nEl equipo de Leo\n"
+        "Hola,\n\n" + "\n\n".join(lines) + f"\n\n{link_label}:\n{panel_url}\n\nEl equipo de Z-BOT\n"
     )
     return EmailMessage(to=(to,), subject=subject, html=html_body, text=text_body)
 
@@ -759,8 +759,8 @@ def build_unattended_email(
 # platform's payment instructions.
 
 PAYMENT_RECEIVED_SUBJECT = "Recibimos tu pago"
-RENEWAL_SUBJECT = "Tu plan de Leo se renueva pronto"
-PAST_DUE_SUBJECT = "Tu pago de Leo está pendiente"
+RENEWAL_SUBJECT = "Tu plan de Z-BOT se renueva pronto"
+PAST_DUE_SUBJECT = "Tu pago de Z-BOT está pendiente"
 PAUSED_UNPAID_SUBJECT = "Pausamos tu agente por un pago pendiente"
 
 

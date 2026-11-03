@@ -86,7 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <header className="bg-brand text-brand-fg">
         <div className="mx-auto flex max-w-[1760px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6 lg:px-8 xl:px-10">
           <div className="flex items-baseline gap-2">
-            <span className="font-heading text-lg font-bold tracking-tight">Leo</span>
+            <span className="font-heading text-lg font-bold tracking-tight">Z-BOT</span>
             <span className="rounded-full bg-brand-fg/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
               Operación
             </span>

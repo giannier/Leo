@@ -245,7 +245,7 @@ class TestMonthly:
         email = render("Panadería <Rosa>", data, to="ana@x.pe", panel_url="https://leo/resultados")
         assert (
             "Panadería &lt;Rosa&gt;" in email.html
-            and email.subject == "Tu mes en Leo: octubre 2026"
+            and email.subject == "Tu mes en Z-BOT: octubre 2026"
         )
 
 

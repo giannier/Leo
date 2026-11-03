@@ -129,7 +129,7 @@ def config(key: str, session: SessionDep) -> ChatConfig:
     return ChatConfig(
         negocio=(profile.business_name if profile and profile.business_name else None)
         or (tenant.name if tenant else ""),
-        asistente=(agent.agent_name if agent else None) or "Leo",
+        asistente=(agent.agent_name if agent else None) or "Z-BOT",
         saludo=chat.saludo,
         color=chat.color,
     )

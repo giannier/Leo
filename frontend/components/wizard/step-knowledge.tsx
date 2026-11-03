@@ -134,7 +134,7 @@ function Loaded({ sources }: { sources: KnowledgeSource[] }) {
       )}
       {ready > 0 ? (
         <span>
-          Leo ya usa{" "}
+          Z-BOT ya usa{" "}
           <span className="font-semibold text-ink">
             {ready} {ready === 1 ? "fuente" : "fuentes"}
           </span>{" "}

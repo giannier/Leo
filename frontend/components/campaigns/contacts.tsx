@@ -179,7 +179,7 @@ export function ContactsPanel({ canImport }: { canImport: boolean }) {
     <div className="space-y-5">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <Alert tone="info">
-        Las campañas solo llegan a quien aceptó recibir promociones. Leo se lo pregunta a tus clientes con un botón
+        Las campañas solo llegan a quien aceptó recibir promociones. Z-BOT se lo pregunta a tus clientes con un botón
         después de una venta confirmada (puedes apagarlo en Ajustes).
       </Alert>
       {page ? (

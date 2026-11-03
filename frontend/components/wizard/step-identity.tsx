@@ -141,7 +141,7 @@ export function StepIdentity({ onSaved }: StepProps) {
         label="Rubro"
         name="industry"
         required
-        hint="Con tu rubro, Leo te sugiere una plantilla de partida que luego puedes cambiar."
+        hint="Con tu rubro, Z-BOT te sugiere una plantilla de partida que luego puedes cambiar."
         options={[NO_RUBRO, ...rubros.map((r) => ({ value: r.key, label: r.nombre }))]}
         value={form.industry}
         onChange={(e) => set("industry", e.target.value)}
@@ -153,7 +153,7 @@ export function StepIdentity({ onSaved }: StepProps) {
       )}
 
       <TextArea
-        label="Cuéntale a Leo sobre tu negocio"
+        label="Cuéntale a Z-BOT sobre tu negocio"
         name="description"
         rows={5}
         hint="Escríbelo como se lo explicarías a un empleado nuevo en su primer día. Mientras más contexto, mejor responde."

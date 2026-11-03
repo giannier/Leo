@@ -381,7 +381,7 @@ function ConnectForm({
       <ol className="mb-4 list-decimal space-y-1 rounded-lg bg-surface-muted p-3 pl-7 text-xs text-ink-soft">
         <li>En YCloud, entra a Desarrolladores → Clave API y copia tu clave.</li>
         <li>Pégala aquí con el número de WhatsApp que ya tienes conectado en esa cuenta.</li>
-        <li>Listo: Leo verifica la clave, crea el webhook en tu cuenta y empieza a recibir tus mensajes.</li>
+        <li>Listo: Z-BOT verifica la clave, crea el webhook en tu cuenta y empieza a recibir tus mensajes.</li>
       </ol>
 
       <form onSubmit={submit} noValidate className="space-y-4">
@@ -414,7 +414,7 @@ function ConnectForm({
           name="display_name"
           required
           maxLength={MAX_DISPLAY_NAME}
-          hint={`Hasta ${MAX_DISPLAY_NAME} caracteres. Es el nombre de tu negocio en Leo.`}
+          hint={`Hasta ${MAX_DISPLAY_NAME} caracteres. Es el nombre de tu negocio en Z-BOT.`}
           value={displayName}
           error={errors.displayName}
           onChange={(e) => setDisplayName(e.target.value)}

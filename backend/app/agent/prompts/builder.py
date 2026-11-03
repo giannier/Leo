@@ -36,7 +36,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.agent.catalog_guard import words
 from app.models.business import AgentConfig, BusinessProfile
 
-DEFAULT_AGENT_NAME = "Leo"
+DEFAULT_AGENT_NAME = "Z-BOT"
 DEFAULT_TONE = "cercano"
 DEFAULT_OBJECTIVE = "ambos"
 DEFAULT_TIMEZONE = "America/Lima"

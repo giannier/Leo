@@ -42,8 +42,8 @@ export function NpsCard() {
   }
 
   return (
-    <section aria-label="Tu opinión sobre Leo" className="space-y-3 rounded-xl border border-line bg-surface p-4">
-      <p className="font-semibold text-ink">¿Qué tan probable es que recomiendes Leo a otro negocio?</p>
+    <section aria-label="Tu opinión sobre Z-BOT" className="space-y-3 rounded-xl border border-line bg-surface p-4">
+      <p className="font-semibold text-ink">¿Qué tan probable es que recomiendes Z-BOT a otro negocio?</p>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Del 0 al 10">
         {Array.from({ length: 11 }, (_, n) => (
           <button

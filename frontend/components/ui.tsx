@@ -246,7 +246,7 @@ export function AuthShell({
     <main className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-4 py-10">
       <div className="w-full max-w-md">
         <Link href="/" className="mb-6 block text-center">
-          <span className="font-heading text-2xl font-bold tracking-tight text-brand">Leo</span>
+          <span className="font-heading text-2xl font-bold tracking-tight text-brand">Z-BOT</span>
         </Link>
 
         <div className="rounded-xl border border-line bg-surface p-6 sm:p-8">

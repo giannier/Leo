@@ -86,8 +86,8 @@ function Settings({ learning, onChanged }: { learning: Learning; onChanged: (nex
           </Button>
         ) : null}
         <Checkbox
-          label="Permitir que Leo proponga mis situaciones a otros negocios de mi rubro"
-          hint="Solo el texto de las situaciones que apruebas, nunca tus conversaciones ni datos de tus clientes. El equipo de Leo lo revisa a mano antes de publicar nada. Apagado por defecto."
+          label="Permitir que Z-BOT proponga mis situaciones a otros negocios de mi rubro"
+          hint="Solo el texto de las situaciones que apruebas, nunca tus conversaciones ni datos de tus clientes. El equipo de Z-BOT lo revisa a mano antes de publicar nada. Apagado por defecto."
           checked={learning.compartir_con_rubro}
           disabled={busy || !canConfigure}
           onChange={(e) => void save({ compartir_con_rubro: e.target.checked })}

@@ -63,7 +63,7 @@ export default function MetricasPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-ink">Métricas</h1>
-          <p className="text-sm text-ink-soft">Cómo va Leo como negocio y qué cuesta cada cliente.</p>
+          <p className="text-sm text-ink-soft">Cómo va Z-BOT como negocio y qué cuesta cada cliente.</p>
         </div>
         <div className="flex gap-1" role="group" aria-label="Período">
           {[7, 30, 90].map((value) => (

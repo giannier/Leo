@@ -86,7 +86,7 @@ export default function InvoicingPage() {
       <header>
         <h1 className="font-heading text-2xl font-semibold text-ink">Facturación electrónica</h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Emite boletas y facturas de tus pedidos desde Leo, con tu cuenta de Nubefact. Tú pulsas «Emitir»: el asistente
+          Emite boletas y facturas de tus pedidos desde Z-BOT, con tu cuenta de Nubefact. Tú pulsas «Emitir»: el asistente
           nunca emite un comprobante.
         </p>
       </header>
@@ -135,7 +135,7 @@ export default function InvoicingPage() {
               </Card>
             </div>
             <div className="space-y-6">
-              <Card title="Impuesto" description="Tus precios incluyen el impuesto. Leo calcula la base y el IGV de cada comprobante.">
+              <Card title="Impuesto" description="Tus precios incluyen el impuesto. Z-BOT calcula la base y el IGV de cada comprobante.">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Select
                     label="Tus ventas son"

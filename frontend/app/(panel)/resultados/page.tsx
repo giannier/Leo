@@ -334,7 +334,7 @@ function Resumen() {
                 </ul>
                 <p className="mt-2 text-xs text-ink-faint">
                   Aproximado. Desde octubre de 2026 Meta cobra cada respuesta pasadas las 1,000 gratis del mes por número. Lo
-                  factura YCloud, no Leo.
+                  factura YCloud, no Z-BOT.
                 </p>
               </section>
             ) : null}

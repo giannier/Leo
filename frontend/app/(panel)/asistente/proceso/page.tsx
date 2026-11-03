@@ -341,7 +341,7 @@ export default function ProcessPage() {
               title="Plantilla de proceso (avanzado)"
               description={
                 process.plantilla_automatica
-                  ? "Leo la elige según lo que hace tu agente. Solo cámbiala si sabes que necesitas otra."
+                  ? "Z-BOT la elige según lo que hace tu agente. Solo cámbiala si sabes que necesitas otra."
                   : "La elegiste tú: lo que haga tu agente ya no la cambia."
               }
             >

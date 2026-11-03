@@ -141,7 +141,7 @@ PROFILE_DEFAULTS = BusinessProfileResponse(
 )
 
 AGENT_DEFAULTS = AgentConfigResponse(
-    agent_name="Leo",
+    agent_name="Z-BOT",
     tone="cercano",
     objective="ambos",
     restrictions=None,

@@ -58,7 +58,7 @@ test.describe("Wizard de onboarding", () => {
     await page.getByLabel("Nombre comercial").fill("Panadería Quispe");
     await page.getByLabel("Rubro").selectOption("retail");
     await page
-      .getByLabel("Cuéntale a Leo sobre tu negocio")
+      .getByLabel("Cuéntale a Z-BOT sobre tu negocio")
       .fill("Panadería artesanal en Miraflores. Pan del día y pasteles por encargo.");
     await saved(page);
 
@@ -81,7 +81,7 @@ test.describe("Wizard de onboarding", () => {
 
     // --- 4. knowledge is optional, so skip it ----------------------------
     await page.getByRole("button", { name: "Siguiente" }).click();
-    await expect(page.getByRole("heading", { name: /4\. Lo que Leo debe saber/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /4\. Lo que Z-BOT debe saber/ })).toBeVisible();
 
     // --- 5. payment ------------------------------------------------------
     await page.getByRole("button", { name: "Siguiente" }).click();

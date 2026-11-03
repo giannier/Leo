@@ -68,7 +68,7 @@ export default function CapabilitiesPage() {
     <div className="space-y-5">
       <AssistantHeader
         title="Qué hará tu agente"
-        description="Elige lo que hace y Leo ajusta cómo conversa y qué te pide para dejarlo listo."
+        description="Elige lo que hace y Z-BOT ajusta cómo conversa y qué te pide para dejarlo listo."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {saved === null ? (

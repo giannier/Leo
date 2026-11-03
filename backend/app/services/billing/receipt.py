@@ -56,7 +56,7 @@ def render_receipt(data: ReceiptData) -> bytes:
         rows.append((f"Pagado en moneda local: {data.paid_local}", 11, False))
     rows += [
         ("", 10, False),
-        ("Leo, de Zentek360. Este comprobante no es una factura electrónica.", 9, False),
+        ("Z-BOT, de Zentek360. Este comprobante no es una factura electrónica.", 9, False),
     ]
     stream = b""
     for text, size, bold in rows:

@@ -23,8 +23,8 @@ const openSans = Open_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Leo",
-    template: "%s · Leo",
+    default: "Z-BOT",
+    template: "%s · Z-BOT",
   },
   description: "Tu agente de WhatsApp que atiende y vende por ti.",
 };

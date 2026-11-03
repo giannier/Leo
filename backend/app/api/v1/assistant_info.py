@@ -503,7 +503,7 @@ def _allowed_levels(session: SessionDep, tenant_id: uuid.UUID) -> list[str]:
 def _behavior(session: SessionDep, tenant_id: uuid.UUID) -> BehaviorResponse:
     agent = AgentConfigRepository(session, tenant_id).current()
     if agent is None:
-        agent = AgentConfigRepository(session, tenant_id).upsert(agent_name="Leo")
+        agent = AgentConfigRepository(session, tenant_id).upsert(agent_name="Z-BOT")
         session.commit()
     stored = dict(agent.system_messages or {})
     return BehaviorResponse(

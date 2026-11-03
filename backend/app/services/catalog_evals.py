@@ -98,7 +98,7 @@ def _config(
         template=template,
         options=template.resolve(),
         stage_instructions=MappingProxyType(texts),
-        behavior=Behavior(agent_name="Leo"),
+        behavior=Behavior(agent_name="Z-BOT"),
         business_name="Negocio de prueba",
         industry=None,
         payment_methods=("yape",),

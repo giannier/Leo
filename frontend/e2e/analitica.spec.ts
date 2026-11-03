@@ -119,7 +119,7 @@ test.describe("Analítica y NPS", () => {
     await psql(`update tenants set created_at = now() - interval '40 days'
       where id = (select tu.tenant_id from tenant_users tu join users u on u.id = tu.user_id where u.email = '${email}')`);
     await page.goto("/");
-    const card = page.getByRole("region", { name: "Tu opinión sobre Leo" });
+    const card = page.getByRole("region", { name: "Tu opinión sobre Z-BOT" });
     await expect(card).toBeVisible();
     await card.getByRole("button", { name: "9", exact: true }).click();
     await card.getByLabel("¿Por qué?").fill("Me ahorra tiempo");
@@ -127,6 +127,6 @@ test.describe("Analítica y NPS", () => {
     await card.getByRole("button", { name: "Enviar" }).click();
     await expect(page.getByText("¡Gracias! Lo leemos todo.")).toBeVisible();
     await page.reload();
-    await expect(page.getByRole("region", { name: "Tu opinión sobre Leo" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Tu opinión sobre Z-BOT" })).toHaveCount(0);
   });
 });

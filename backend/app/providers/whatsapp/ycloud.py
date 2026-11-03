@@ -589,7 +589,7 @@ class YCloudProvider:
         return await self._request(
             WEBHOOK_ENDPOINTS_PATH,
             api_key=api_key,
-            json={"url": url, "enabledEvents": events, "description": "Leo"},
+            json={"url": url, "enabledEvents": events, "description": "Z-BOT"},
         )
 
     async def remove_webhook(self, *, api_key: str, endpoint_id: str) -> None:

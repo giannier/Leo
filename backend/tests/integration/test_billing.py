@@ -218,7 +218,7 @@ class TestTheCalendar:
             select(Charge).where(Charge.tenant_id == tenant_id, Charge.kind == "renewal")
         ).scalar_one()
         assert renewal.amount_usd == Decimal("29.00") and renewal.period_start == end
-        assert [n.subject for n in notices] == ["Tu plan de Leo se renueva pronto"]
+        assert [n.subject for n in notices] == ["Tu plan de Z-BOT se renueva pronto"]
         assert renewal.reference in (notices[0].text or "")
 
         close_periods(db, now=end + timedelta(minutes=1))
@@ -232,8 +232,8 @@ class TestTheCalendar:
             reminders += dun(db, now=end + timedelta(days=day, hours=1))
         # Day 1 and day 3 remind; day 5 is the end of the grace: the pause.
         assert [r.subject for r in reminders] == [
-            "Tu pago de Leo está pendiente",
-            "Tu pago de Leo está pendiente",
+            "Tu pago de Z-BOT está pendiente",
+            "Tu pago de Z-BOT está pendiente",
             "Pausamos tu agente por un pago pendiente",
         ]
         assert subscription.status == "paused"

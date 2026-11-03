@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 # change (it was 60).
 CACHE_TTL_SECONDS = 10.0
 DEFAULT_TEMPLATE_KEY = "productos"
-DEFAULT_AGENT_NAME = "Leo"
+DEFAULT_AGENT_NAME = "Z-BOT"
 DEFAULT_TONE = "cercano"
 DEFAULT_PACE = "equilibrado"
 DEFAULT_DETAIL = "moderado"

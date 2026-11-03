@@ -152,7 +152,7 @@ class TestDefaults:
         assert config.template.key == "productos"
         assert config.options.modalidad_pago == "previo"
         assert config.options.datos_requeridos == ("nombres", "telefono")
-        assert config.behavior.agent_name == "Leo"
+        assert config.behavior.agent_name == "Z-BOT"
         assert (config.behavior.tone, config.behavior.ritmo, config.behavior.detalle) == (
             "cercano",
             "equilibrado",

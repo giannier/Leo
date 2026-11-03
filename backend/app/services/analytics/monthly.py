@@ -105,16 +105,16 @@ def render(tenant_name: str, data: dict[str, Any], *, to: str, panel_url: str) -
     url = escape(panel_url, quote=True)
     html = (
         f"<p>Hola,</p><p>Así le fue a <strong>{name}</strong> en {escape(data['mes'])}:</p>"
-        f'<table>{table}</table><p><a href="{url}">Ver el detalle en Leo</a></p>'
+        f'<table>{table}</table><p><a href="{url}">Ver el detalle en Z-BOT</a></p>'
         "<p style='color:#64748b;font-size:12px'>Puedes apagar este correo en Resultados.</p>"
-        "<p>El equipo de Leo</p>"
+        "<p>El equipo de Z-BOT</p>"
     )
     text = "\n".join(
         [f"Así le fue a {tenant_name} en {data['mes']}:"]
         + [f"- {label}: {value}" for label, value in rows]
         + [f"Detalle: {panel_url}"]
     )
-    return EmailMessage(to=(to,), subject=f"Tu mes en Leo: {data['mes']}", html=html, text=text)
+    return EmailMessage(to=(to,), subject=f"Tu mes en Z-BOT: {data['mes']}", html=html, text=text)
 
 
 def claim(session: Session, tenant_id: uuid.UUID, month: date) -> bool:
