@@ -89,7 +89,9 @@ bandeja, ve sus métricas), sus **operadores** (empleados que atienden la bandej
   tenants; obligatoria en CI
 - **Contract tests** de los adaptadores de proveedor (mocks de YCloud/Meta/LLM/pagos)
 - **Linter/Formatter:** Ruff; **Tipado:** mypy en CI; **Commits:** Conventional Commits
-- **CI/CD:** nada llega a producción sin pasar lint, mypy, tests y evals
+- **CI/CD:** nada llega a producción sin pasar lint, mypy y tests. Los evals con el modelo real cuestan dinero en cada
+  corrida: se corren **a mano** y solo con presupuesto aprobado por Giannier (decisión del 2026-11-03, por costo; antes
+  corrían en cada push a `main`)
 
 ## Seguridad
 - Aislamiento por `tenant_id` en capa de repositorio, verificado por tests
@@ -106,4 +108,6 @@ bandeja, ve sus métricas), sus **operadores** (empleados que atienden la bandej
 - No modificar esquema de BD sin migración Alembic revisable
 - No tocar billing, credenciales ni verificación de webhooks sin revisión humana
 - No romper las interfaces `WhatsAppProvider` / `LLMProvider` / `PaymentProvider`
-- No cambiar prompts del agente en producción sin correr los evals
+- No cambiar prompts del agente en producción sin verificarlos. Sin presupuesto aprobado para el modelo real
+  (Giannier, 2026-11-03), la verificación es la suite sin API (tests, simulación sin modelo) más lo que Giannier
+  prueba en el chat de prueba y con números reales; los evals con el modelo real, solo con su aprobación

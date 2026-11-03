@@ -25,8 +25,9 @@ según tenants reales) → la restante → 015-integraciones. Ver `docs/post-mvp
 - Esquema de BD solo por migración Alembic. Nunca `create_all` ni edición manual.
 - Dependencias nuevas: proponer con justificación y esperar aprobación explícita.
 - Billing y credenciales: todo diff requiere revisión humana antes de merge.
-- Prompts del agente: cualquier cambio corre los evals (`make evals`) y se adjunta el
-  resultado en el PR.
+- Prompts del agente: cualquier cambio se verifica. Los evals con el modelo real (`make evals`) cuestan
+  dinero: desde el 2026-11-03 se corren solo a mano y con presupuesto aprobado por Giannier (ver el
+  CLAUDE.md de la raíz).
 - Dinero siempre con Decimal. Jamás float.
 - Commits: Conventional Commits + `[TASK-XXX]`. Un commit por task como mínimo.
 

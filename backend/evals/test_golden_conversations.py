@@ -5,8 +5,8 @@ fast, deterministic and free, and these are none of those - they call a real
 provider, cost money, and can fail because a vendor changed a model rather
 than because anybody changed this repository.
 
-`make evals` runs them. CI runs them when `backend/app/agent/**` changes,
-which is the Constitution's rule: no prompt change ships without them.
+`make evals` runs them. CI runs them only by hand (Actions > Evals > Run
+workflow): since 2026-11-03 they no longer run on every push, for cost.
 """
 
 from __future__ import annotations
